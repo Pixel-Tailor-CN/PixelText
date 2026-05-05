@@ -2,11 +2,8 @@ package vip.mystery0.pixel.text.ui.message.cards
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,12 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -35,71 +27,48 @@ import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
 fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode) {
-    var showOriginal by remember { mutableStateOf(false) }
+    @Suppress("DEPRECATION")
+    val clipboardManager = LocalClipboardManager.current
 
-    if (showOriginal) {
-        OriginalTextCard(
-            content = content,
-            onToggle = { showOriginal = false }
-        )
-    } else {
-        @Suppress("DEPRECATION")
-        val clipboardManager = LocalClipboardManager.current
-
-        ElevatedCard(
-            shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ),
-            modifier = Modifier.widthIn(max = 300.dp)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(result.code))
-                    }
+    ElevatedCard(
+        shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        modifier = Modifier.widthIn(max = 300.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(result.code))
+                }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "验证码",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                            )
-                            Text(
-                                text = result.code,
-                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                letterSpacing = 4.sp
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy code",
-                            tint = MaterialTheme.colorScheme.primary
+                    Column {
+                        Text(
+                            text = "验证码",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = result.code,
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            letterSpacing = 4.sp
                         )
                     }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                TextButton(
-                    onClick = { showOriginal = true },
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.align(Alignment.Start)
-                ) {
-                    Text(
-                        text = "查看原文",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy code",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }

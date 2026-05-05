@@ -4,5 +4,5 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun NormalMessageCard(content: String) {
-    OriginalTextCard(content = content, onToggle = null)
+    OriginalTextCard(content = content)
 }
