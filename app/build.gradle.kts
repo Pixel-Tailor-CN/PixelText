@@ -4,40 +4,87 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val packageName = "vip.mystery0.pixel.text"
+val gitVersionCode: Int = providers.exec {
+    commandLine(
+        "git",
+        "rev-list",
+        "HEAD",
+        "--count"
+    )
+}.standardOutput.asText.get().trim().toInt()
+val gitVersionName: String =
+    providers.exec {
+        commandLine(
+            "git",
+            "rev-parse",
+            "--short=8",
+            "HEAD"
+        )
+    }.standardOutput.asText.get().trim()
+val appVersionName: String = libs.versions.app.version.get()
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        optIn.add("androidx.compose.material3.ExperimentalMaterial3Api")
+    }
+}
+
 android {
-    namespace = "vip.mystery0.pixel.text"
+    namespace = packageName
     compileSdk {
-        version = release(36)
+        version = release(libs.versions.android.compileSdk.get().toInt())
     }
 
     defaultConfig {
-        applicationId = "vip.mystery0.pixel.text"
-        minSdk = 29
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationId = packageName
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        versionCode = gitVersionCode
+        versionName = appVersionName
     }
-
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    signingConfigs {
+        create("sign")
+    }
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+            isShrinkResources = false
+            versionNameSuffix = ".d$gitVersionCode.$gitVersionName"
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles("proguard-rules.pro")
+            versionNameSuffix = ".r$gitVersionCode.$gitVersionName"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("sign")
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    lint {
+        checkReleaseBuilds = false
+    }
+    @Suppress("UnstableApiUsage")
+    androidResources {
+        localeFilters.add("en")
+        localeFilters.add("zh-rCN")
     }
 }
 
@@ -48,13 +95,14 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation(libs.material.icons.core)
+    implementation(libs.material.icons.extended)
+
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.zhanghai.preference)
 }
+
+apply(from = rootProject.file("signing.gradle"))
