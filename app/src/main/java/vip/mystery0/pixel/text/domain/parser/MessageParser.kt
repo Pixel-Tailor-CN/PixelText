@@ -174,7 +174,31 @@ class MessageParser(private val context: Context) {
                     passenger = getGroupOrNull(matcher, "passenger") ?: "--"
                 )
             }
+            "BankTransaction" -> {
+                val details = mutableMapOf<String, String>()
+                getGroupOrNull(matcher, "account")?.let { details["交易账户"] = it }
+                getGroupOrNull(matcher, "date")?.let { details["交易时间"] = it }
+                getGroupOrNull(matcher, "details")?.let {
+                    details["交易备注"] = it.trim('（', '）', '(', ')')
+                }
 
+                return ParsedResult.BankTransaction(
+                    type = getGroupOrNull(matcher, "type") ?: "交易",
+                    amount = getGroupOrNull(matcher, "amount") ?: "0.00",
+                    details = details
+                )
+            }
+
+            "PhoneRecharge" -> {
+                val details = mutableMapOf<String, String>()
+                getGroupOrNull(matcher, "date")?.let { details["充值时间"] = it }
+                getGroupOrNull(matcher, "balance")?.let { details["当前余额"] = "${it}元" }
+
+                return ParsedResult.PhoneRecharge(
+                    amount = getGroupOrNull(matcher, "amount") ?: "0.00",
+                    details = details
+                )
+            }
             "VerificationCode" -> {
                 val code = getGroupOrNull(matcher, "code")
                 if (code != null) {
