@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
-import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 
@@ -43,41 +42,83 @@ fun MockMessageScreen() {
         MessageModel(
             id = 1,
             sender = "12306",
-            content = "【铁路客服】订单E123456789，张三您已购2026-03-31的G6921次05车厢16D二等座，成都东16:14开往西安北。检票口A25。请戴好口罩，配合防疫工作。",
-            timestamp = System.currentTimeMillis() - 1000 * 60 * 2, // 2 mins ago
-            simName = "中国移动"
+            content = "10月24日 周四 G123 08:00北京南开往上海虹桥，乘车人张三，座位05车厢 12F。",
+            timestamp = System.currentTimeMillis() - 1000 * 60 * 2,
+            simName = "中国移动",
+            parsedResult = ParsedResult.Ticket.TrainTicket(
+                date = "10月24日 周四",
+                trainNumber = "G123",
+                trainType = "高铁",
+                departureTime = "08:00",
+                departureStation = "北京南",
+                arrivalTime = "12:35",
+                arrivalStation = "上海虹桥",
+                passenger = "张三",
+                seat = "05车厢 12F"
+            )
         ),
         MessageModel(
             id = 2,
-            sender = "95588",
-            content = "【工商银行】您正在进行快捷支付绑卡，验证码：884512，请勿泄露给他人。5分钟内有效。",
+            sender = "中国国航",
+            content = "11月12日周二CA1553，上海SHA 14:20直飞深圳SZX 16:55。航站楼T2，登机时间13:40。",
             timestamp = System.currentTimeMillis() - 1000 * 60 * 5,
-            simName = "卡2"
+            simName = "卡2",
+            parsedResult = ParsedResult.Ticket.Flight(
+                date = "11月12日 周二",
+                flightNumber = "CA1553",
+                departureCode = "SHA",
+                departureCity = "上海",
+                departureTime = "14:20",
+                flightType = "直飞",
+                arrivalCode = "SZX",
+                arrivalCity = "深圳",
+                arrivalTime = "16:55",
+                terminal = "T2",
+                boardingTime = "13:40"
+            )
         ),
         MessageModel(
             id = 3,
-            sender = "10086",
-            content = "【中国移动】尊敬的客户，您的本月套餐流量已使用80%，请注意使用。如需订购流量包，请回复...。",
-            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 24
+            sender = "95588",
+            content = "您尾号8892的账户发生POS消费，金额-125.50，余额￥14500.20。",
+            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 2,
+            simName = "中国移动",
+            parsedResult = ParsedResult.BankTransaction(
+                type = "POS消费",
+                amount = "-125.50",
+                details = mapOf(
+                    "账户" to "尾号 8892",
+                    "余额" to "￥14500.20"
+                )
+            )
         ),
         MessageModel(
             id = 4,
-            sender = "Alipay",
-            content = "Your Alipay verification code is 4392. Do not share it with anyone.",
-            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 48
+            sender = "10086",
+            content = "充值成功！充值号码138****5678，充值金额100.00元，当前余额￥153.20。",
+            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 24,
+            simName = "卡1",
+            parsedResult = ParsedResult.PhoneRecharge(
+                amount = "100.00",
+                details = mapOf(
+                    "充值号码" to "138****5678",
+                    "当前余额" to "￥153.20"
+                )
+            )
         )
-    ).map { it.copy(parsedResult = MessageParser.parse(it.content)) }
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("原点短信 - 原型验证") },
+                title = { Text("原点短信 - 视觉原型") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background // 给整个列表加一个主题底色，让表面卡片更凸显
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -85,7 +126,7 @@ fun MockMessageScreen() {
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             items(mockMessages) { message ->
                 MessageItem(message)

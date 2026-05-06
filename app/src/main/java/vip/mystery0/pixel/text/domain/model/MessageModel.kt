@@ -4,23 +4,43 @@ sealed class ParsedResult {
     data class VerificationCode(val code: String) : ParsedResult()
 
     sealed class Ticket : ParsedResult() {
-        data class HighSpeedRail(
-            val trainNumber: String,
+        data class TrainTicket(
             val date: String,
-            val departureStation: String,
+            val trainNumber: String,
+            val trainType: String,
             val departureTime: String,
-            val arrivalStation: String?,
-            val arrivalTime: String?,
-            val seat: String?,
-            val passenger: String?,
-            val ticketGate: String?,
-            val status: String?
+            val departureStation: String,
+            val arrivalTime: String,
+            val arrivalStation: String,
+            val passenger: String,
+            val seat: String
         ) : Ticket()
 
-        data class Flight(val placeholder: String = "") : Ticket()
-
-        data class Bus(val placeholder: String = "") : Ticket()
+        data class Flight(
+            val date: String,
+            val flightNumber: String,
+            val departureCode: String,
+            val departureCity: String,
+            val departureTime: String,
+            val flightType: String,
+            val arrivalCode: String,
+            val arrivalCity: String,
+            val arrivalTime: String,
+            val terminal: String,
+            val boardingTime: String
+        ) : Ticket()
     }
+
+    data class BankTransaction(
+        val type: String,
+        val amount: String,
+        val details: Map<String, String>
+    ) : ParsedResult()
+
+    data class PhoneRecharge(
+        val amount: String,
+        val details: Map<String, String>
+    ) : ParsedResult()
     
     data object None : ParsedResult()
 }

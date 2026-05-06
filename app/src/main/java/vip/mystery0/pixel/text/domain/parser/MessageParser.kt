@@ -20,17 +20,16 @@ object MessageParser {
             val gateMatch = Regex("检票口([a-zA-Z0-9]+)").find(content)
 
             if (trainMatch != null && depMatch != null) {
-                return ParsedResult.Ticket.HighSpeedRail(
+                return ParsedResult.Ticket.TrainTicket(
                     trainNumber = trainMatch.groupValues[1],
                     date = dateMatch?.value ?: "",
+                    trainType = "高铁",
                     departureStation = depMatch.groupValues[1].replace("座", ""), // 简单清理
                     departureTime = depMatch.groupValues[2],
-                    arrivalStation = arrMatch?.groupValues?.get(1),
-                    arrivalTime = null, // 通常短信不包含到达时间
-                    seat = seatMatch?.groupValues?.get(1),
-                    passenger = passengerMatch?.groupValues?.get(1),
-                    ticketGate = gateMatch?.groupValues?.get(1),
-                    status = if (content.contains("已购") || content.contains("成功")) "购票成功" else null
+                    arrivalStation = arrMatch?.groupValues?.get(1) ?: "--",
+                    arrivalTime = "--", // 通常短信不包含到达时间
+                    seat = seatMatch?.groupValues?.get(1) ?: "--",
+                    passenger = passengerMatch?.groupValues?.get(1) ?: "--"
                 )
             }
         }
