@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "12306_ticket_full",
+      "target_card": "TrainTicket",
+      "priority": 100,
+      "fast_fail": {
+        "signature_equals": "铁路客服"
+      },
+      "conditions": {
+        "content_regex": "订单号(?<orderNo>[A-Z0-9]+).*?(?<passenger>.{2,10})您已购(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次\\s*(?<departureTime>\\d{2}:\\d{2})开\\s*(?<departureStation>.+?)站-(?<arrivalStation>.+?)站.*?座位号为(?<seat>.+?)。"
+      }
+    },
+    {
+      "id": "12306_ticket_no_passenger",
+      "target_card": "TrainTicket",
+      "priority": 90,
+      "fast_fail": {
+        "signature_equals": "铁路客服"
+      },
+      "conditions": {
+        "content_regex": "订单号(?<orderNo>[A-Z0-9]+).*?您已购(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次\\s*(?<departureTime>\\d{2}:\\d{2})开\\s*(?<departureStation>.+?)站-(?<arrivalStation>.+?)站"
+      }
+    },
+    {
+      "id": "verification_code_general",
+      "target_card": "VerificationCode",
+      "priority": 10,
+      "fast_fail": {
+        "keywords": [
+          "验证码",
+          "动态码",
+          "校验码",
+          "code"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?i)(?:验证码|动态码|校验码|code).*?(?<code>[0-9a-zA-Z]{4,8})"
+      }
+    }
+  ]
+}

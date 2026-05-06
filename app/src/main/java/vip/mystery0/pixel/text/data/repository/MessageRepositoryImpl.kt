@@ -14,7 +14,10 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 
-class MessageRepositoryImpl(private val context: Context) : MessageRepository {
+class MessageRepositoryImpl(
+    private val context: Context,
+    private val messageParser: MessageParser
+) : MessageRepository {
 
     override fun getConversations(): Flow<List<ConversationModel>> = flow {
         val conversationsMap = linkedMapOf<Long, ConversationModel>()
@@ -213,7 +216,7 @@ class MessageRepositoryImpl(private val context: Context) : MessageRepository {
                         timestamp = date,
                         simName = getSimName(subId),
                         isReceived = type == Telephony.Sms.MESSAGE_TYPE_INBOX,
-                        parsedResult = MessageParser.parse(body)
+                        parsedResult = messageParser.parse(address, body)
                     )
                 )
             }
@@ -258,7 +261,7 @@ class MessageRepositoryImpl(private val context: Context) : MessageRepository {
                         content = body,
                         timestamp = date,
                         simName = "默认卡",
-                        parsedResult = MessageParser.parse(body)
+                        parsedResult = messageParser.parse(address, body)
                     )
                 )
             }
