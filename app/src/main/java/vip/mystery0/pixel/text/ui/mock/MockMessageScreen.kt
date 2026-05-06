@@ -136,7 +136,7 @@ fun MockMessageScreen() {
 }
 
 @Composable
-fun MessageItem(message: MessageModel) {
+private fun MessageItem(message: MessageModel) {
     var showOriginal by remember { mutableStateOf(false) }
     
     Column(
@@ -201,7 +201,7 @@ fun MessageItem(message: MessageModel) {
     }
 }
 
-fun formatTimeAgo(timestamp: Long): String {
+private fun formatTimeAgo(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     return when {
         diff < 1000 * 60 -> "刚刚"
