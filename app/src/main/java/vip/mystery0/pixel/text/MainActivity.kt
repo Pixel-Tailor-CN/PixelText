@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import vip.mystery0.pixel.text.ui.message.MessageScreen
+import vip.mystery0.pixel.text.ui.AppNavigation
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class MainActivity : ComponentActivity() {
@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PixelTextTheme {
-                MessageScreen()
+                AppNavigation()
             }
         }
     }
