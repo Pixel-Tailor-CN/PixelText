@@ -24,7 +24,7 @@ import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
 
 @Composable
 fun BankTransactionCard(result: ParsedResult.BankTransaction) {
-    val themeColor = MaterialTheme.colorScheme.error
+    val themeColor = MaterialTheme.colorScheme.primary
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = themeColor.copy(alpha = 0.03f),
@@ -35,7 +35,7 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction) {
             CardHeader(
                 icon = Icons.Rounded.AccountBalance,
                 iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.errorContainer,
+                iconBg = MaterialTheme.colorScheme.primaryContainer,
                 title = "银行交易",
                 dividerColor = themeColor.copy(alpha = 0.1f)
             )

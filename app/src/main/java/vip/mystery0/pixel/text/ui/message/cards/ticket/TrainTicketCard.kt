@@ -29,7 +29,7 @@ import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
 
 @Composable
 fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
-    val themeColor = MaterialTheme.colorScheme.tertiary
+    val themeColor = MaterialTheme.colorScheme.primary
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = themeColor.copy(alpha = 0.03f),
@@ -40,7 +40,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
             CardHeader(
                 icon = Icons.Rounded.DirectionsRailway,
                 iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.tertiaryContainer,
+                iconBg = MaterialTheme.colorScheme.primaryContainer,
                 title = "火车票",
                 dividerColor = themeColor.copy(alpha = 0.1f)
             )
@@ -59,12 +59,12 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                 )
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Text(
                         text = result.trainNumber,
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }

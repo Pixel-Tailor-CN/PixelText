@@ -26,7 +26,7 @@ import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
 
 @Composable
 fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
-    val themeColor = MaterialTheme.colorScheme.secondary
+    val themeColor = MaterialTheme.colorScheme.primary
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = themeColor.copy(alpha = 0.03f),
@@ -37,7 +37,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
             CardHeader(
                 icon = Icons.Rounded.PhoneIphone,
                 iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.secondaryContainer,
+                iconBg = MaterialTheme.colorScheme.primaryContainer,
                 title = "充值成功",
                 dividerColor = themeColor.copy(alpha = 0.1f)
             )
