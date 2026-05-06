@@ -1,26 +1,59 @@
 {
-  "version": 1,
+  "version": 2,
   "rules": [
     {
-      "id": "12306_ticket_full",
+      "id": "12306_ticket_short",
       "target_card": "TrainTicket",
       "priority": 100,
       "fast_fail": {
-        "signature_equals": "铁路客服"
+        "signature_equals": "12306"
       },
       "conditions": {
-        "content_regex": "订单号(?<orderNo>[A-Z0-9]+).*?(?<passenger>.{2,10})您已购(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次\\s*(?<departureTime>\\d{2}:\\d{2})开\\s*(?<departureStation>.+?)站-(?<arrivalStation>.+?)站.*?座位号为(?<seat>.+?)。"
+        "content_regex": "(?<passenger>[\\u4e00-\\u9fa5]+)购票成功，(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次，(?<departureStation>.+?)站(?<departureTime>\\d{2}:\\d{2})开"
       }
     },
     {
-      "id": "12306_ticket_no_passenger",
+      "id": "train_ticket_huilianyi",
       "target_card": "TrainTicket",
       "priority": 90,
       "fast_fail": {
-        "signature_equals": "铁路客服"
+        "signature_equals": "汇联易甄选"
       },
       "conditions": {
-        "content_regex": "订单号(?<orderNo>[A-Z0-9]+).*?您已购(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次\\s*(?<departureTime>\\d{2}:\\d{2})开\\s*(?<departureStation>.+?)站-(?<arrivalStation>.+?)站"
+        "content_regex": "(?<date>\\d{4}-\\d{2}-\\d{2}) (?<departureTime>\\d{2}:\\d{2}:\\d{2})出发，(?<departureStation>[^—]+)—(?<arrivalStation>[^，]+)，(?<trainNo>[A-Z0-9]+)，(?:检票口：(?<gate>[A-Z0-9]+)，)?(?<passenger>[\\u4e00-\\u9fa5]+) .*?(?<seat>\\d+车厢\\w+号)"
+      }
+    },
+    {
+      "id": "bank_transaction_cmb",
+      "target_card": "BankTransaction",
+      "priority": 80,
+      "fast_fail": {
+        "signature_equals": "招商银行"
+      },
+      "conditions": {
+        "content_regex": "账户(?<account>\\d{4})于(?<date>\\d{2}月\\d{2}日\\d{2}:\\d{2}).*?(?<type>扣款|消费|入账|支出|存入|转账|收入).*?(?<amount>[0-9,.]+)(?<currency>元)(?<details>.*)"
+      }
+    },
+    {
+      "id": "bank_transaction_comm",
+      "target_card": "BankTransaction",
+      "priority": 79,
+      "fast_fail": {
+        "signature_equals": "交通银行"
+      },
+      "conditions": {
+        "content_regex": "尾号\\*?(?<account>\\d{4}).*?(?<date>\\d{2}月\\d{2}日\\d{2}：\\d{2})在(?<details>.*?)(?<type>支付|消费|扣款)(?<amount>[0-9,.]+)(?<currency>元)"
+      }
+    },
+    {
+      "id": "phone_recharge_unicom",
+      "target_card": "PhoneRecharge",
+      "priority": 70,
+      "fast_fail": {
+        "signature_equals": "中国联通"
+      },
+      "conditions": {
+        "content_regex": "于(?<date>\\d{2}日\\d{2}时\\d{2}分)(?:交费|充值)(?<amount>[0-9,.]+)元，账户当前可用余额为(?<balance>[0-9,.]+)元"
       }
     },
     {
