@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -38,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -130,13 +132,26 @@ fun ConversationDetailScreen(
             }
 
             is MessageUiState.Success -> {
+                val listState = rememberLazyListState()
+
+                LaunchedEffect(listState) {
+                    snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+                        .collect { lastIndex ->
+                            if (lastIndex != null && lastIndex >= state.messages.size - 5) {
+                                viewModel.loadMore()
+                            }
+                        }
+                }
+
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    reverseLayout = true
                 ) {
                     items(state.messages) { message ->
                         MessageItem(message)
@@ -151,23 +166,35 @@ fun ConversationDetailScreen(
 fun MessageItem(message: MessageModel) {
     var showOriginal by remember { mutableStateOf(false) }
 
+    val arrangement = if (message.isReceived) Arrangement.Start else Arrangement.End
+    val cardAlignment = if (message.isReceived) Alignment.Start else Alignment.End
+
     Column(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = cardAlignment
     ) {
-        if (showOriginal || message.parsedResult is ParsedResult.None) {
-            OriginalTextCard(content = message.content)
-        } else {
-            MessageCardFactory.CreateCard(
-                content = message.content,
-                parsedResult = message.parsedResult
-            )
+        Box(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
+        ) {
+            Column(horizontalAlignment = cardAlignment) {
+                if (showOriginal || message.parsedResult is ParsedResult.None) {
+                    OriginalTextCard(content = message.content)
+                } else {
+                    MessageCardFactory.CreateCard(
+                        content = message.content,
+                        parsedResult = message.parsedResult
+                    )
+                }
+            }
         }
 
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 8.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth(0.85f)
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = arrangement
         ) {
             Text(
                 text = formatTimeAgo(message.timestamp),

@@ -15,7 +15,9 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         MutableStateFlow<ConversationListUiState>(ConversationListUiState.Loading)
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
 
-    fun loadConversations() {
+    fun loadConversations(force: Boolean = false) {
+        if (!force && _uiState.value is ConversationListUiState.Success) return
+        
         viewModelScope.launch {
             _uiState.value = ConversationListUiState.Loading
             repository.getConversations()

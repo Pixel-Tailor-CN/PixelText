@@ -51,5 +51,6 @@ data class MessageModel(
     val content: String,
     val timestamp: Long,
     val simName: String = "卡1",
+    val isReceived: Boolean = true,
     val parsedResult: ParsedResult = ParsedResult.None
 )
