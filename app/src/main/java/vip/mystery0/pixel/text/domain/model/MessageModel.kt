@@ -1,7 +1,7 @@
 package vip.mystery0.pixel.text.domain.model
 
 sealed class ParsedResult {
-    data class VerificationCode(val code: String) : ParsedResult()
+    data class VerificationCode(val code: String, val signature: String? = null) : ParsedResult()
 
     sealed class Ticket : ParsedResult() {
         data class TrainTicket(
@@ -40,6 +40,11 @@ sealed class ParsedResult {
     data class PhoneRecharge(
         val amount: String,
         val details: Map<String, String>
+    ) : ParsedResult()
+
+    data class Dynamic(
+        val cardType: String,
+        val fields: Map<String, String>
     ) : ParsedResult()
     
     data object None : ParsedResult()

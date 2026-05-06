@@ -53,8 +53,13 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode)
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
+                        val titleText = if (result.signature != null) {
+                            "${result.signature} · 验证码"
+                        } else {
+                            "验证码"
+                        }
                         Text(
-                            text = "验证码",
+                            text = titleText,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                         )
