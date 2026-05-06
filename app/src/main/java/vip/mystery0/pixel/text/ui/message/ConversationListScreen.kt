@@ -182,10 +182,13 @@ fun ConversationListScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(state.conversations) { conv ->
+                        items(state.conversations) { conversation ->
                             ConversationItem(
-                                conv,
-                                onClick = { onNavigateToDetail(conv.threadId, conv.address) })
+                                conversation = conversation,
+                                onClick = {
+                                    onNavigateToDetail(conversation.threadId, conversation.address)
+                                }
+                            )
                         }
                     }
                 }
@@ -209,7 +212,10 @@ fun ConversationListScreen(
 }
 
 @Composable
-fun ConversationItem(conversation: ConversationModel, onClick: () -> Unit) {
+fun ConversationItem(
+    conversation: ConversationModel,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

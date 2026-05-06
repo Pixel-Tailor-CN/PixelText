@@ -55,6 +55,7 @@ fun ConversationDetailScreen(
     threadId: Long,
     address: String,
     onNavigateBack: () -> Unit,
+    isTablet: Boolean = false,
     viewModel: ConversationDetailViewModel = koinViewModel()
 ) {
     LaunchedEffect(threadId, address) {
@@ -68,8 +69,10 @@ fun ConversationDetailScreen(
             TopAppBar(
                 title = { Text(address) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                    if (!isTablet) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 actions = {
@@ -242,10 +245,20 @@ fun MessageItem(message: MessageModel) {
 
 fun formatTimeAgo(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
+    val oneMinute = 1000L * 60
+    val oneHour = oneMinute * 60
+    val oneDay = oneHour * 24
+    val sevenDays = oneDay * 7
+
     return when {
-        diff < 1000 * 60 -> "刚刚"
-        diff < 1000 * 60 * 60 -> "${diff / (1000 * 60)}分钟前"
-        diff < 1000 * 60 * 60 * 24 -> "${diff / (1000 * 60 * 60)}小时前"
-        else -> "${diff / (1000 * 60 * 60 * 24)}天前"
+        diff < oneMinute * 5 -> "刚刚"
+        diff < oneHour -> "${diff / oneMinute}分钟前"
+        diff < oneDay -> "${diff / oneHour}小时前"
+        diff < sevenDays -> "${diff / oneDay}天前"
+        else -> {
+            val formatter =
+                java.text.SimpleDateFormat("yyyy年M月d日 HH:mm:ss", java.util.Locale.getDefault())
+            formatter.format(java.util.Date(timestamp))
+        }
     }
 }
