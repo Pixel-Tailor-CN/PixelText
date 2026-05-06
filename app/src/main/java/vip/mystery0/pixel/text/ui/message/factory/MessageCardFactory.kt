@@ -4,18 +4,22 @@ import androidx.compose.runtime.Composable
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.NormalMessageCard
 import vip.mystery0.pixel.text.ui.message.cards.VerificationCodeCard
-import vip.mystery0.pixel.text.ui.message.cards.ticket.HighSpeedRailCard
+import vip.mystery0.pixel.text.ui.message.cards.finance.BankTransactionCard
+import vip.mystery0.pixel.text.ui.message.cards.finance.PhoneRechargeCard
+import vip.mystery0.pixel.text.ui.message.cards.ticket.FlightCard
+import vip.mystery0.pixel.text.ui.message.cards.ticket.TrainTicketCard
 
 object MessageCardFactory {
 
     @Composable
     fun CreateCard(content: String, parsedResult: ParsedResult) {
         when (parsedResult) {
-            is ParsedResult.Ticket.HighSpeedRail -> HighSpeedRailCard(parsedResult)
-            is ParsedResult.Ticket.Flight -> NormalMessageCard(content) // Not implemented yet
-            is ParsedResult.Ticket.Bus -> NormalMessageCard(content) // Not implemented yet
+            is ParsedResult.Ticket.TrainTicket -> TrainTicketCard(parsedResult)
+            is ParsedResult.Ticket.Flight -> FlightCard(parsedResult)
+            is ParsedResult.BankTransaction -> BankTransactionCard(parsedResult)
+            is ParsedResult.PhoneRecharge -> PhoneRechargeCard(parsedResult)
             is ParsedResult.VerificationCode -> VerificationCodeCard(content, parsedResult)
-            is ParsedResult.None -> NormalMessageCard(content)
+            else -> NormalMessageCard(content)
         }
     }
 }
