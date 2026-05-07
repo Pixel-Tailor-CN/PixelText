@@ -54,8 +54,7 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = result.amount,
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.displaySmallEmphasized.copy(
                         fontSize = 28.sp
                     ),
                     color = themeColor

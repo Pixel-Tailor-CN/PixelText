@@ -29,7 +29,8 @@ import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -59,7 +60,7 @@ import androidx.core.content.ContextCompat
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
@@ -167,7 +168,7 @@ fun ConversationListScreen(
             when (val state = uiState) {
                 is ConversationListUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        LoadingIndicator()
                     }
                 }
 
@@ -250,7 +251,7 @@ fun ConversationItem(
             ) {
                 Text(
                     text = conversation.address,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.Normal),
+                    style = if (conversation.unreadCount > 0) MaterialTheme.typography.bodyLargeEmphasized else MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

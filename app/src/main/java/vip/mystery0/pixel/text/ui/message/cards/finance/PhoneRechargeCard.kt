@@ -49,8 +49,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
             ) {
                 Text(
                     text = result.amount,
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.displayMediumEmphasized.copy(
                         fontSize = 36.sp
                     ),
                     color = themeColor
