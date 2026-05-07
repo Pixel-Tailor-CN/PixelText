@@ -1,14 +1,12 @@
 package vip.mystery0.pixel.text.ui.message.cards
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,25 +19,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 
 @Composable
 fun OriginalTextCard(content: String, isSelected: Boolean = false) {
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(durationMillis = 200),
         label = "bubbleBackground"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(durationMillis = 200),
         label = "bubbleText"
     )
     val linkColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary,
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inversePrimary else MaterialTheme.colorScheme.primary,
         animationSpec = tween(durationMillis = 200),
         label = "linkColor"
     )
@@ -58,7 +59,7 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
     }
 
     // 构建带链接标注的文本
-    val annotatedString = remember(content, textColor, linkColor) {
+    val annotatedString = remember(content, linkColor) {
         buildAnnotatedString {
             var lastIndex = 0
             urlPattern.findAll(content).forEach { matchResult ->
@@ -71,16 +72,21 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
                     append(content.substring(lastIndex, startIndex))
                 }
 
-                // 添加 URL 文本，带下划线和颜色
-                pushStringAnnotation(tag = "URL", annotation = url)
-                pushStyle(
-                    SpanStyle(
-                        color = linkColor,
-                        textDecoration = TextDecoration.Underline
+                // 添加 URL 文本，并使用 LinkAnnotation 处理点击
+                val link = LinkAnnotation.Url(
+                    url = url,
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline
+                        )
                     )
-                )
+                ) {
+                    pendingUrl = (it as LinkAnnotation.Url).url
+                    showDialog = true
+                }
+                pushLink(link)
                 append(url)
-                pop()
                 pop()
 
                 lastIndex = endIndex
@@ -99,16 +105,9 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
         modifier = Modifier.widthIn(max = 320.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            ClickableText(
+            Text(
                 text = annotatedString,
-                style = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                onClick = { offset ->
-                    annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                        .firstOrNull()?.let { annotation ->
-                            pendingUrl = annotation.item
-                            showDialog = true
-                        }
-                }
+                style = MaterialTheme.typography.bodyMedium.copy(color = textColor)
             )
         }
     }
@@ -130,7 +129,7 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
                             } else {
                                 pendingUrl
                             }
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, finalUrl.toUri())
                         context.startActivity(intent)
                     } catch (e: Exception) {
                         // 处理打开失败的情况
