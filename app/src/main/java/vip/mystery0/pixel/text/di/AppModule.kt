@@ -9,6 +9,7 @@ import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.ui.message.ConversationDetailViewModel
 import vip.mystery0.pixel.text.ui.message.ConversationListViewModel
 import vip.mystery0.pixel.text.ui.message.MessageViewModel
+import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 
 val appModule = module {
     single { MessageParser(androidContext()) }
@@ -16,4 +17,5 @@ val appModule = module {
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
     viewModel { ConversationDetailViewModel(get()) }
+    viewModel { SearchViewModel(get()) }
 }

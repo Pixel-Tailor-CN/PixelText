@@ -61,6 +61,7 @@ sealed class ParsedResult {
 
 data class MessageModel(
     val id: Long,
+    val threadId: Long = -1,
     val sender: String,
     val content: String,
     val timestamp: Long,
