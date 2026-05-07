@@ -63,7 +63,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                 )
                 Text(
                     text = result.flightNumber,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
                     color = themeColor
                 )
             }
@@ -78,8 +78,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
                         text = result.departureCode,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 36.sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
@@ -130,8 +129,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = result.arrivalCode,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 36.sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
@@ -162,7 +160,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = result.terminal,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.titleMediumEmphasized,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -183,7 +181,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = result.boardingTime,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.titleMediumEmphasized,
                         color = themeColor
                     )
                 }

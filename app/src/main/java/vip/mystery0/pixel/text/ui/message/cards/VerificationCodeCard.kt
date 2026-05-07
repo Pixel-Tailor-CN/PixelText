@@ -65,7 +65,7 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode)
                         )
                         Text(
                             text = result.code,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.headlineSmallEmphasized,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             letterSpacing = 4.sp
                         )

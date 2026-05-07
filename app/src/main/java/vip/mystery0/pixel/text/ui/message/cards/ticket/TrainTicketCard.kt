@@ -63,7 +63,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                 ) {
                     Text(
                         text = result.trainNumber,
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelMediumEmphasized,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
@@ -80,8 +80,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                 Column(horizontalAlignment = Alignment.Start) {
                     Text(
                         text = result.departureTime,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 32.sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
@@ -119,8 +118,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = result.arrivalTime,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 32.sp
                         ),
                         color = MaterialTheme.colorScheme.onSurface
@@ -159,7 +157,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = result.passenger,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.bodyMediumEmphasized,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -181,7 +179,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = result.seat,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.bodyMediumEmphasized,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }

@@ -56,7 +56,7 @@ fun CardHeader(
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.titleSmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface
         )
     }
@@ -114,7 +114,7 @@ fun InfoMapList(
                     )
                     Text(
                         text = entry.value,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.W500),
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
                         color = if (entry.key == highlightKey) highlightColor else MaterialTheme.colorScheme.onSurface
                     )
                 }
