@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 
@@ -41,10 +42,39 @@ class MessageRepositoryImpl(
             return@flow
         }
 
-        // 2. 针对这批 thread_id，从短信表中获取最新的消息详情和未读数
+        emit(fetchConversationDetails(threadIds))
+    }.flowOn(Dispatchers.IO)
+
+    override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
+        val threadIds = mutableSetOf<Long>()
+
+        // 同时搜索地址和内容
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(Telephony.Sms.THREAD_ID),
+            "${Telephony.Sms.ADDRESS} LIKE ? OR ${Telephony.Sms.BODY} LIKE ?",
+            arrayOf("%$query%", "%$query%"),
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            while (cursor.moveToNext()) {
+                threadIds.add(cursor.getLong(threadIdIndex))
+                if (threadIds.size > 50) break // 搜索结果限制前 50 条
+            }
+        }
+
+        if (threadIds.isEmpty()) {
+            emit(emptyList())
+            return@flow
+        }
+
+        emit(fetchConversationDetails(threadIds.toList()))
+    }.flowOn(Dispatchers.IO)
+
+    private fun fetchConversationDetails(threadIds: List<Long>): List<ConversationModel> {
         val messagesMap = mutableMapOf<Long, ConversationModel>()
         val idString = threadIds.joinToString(",")
-        
+
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
@@ -69,7 +99,6 @@ class MessageRepositoryImpl(
                 val read = cursor.getInt(readIndex) == 1
 
                 if (!messagesMap.containsKey(threadId)) {
-                    // 因为是按 DATE DESC 排序，所以第一条遇到的就是该会话的最新的消息
                     val address = cursor.getString(addressIndex) ?: ""
                     val body = cursor.getString(bodyIndex) ?: ""
                     val date = cursor.getLong(dateIndex)
@@ -81,7 +110,6 @@ class MessageRepositoryImpl(
                         unreadCount = if (read) 0 else 1
                     )
                 } else {
-                    // 后续遇到的同一 threadId 的消息，只累加未读数
                     if (!read) {
                         val existing = messagesMap[threadId]!!
                         messagesMap[threadId] =
@@ -90,11 +118,8 @@ class MessageRepositoryImpl(
                 }
             }
         }
-
-        // 3. 按照 threadIds 的原始顺序（时间倒序）发射结果
-        val sortedResult = threadIds.mapNotNull { messagesMap[it] }
-        emit(sortedResult)
-    }.flowOn(Dispatchers.IO)
+        return threadIds.mapNotNull { messagesMap[it] }
+    }
 
     private val simNameCache = mutableMapOf<Int, String>()
 
@@ -197,6 +222,57 @@ class MessageRepositoryImpl(
         return fallbackName
     }
 
+    override fun searchMessages(query: String): Flow<List<MessageModel>> = flow {
+        val messages = mutableListOf<MessageModel>()
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.THREAD_ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+                Telephony.Sms.SUBSCRIPTION_ID,
+                Telephony.Sms.TYPE
+            ),
+            "${Telephony.Sms.BODY} LIKE ?",
+            arrayOf("%$query%"),
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
+            val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
+            val subIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.SUBSCRIPTION_ID)
+            val typeIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idIndex)
+                val threadId = cursor.getLong(threadIdIndex)
+                val address = cursor.getString(addressIndex) ?: ""
+                val body = cursor.getString(bodyIndex) ?: ""
+                val date = cursor.getLong(dateIndex)
+                val subId = cursor.getInt(subIdIndex)
+                val type = cursor.getInt(typeIndex)
+
+                messages.add(
+                    MessageModel(
+                        id = id,
+                        threadId = threadId,
+                        sender = address,
+                        content = body,
+                        timestamp = date,
+                        simName = getSimName(subId),
+                        isReceived = type == Telephony.Sms.MESSAGE_TYPE_INBOX,
+                        parsedResult = ParsedResult.None // 搜索模式暂不解析
+                    )
+                )
+            }
+        }
+        emit(messages)
+    }.flowOn(Dispatchers.IO)
+
     override fun getMessagesByThread(
         threadId: Long,
         limit: Int,
@@ -235,6 +311,7 @@ class MessageRepositoryImpl(
                 messages.add(
                     MessageModel(
                         id = id,
+                        threadId = threadId,
                         sender = address,
                         content = body,
                         timestamp = date,
@@ -253,6 +330,7 @@ class MessageRepositoryImpl(
         val uri = Telephony.Sms.CONTENT_URI
         val projection = arrayOf(
             Telephony.Sms._ID,
+            Telephony.Sms.THREAD_ID,
             Telephony.Sms.ADDRESS,
             Telephony.Sms.BODY,
             Telephony.Sms.DATE,
@@ -274,6 +352,7 @@ class MessageRepositoryImpl(
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idIndex)
+                val threadId = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID))
                 val address = cursor.getString(addressIndex) ?: ""
                 val body = cursor.getString(bodyIndex) ?: ""
                 val date = cursor.getLong(dateIndex)
@@ -281,6 +360,7 @@ class MessageRepositoryImpl(
                 messages.add(
                     MessageModel(
                         id = id,
+                        threadId = threadId,
                         sender = address,
                         content = body,
                         timestamp = date,

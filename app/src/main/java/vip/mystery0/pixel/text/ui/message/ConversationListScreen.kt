@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.ui.message
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -23,18 +24,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -54,18 +58,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.ui.message.search.SearchOverlay
+import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
+    searchViewModel: SearchViewModel = koinViewModel(),
     onNavigateToDetail: (Long, String) -> Unit,
     onNavigateToMock: () -> Unit
 ) {
@@ -96,121 +108,211 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val searchQuery by searchViewModel.searchQuery.collectAsState()
+    var isSearchActive by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+
+    BackHandler(enabled = isSearchActive) {
+        focusManager.clearFocus()
+        isSearchActive = false
+        searchViewModel.updateQuery("")
+    }
 
     val sheetState = rememberModalBottomSheetState()
     var showProfileSheet by remember { mutableStateOf(false) }
 
-    Scaffold(
-        floatingActionButton = {
-            if (hasPermission) {
-                ExtendedFloatingActionButton(
-                    text = { Text("Start chat") },
-                    icon = { Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = null) },
-                    onClick = { /* TODO */ },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            floatingActionButton = {
+                if (hasPermission && !isSearchActive) {
+                    ExtendedFloatingActionButton(
+                        text = { Text("Start chat") },
+                        icon = { Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = null) },
+                        onClick = { /* TODO */ },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { paddingValues ->
+            if (!hasPermission) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
+                }
+                return@Scaffold
             }
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        if (!hasPermission) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
-            }
-            return@Scaffold
-        }
 
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .height(48.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                Row(
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(48.dp)
                 ) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "原点短信",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                            .clickable { showProfileSheet = true },
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "P",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                }
-            }
-
-            when (val state = uiState) {
-                is ConversationListUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LoadingIndicator()
-                    }
-                }
-
-                is ConversationListUiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("读取失败: ${state.message}", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-
-                is ConversationListUiState.Success -> {
-                    val listState = rememberLazyListState()
-
-                    val shouldLoadMore = remember {
-                        derivedStateOf {
-                            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                                ?: return@derivedStateOf false
-                            lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 5
-                        }
-                    }
-
-                    LaunchedEffect(shouldLoadMore.value) {
-                        if (shouldLoadMore.value) {
-                            viewModel.loadMore()
-                        }
-                    }
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        items(state.conversations, key = { it.threadId }) { conversation ->
-                            ConversationItem(
-                                conversation = conversation,
+                        if (isSearchActive) {
+                            IconButton(
                                 onClick = {
-                                    onNavigateToDetail(conversation.threadId, conversation.address)
-                                }
+                                    isSearchActive = false
+                                    searchViewModel.updateQuery("")
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            Icon(
+                                Icons.Rounded.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "搜索短信",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = {
+                                    searchViewModel.updateQuery(it)
+                                    if (it.isNotEmpty()) isSearchActive = true
+                                },
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(focusRequester)
+                                    .onFocusChanged {
+                                        if (it.isFocused) isSearchActive = true
+                                    },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                            )
+                        }
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchViewModel.updateQuery("") },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Close,
+                                    contentDescription = "Clear",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .clickable { showProfileSheet = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "P",
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.labelLarge
                             )
                         }
                     }
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    when (val state = uiState) {
+                        is ConversationListUiState.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                LoadingIndicator()
+                            }
+                        }
+
+                        is ConversationListUiState.Error -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "读取失败: ${state.message}",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        is ConversationListUiState.Success -> {
+                            val listState = rememberLazyListState()
+
+                            val shouldLoadMore = remember {
+                                derivedStateOf {
+                                    val lastVisibleItem =
+                                        listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                                            ?: return@derivedStateOf false
+                                    lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 5
+                                }
+                            }
+
+                            LaunchedEffect(shouldLoadMore.value) {
+                                if (shouldLoadMore.value) {
+                                    viewModel.loadMore()
+                                }
+                            }
+
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 80.dp)
+                            ) {
+                                items(state.conversations, key = { it.threadId }) { conversation ->
+                                    ConversationItem(
+                                        conversation = conversation,
+                                        onClick = {
+                                            onNavigateToDetail(
+                                                conversation.threadId,
+                                                conversation.address
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SearchOverlay(
+                        isVisible = isSearchActive,
+                        onDismiss = { isSearchActive = false },
+                        onResultClick = { message ->
+                            onNavigateToDetail(message.threadId, message.sender)
+                        },
+                        viewModel = searchViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
