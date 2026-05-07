@@ -23,18 +23,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -53,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -221,7 +221,7 @@ fun ConversationItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -235,10 +235,12 @@ fun ConversationItem(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = conversation.address.firstOrNull()?.uppercase() ?: "?",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium
+            // 使用联系人头像图标
+            Icon(
+                imageVector = Icons.Rounded.AccountCircle,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(32.dp)
             )
         }
 
@@ -333,13 +335,18 @@ fun formatTimeShort(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val calendar = java.util.Calendar.getInstance()
     calendar.timeInMillis = timestamp
+
+    val now = java.util.Calendar.getInstance()
+    val isSameYear = calendar.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR)
+
     return when {
+        // 今天：显示时间
         diff < 1000 * 60 * 60 * 24 -> String.format(
             "%02d:%02d",
             calendar.get(java.util.Calendar.HOUR_OF_DAY),
             calendar.get(java.util.Calendar.MINUTE)
         )
-
+        // 本周：显示星期
         diff < 1000 * 60 * 60 * 24 * 7 -> listOf(
             "周日",
             "周一",
@@ -349,9 +356,16 @@ fun formatTimeShort(timestamp: Long): String {
             "周五",
             "周六"
         )[calendar.get(java.util.Calendar.DAY_OF_WEEK) - 1]
-
-        else -> String.format(
+        // 今年：显示月日
+        isSameYear -> String.format(
             "%02d月%02d日",
+            calendar.get(java.util.Calendar.MONTH) + 1,
+            calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+        // 去年及更早：显示年月日
+        else -> String.format(
+            "%d年%02d月%02d日",
+            calendar.get(java.util.Calendar.YEAR),
             calendar.get(java.util.Calendar.MONTH) + 1,
             calendar.get(java.util.Calendar.DAY_OF_MONTH)
         )
