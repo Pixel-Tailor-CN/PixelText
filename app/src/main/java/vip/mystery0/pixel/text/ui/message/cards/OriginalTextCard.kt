@@ -12,17 +12,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun OriginalTextCard(content: String) {
+fun OriginalTextCard(content: String, isSelected: Boolean = false) {
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
     Surface(
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = backgroundColor,
         modifier = Modifier.widthIn(max = 280.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = content,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = textColor
             )
         }
     }

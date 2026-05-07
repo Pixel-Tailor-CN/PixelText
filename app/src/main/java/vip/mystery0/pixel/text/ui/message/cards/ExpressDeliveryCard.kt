@@ -30,12 +30,17 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
-fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
-    val themeColor = MaterialTheme.colorScheme.tertiary
+fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery, isSelected: Boolean = false) {
+    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.tertiary
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surface
+    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val headerBgColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.tertiaryContainer
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = containerColor,
+        border = BorderStroke(1.dp, if (isSelected) containerColor else MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
@@ -43,8 +48,9 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
                 CardHeader(
                     icon = Icons.Rounded.Inventory,
                     iconTint = themeColor,
-                    iconBg = MaterialTheme.colorScheme.tertiaryContainer,
-                    title = "${result.company} · 取件通知"
+                    iconBg = headerBgColor,
+                    title = "${result.company} · 取件通知",
+                    dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.outlineVariant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -56,7 +62,7 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
                     Text(
                         text = result.company,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -65,17 +71,17 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
                             fontSize = 32.sp,
                             letterSpacing = 1.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                        color = if (isSelected) themeColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
                     ) {
                         Text(
                             text = "扫码开门自助取件",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = themeColor,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                         )
                     }
@@ -83,7 +89,7 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
             }
 
             Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                color = if (isSelected) themeColor.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -91,14 +97,14 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
                         Icon(
                             Icons.Rounded.LocationOn,
                             contentDescription = "Location",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = onContainerVariantColor,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = result.location,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = onContainerColor
                         )
                     }
 
@@ -108,14 +114,14 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery) {
                             Icon(
                                 Icons.Rounded.Schedule,
                                 contentDescription = "Time",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = onContainerVariantColor,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = result.time,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = onContainerColor
                             )
                         }
                     }

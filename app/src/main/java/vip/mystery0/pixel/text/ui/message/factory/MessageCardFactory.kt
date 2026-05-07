@@ -13,15 +13,15 @@ import vip.mystery0.pixel.text.ui.message.cards.ticket.TrainTicketCard
 object MessageCardFactory {
 
     @Composable
-    fun CreateCard(content: String, parsedResult: ParsedResult) {
+    fun CreateCard(content: String, parsedResult: ParsedResult, isSelected: Boolean = false) {
         when (parsedResult) {
-            is ParsedResult.Ticket.TrainTicket -> TrainTicketCard(parsedResult)
-            is ParsedResult.Ticket.Flight -> FlightCard(parsedResult)
-            is ParsedResult.BankTransaction -> BankTransactionCard(parsedResult)
-            is ParsedResult.PhoneRecharge -> PhoneRechargeCard(parsedResult)
-            is ParsedResult.ExpressDelivery -> ExpressDeliveryCard(parsedResult)
-            is ParsedResult.VerificationCode -> VerificationCodeCard(content, parsedResult)
-            else -> NormalMessageCard(content)
+            is ParsedResult.Ticket.TrainTicket -> TrainTicketCard(parsedResult, isSelected)
+            is ParsedResult.Ticket.Flight -> FlightCard(parsedResult, isSelected)
+            is ParsedResult.BankTransaction -> BankTransactionCard(parsedResult, isSelected)
+            is ParsedResult.PhoneRecharge -> PhoneRechargeCard(parsedResult, isSelected)
+            is ParsedResult.ExpressDelivery -> ExpressDeliveryCard(parsedResult, isSelected)
+            is ParsedResult.VerificationCode -> VerificationCodeCard(content, parsedResult, isSelected)
+            else -> NormalMessageCard(content, isSelected)
         }
     }
 }

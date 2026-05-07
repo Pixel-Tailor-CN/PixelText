@@ -26,21 +26,24 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
-fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode) {
+fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode, isSelected: Boolean = false) {
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
+
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer
+    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onPrimaryContainer
 
     ElevatedCard(
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            containerColor = containerColor
         ),
         modifier = Modifier.widthIn(max = 300.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
+                color = onContainerColor.copy(alpha = 0.1f),
                 onClick = {
                     clipboardManager.setText(AnnotatedString(result.code))
                 }
@@ -61,19 +64,19 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode)
                         Text(
                             text = titleText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            color = onContainerColor.copy(alpha = 0.7f)
                         )
                         Text(
                             text = result.code,
                             style = MaterialTheme.typography.headlineSmallEmphasized,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = onContainerColor,
                             letterSpacing = 4.sp
                         )
                     }
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
                         contentDescription = "Copy code",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (isSelected) onContainerColor else MaterialTheme.colorScheme.primary
                     )
                 }
             }

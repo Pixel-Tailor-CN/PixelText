@@ -31,23 +31,28 @@ import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
 
 @Composable
-fun BankTransactionCard(result: ParsedResult.BankTransaction) {
-    val themeColor = if (result.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    val headerColor = if (result.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolean = false) {
+    val baseThemeColor = if (result.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor
+    val headerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else (if (result.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary)
+    
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f)
+    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = themeColor.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.15f)),
+        color = containerColor,
+        border = BorderStroke(1.dp, if (isSelected) containerColor else baseThemeColor.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             CardHeader(
                 icon = Icons.Rounded.AccountBalance,
                 iconTint = headerColor,
-                iconBg = if (result.isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else (if (result.isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
                 title = "银行交易",
-                dividerColor = themeColor.copy(alpha = 0.1f)
+                dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.1f)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -60,14 +65,14 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction) {
                     Text(
                         text = result.type,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                     
                     if (!result.isSuccess) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            color = if (isSelected) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -111,7 +116,7 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction) {
                 details = finalDetails,
                 highlightKey = if (!result.isSuccess) "失败原因" else null,
                 highlightColor = MaterialTheme.colorScheme.error,
-                containerColor = themeColor.copy(alpha = 0.08f)
+                containerColor = if (isSelected) baseThemeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.08f)
             )
         }
     }
