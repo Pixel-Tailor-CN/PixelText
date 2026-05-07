@@ -30,7 +30,7 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
     Surface(
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
         color = backgroundColor,
-        modifier = Modifier.widthIn(max = 280.dp)
+        modifier = Modifier.widthIn(max = 320.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
