@@ -19,9 +19,32 @@ class MessageRepositoryImpl(
     private val messageParser: MessageParser
 ) : MessageRepository {
 
-    override fun getConversations(): Flow<List<ConversationModel>> = flow {
-        val conversationsMap = linkedMapOf<Long, ConversationModel>()
+    override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
+        val threadIds = mutableListOf<Long>()
 
+        // 1. 先从 conversations 视图获取 thread_id 列表，这非常快且支持分页
+        context.contentResolver.query(
+            Uri.parse("content://sms/conversations"),
+            arrayOf(Telephony.Sms.THREAD_ID),
+            null,
+            null,
+            "${Telephony.Sms.DATE} DESC LIMIT $limit OFFSET $offset"
+        )?.use { cursor ->
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            while (cursor.moveToNext()) {
+                threadIds.add(cursor.getLong(threadIdIndex))
+            }
+        }
+
+        if (threadIds.isEmpty()) {
+            emit(emptyList())
+            return@flow
+        }
+
+        // 2. 针对这批 thread_id，从短信表中获取最新的消息详情和未读数
+        val messagesMap = mutableMapOf<Long, ConversationModel>()
+        val idString = threadIds.joinToString(",")
+        
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
@@ -31,7 +54,7 @@ class MessageRepositoryImpl(
                 Telephony.Sms.DATE,
                 Telephony.Sms.READ
             ),
-            null,
+            "${Telephony.Sms.THREAD_ID} IN ($idString)",
             null,
             "${Telephony.Sms.DATE} DESC"
         )?.use { cursor ->
@@ -45,11 +68,12 @@ class MessageRepositoryImpl(
                 val threadId = cursor.getLong(threadIdIndex)
                 val read = cursor.getInt(readIndex) == 1
 
-                if (!conversationsMap.containsKey(threadId)) {
+                if (!messagesMap.containsKey(threadId)) {
+                    // 因为是按 DATE DESC 排序，所以第一条遇到的就是该会话的最新的消息
                     val address = cursor.getString(addressIndex) ?: ""
                     val body = cursor.getString(bodyIndex) ?: ""
                     val date = cursor.getLong(dateIndex)
-                    conversationsMap[threadId] = ConversationModel(
+                    messagesMap[threadId] = ConversationModel(
                         threadId = threadId,
                         address = address,
                         snippet = body,
@@ -57,19 +81,19 @@ class MessageRepositoryImpl(
                         unreadCount = if (read) 0 else 1
                     )
                 } else {
+                    // 后续遇到的同一 threadId 的消息，只累加未读数
                     if (!read) {
-                        val existing = conversationsMap[threadId]!!
-                        conversationsMap[threadId] =
+                        val existing = messagesMap[threadId]!!
+                        messagesMap[threadId] =
                             existing.copy(unreadCount = existing.unreadCount + 1)
                     }
                 }
-
-                if (conversationsMap.size >= 100 && cursor.position > 1000) {
-                    break
-                }
             }
         }
-        emit(conversationsMap.values.toList())
+
+        // 3. 按照 threadIds 的原始顺序（时间倒序）发射结果
+        val sortedResult = threadIds.mapNotNull { messagesMap[it] }
+        emit(sortedResult)
     }.flowOn(Dispatchers.IO)
 
     private val simNameCache = mutableMapOf<Int, String>()
@@ -240,7 +264,7 @@ class MessageRepositoryImpl(
             projection,
             null,
             null,
-            "${Telephony.Sms.DATE} DESC LIMIT 100" // 暂时拉取前100条用于验证
+            "${Telephony.Sms.DATE} DESC"
         )?.use { cursor ->
             val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
             val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
