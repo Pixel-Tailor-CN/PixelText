@@ -1,6 +1,13 @@
 package vip.mystery0.pixel.text.ui.message
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,12 +49,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -64,30 +79,103 @@ fun ConversationDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val selectedMessageIds = remember { mutableStateListOf<Long>() }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(address) },
-                navigationIcon = {
-                    if (!isTablet) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+            if (selectedMessageIds.isNotEmpty()) {
+                TopAppBar(
+                    title = { Text(selectedMessageIds.size.toString()) },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedMessageIds.clear() }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear selection")
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Rounded.Call, contentDescription = "Call")
-                    }
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "More")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            if (uiState is MessageUiState.Success) {
+                                val state = uiState as MessageUiState.Success
+                                val texts = state.messages.filter { it.id in selectedMessageIds }.map { it.content }
+                                clipboardManager.setPrimaryClip(ClipData.newPlainText("Messages", texts.joinToString("\n")))
+                            }
+                            selectedMessageIds.clear()
+                        }) {
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy")
+                        }
+                        IconButton(onClick = {
+                            // TODO: Delete messages
+                            selectedMessageIds.clear()
+                        }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Delete")
+                        }
+                        if (selectedMessageIds.size == 1) {
+                            var showMoreMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showMoreMenu = true }) {
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                                }
+                                DropdownMenu(
+                                    expanded = showMoreMenu,
+                                    onDismissRequest = { showMoreMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("分享") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            if (uiState is MessageUiState.Success) {
+                                                val state = uiState as MessageUiState.Success
+                                                val text = state.messages.find { it.id == selectedMessageIds.first() }?.content ?: ""
+                                                val sendIntent = Intent().apply {
+                                                    action = Intent.ACTION_SEND
+                                                    putExtra(Intent.EXTRA_TEXT, text)
+                                                    type = "text/plain"
+                                                }
+                                                context.startActivity(Intent.createChooser(sendIntent, null))
+                                            }
+                                            selectedMessageIds.clear()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("转发") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            // TODO: Forward message
+                                            selectedMessageIds.clear()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = { Text(address) },
+                    navigationIcon = {
+                        if (!isTablet) {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { /* TODO */ }) {
+                            Icon(Icons.Rounded.Call, contentDescription = "Call")
+                        }
+                        IconButton(onClick = { /* TODO */ }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    )
+                )
+            }
         },
         bottomBar = {
             Surface(
@@ -158,7 +246,25 @@ fun ConversationDetailScreen(
                     reverseLayout = true
                 ) {
                     items(state.messages) { message ->
-                        MessageItem(message)
+                        val isSelected = selectedMessageIds.contains(message.id)
+                        MessageItem(
+                            message = message,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (selectedMessageIds.isNotEmpty()) {
+                                    if (isSelected) {
+                                        selectedMessageIds.remove(message.id)
+                                    } else {
+                                        selectedMessageIds.add(message.id)
+                                    }
+                                }
+                            },
+                            onLongClick = {
+                                if (!isSelected) {
+                                    selectedMessageIds.add(message.id)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -166,15 +272,28 @@ fun ConversationDetailScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageItem(message: MessageModel) {
+fun MessageItem(
+    message: MessageModel,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     var showOriginal by remember { mutableStateOf(false) }
 
     val arrangement = if (message.isReceived) Arrangement.Start else Arrangement.End
     val cardAlignment = if (message.isReceived) Alignment.Start else Alignment.End
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(vertical = 4.dp),
         horizontalAlignment = cardAlignment
     ) {
         Box(
