@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.1.1"
 kotlin = "2.3.21"
 
 app-version = "1.9"
@@ -11,7 +11,7 @@ coreKtx = "1.18.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
 composeBom = "2026.04.01"
-androidx-navigation-compose = "2.8.5"
+androidx-navigation-compose = "2.9.8"
 material3 = "1.5.0-alpha19"
 material-icons = "1.7.8"
 koin = "4.2.1"
