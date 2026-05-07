@@ -8,6 +8,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -260,8 +261,16 @@ fun ConversationDetailScreen(
                                 }
                             },
                             onLongClick = {
-                                if (!isSelected) {
+                                if (selectedMessageIds.isEmpty()) {
+                                    // 首次长按，进入多选模式
                                     selectedMessageIds.add(message.id)
+                                } else {
+                                    // 已在多选模式，长按也切换选中状态
+                                    if (isSelected) {
+                                        selectedMessageIds.remove(message.id)
+                                    } else {
+                                        selectedMessageIds.add(message.id)
+                                    }
                                 }
                             }
                         )
@@ -281,6 +290,7 @@ fun MessageItem(
     onLongClick: () -> Unit
 ) {
     var showOriginal by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     val arrangement = if (message.isReceived) Arrangement.Start else Arrangement.End
     val cardAlignment = if (message.isReceived) Alignment.Start else Alignment.End
@@ -290,7 +300,9 @@ fun MessageItem(
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onLongClick,
+                indication = null,
+                interactionSource = interactionSource
             )
             .padding(vertical = 4.dp),
         horizontalAlignment = cardAlignment
