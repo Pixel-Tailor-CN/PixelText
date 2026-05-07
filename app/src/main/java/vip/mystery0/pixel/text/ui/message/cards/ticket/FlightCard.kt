@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.cards.ticket
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,9 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
@@ -33,24 +35,41 @@ import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
 
 @Composable
 fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) {
-    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.primary
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else themeColor.copy(alpha = 0.03f)
-    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
-    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val baseThemeColor = MaterialTheme.colorScheme.primary
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f),
+        animationSpec = tween(durationMillis = 200),
+        label = "containerColor"
+    )
+    val onContainerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(durationMillis = 200),
+        label = "onContainerColor"
+    )
+    val onContainerVariantColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 200),
+        label = "onContainerVariantColor"
+    )
+    val accentColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor,
+        animationSpec = tween(durationMillis = 200),
+        label = "accentColor"
+    )
 
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = containerColor,
-        border = BorderStroke(1.dp, if (isSelected) containerColor else themeColor.copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, if (isSelected) containerColor else baseThemeColor.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             CardHeader(
                 icon = Icons.Rounded.FlightTakeoff,
-                iconTint = themeColor,
-                iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
+                iconTint = accentColor,
+                iconBg = if (isSelected) onContainerColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primaryContainer,
                 title = "航班行程",
-                dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else themeColor.copy(alpha = 0.1f)
+                dividerColor = onContainerColor.copy(alpha = 0.1f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -68,7 +87,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                 Text(
                     text = result.flightNumber,
                     style = MaterialTheme.typography.labelLargeEmphasized,
-                    color = themeColor
+                    color = accentColor
                 )
             }
 
@@ -106,19 +125,19 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         HorizontalDivider(
-                            color = themeColor.copy(alpha = 0.2f),
+                            color = accentColor.copy(alpha = 0.2f),
                             modifier = Modifier.weight(1f)
                         )
                         Icon(
                             imageVector = Icons.Rounded.AirplanemodeActive,
                             contentDescription = null,
-                            tint = themeColor,
+                            tint = accentColor,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp)
                                 .size(16.dp)
                         )
                         HorizontalDivider(
-                            color = themeColor.copy(alpha = 0.2f),
+                            color = accentColor.copy(alpha = 0.2f),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -126,7 +145,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                     Text(
                         text = result.flightType,
                         style = MaterialTheme.typography.labelSmall,
-                        color = themeColor.copy(alpha = 0.7f)
+                        color = accentColor.copy(alpha = 0.7f)
                     )
                 }
 
@@ -148,7 +167,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            DashedDivider(color = themeColor.copy(alpha = 0.2f))
+            DashedDivider(color = accentColor.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
@@ -173,7 +192,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                     modifier = Modifier
                         .width(1.dp)
                         .height(30.dp)
-                        .background(themeColor.copy(alpha = 0.2f))
+                        .background(accentColor.copy(alpha = 0.2f))
                 )
 
                 Column(horizontalAlignment = Alignment.End) {
@@ -186,7 +205,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                     Text(
                         text = result.boardingTime,
                         style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = themeColor
+                        color = accentColor
                     )
                 }
             }

@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.cards
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,11 +18,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
@@ -30,8 +32,16 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode,
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer
-    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onPrimaryContainer
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
+        animationSpec = tween(durationMillis = 200),
+        label = "containerColor"
+    )
+    val onContainerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onPrimaryContainer,
+        animationSpec = tween(durationMillis = 200),
+        label = "onContainerColor"
+    )
 
     ElevatedCard(
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
