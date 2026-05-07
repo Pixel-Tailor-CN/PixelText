@@ -32,21 +32,25 @@ import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
 
 @Composable
-fun FlightCard(result: ParsedResult.Ticket.Flight) {
-    val themeColor = MaterialTheme.colorScheme.primary
+fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) {
+    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.primary
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else themeColor.copy(alpha = 0.03f)
+    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = themeColor.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.15f)),
+        color = containerColor,
+        border = BorderStroke(1.dp, if (isSelected) containerColor else themeColor.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             CardHeader(
                 icon = Icons.Rounded.FlightTakeoff,
                 iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.primaryContainer,
+                iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
                 title = "航班行程",
-                dividerColor = themeColor.copy(alpha = 0.1f)
+                dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else themeColor.copy(alpha = 0.1f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -59,7 +63,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                 Text(
                     text = result.date,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = onContainerVariantColor
                 )
                 Text(
                     text = result.flightNumber,
@@ -81,13 +85,13 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                         style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 36.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${result.departureCity} ${result.departureTime}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                 }
 
@@ -132,13 +136,13 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                         style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 36.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${result.arrivalCity} ${result.arrivalTime}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                 }
             }
@@ -155,13 +159,13 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                     Text(
                         text = "航站楼",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = onContainerVariantColor.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = result.terminal,
                         style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                 }
 
@@ -176,7 +180,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight) {
                     Text(
                         text = "登机时间",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = onContainerVariantColor.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(

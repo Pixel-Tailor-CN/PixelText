@@ -25,21 +25,26 @@ import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
 
 @Composable
-fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
-    val themeColor = MaterialTheme.colorScheme.primary
+fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge, isSelected: Boolean = false) {
+    val baseThemeColor = MaterialTheme.colorScheme.primary
+    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor
+    
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f)
+    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = themeColor.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.15f)),
+        color = containerColor,
+        border = BorderStroke(1.dp, if (isSelected) containerColor else baseThemeColor.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             CardHeader(
                 icon = Icons.Rounded.PhoneIphone,
-                iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.primaryContainer,
+                iconTint = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor,
+                iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
                 title = "充值成功",
-                dividerColor = themeColor.copy(alpha = 0.1f)
+                dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.1f)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -58,7 +63,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
                 Text(
                     text = "元",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = onContainerVariantColor,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
@@ -69,7 +74,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge) {
                 details = result.details,
                 highlightKey = "当前余额",
                 highlightColor = themeColor,
-                containerColor = themeColor.copy(alpha = 0.08f)
+                containerColor = if (isSelected) baseThemeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.08f)
             )
         }
     }

@@ -28,21 +28,25 @@ import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
 
 @Composable
-fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
-    val themeColor = MaterialTheme.colorScheme.primary
+fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean = false) {
+    val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.primary
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else themeColor.copy(alpha = 0.03f)
+    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
+    val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = themeColor.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.15f)),
+        color = containerColor,
+        border = BorderStroke(1.dp, if (isSelected) containerColor else themeColor.copy(alpha = 0.15f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             CardHeader(
                 icon = Icons.Rounded.DirectionsRailway,
                 iconTint = themeColor,
-                iconBg = MaterialTheme.colorScheme.primaryContainer,
+                iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
                 title = "火车票",
-                dividerColor = themeColor.copy(alpha = 0.1f)
+                dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else themeColor.copy(alpha = 0.1f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -55,16 +59,16 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                 Text(
                     text = result.date,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = onContainerVariantColor
                 )
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = if (isSelected) themeColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Text(
                         text = result.trainNumber,
                         style = MaterialTheme.typography.labelMediumEmphasized,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = if (isSelected) themeColor else MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
@@ -83,13 +87,13 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 32.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = result.departureStation,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                 }
 
@@ -103,7 +107,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surface,
+                        color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.dp, themeColor.copy(alpha = 0.3f))
                     ) {
                         Text(
@@ -121,13 +125,13 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         style = MaterialTheme.typography.displaySmallEmphasized.copy(
                             fontSize = 32.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = onContainerColor
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = result.arrivalStation,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = onContainerVariantColor
                     )
                 }
             }
@@ -142,7 +146,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
             ) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = themeColor.copy(alpha = 0.08f),
+                    color = if (isSelected) themeColor.copy(alpha = 0.08f) else themeColor.copy(alpha = 0.08f),
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -152,19 +156,19 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         Text(
                             text = "乘车人",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            color = onContainerVariantColor.copy(alpha = 0.8f)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = result.passenger,
                             style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = onContainerColor
                         )
                     }
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = themeColor.copy(alpha = 0.08f),
+                    color = if (isSelected) themeColor.copy(alpha = 0.08f) else themeColor.copy(alpha = 0.08f),
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -174,13 +178,13 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket) {
                         Text(
                             text = "座位",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            color = onContainerVariantColor.copy(alpha = 0.8f)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = result.seat,
                             style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = onContainerColor
                         )
                     }
                 }

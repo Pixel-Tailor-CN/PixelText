@@ -288,7 +288,6 @@ fun MessageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -302,11 +301,12 @@ fun MessageItem(
         ) {
             Column(horizontalAlignment = cardAlignment) {
                 if (showOriginal || message.parsedResult is ParsedResult.None) {
-                    OriginalTextCard(content = message.content)
+                    OriginalTextCard(content = message.content, isSelected = isSelected)
                 } else {
                     MessageCardFactory.CreateCard(
                         content = message.content,
-                        parsedResult = message.parsedResult
+                        parsedResult = message.parsedResult,
+                        isSelected = isSelected
                     )
                 }
             }
