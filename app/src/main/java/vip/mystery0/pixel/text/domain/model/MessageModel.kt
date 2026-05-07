@@ -34,7 +34,16 @@ sealed class ParsedResult {
     data class BankTransaction(
         val type: String,
         val amount: String,
+        val isSuccess: Boolean = true,
+        val errorMessage: String? = null,
         val details: Map<String, String>
+    ) : ParsedResult()
+
+    data class ExpressDelivery(
+        val company: String,
+        val code: String,
+        val location: String,
+        val time: String? = null
     ) : ParsedResult()
 
     data class PhoneRecharge(

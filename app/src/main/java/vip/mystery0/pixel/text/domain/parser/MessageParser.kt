@@ -182,10 +182,23 @@ class MessageParser(private val context: Context) {
                     details["交易备注"] = it.trim('（', '）', '(', ')')
                 }
 
+                val isSuccess = getGroupOrNull(matcher, "status") != "失败"
+                val reason = getGroupOrNull(matcher, "reason")
+
                 return ParsedResult.BankTransaction(
                     type = getGroupOrNull(matcher, "type") ?: "交易",
                     amount = getGroupOrNull(matcher, "amount") ?: "0.00",
+                    isSuccess = isSuccess,
+                    errorMessage = reason,
                     details = details
+                )
+            }
+            "ExpressDelivery" -> {
+                return ParsedResult.ExpressDelivery(
+                    company = getGroupOrNull(matcher, "company") ?: "--",
+                    code = getGroupOrNull(matcher, "code") ?: "--",
+                    location = getGroupOrNull(matcher, "location") ?: "--",
+                    time = getGroupOrNull(matcher, "time")
                 )
             }
 
