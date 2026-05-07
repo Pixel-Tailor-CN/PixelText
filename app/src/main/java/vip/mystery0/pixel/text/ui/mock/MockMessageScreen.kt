@@ -94,6 +94,35 @@ fun MockMessageScreen() {
         ),
         MessageModel(
             id = 4,
+            sender = "招商银行",
+            content = "尾号8892账户10月25日消费失败，金额 192.10，失败原因：卡片已过期，请更换新卡后重试。",
+            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 3,
+            simName = "中国移动",
+            parsedResult = ParsedResult.BankTransaction(
+                type = "消费",
+                amount = "192.10",
+                isSuccess = false,
+                errorMessage = "卡片已过期",
+                details = mapOf(
+                    "账户" to "信用卡 尾号 8892"
+                )
+            )
+        ),
+        MessageModel(
+            id = 5,
+            sender = "菜鸟驿站",
+            content = "【菜鸟驿站】中通快递暂存至5栋1单元101号无人自助店，凭提货码 22-3-5041 提取，请于今天 23:00 前领取。",
+            timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 12,
+            simName = "中国移动",
+            parsedResult = ParsedResult.ExpressDelivery(
+                company = "中通快递",
+                code = "22-3-5041",
+                location = "5栋1单元101号无人自助店",
+                time = "今天 23:00"
+            )
+        ),
+        MessageModel(
+            id = 6,
             sender = "10086",
             content = "充值成功！充值号码138****5678，充值金额100.00元，当前余额￥153.20。",
             timestamp = System.currentTimeMillis() - 1000 * 60 * 60 * 24,
