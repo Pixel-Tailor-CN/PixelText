@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,6 +46,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -179,11 +181,28 @@ fun ConversationListScreen(
                 }
 
                 is ConversationListUiState.Success -> {
+                    val listState = rememberLazyListState()
+
+                    val shouldLoadMore = remember {
+                        derivedStateOf {
+                            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                                ?: return@derivedStateOf false
+                            lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 5
+                        }
+                    }
+
+                    LaunchedEffect(shouldLoadMore.value) {
+                        if (shouldLoadMore.value) {
+                            viewModel.loadMore()
+                        }
+                    }
+
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 80.dp)
                     ) {
-                        items(state.conversations) { conversation ->
+                        items(state.conversations, key = { it.threadId }) { conversation ->
                             ConversationItem(
                                 conversation = conversation,
                                 onClick = {

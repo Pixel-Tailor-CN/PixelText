@@ -15,17 +15,48 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         MutableStateFlow<ConversationListUiState>(ConversationListUiState.Loading)
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
 
+    private val allConversations = mutableListOf<ConversationModel>()
+    private var offset = 0
+    private var isLoadingMore = false
+    private var hasMore = true
+
     fun loadConversations(force: Boolean = false) {
-        if (!force && _uiState.value is ConversationListUiState.Success) return
-        
-        viewModelScope.launch {
+        if (force) {
+            offset = 0
+            allConversations.clear()
+            hasMore = true
             _uiState.value = ConversationListUiState.Loading
-            repository.getConversations()
+        } else if (allConversations.isNotEmpty()) {
+            return
+        }
+
+        fetchNextBatch(100)
+    }
+
+    fun loadMore() {
+        if (isLoadingMore || !hasMore) return
+        fetchNextBatch(50)
+    }
+
+    private fun fetchNextBatch(limit: Int) {
+        isLoadingMore = true
+        viewModelScope.launch {
+            repository.getConversations(limit, offset)
                 .catch { e ->
-                    _uiState.value = ConversationListUiState.Error(e.message ?: "Unknown error")
+                    if (allConversations.isEmpty()) {
+                        _uiState.value = ConversationListUiState.Error(e.message ?: "Unknown error")
+                    }
+                    isLoadingMore = false
                 }
-                .collect { list ->
-                    _uiState.value = ConversationListUiState.Success(list)
+                .collect { newList ->
+                    if (newList.isEmpty()) {
+                        hasMore = false
+                    } else {
+                        allConversations.addAll(newList)
+                        offset += newList.size
+                        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+                    }
+                    isLoadingMore = false
                 }
         }
     }
