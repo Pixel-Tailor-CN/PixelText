@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import vip.mystery0.pixel.text.ui.message.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.message.ConversationListScreen
+import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 
 @Composable
 fun AppNavigation() {
@@ -33,8 +35,25 @@ fun AppNavigation() {
                 onNavigateToDetail = { threadId, address ->
                     navController.navigate("conversation_detail/$threadId/$address")
                 },
+                onNavigateToSearch = {
+                    navController.navigate("search")
+                },
                 onNavigateToMock = {
                     navController.navigate("mock_messages")
+                }
+            )
+        }
+        composable(
+            route = "search",
+            enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+            exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+            popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right) },
+            popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) }
+        ) {
+            SearchScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onResultClick = { message ->
+                    navController.navigate("conversation_detail/${message.threadId}/${message.sender}")
                 }
             )
         }
