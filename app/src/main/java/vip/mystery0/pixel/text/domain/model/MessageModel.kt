@@ -12,8 +12,7 @@ sealed class ParsedResult {
             val departureStation: String,
             val arrivalTime: String,
             val arrivalStation: String,
-            val passenger: String,
-            val seat: String
+            val details: Map<String, String>
         ) : Ticket()
 
         data class Flight(

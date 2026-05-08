@@ -162,6 +162,13 @@ class MessageParser(private val context: Context) {
 
         when (rule.targetCard) {
             "TrainTicket" -> {
+                val details = mutableMapOf<String, String>()
+                getGroupOrNull(matcher, "passenger")?.let { details["乘车人"] = it }
+                getGroupOrNull(matcher, "seatClass")?.let { details["席别"] = it }
+                getGroupOrNull(matcher, "seat")?.let { details["座位"] = it }
+                getGroupOrNull(matcher, "gate")?.let { details["检票口"] = it }
+                getGroupOrNull(matcher, "orderNo")?.let { details["订单号"] = it }
+
                 return ParsedResult.Ticket.TrainTicket(
                     trainNumber = getGroupOrNull(matcher, "trainNo") ?: "--",
                     date = getGroupOrNull(matcher, "date") ?: "",
@@ -170,8 +177,7 @@ class MessageParser(private val context: Context) {
                     departureTime = getGroupOrNull(matcher, "departureTime") ?: "--",
                     arrivalStation = getGroupOrNull(matcher, "arrivalStation") ?: "--",
                     arrivalTime = "--",
-                    seat = getGroupOrNull(matcher, "seat") ?: "--",
-                    passenger = getGroupOrNull(matcher, "passenger") ?: "--"
+                    details = details
                 )
             }
             "BankTransaction" -> {
@@ -185,9 +191,21 @@ class MessageParser(private val context: Context) {
                 val isSuccess = getGroupOrNull(matcher, "status") != "失败"
                 val reason = getGroupOrNull(matcher, "reason")
 
+                val type = getGroupOrNull(matcher, "type") ?: "交易"
+                val rawAmount = getGroupOrNull(matcher, "amount") ?: "0.00"
+
+                val incomeKeywords = listOf("入账", "收入", "存入", "退款", "退回")
+                val expenseKeywords = listOf("扣款", "消费", "支出", "支付", "转出", "代收")
+
+                val sign = when {
+                    incomeKeywords.any { type.contains(it) } -> "+"
+                    expenseKeywords.any { type.contains(it) } -> "-"
+                    else -> ""
+                }
+
                 return ParsedResult.BankTransaction(
-                    type = getGroupOrNull(matcher, "type") ?: "交易",
-                    amount = getGroupOrNull(matcher, "amount") ?: "0.00",
+                    type = type,
+                    amount = "$sign$rawAmount",
                     isSuccess = isSuccess,
                     errorMessage = reason,
                     details = details
@@ -195,7 +213,7 @@ class MessageParser(private val context: Context) {
             }
             "ExpressDelivery" -> {
                 return ParsedResult.ExpressDelivery(
-                    company = getGroupOrNull(matcher, "company") ?: "--",
+                    company = getGroupOrNull(matcher, "company") ?: signature ?: "--",
                     code = getGroupOrNull(matcher, "code") ?: "--",
                     location = getGroupOrNull(matcher, "location") ?: "--",
                     time = getGroupOrNull(matcher, "time")

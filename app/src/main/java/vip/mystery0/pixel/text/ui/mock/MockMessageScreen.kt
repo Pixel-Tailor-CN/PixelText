@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,13 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MockMessageScreen() {
     val mockMessages = listOf(
@@ -53,8 +53,10 @@ fun MockMessageScreen() {
                 departureStation = "北京南",
                 arrivalTime = "12:35",
                 arrivalStation = "上海虹桥",
-                passenger = "张三",
-                seat = "05车厢 12F"
+                details = mapOf(
+                    "乘车人" to "张三",
+                    "座位" to "05车厢 12F"
+                )
             )
         ),
         MessageModel(
@@ -140,7 +142,7 @@ fun MockMessageScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("原点短信 - 视觉原型") },
+                title = { Text(stringResource(R.string.app_name)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
