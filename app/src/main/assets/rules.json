@@ -2,86 +2,85 @@
   "version": 2,
   "rules": [
     {
-      "id": "12306_ticket_short",
-      "target_card": "TrainTicket",
-      "priority": 100,
-      "fast_fail": {
-        "signature_equals": "12306"
-      },
-      "conditions": {
-        "content_regex": "(?<passenger>[\u4e00-\u9fa5]+)购票成功，(?<date>\\d{1,2}月\\d{1,2}日)\\s*(?<trainNo>[A-Z0-9]+)次，(?<departureStation>.+?)站(?<departureTime>\\d{2}:\\d{2})开"
-      }
-    },
-    {
-      "id": "train_ticket_huilianyi",
-      "target_card": "TrainTicket",
+      "id": "bank_boc_credit_fail",
+      "target_card": "BankTransaction",
       "priority": 90,
       "fast_fail": {
-        "signature_equals": "汇联易甄选"
+        "signature_equals": "中国银行",
+        "keywords": [
+          "信用卡",
+          "交易失败"
+        ]
       },
       "conditions": {
-        "content_regex": "(?<date>\\d{4}-\\d{2}-\\d{2}) (?<departureTime>\\d{2}:\\d{2}:\\d{2})出发，(?<departureStation>[^—]+)—(?<arrivalStation>[^，]+)，(?<trainNo>[A-Z0-9]+)，(?:检票口：(?<gate>[A-Z0-9]+)，)?(?<passenger>[\u4e00-\u9fa5]+) .*?(?<seat>\\d+车厢\\w+号)"
+        "content_regex": "信用卡(?<account>\\d+)于(?<date>\\d{4}年\\d{2}月\\d{2}日)(?<type>消费)RMB(?<amount>[0-9,.]+)元[，。].*?因(?<reason>.*?)导致交易(?<status>失败)"
       }
     },
     {
-      "id": "express_delivery_cainiao",
-      "target_card": "ExpressDelivery",
+      "id": "bank_boc_debit_collection",
+      "target_card": "BankTransaction",
       "priority": 85,
       "fast_fail": {
+        "signature_equals": "中国银行",
         "keywords": [
-          "取件",
-          "驿站",
-          "快递"
+          "借记卡",
+          "代收"
         ]
       },
       "conditions": {
-        "content_regex": "【(?<station>.*?)】.*?(?<company>[\u4e00-\u9fa5]{2,4}快递|顺丰).*?(?:暂存|到达|放置)至(?<location>[^，。]+)[，。].*?(?:取件码|提货码|凭证)[：:]?(?<code>[a-zA-Z0-9-]+)(?:，.*?于(?<time>[^前]+)前)?"
+        "content_regex": "借记卡(?<account>\\d+)于(?<date>\\d{4})发生(?<type>.*?交易)[，。]金额(?<amount>[0-9,.]+)人民币[，。](?<details>已冻结.*)"
       }
     },
     {
-      "id": "bank_transaction_fail",
-      "target_card": "BankTransaction",
-      "priority": 82,
+      "id": "ticket_12306_success_v2",
+      "target_card": "TrainTicket",
+      "priority": 105,
       "fast_fail": {
+        "signature_equals": "12306",
         "keywords": [
-          "失败"
+          "购票成功"
         ]
       },
       "conditions": {
-        "content_regex": "尾号\\*?(?<account>\\d{4}).*?(?<type>支付|消费|扣款|交易).*?(?<amount>[0-9,.]+).*?(?<status>失败).*?原因[：:]?(?<reason>[^，。]+)"
+        "content_regex": "(?<passenger>[\\u4e00-\\u9fa5]+)购票成功，(?<date>\\d{1,2}月\\d{1,2}日)(?<trainNo>[A-Z0-9]+)次，(?<departureStation>[^0-9a-zA-Z]+)(?<departureTime>\\d{2}:\\d{2})开"
       }
     },
     {
-      "id": "bank_transaction_cmb",
+      "id": "bank_cmb_transaction_v2",
       "target_card": "BankTransaction",
-      "priority": 80,
+      "priority": 95,
       "fast_fail": {
         "signature_equals": "招商银行"
       },
       "conditions": {
-        "content_regex": "账户(?<account>\\d{4})于(?<date>\\d{2}月\\d{2}日\\d{2}:\\d{2}).*?(?<type>扣款|消费|入账|支出|存入|转账|收入).*?(?<amount>[0-9,.]+)(?<currency>元)(?<details>.*)"
+        "content_regex": "账户(?<account>\\d{4})于(?<date>\\d{2}月\\d{2}日\\d{2}:\\d{2})(?<type>[^，。人]+?)[，]?人民币(?<amount>[0-9,.]+)(?:元)?[。，（\\(]?(?<details>[^）\\)]*)"
       }
     },
     {
-      "id": "bank_transaction_comm",
-      "target_card": "BankTransaction",
-      "priority": 79,
+      "id": "ticket_huilianyi_success_v2",
+      "target_card": "TrainTicket",
+      "priority": 105,
       "fast_fail": {
-        "signature_equals": "交通银行"
+        "signature_equals": "汇联易甄选",
+        "keywords": [
+          "购票成功"
+        ]
       },
       "conditions": {
-        "content_regex": "尾号\\*?(?<account>\\d{4}).*?(?<date>\\d{2}月\\d{2}日\\d{2}：\\d{2})在(?<details>.*?)(?<type>支付|消费|扣款)(?<amount>[0-9,.]+)(?<currency>元)"
+        "content_regex": "购票成功，(?<date>\\d{4}-\\d{2}-\\d{2})\\s*(?<departureTime>\\d{2}:\\d{2}:\\d{2})出发，(?<departureStation>[^—]+)—(?<arrivalStation>[^，]+)，(?<trainNo>[A-Z0-9]+)，(?:检票口：(?<gate>[^，]+)，)?(?<passenger>[\\u4e00-\\u9fa5]+).*?(?<seatClass>\\w+座)?\\s*(?<seat>\\d+车厢\\w+号)"
       }
     },
     {
-      "id": "phone_recharge_unicom",
-      "target_card": "PhoneRecharge",
-      "priority": 70,
+      "id": "express_delivery_arrival",
+      "target_card": "ExpressDelivery",
+      "priority": 90,
       "fast_fail": {
-        "signature_equals": "中国联通"
+        "keywords": [
+          "包裹已到"
+        ]
       },
       "conditions": {
-        "content_regex": "于(?<date>\\d{2}日\\d{2}时\\d{2}分)(?:交费|充值)(?<amount>[0-9,.]+)元，账户当前可用余额为(?<balance>[0-9,.]+)元"
+        "content_regex": "(?:您的?(?<company>[^包]+?)包裹|您有包裹)已到(?<location>[^，。]+)[，。](?:请(?<time>[^前]+)前)?.*?(?:凭|取件码)[：:]?(?<code>[0-9a-zA-Z-]+)"
       }
     },
     {

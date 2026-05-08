@@ -159,52 +159,49 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean
             DashedDivider(color = accentColor.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
+            val detailEntries = result.details.entries.toList()
+            val chunkedEntries = detailEntries.chunked(2)
+
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = onContainerColor.copy(alpha = 0.05f),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 12.dp)
+                chunkedEntries.forEach { rowEntries ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = "乘车人",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = onContainerVariantColor.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = result.passenger,
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = onContainerColor
-                        )
-                    }
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = onContainerColor.copy(alpha = 0.05f),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = "座位",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = onContainerVariantColor.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = result.seat,
-                            style = MaterialTheme.typography.bodyMediumEmphasized,
-                            color = onContainerColor
-                        )
+                        rowEntries.forEach { entry ->
+                            val isHighlight = entry.key == "检票口"
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) onContainerColor.copy(alpha = 0.05f) else baseThemeColor.copy(
+                                    alpha = 0.08f
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 12.dp)
+                                ) {
+                                    Text(
+                                        text = entry.key,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = onContainerVariantColor.copy(alpha = 0.8f)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = entry.value,
+                                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                                        color = if (isHighlight && !isSelected) MaterialTheme.colorScheme.primary else onContainerColor
+                                    )
+                                }
+                            }
+                        }
+                        // Add empty spacer if row is incomplete
+                        if (rowEntries.size < 2) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
