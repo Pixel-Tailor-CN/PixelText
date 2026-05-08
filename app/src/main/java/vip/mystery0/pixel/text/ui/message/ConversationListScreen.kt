@@ -42,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -188,6 +189,7 @@ fun ConversationListScreen(
 
                         is ConversationListUiState.Success -> {
                             val listState = rememberLazyListState()
+                            var isRefreshing by remember { mutableStateOf(false) }
 
                             val shouldLoadMore = remember {
                                 derivedStateOf {
@@ -204,21 +206,36 @@ fun ConversationListScreen(
                                 }
                             }
 
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(bottom = 80.dp)
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    isRefreshing = true
+                                    viewModel.loadConversations(force = true)
+                                },
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                items(state.conversations, key = { it.threadId }) { conversation ->
-                                    ConversationItem(
-                                        conversation = conversation,
-                                        onClick = {
-                                            onNavigateToDetail(
-                                                conversation.threadId,
-                                                conversation.address
-                                            )
-                                        }
-                                    )
+                                LaunchedEffect(state) {
+                                    isRefreshing = false
+                                }
+
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(bottom = 80.dp)
+                                ) {
+                                    items(
+                                        state.conversations,
+                                        key = { it.threadId }) { conversation ->
+                                        ConversationItem(
+                                            conversation = conversation,
+                                            onClick = {
+                                                onNavigateToDetail(
+                                                    conversation.threadId,
+                                                    conversation.address
+                                                )
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
