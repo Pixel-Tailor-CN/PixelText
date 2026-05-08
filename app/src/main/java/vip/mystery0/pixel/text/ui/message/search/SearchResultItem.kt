@@ -51,11 +51,7 @@ fun SearchResultItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(
-                    Color(0xFF000000.toInt() or (message.sender.hashCode() and 0x00FFFFFF)).copy(
-                        alpha = 1f
-                    )
-                ),
+                .background(vip.mystery0.pixel.text.ui.theme.getAvatarColor(message.sender)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
