@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
     <!-- Required to interact with system SMS/MMS provider -->
     <uses-permission android:name="android.permission.WRITE_SMS" />
+    <!-- Required to read contacts for picking recipients -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Required to post notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
