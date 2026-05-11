@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -552,22 +553,42 @@ fun NewChatBottomSheet(
         getAvailableSimCards(context)
     }
 
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(context, "需要联系人权限才能选择联系人", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val contactPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickContact()
     ) { uri: Uri? ->
         uri?.let {
-            context.contentResolver.query(
+            val contactId = context.contentResolver.query(
                 it,
-                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                arrayOf(ContactsContract.Contacts._ID),
                 null,
                 null,
                 null
             )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val number = cursor.getString(0)
-                    val threadId = getThreadIdForAddress(context, number)
-                    onDismiss()
-                    onNavigateToDetail(threadId, number)
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+
+            contactId?.let { id ->
+                context.contentResolver.query(
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+                    arrayOf(id.toString()),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val number = cursor.getString(0)
+                        val threadId = getThreadIdForAddress(context, number)
+                        onDismiss()
+                        onNavigateToDetail(threadId, number)
+                    }
                 }
             }
         }
@@ -665,7 +686,11 @@ fun NewChatBottomSheet(
 
         androidx.compose.material3.OutlinedButton(
             onClick = {
-                contactPickerLauncher.launch(null)
+                if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                    contactPickerLauncher.launch(null)
+                } else {
+                    contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                }
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
