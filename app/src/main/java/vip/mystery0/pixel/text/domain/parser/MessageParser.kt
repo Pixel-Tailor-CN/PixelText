@@ -51,9 +51,9 @@ class MessageParser(private val context: Context) {
 
                 val fastFail = ruleObj.optJSONObject("fast_fail")
                 val senderEquals =
-                    fastFail?.optString("sender_equals", null)?.takeIf { it.isNotBlank() }
+                    fastFail?.optString("sender_equals", "")?.takeIf { it.isNotBlank() }
                 val signatureEquals =
-                    fastFail?.optString("signature_equals", null)?.takeIf { it.isNotBlank() }
+                    fastFail?.optString("signature_equals", "")?.takeIf { it.isNotBlank() }
                 val keywordsArray = fastFail?.optJSONArray("keywords")
                 val keywords = mutableListOf<String>()
                 if (keywordsArray != null) {
@@ -102,8 +102,8 @@ class MessageParser(private val context: Context) {
     }
 
     fun extractSignature(content: String): String? {
-        val startRegex = Regex("^【(.*?)】|^\\[(.*?)\\]")
-        val endRegex = Regex("【(.*?)】$|\\[(.*?)\\]$")
+        val startRegex = Regex("^【(.*?)】|^\\[(.*?)]")
+        val endRegex = Regex("【(.*?)】$|\\[(.*?)]$")
 
         startRegex.find(content)?.let { return it.groupValues[1].ifEmpty { it.groupValues[2] } }
         endRegex.find(content)?.let { return it.groupValues[1].ifEmpty { it.groupValues[2] } }
