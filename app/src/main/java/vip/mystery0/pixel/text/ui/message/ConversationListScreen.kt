@@ -2,9 +2,14 @@ package vip.mystery0.pixel.text.ui.message
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Telephony
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +50,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -57,10 +63,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
@@ -96,6 +106,41 @@ fun ConversationListScreen(
             viewModel.loadConversations()
         } else {
             permissionLauncher.launch(Manifest.permission.READ_SMS)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, hasPermission) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (hasPermission) {
+                    viewModel.refreshSilent()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    DisposableEffect(context, hasPermission) {
+        if (!hasPermission) return@DisposableEffect onDispose {}
+
+        val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                viewModel.refreshSilent()
+            }
+        }
+
+        context.contentResolver.registerContentObserver(
+            Telephony.Sms.CONTENT_URI,
+            true,
+            contentObserver
+        )
+
+        onDispose {
+            context.contentResolver.unregisterContentObserver(contentObserver)
         }
     }
 
@@ -272,20 +317,33 @@ fun ConversationItem(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(vip.mystery0.pixel.text.ui.theme.getAvatarColor(conversation.address)),
-            contentAlignment = Alignment.Center
-        ) {
-            // 使用联系人头像图标
-            Icon(
-                imageVector = Icons.Rounded.AccountCircle,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(32.dp)
-            )
+        Box(modifier = Modifier.size(48.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(vip.mystery0.pixel.text.ui.theme.getAvatarColor(conversation.address)),
+                contentAlignment = Alignment.Center
+            ) {
+                // 使用联系人头像图标
+                Icon(
+                    imageVector = Icons.Rounded.AccountCircle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            if (conversation.unreadCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error)
+                        .align(Alignment.TopEnd)
+                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -297,7 +355,9 @@ fun ConversationItem(
             ) {
                 Text(
                     text = conversation.address,
-                    style = if (conversation.unreadCount > 0) MaterialTheme.typography.bodyLargeEmphasized else MaterialTheme.typography.bodyLarge,
+                    style = if (conversation.unreadCount > 0) MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ) else MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)

@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
     <!-- Required to interact with system SMS/MMS provider -->
     <uses-permission android:name="android.permission.WRITE_SMS" />
+    <!-- Required to post notifications on Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
 
     <application
         android:name=".PixelTextApp"
@@ -85,6 +88,16 @@
                 <data android:scheme="mmsto" />
             </intent-filter>
         </activity>
+
+        <!-- 5. BroadcastReceiver for notification actions (mark read / delete) -->
+        <receiver
+            android:name=".receiver.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="vip.mystery0.pixel.text.action.MARK_READ" />
+                <action android:name="vip.mystery0.pixel.text.action.DELETE_SMS" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

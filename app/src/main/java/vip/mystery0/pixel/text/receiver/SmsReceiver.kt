@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
@@ -17,14 +18,14 @@ class SmsReceiver : BroadcastReceiver() {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             if (messages.isEmpty()) return
 
-            // Combine multipart messages
+            // 合并多段短信（长短信拆包）
             val sender = messages[0]?.displayOriginatingAddress ?: return
             val body = messages.joinToString("") { it?.displayMessageBody ?: "" }
             val timestamp = messages[0]?.timestampMillis ?: System.currentTimeMillis()
 
             Log.d(TAG, "Received SMS from $sender: $body")
 
-            // Insert into system SMS database
+            // 写入系统短信数据库
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, sender)
                 put(Telephony.Sms.BODY, body)
@@ -34,11 +35,36 @@ class SmsReceiver : BroadcastReceiver() {
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
             }
 
+            var threadId = 0L
+            var insertedUri: android.net.Uri? = null
             try {
-                context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+                insertedUri =
+                    context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+                // 从插入后的记录中读取 thread_id，用于通知分组和后续跳转
+                if (insertedUri != null) {
+                    context.contentResolver.query(
+                        insertedUri,
+                        arrayOf(Telephony.Sms.THREAD_ID),
+                        null, null, null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            threadId =
+                                cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID))
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to insert SMS into database", e)
             }
+
+            // 发送通知
+            SmsNotificationHelper.showSmsNotification(
+                context = context,
+                sender = sender,
+                body = body,
+                threadId = threadId,
+                messageUri = insertedUri?.toString(),
+            )
         }
     }
 }

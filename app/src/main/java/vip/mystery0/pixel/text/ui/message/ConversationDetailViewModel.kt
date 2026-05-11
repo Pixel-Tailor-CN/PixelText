@@ -33,6 +33,10 @@ class ConversationDetailViewModel(private val repository: MessageRepository) : V
         hasMore = true
         _uiState.value = MessageUiState.Loading
         fetchMessages()
+
+        viewModelScope.launch {
+            repository.markThreadAsRead(threadId)
+        }
     }
 
     fun loadMore() {
