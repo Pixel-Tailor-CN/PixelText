@@ -16,6 +16,6 @@ val appModule = module {
     single<MessageRepository> { MessageRepositoryImpl(androidContext(), get()) }
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
-    viewModel { ConversationDetailViewModel(get()) }
+    viewModel { ConversationDetailViewModel(get(), androidContext()) }
     viewModel { SearchViewModel(get()) }
 }

@@ -21,8 +21,6 @@ class HeadlessSmsSendService : Service() {
             val message = intent.getStringExtra(Intent.EXTRA_TEXT)
             val uri = intent.data
 
-            Log.d(TAG, "Headless SMS requested. URI: $uri, Message: $message")
-
             if (uri != null && !message.isNullOrBlank()) {
                 val recipient = getRecipient(uri)
                 if (recipient.isNotBlank()) {
@@ -50,7 +48,6 @@ class HeadlessSmsSendService : Service() {
             } else {
                 smsManager.sendTextMessage(recipient, null, message, null, null)
             }
-            Log.d(TAG, "Headless SMS sent successfully to $recipient")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send headless SMS to $recipient", e)
         }

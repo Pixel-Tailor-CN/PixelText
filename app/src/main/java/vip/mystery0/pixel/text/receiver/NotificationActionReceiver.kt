@@ -106,7 +106,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0 AND ${Telephony.Sms.TYPE} = ?",
                 arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
             )
-            Log.d(TAG, "Marked $updated messages as read in thread $threadId")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to mark thread $threadId as read", e)
         }
@@ -119,7 +118,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
         try {
             val uri = messageUriStr.toUri()
             val deleted = context.contentResolver.delete(uri, null, null)
-            Log.d(TAG, "Deleted $deleted message(s) at $messageUriStr")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to delete SMS at $messageUriStr", e)
         }
@@ -143,7 +141,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
             } else {
                 smsManager.sendMultipartTextMessage(recipient, null, parts, null, null)
             }
-            Log.d(TAG, "Reply sent to $recipient (${parts.size} part(s))")
 
             // 写入系统数据库，使所有短信应用均可看到该发送记录
             saveSentMessageToDb(context, recipient, text)
@@ -174,7 +171,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
             }
             val uri = context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
-            Log.d(TAG, "Saved sent message to DB: $uri")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save sent message to DB", e)
         }
