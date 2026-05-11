@@ -38,11 +38,16 @@ class ConversationDetailViewModel(
         _messages.clear()
         offset = 0
         hasMore = true
-        _uiState.value = MessageUiState.Loading
-        fetchMessages()
 
-        viewModelScope.launch {
-            repository.markThreadAsRead(threadId)
+        if (threadId == -1L) {
+            // 新会话，没有历史消息
+            _uiState.value = MessageUiState.Success(emptyList())
+        } else {
+            _uiState.value = MessageUiState.Loading
+            fetchMessages()
+            viewModelScope.launch {
+                repository.markThreadAsRead(threadId)
+            }
         }
     }
 
@@ -98,6 +103,22 @@ class ConversationDetailViewModel(
                 context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
 
                 kotlinx.coroutines.delay(500)
+
+                // 如果是新会话，需要查询新的 threadId
+                if (currentThreadId == -1L) {
+                    context.contentResolver.query(
+                        Telephony.Sms.CONTENT_URI,
+                        arrayOf(Telephony.Sms.THREAD_ID),
+                        "${Telephony.Sms.ADDRESS} = ?",
+                        arrayOf(address),
+                        "${Telephony.Sms.DATE} DESC LIMIT 1"
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            currentThreadId = cursor.getLong(0)
+                        }
+                    }
+                }
+
                 _messages.clear()
                 offset = 0
                 hasMore = true
