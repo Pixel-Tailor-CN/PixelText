@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
@@ -40,13 +41,13 @@ object SmsNotificationHelper {
     }
 
     /**
-     * 发送新短信通知，带"已阅"和"删除"操作按钮。
+     * 发送新短信通知，带"已阅"和"回复"操作按钮。
      *
      * @param context       上下文
      * @param sender        发件人（号码或联系人名称）
      * @param body          短信内容
      * @param threadId      会话 ID，用于跳转、分组和标记已读
-     * @param messageUri    插入数据库后返回的 URI（content://sms/inbox/xxx），用于精准删除
+     * @param messageUri    插入数据库后返回的 URI（目前未使用，预留）
      */
     fun showSmsNotification(
         context: Context,
@@ -97,19 +98,30 @@ object SmsNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // ── Action 2："删除" ─────────────────────────────────────────────────
-        val deleteIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            action = NotificationActionReceiver.ACTION_DELETE_SMS
+        // ── Action 2："回复" ─────────────────────────────────────────────────
+        val replyLabel = context.getString(R.string.notification_reply_hint)
+        val remoteInput = RemoteInput.Builder(NotificationActionReceiver.EXTRA_REPLY_TEXT)
+            .setLabel(replyLabel)
+            .build()
+
+        val replyIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_REPLY_SMS
             putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
             putExtra(NotificationActionReceiver.EXTRA_THREAD_ID, threadId)
-            putExtra(NotificationActionReceiver.EXTRA_MESSAGE_URI, messageUri)
+            putExtra(NotificationActionReceiver.EXTRA_REPLY_ADDRESS, sender)
         }
-        val deletePendingIntent = PendingIntent.getBroadcast(
+        val replyPendingIntent = PendingIntent.getBroadcast(
             context,
             notificationId * 10 + 2,
-            deleteIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            replyIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE // Required for RemoteInput
         )
+
+        val replyAction = NotificationCompat.Action.Builder(
+            0,
+            context.getString(R.string.notification_action_reply),
+            replyPendingIntent
+        ).addRemoteInput(remoteInput).build()
 
         // ── 构建通知 ─────────────────────────────────────────────────────────
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
@@ -122,18 +134,14 @@ object SmsNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setGroup("sms_group_$threadId")
-            // Action 1：已阅（无图标，图标参数在折叠通知中通常不显示，传 0 即可）
+            // Action 1：已阅
             .addAction(
                 0,
                 context.getString(R.string.notification_action_mark_read),
                 markReadPendingIntent
             )
-            // Action 2：删除
-            .addAction(
-                0,
-                context.getString(R.string.notification_action_delete),
-                deletePendingIntent
-            )
+            // Action 2：回复
+            .addAction(replyAction)
             .build()
 
         NotificationManagerCompat.from(context).notify(notificationId, notification)

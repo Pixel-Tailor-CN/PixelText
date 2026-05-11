@@ -89,12 +89,13 @@
             </intent-filter>
         </activity>
 
-        <!-- 5. BroadcastReceiver for notification actions (mark read / delete) -->
+        <!-- 5. BroadcastReceiver for notification actions (mark read / reply / delete) -->
         <receiver
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="vip.mystery0.pixel.text.action.MARK_READ" />
+                <action android:name="vip.mystery0.pixel.text.action.REPLY_SMS" />
                 <action android:name="vip.mystery0.pixel.text.action.DELETE_SMS" />
             </intent-filter>
         </receiver>
