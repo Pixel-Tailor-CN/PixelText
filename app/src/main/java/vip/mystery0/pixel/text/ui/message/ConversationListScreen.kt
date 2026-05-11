@@ -1,10 +1,13 @@
 package vip.mystery0.pixel.text.ui.message
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.provider.Telephony
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
@@ -45,6 +49,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -158,6 +163,7 @@ fun ConversationListScreen(
 
     val sheetState = rememberModalBottomSheetState()
     var showProfileSheet by remember { mutableStateOf(false) }
+    var showNewChatSheet by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -199,7 +205,7 @@ fun ConversationListScreen(
                     ExtendedFloatingActionButton(
                         text = { Text("Start chat") },
                         icon = { Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = null) },
-                        onClick = { /* TODO */ },
+                        onClick = { showNewChatSheet = true },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -327,6 +333,18 @@ fun ConversationListScreen(
                     showProfileSheet = false
                     onNavigateToMock()
                 }
+            )
+        }
+    }
+
+    if (showNewChatSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showNewChatSheet = false },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            NewChatBottomSheet(
+                onDismiss = { showNewChatSheet = false },
+                onNavigateToDetail = onNavigateToDetail
             )
         }
     }
@@ -518,4 +536,191 @@ fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
             tint = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
+}
+
+@Composable
+fun NewChatBottomSheet(
+    onDismiss: () -> Unit,
+    onNavigateToDetail: (Long, String) -> Unit
+) {
+    val context = LocalContext.current
+    var phoneNumber by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    var selectedSimSlot by remember { mutableStateOf(0) }
+
+    val simCards = remember {
+        getAvailableSimCards(context)
+    }
+
+    val contactPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact()
+    ) { uri: Uri? ->
+        uri?.let {
+            context.contentResolver.query(
+                it,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val number = cursor.getString(0)
+                    val threadId = getThreadIdForAddress(context, number)
+                    onDismiss()
+                    onNavigateToDetail(threadId, number)
+                }
+            }
+        }
+    }
+
+    val isValidPhoneNumber = phoneNumber.isNotBlank() && phoneNumber.matches(Regex("^[0-9+\\s-]+$"))
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "接收人",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    androidx.compose.material3.TextField(
+                        value = phoneNumber,
+                        onValueChange = {
+                            phoneNumber = it
+                            showError = it.isNotBlank() && !it.matches(Regex("^[0-9+\\s-]+$"))
+                        },
+                        placeholder = { Text("输入电话号码") },
+                        isError = showError,
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = androidx.compose.material3.TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            errorContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            errorIndicatorColor = Color.Transparent
+                        )
+                    )
+                }
+                if (showError) {
+                    Text(
+                        "请输入有效的电话号码",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+
+                if (simCards.size > 1) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        simCards.forEachIndexed { index, simName ->
+                            androidx.compose.material3.FilterChip(
+                                selected = selectedSimSlot == index,
+                                onClick = { selectedSimSlot = index },
+                                label = { Text(simName) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        androidx.compose.material3.Button(
+            onClick = {
+                if (isValidPhoneNumber) {
+                    val trimmedNumber = phoneNumber.trim()
+                    val threadId = getThreadIdForAddress(context, trimmedNumber)
+                    onDismiss()
+                    onNavigateToDetail(threadId, trimmedNumber)
+                }
+            },
+            enabled = isValidPhoneNumber,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("下一步")
+        }
+
+        androidx.compose.material3.OutlinedButton(
+            onClick = {
+                contactPickerLauncher.launch(null)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("选择联系人")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+private fun getThreadIdForAddress(context: Context, address: String): Long {
+    context.contentResolver.query(
+        Telephony.Sms.CONTENT_URI,
+        arrayOf(Telephony.Sms.THREAD_ID),
+        "${Telephony.Sms.ADDRESS} = ?",
+        arrayOf(address),
+        "${Telephony.Sms.DATE} DESC LIMIT 1"
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            return cursor.getLong(0)
+        }
+    }
+    return -1L
+}
+
+private fun getAvailableSimCards(context: Context): List<String> {
+    val simCards = mutableListOf<String>()
+    try {
+        context.contentResolver.query(
+            Uri.parse("content://telephony/siminfo"),
+            arrayOf("display_name", "carrier_name"),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            val displayNameIdx = cursor.getColumnIndex("display_name")
+            val carrierNameIdx = cursor.getColumnIndex("carrier_name")
+            var index = 1
+            while (cursor.moveToNext()) {
+                val displayName =
+                    if (displayNameIdx >= 0) cursor.getString(displayNameIdx) else null
+                val carrierName =
+                    if (carrierNameIdx >= 0) cursor.getString(carrierNameIdx) else null
+                val name = when {
+                    !carrierName.isNullOrBlank() && carrierName != "null" -> carrierName
+                    !displayName.isNullOrBlank() && displayName != "null" -> displayName
+                    else -> "卡$index"
+                }
+                simCards.add(name)
+                index++
+            }
+        }
+    } catch (e: Exception) {
+        // 如果查询失败，返回空列表
+    }
+    return simCards
 }
