@@ -379,13 +379,30 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             val values = ContentValues().apply {
                 put(Telephony.Sms.READ, 1)
+                put(Telephony.Sms.SEEN, 1)
             }
-            context.contentResolver.update(
-                Telephony.Sms.CONTENT_URI,
-                values,
-                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
-                arrayOf(threadId.toString())
-            )
+
+            try {
+                context.contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "${Telephony.Sms.THREAD_ID} = ? AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0)",
+                    arrayOf(threadId.toString())
+                )
+            } catch (e: Exception) {
+                Log.e("MessageRepository", "Error updating SMS read status", e)
+            }
+
+            try {
+                context.contentResolver.update(
+                    Telephony.Mms.CONTENT_URI,
+                    values,
+                    "${Telephony.Mms.THREAD_ID} = ? AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0)",
+                    arrayOf(threadId.toString())
+                )
+            } catch (e: Exception) {
+                Log.e("MessageRepository", "Error updating MMS read status", e)
+            }
         }
     }
 }
