@@ -5,7 +5,8 @@
 Pixel Text 是一款纯粹的、符合原生 Android 审美的短信应用。通过本地智能解析技术，将验证码、服务短信转化为精美的 Material You 卡片。
 
 **核心特性**：
-- 🔒 无网络权限，所有解析在本地完成
+
+- 🔒 所有短信解析在本地完成
 - 🧩 基于正则的动态解析引擎
 - 🎨 Material 3 + Dynamic Color
 - 📱 支持作为默认短信应用
@@ -19,7 +20,7 @@ Pixel Text 是一款纯粹的、符合原生 Android 审美的短信应用。通
 - **异步**: Coroutines + Flow
 - **依赖注入**: Koin
 - **数据存储**: DataStore Preferences
-- **最低 SDK**: 根据 `libs.versions.toml` 配置
+- **最低 SDK**: 31 (Android 12)
 
 ## 项目结构
 
@@ -54,13 +55,16 @@ app/src/main/java/vip/mystery0/pixel/text/
 
 ### 2. 支持的卡片类型
 
-| 卡片类型 | 类名 | 用途 |
-|---------|------|------|
-| `TrainTicket` | `TrainTicketCard.kt` | 火车票/高铁票 |
-| `BankTransaction` | `BankTransactionCard.kt` | 银行动账 |
-| `PhoneRecharge` | `PhoneRechargeCard.kt` | 手机充值/交费 |
-| `VerificationCode` | `VerificationCodeCard.kt` | 验证码 |
-| `Flight` | `FlightCard.kt` | 航班信息 |
+| 卡片类型               | 类名                        | 用途      |
+|--------------------|---------------------------|---------|
+| `TrainTicket`      | `TrainTicketCard.kt`      | 火车票/高铁票 |
+| `BankTransaction`  | `BankTransactionCard.kt`  | 银行动账    |
+| `PhoneRecharge`    | `PhoneRechargeCard.kt`    | 手机充值/交费 |
+| `VerificationCode` | `VerificationCodeCard.kt` | 验证码     |
+| `Flight`           | `FlightCard.kt`           | 航班信息    |
+| `ExpressDelivery`  | `ExpressDeliveryCard.kt`  | 快递到达通知  |
+| `NormalMessage`    | `NormalMessageCard.kt`    | 普通消息    |
+| `OriginalText`     | `OriginalTextCard.kt`     | 原始文本    |
 
 ### 3. 解析规则 JSON 结构
 
@@ -114,8 +118,11 @@ app/src/main/java/vip/mystery0/pixel/text/
 ```kotlin
 val appModule = module {
     single { MessageParser(androidContext()) }
-    single<MessageRepository> { MessageRepositoryImpl(androidContext()) }
+    single<MessageRepository> { MessageRepositoryImpl(androidContext(), get()) }
+    viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
+    viewModel { ConversationDetailViewModel(get()) }
+    viewModel { SearchViewModel(get()) }
 }
 ```
 
@@ -138,26 +145,45 @@ val appModule = module {
 
 ## 特殊注意事项
 
-### 1. 无网络权限
+### 1. 权限要求
 
-应用**不应添加任何网络权限**（`INTERNET`、`ACCESS_NETWORK_STATE` 等），这是核心隐私承诺。
+应用需要以下权限：
 
-### 2. 短信权限
+**短信相关**：
 
-需要以下权限：
-- `READ_SMS`
-- `SEND_SMS`
-- `RECEIVE_SMS`
-- `READ_PHONE_STATE` (用于识别 SIM 卡)
+- `READ_SMS` - 读取短信
+- `SEND_SMS` - 发送短信
+- `RECEIVE_SMS` - 接收短信
+- `RECEIVE_MMS` - 接收彩信
+- `RECEIVE_WAP_PUSH` - 接收 WAP Push
+- `WRITE_SMS` - 写入短信数据库
+- `READ_PHONE_STATE` - 识别 SIM 卡
 
-### 3. 默认短信应用
+**其他**：
+
+- `INTERNET` - 网络访问（必需）
+- `POST_NOTIFICATIONS` - Android 13+ 通知权限
+
+### 2. 默认短信应用
 
 需实现以下组件（参考 Android 官方文档）：
-- `BroadcastReceiver` (接收 `SMS_DELIVER_ACTION`)
-- `Service` (处理 `WAP_PUSH_DELIVER_ACTION`)
-- `Activity` (响应 `SENDTO` Intent)
 
-### 4. 解析规则更新
+**接收器**：
+
+- `SmsReceiver` - 接收 `SMS_DELIVER_ACTION`
+- `MmsReceiver` - 接收 `WAP_PUSH_DELIVER_ACTION`
+- `NotificationActionReceiver` - 处理通知栏操作（标记已读/回复/删除）
+
+**服务**：
+
+- `HeadlessSmsSendService` - 处理 `RESPOND_VIA_MESSAGE`（快速回复）
+
+**活动**：
+
+- `MainActivity` - 主界面（`MAIN` + `APP_MESSAGING`）
+- `ComposeSmsActivity` - 响应 `SEND` 和 `SENDTO` Intent
+
+### 3. 解析规则更新
 
 当需要添加新的解析规则时：
 1. 参考 `docs/rule_generation_guide.md`
