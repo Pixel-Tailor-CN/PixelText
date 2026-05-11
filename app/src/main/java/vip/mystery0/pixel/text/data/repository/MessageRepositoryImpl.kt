@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.data.repository
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.Telephony
@@ -9,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
@@ -372,4 +374,18 @@ class MessageRepositoryImpl(
         }
         emit(messages)
     }.flowOn(Dispatchers.IO)
+
+    override suspend fun markThreadAsRead(threadId: Long) {
+        withContext(Dispatchers.IO) {
+            val values = ContentValues().apply {
+                put(Telephony.Sms.READ, 1)
+            }
+            context.contentResolver.update(
+                Telephony.Sms.CONTENT_URI,
+                values,
+                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0",
+                arrayOf(threadId.toString())
+            )
+        }
+    }
 }

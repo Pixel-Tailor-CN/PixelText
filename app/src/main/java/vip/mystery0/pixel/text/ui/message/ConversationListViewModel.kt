@@ -60,6 +60,19 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
                 }
         }
     }
+
+    fun refreshSilent() {
+        if (isLoadingMore || allConversations.isEmpty()) return
+        viewModelScope.launch {
+            repository.getConversations(maxOf(100, offset), 0)
+                .catch { /* ignore error during silent refresh */ }
+                .collect { newList ->
+                    allConversations.clear()
+                    allConversations.addAll(newList)
+                    _uiState.value = ConversationListUiState.Success(allConversations.toList())
+                }
+        }
+    }
 }
 
 sealed class ConversationListUiState {

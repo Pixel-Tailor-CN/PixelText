@@ -10,4 +10,5 @@ interface MessageRepository {
     fun searchMessages(query: String): Flow<List<MessageModel>>
     fun getMessagesByThread(threadId: Long, limit: Int, offset: Int): Flow<List<MessageModel>>
     fun getMessages(): Flow<List<MessageModel>>
+    suspend fun markThreadAsRead(threadId: Long)
 }
