@@ -73,6 +73,12 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
                 }
         }
     }
+
+    fun markAsRead(threadId: Long) {
+        viewModelScope.launch {
+            repository.markThreadAsRead(threadId)
+        }
+    }
 }
 
 sealed class ConversationListUiState {

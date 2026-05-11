@@ -8,6 +8,7 @@ import android.os.Looper
 import android.provider.Telephony
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,10 +33,10 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,11 +45,15 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,9 +66,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,11 +76,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
@@ -271,15 +281,32 @@ fun ConversationListScreen(
                                     items(
                                         state.conversations,
                                         key = { it.threadId }) { conversation ->
-                                        ConversationItem(
-                                            conversation = conversation,
-                                            onClick = {
-                                                onNavigateToDetail(
-                                                    conversation.threadId,
-                                                    conversation.address
-                                                )
+                                        val dismissState = rememberSwipeToDismissBoxState()
+                                        LaunchedEffect(dismissState.targetValue) {
+                                            if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd) {
+                                                viewModel.markAsRead(conversation.threadId)
+                                                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
                                             }
-                                        )
+                                        }
+
+                                        SwipeToDismissBox(
+                                            state = dismissState,
+                                            backgroundContent = {
+                                                SwipeBackground(dismissState)
+                                            },
+                                            enableDismissFromStartToEnd = conversation.unreadCount > 0,
+                                            enableDismissFromEndToStart = false
+                                        ) {
+                                            ConversationItem(
+                                                conversation = conversation,
+                                                onClick = {
+                                                    onNavigateToDetail(
+                                                        conversation.threadId,
+                                                        conversation.address
+                                                    )
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -436,42 +463,59 @@ fun ProfileSheetContent(onMockClicked: () -> Unit) {
 }
 
 fun formatTimeShort(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val calendar = java.util.Calendar.getInstance()
-    calendar.timeInMillis = timestamp
+    val instant = Instant.ofEpochMilli(timestamp)
+    val dateTime = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+    val now = LocalDateTime.now()
 
-    val now = java.util.Calendar.getInstance()
-    val isSameYear = calendar.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR)
+    val midnightToday = now.toLocalDate().atStartOfDay()
+    val midnightThisWeek = midnightToday.minusDays(6)
 
     return when {
         // 今天：显示时间
-        diff < 1000 * 60 * 60 * 24 -> String.format(
-            "%02d:%02d",
-            calendar.get(java.util.Calendar.HOUR_OF_DAY),
-            calendar.get(java.util.Calendar.MINUTE)
-        )
+        dateTime.isAfter(midnightToday) -> {
+            dateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+        }
         // 本周：显示星期
-        diff < 1000 * 60 * 60 * 24 * 7 -> listOf(
-            "周日",
-            "周一",
-            "周二",
-            "周三",
-            "周四",
-            "周五",
-            "周六"
-        )[calendar.get(java.util.Calendar.DAY_OF_WEEK) - 1]
+        dateTime.isAfter(midnightThisWeek) -> {
+            val dayOfWeek = dateTime.dayOfWeek.value // 1 (Mon) to 7 (Sun)
+            val days = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+            days[dayOfWeek - 1]
+        }
         // 今年：显示月日
-        isSameYear -> String.format(
-            "%02d月%02d日",
-            calendar.get(java.util.Calendar.MONTH) + 1,
-            calendar.get(java.util.Calendar.DAY_OF_MONTH)
-        )
+        dateTime.year == now.year -> {
+            dateTime.format(DateTimeFormatter.ofPattern("MM月dd日"))
+        }
         // 去年及更早：显示年月日
-        else -> String.format(
-            "%d年%02d月%02d日",
-            calendar.get(java.util.Calendar.YEAR),
-            calendar.get(java.util.Calendar.MONTH) + 1,
-            calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        else -> {
+            dateTime.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日"))
+        }
+    }
+}
+
+@Composable
+fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
+    val color = when (dismissState.dismissDirection) {
+        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+        else -> Color.Transparent
+    }
+    val alignment = Alignment.CenterStart
+    val icon = Icons.Rounded.DoneAll
+    val scale by animateFloatAsState(
+        if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.75f else 1.2f
+    )
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(color)
+            .padding(horizontal = 24.dp),
+        contentAlignment = alignment
+    ) {
+        Icon(
+            icon,
+            contentDescription = "Mark as read",
+            modifier = Modifier.scale(scale),
+            tint = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
