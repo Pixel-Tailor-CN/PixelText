@@ -1,5 +1,9 @@
 package vip.mystery0.pixel.text.ui.message
 
+import android.content.ContentValues
+import android.content.Context
+import android.provider.Telephony
+import android.telephony.SmsManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,7 +14,10 @@ import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 
-class ConversationDetailViewModel(private val repository: MessageRepository) : ViewModel() {
+class ConversationDetailViewModel(
+    private val repository: MessageRepository,
+    private val context: Context
+) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
 
@@ -64,6 +71,40 @@ class ConversationDetailViewModel(private val repository: MessageRepository) : V
                     }
                     isLoadingMore = false
                 }
+        }
+    }
+
+    fun sendMessage(address: String, message: String) {
+        viewModelScope.launch {
+            try {
+                val smsManager = context.getSystemService(SmsManager::class.java)
+                val parts = smsManager.divideMessage(message)
+                if (parts.size > 1) {
+                    smsManager.sendMultipartTextMessage(address, null, parts, null, null)
+                } else {
+                    smsManager.sendTextMessage(address, null, message, null, null)
+                }
+
+                val values = ContentValues().apply {
+                    put(Telephony.Sms.ADDRESS, address)
+                    put(Telephony.Sms.BODY, message)
+                    put(Telephony.Sms.DATE, System.currentTimeMillis())
+                    put(Telephony.Sms.READ, 1)
+                    put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
+                    if (currentThreadId != -1L) {
+                        put(Telephony.Sms.THREAD_ID, currentThreadId)
+                    }
+                }
+                context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+
+                kotlinx.coroutines.delay(500)
+                _messages.clear()
+                offset = 0
+                hasMore = true
+                fetchMessages()
+            } catch (e: Exception) {
+                // Handle error
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.Telephony
 import android.telephony.TelephonyManager
 import android.util.Log
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -126,10 +127,8 @@ class MessageRepositoryImpl(
     private val simNameCache = mutableMapOf<Int, String>()
 
     private fun getSimName(subId: Int): String {
-        Log.d("SIM_INFO", "getSimName called with subId: $subId")
         if (subId <= 0) return "默认卡"
         if (simNameCache.containsKey(subId)) {
-            Log.d("SIM_INFO", "Cache hit for subId $subId: ${simNameCache[subId]}")
             return simNameCache[subId]!!
         }
 
@@ -141,11 +140,6 @@ class MessageRepositoryImpl(
             val networkName = subTelephonyManager.networkOperatorName
             val simName = subTelephonyManager.simOperatorName
 
-            Log.d(
-                "SIM_INFO",
-                "TelephonyManager API - networkName: $networkName, simName: $simName for subId: $subId"
-            )
-
             val resolvedName = if (!simName.isNullOrBlank()) {
                 simName
             } else if (!networkName.isNullOrBlank()) {
@@ -155,7 +149,6 @@ class MessageRepositoryImpl(
             }
 
             if (resolvedName != null && resolvedName.length > 1) {
-                Log.d("SIM_INFO", "Resolved name via TelephonyManager: $resolvedName")
                 simNameCache[subId] = resolvedName
                 return resolvedName
             }
@@ -164,33 +157,15 @@ class MessageRepositoryImpl(
         }
 
         try {
-            Log.d("SIM_INFO", "Attempting to query content://telephony/siminfo for subId: $subId")
             val cursor = context.contentResolver.query(
-                Uri.parse("content://telephony/siminfo"),
+                "content://telephony/siminfo".toUri(),
                 null,
                 "_id = ?",
                 arrayOf(subId.toString()),
                 null
             )
             cursor?.use {
-                Log.d("SIM_INFO", "Cursor returned for subId $subId. Count: ${it.count}")
                 if (it.moveToFirst()) {
-                    val columns = it.columnNames
-                    val columnData = columns.joinToString(", ") { col ->
-                        val idx = it.getColumnIndex(col)
-                        val value = if (idx >= 0) {
-                            when (it.getType(idx)) {
-                                android.database.Cursor.FIELD_TYPE_STRING -> it.getString(idx)
-                                android.database.Cursor.FIELD_TYPE_INTEGER -> it.getInt(idx)
-                                    .toString()
-
-                                else -> "other_type"
-                            }
-                        } else "not_found"
-                        "$col=$value"
-                    }
-                    Log.d("SIM_INFO", "Row data for subId $subId: $columnData")
-
                     val carrierNameIdx = it.getColumnIndex("carrier_name")
                     val carrierName =
                         if (carrierNameIdx >= 0) it.getString(carrierNameIdx) else null
@@ -209,7 +184,6 @@ class MessageRepositoryImpl(
                     } else {
                         "卡${simId + 1}"
                     }
-                    Log.d("SIM_INFO", "Resolved name for subId $subId: $name")
                     simNameCache[subId] = name
                     return name
                 }
@@ -219,7 +193,6 @@ class MessageRepositoryImpl(
         }
 
         val fallbackName = "卡${simNameCache.size + 1}"
-        Log.d("SIM_INFO", "Fallback triggered for subId $subId. Assigning: $fallbackName")
         simNameCache[subId] = fallbackName
         return fallbackName
     }

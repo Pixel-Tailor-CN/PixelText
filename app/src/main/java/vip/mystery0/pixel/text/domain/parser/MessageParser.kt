@@ -94,8 +94,6 @@ class MessageParser(private val context: Context) {
                     genericRules.add(rule)
                 }
             }
-
-            Log.d("MessageParser", "Loaded ${rules.size} dynamic rules successfully.")
         } catch (e: Exception) {
             Log.e("MessageParser", "Failed to load rules.json", e)
         }

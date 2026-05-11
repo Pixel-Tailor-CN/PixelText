@@ -23,8 +23,6 @@ class SmsReceiver : BroadcastReceiver() {
             val body = messages.joinToString("") { it?.displayMessageBody ?: "" }
             val timestamp = messages[0]?.timestampMillis ?: System.currentTimeMillis()
 
-            Log.d(TAG, "Received SMS from $sender: $body")
-
             // 写入系统短信数据库
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, sender)
