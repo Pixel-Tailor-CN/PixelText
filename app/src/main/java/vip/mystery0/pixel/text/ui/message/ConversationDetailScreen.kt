@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -92,11 +93,18 @@ fun ConversationDetailScreen(
                     },
                     actions = {
                         IconButton(onClick = {
-                            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clipboardManager =
+                                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             if (uiState is MessageUiState.Success) {
                                 val state = uiState as MessageUiState.Success
-                                val texts = state.messages.filter { it.id in selectedMessageIds }.map { it.content }
-                                clipboardManager.setPrimaryClip(ClipData.newPlainText("Messages", texts.joinToString("\n")))
+                                val texts = state.messages.filter { it.id in selectedMessageIds }
+                                    .map { it.content }
+                                clipboardManager.setPrimaryClip(
+                                    ClipData.newPlainText(
+                                        "Messages",
+                                        texts.joinToString("\n")
+                                    )
+                                )
                             }
                             selectedMessageIds.clear()
                         }) {
@@ -124,13 +132,20 @@ fun ConversationDetailScreen(
                                             showMoreMenu = false
                                             if (uiState is MessageUiState.Success) {
                                                 val state = uiState as MessageUiState.Success
-                                                val text = state.messages.find { it.id == selectedMessageIds.first() }?.content ?: ""
+                                                val text =
+                                                    state.messages.find { it.id == selectedMessageIds.first() }?.content
+                                                        ?: ""
                                                 val sendIntent = Intent().apply {
                                                     action = Intent.ACTION_SEND
                                                     putExtra(Intent.EXTRA_TEXT, text)
                                                     type = "text/plain"
                                                 }
-                                                context.startActivity(Intent.createChooser(sendIntent, null))
+                                                context.startActivity(
+                                                    Intent.createChooser(
+                                                        sendIntent,
+                                                        null
+                                                    )
+                                                )
                                             }
                                             selectedMessageIds.clear()
                                         }
@@ -157,7 +172,10 @@ fun ConversationDetailScreen(
                     navigationIcon = {
                         if (!isTablet) {
                             IconButton(onClick = onNavigateBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back"
+                                )
                             }
                         }
                     },
@@ -180,7 +198,8 @@ fun ConversationDetailScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Row(
