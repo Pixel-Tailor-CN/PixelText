@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -19,55 +20,63 @@ import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 fun AppNavigation() {
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = "conversations",
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None }
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        composable("conversations") {
-            ConversationListScreen(
-                onNavigateToDetail = { threadId, address ->
-                    navController.navigate("conversation_detail/$threadId/$address")
-                },
-                onNavigateToSearch = {
-                    navController.navigate("search")
-                },
-                onNavigateToMock = {
-                    navController.navigate("mock_messages")
-                }
-            )
-        }
-        composable(
-            route = "search",
-            enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
-            exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
-            popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right) },
-            popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) }
+        NavHost(
+            navController = navController,
+            startDestination = "conversations",
+            modifier = Modifier.fillMaxSize(),
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
-            SearchScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onResultClick = { message ->
-                    navController.navigate("conversation_detail/${message.threadId}/${message.sender}")
-                }
-            )
+            composable("conversations") {
+                ConversationListScreen(
+                    onNavigateToDetail = { threadId, address ->
+                        navController.navigate("conversation_detail/$threadId/$address")
+                    },
+                    onNavigateToSearch = {
+                        navController.navigate("search")
+                    },
+                    onNavigateToMock = {
+                        navController.navigate("mock_messages")
+                    }
+                )
+            }
+            composable(
+                route = "search",
+                enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+                exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
+                popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right) },
+                popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) }
+            ) {
+                SearchScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onResultClick = { message ->
+                        navController.navigate("conversation_detail/${message.threadId}/${message.sender}")
+                    }
+                )
+            }
+            composable("conversation_detail/{threadId}/{address}") { backStackEntry ->
+                val threadId =
+                    backStackEntry.arguments?.getString("threadId")?.toLongOrNull() ?: -1L
+                val address = backStackEntry.arguments?.getString("address") ?: ""
+                ConversationDetailScreen(
+                    threadId = threadId,
+                    address = address,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("mock_messages") {
+                vip.mystery0.pixel.text.ui.mock.MockMessageScreen()
+            }
         }
-        composable("conversation_detail/{threadId}/{address}") { backStackEntry ->
-            val threadId = backStackEntry.arguments?.getString("threadId")?.toLongOrNull() ?: -1L
-            val address = backStackEntry.arguments?.getString("address") ?: ""
-            ConversationDetailScreen(
-                threadId = threadId,
-                address = address,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
-        composable("mock_messages") {
-            vip.mystery0.pixel.text.ui.mock.MockMessageScreen()
-        }
+
+        // 默认短信应用引导对话框：非默认时在任意页面自动弹出，用户可选择跳过
+        DefaultSmsAppDialog()
     }
 }

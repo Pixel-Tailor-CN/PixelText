@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">PixelText</string>
     <string name="notification_action_mark_read">已阅</string>
-    <string name="notification_action_delete">删除</string>
+    <string name="notification_action_reply">回复</string>
+    <string name="notification_reply_hint">回复…</string>
+    <string name="notification_reply_sent">消息已发送</string>
+    <string name="notification_reply_failed">发送失败，请重试</string>
 </resources>
