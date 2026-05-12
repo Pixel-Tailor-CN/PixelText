@@ -71,10 +71,11 @@ object SmsNotificationHelper {
         val notificationId =
             if (threadId != 0L) threadId.toInt() else System.currentTimeMillis().toInt()
 
-        // ── 主体点击：打开 MainActivity 并传入 threadId ──────────────────────
+        // ── 主体点击：打开 MainActivity 并传入 threadId 和发件人地址 ────────
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("thread_id", threadId)
+            putExtra(MainActivity.EXTRA_THREAD_ID, threadId)
+            putExtra(MainActivity.EXTRA_ADDRESS, sender)
         }
         val contentPendingIntent = PendingIntent.getActivity(
             context,
