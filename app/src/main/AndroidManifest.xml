@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.WRITE_SMS" />
     <!-- Required to read contacts for picking recipients -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Required to identify SIM cards for dual-SIM support -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- Required to post notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -92,14 +94,22 @@
             </intent-filter>
         </activity>
 
-        <!-- 5. BroadcastReceiver for notification actions (mark read / reply / delete) -->
+        <!-- 5. BroadcastReceiver for notification actions (mark read / reply) -->
         <receiver
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="vip.mystery0.pixel.text.action.MARK_READ" />
                 <action android:name="vip.mystery0.pixel.text.action.REPLY_SMS" />
-                <action android:name="vip.mystery0.pixel.text.action.DELETE_SMS" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 6. BroadcastReceiver for MMS download completion callback -->
+        <receiver
+            android:name=".mms.MmsDownloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="vip.mystery0.pixel.text.action.MMS_DOWNLOADED" />
             </intent-filter>
         </receiver>
 

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.telephony.SubscriptionManager
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -66,6 +67,8 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
+import vip.mystery0.pixel.text.util.SimInfo
+import vip.mystery0.pixel.text.util.SimInfoProvider
 
 @Composable
 fun ConversationDetailScreen(
@@ -85,6 +88,16 @@ fun ConversationDetailScreen(
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var messageText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // 双卡场景：加载当前激活的 SIM 列表，单卡 / 无权限时为空列表
+    val simList = remember { SimInfoProvider.getActiveSimList(context) }
+    var selectedSubId by remember(simList) {
+        val default = SimInfoProvider.getDefaultSmsSubscriptionId()
+        val resolved = simList.firstOrNull { it.subscriptionId == default }?.subscriptionId
+            ?: simList.firstOrNull()?.subscriptionId
+            ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID
+        mutableStateOf(resolved)
+    }
 
     // 监听发送结果事件，统一通过 Snackbar 提示
     LaunchedEffect(Unit) {
@@ -229,6 +242,14 @@ fun ConversationDetailScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    // 双卡时显示 SIM 切换；单卡 / 无权限时不展示，保持原有布局
+                    if (simList.size >= 2) {
+                        SimSelectorButton(
+                            simList = simList,
+                            selectedSubId = selectedSubId,
+                            onSelected = { selectedSubId = it },
+                        )
+                    }
                     androidx.compose.material3.TextField(
                         value = messageText,
                         onValueChange = { messageText = it },
@@ -245,7 +266,7 @@ fun ConversationDetailScreen(
                     IconButton(
                         onClick = {
                             if (messageText.isNotBlank()) {
-                                viewModel.sendMessage(address, messageText.trim())
+                                viewModel.sendMessage(address, messageText.trim(), selectedSubId)
                                 messageText = ""
                             }
                         },
@@ -423,6 +444,71 @@ fun MessageItem(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { showOriginal = !showOriginal }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 输入栏中的 SIM 卡选择按钮：点击弹出菜单切换发送使用的 SIM。
+ *
+ * 仅在双卡（含以上）时由调用方决定是否显示。
+ */
+@Composable
+private fun SimSelectorButton(
+    simList: List<SimInfo>,
+    selectedSubId: Int,
+    onSelected: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentLabel = simList.firstOrNull { it.subscriptionId == selectedSubId }?.displayName
+        ?: simList.firstOrNull()?.displayName.orEmpty()
+
+    Box {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .clickable { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(
+                        id = vip.mystery0.pixel.text.R.drawable.ic_sim
+                    ),
+                    contentDescription = "Select SIM",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = currentLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            simList.forEach { sim ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = if (sim.phoneNumber.isNullOrBlank()) sim.displayName
+                            else "${sim.displayName}  ${sim.phoneNumber}"
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelected(sim.subscriptionId)
+                    }
                 )
             }
         }

@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -102,14 +103,21 @@ class ConversationDetailViewModel(
         }
     }
 
-    fun sendMessage(address: String, message: String) {
+    /**
+     * @param subId 指定发送使用的 SIM 卡。传 [SubscriptionManager.INVALID_SUBSCRIPTION_ID] 表示使用默认 SIM。
+     */
+    fun sendMessage(
+        address: String,
+        message: String,
+        subId: Int = SubscriptionManager.INVALID_SUBSCRIPTION_ID,
+    ) {
         if (_sending.value) return
         _sending.value = true
 
         viewModelScope.launch {
             try {
                 // 1. 写入"发件箱"占位（pending），先把 UI 显示出来；获取 thread_id
-                val pendingUri = insertOutboxPlaceholder(address, message)
+                val pendingUri = insertOutboxPlaceholder(address, message, subId)
                 val resolvedThreadId = queryThreadIdFromUri(pendingUri) ?: currentThreadId
                 if (currentThreadId == -1L && resolvedThreadId != -1L) {
                     currentThreadId = resolvedThreadId
@@ -119,7 +127,7 @@ class ConversationDetailViewModel(
                 refreshMessagesAfterSend()
 
                 // 3. 用 PendingIntent 发短信，监听系统返回的发送结果
-                val resultCode = sendSmsAndAwaitResult(address, message)
+                val resultCode = sendSmsAndAwaitResult(address, message, subId)
 
                 // 4. 根据结果更新数据库中的那条占位记录
                 handleSendResult(pendingUri, resultCode)
@@ -135,7 +143,11 @@ class ConversationDetailViewModel(
     /**
      * 在 outbox 中插入占位消息，返回插入后的 URI。
      */
-    private fun insertOutboxPlaceholder(address: String, message: String): android.net.Uri? {
+    private fun insertOutboxPlaceholder(
+        address: String,
+        message: String,
+        subId: Int,
+    ): android.net.Uri? {
         val now = System.currentTimeMillis()
         val values = ContentValues().apply {
             put(Telephony.Sms.ADDRESS, address)
@@ -146,6 +158,9 @@ class ConversationDetailViewModel(
             put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_OUTBOX)
             if (currentThreadId != -1L) {
                 put(Telephony.Sms.THREAD_ID, currentThreadId)
+            }
+            if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                put(Telephony.Sms.SUBSCRIPTION_ID, subId)
             }
         }
         return context.contentResolver.insert(Telephony.Sms.CONTENT_URI, values)
@@ -173,12 +188,17 @@ class ConversationDetailViewModel(
      *
      * @return SmsManager 的发送结果码（RESULT_OK 或其它错误码）
      */
-    private suspend fun sendSmsAndAwaitResult(address: String, message: String): Int {
+    private suspend fun sendSmsAndAwaitResult(address: String, message: String, subId: Int): Int {
         val requestId = sendRequestCounter.incrementAndGet()
         val sentAction = "$ACTION_SMS_SENT.$requestId"
 
         return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-            val smsManager = context.getSystemService(SmsManager::class.java)
+            val baseSmsManager = context.getSystemService(SmsManager::class.java)
+            val smsManager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                baseSmsManager.createForSubscriptionId(subId)
+            } else {
+                baseSmsManager
+            }
             val parts = smsManager.divideMessage(message)
             val expectedCount = parts.size.coerceAtLeast(1)
             var receivedCount = 0

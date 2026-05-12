@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.telephony.SubscriptionManager
 import android.util.Log
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
@@ -23,6 +24,12 @@ class SmsReceiver : BroadcastReceiver() {
             val body = messages.joinToString("") { it?.displayMessageBody ?: "" }
             val timestamp = messages[0]?.timestampMillis ?: System.currentTimeMillis()
 
+            // 从 intent 取本次短信归属的 SIM 卡 subId，用于双卡分流
+            val subId = intent.getIntExtra(
+                "subscription",
+                SubscriptionManager.INVALID_SUBSCRIPTION_ID
+            )
+
             // 写入系统短信数据库
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, sender)
@@ -31,6 +38,9 @@ class SmsReceiver : BroadcastReceiver() {
                 put(Telephony.Sms.DATE_SENT, timestamp)
                 put(Telephony.Sms.READ, 0)
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
+                if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    put(Telephony.Sms.SUBSCRIPTION_ID, subId)
+                }
             }
 
             var threadId = 0L
