@@ -14,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
@@ -31,9 +30,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
         /** 将当前会话的所有未读短信标记为已读 */
         const val ACTION_MARK_READ = "vip.mystery0.pixel.text.action.MARK_READ"
 
-        /** 删除本次通知对应的那条短信（预留，当前未在通知中展示） */
-        const val ACTION_DELETE_SMS = "vip.mystery0.pixel.text.action.DELETE_SMS"
-
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
         const val ACTION_REPLY_SMS = "vip.mystery0.pixel.text.action.REPLY_SMS"
 
@@ -42,9 +38,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
         /** Intent extra：会话 thread_id，标记已读时使用 */
         const val EXTRA_THREAD_ID = "extra_thread_id"
-
-        /** Intent extra：插入数据库后的短信 URI（content://sms/inbox/xxx），删除时使用 */
-        const val EXTRA_MESSAGE_URI = "extra_message_uri"
 
         /** Intent extra：回复目标的手机号 / 发件人地址 */
         const val EXTRA_REPLY_ADDRESS = "extra_reply_address"
@@ -59,16 +52,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
         val threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
-        val messageUriStr = intent.getStringExtra(EXTRA_MESSAGE_URI)
 
         when (intent.action) {
             ACTION_MARK_READ -> {
                 if (threadId != -1L) markThreadAsRead(context, threadId)
-                cancelNotification(context, notificationId)
-            }
-
-            ACTION_DELETE_SMS -> {
-                if (!messageUriStr.isNullOrBlank()) deleteSms(context, messageUriStr)
                 cancelNotification(context, notificationId)
             }
 
@@ -108,18 +95,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to mark thread $threadId as read", e)
-        }
-    }
-
-    /**
-     * 通过插入时返回的 URI 精准删除单条短信。
-     */
-    private fun deleteSms(context: Context, messageUriStr: String) {
-        try {
-            val uri = messageUriStr.toUri()
-            val deleted = context.contentResolver.delete(uri, null, null)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete SMS at $messageUriStr", e)
         }
     }
 
