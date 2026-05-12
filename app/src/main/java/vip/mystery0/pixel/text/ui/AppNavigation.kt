@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,9 +17,27 @@ import vip.mystery0.pixel.text.ui.message.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.message.ConversationListScreen
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 
+/**
+ * 通知点击等外部入口带过来的会话跳转目标。
+ */
+data class ConversationDeepLink(
+    val threadId: Long,
+    val address: String,
+)
+
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    pendingDeepLink: ConversationDeepLink? = null,
+    onDeepLinkConsumed: () -> Unit = {},
+) {
     val navController = rememberNavController()
+
+    // 收到外部 deep link 时，直接跳转到对应会话详情
+    LaunchedEffect(pendingDeepLink) {
+        val link = pendingDeepLink ?: return@LaunchedEffect
+        navController.navigate("conversation_detail/${link.threadId}/${link.address}")
+        onDeepLinkConsumed()
+    }
 
     Box(
         modifier = Modifier

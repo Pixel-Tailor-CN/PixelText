@@ -1,18 +1,35 @@
 package vip.mystery0.pixel.text.ui.message
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * 单次性的发送结果事件，供 UI 用 Snackbar 等方式提示用户。
+ */
+sealed interface SendResultEvent {
+    data object Success : SendResultEvent
+    data class Failure(val reason: String) : SendResultEvent
+}
 
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
@@ -23,6 +40,12 @@ class ConversationDetailViewModel(
 
     private val _address = MutableStateFlow<String>("")
     val address: StateFlow<String> = _address.asStateFlow()
+
+    private val _sending = MutableStateFlow(false)
+    val sending: StateFlow<Boolean> = _sending.asStateFlow()
+
+    private val _sendResultEvents = Channel<SendResultEvent>(Channel.BUFFERED)
+    val sendResultEvents = _sendResultEvents.receiveAsFlow()
 
     private var currentThreadId: Long = -1L
     private var offset = 0
@@ -80,52 +103,184 @@ class ConversationDetailViewModel(
     }
 
     fun sendMessage(address: String, message: String) {
+        if (_sending.value) return
+        _sending.value = true
+
         viewModelScope.launch {
             try {
-                val smsManager = context.getSystemService(SmsManager::class.java)
-                val parts = smsManager.divideMessage(message)
-                if (parts.size > 1) {
-                    smsManager.sendMultipartTextMessage(address, null, parts, null, null)
-                } else {
-                    smsManager.sendTextMessage(address, null, message, null, null)
+                // 1. 写入"发件箱"占位（pending），先把 UI 显示出来；获取 thread_id
+                val pendingUri = insertOutboxPlaceholder(address, message)
+                val resolvedThreadId = queryThreadIdFromUri(pendingUri) ?: currentThreadId
+                if (currentThreadId == -1L && resolvedThreadId != -1L) {
+                    currentThreadId = resolvedThreadId
                 }
 
-                val values = ContentValues().apply {
-                    put(Telephony.Sms.ADDRESS, address)
-                    put(Telephony.Sms.BODY, message)
-                    put(Telephony.Sms.DATE, System.currentTimeMillis())
-                    put(Telephony.Sms.READ, 1)
-                    put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
-                    if (currentThreadId != -1L) {
-                        put(Telephony.Sms.THREAD_ID, currentThreadId)
-                    }
-                }
-                context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+                // 2. 立刻把占位插入到 UI 头部，给用户即时反馈
+                refreshMessagesAfterSend()
 
-                kotlinx.coroutines.delay(500)
+                // 3. 用 PendingIntent 发短信，监听系统返回的发送结果
+                val resultCode = sendSmsAndAwaitResult(address, message)
 
-                // 如果是新会话，需要查询新的 threadId
-                if (currentThreadId == -1L) {
-                    context.contentResolver.query(
-                        Telephony.Sms.CONTENT_URI,
-                        arrayOf(Telephony.Sms.THREAD_ID),
-                        "${Telephony.Sms.ADDRESS} = ?",
-                        arrayOf(address),
-                        "${Telephony.Sms.DATE} DESC LIMIT 1"
-                    )?.use { cursor ->
-                        if (cursor.moveToFirst()) {
-                            currentThreadId = cursor.getLong(0)
-                        }
-                    }
-                }
-
-                _messages.clear()
-                offset = 0
-                hasMore = true
-                fetchMessages()
+                // 4. 根据结果更新数据库中的那条占位记录
+                handleSendResult(pendingUri, resultCode)
+                refreshMessagesAfterSend()
             } catch (e: Exception) {
-                // Handle error
+                _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
+            } finally {
+                _sending.value = false
             }
         }
+    }
+
+    /**
+     * 在 outbox 中插入占位消息，返回插入后的 URI。
+     */
+    private fun insertOutboxPlaceholder(address: String, message: String): android.net.Uri? {
+        val now = System.currentTimeMillis()
+        val values = ContentValues().apply {
+            put(Telephony.Sms.ADDRESS, address)
+            put(Telephony.Sms.BODY, message)
+            put(Telephony.Sms.DATE, now)
+            put(Telephony.Sms.READ, 1)
+            put(Telephony.Sms.SEEN, 1)
+            put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_OUTBOX)
+            if (currentThreadId != -1L) {
+                put(Telephony.Sms.THREAD_ID, currentThreadId)
+            }
+        }
+        return context.contentResolver.insert(Telephony.Sms.CONTENT_URI, values)
+    }
+
+    /**
+     * 从插入返回的 URI 读取 thread_id，避免靠 delay 等待系统填值。
+     */
+    private fun queryThreadIdFromUri(uri: android.net.Uri?): Long? {
+        if (uri == null) return null
+        context.contentResolver.query(
+            uri,
+            arrayOf(Telephony.Sms.THREAD_ID),
+            null, null, null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return cursor.getLong(0)
+            }
+        }
+        return null
+    }
+
+    /**
+     * 通过 PendingIntent 发短信并挂起等待 SMS_SENT 广播。
+     *
+     * @return SmsManager 的发送结果码（RESULT_OK 或其它错误码）
+     */
+    private suspend fun sendSmsAndAwaitResult(address: String, message: String): Int {
+        val requestId = sendRequestCounter.incrementAndGet()
+        val sentAction = "$ACTION_SMS_SENT.$requestId"
+
+        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            val smsManager = context.getSystemService(SmsManager::class.java)
+            val parts = smsManager.divideMessage(message)
+            val expectedCount = parts.size.coerceAtLeast(1)
+            var receivedCount = 0
+            var firstError = android.app.Activity.RESULT_OK
+
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(c: Context?, intent: Intent?) {
+                    receivedCount++
+                    if (resultCode != android.app.Activity.RESULT_OK
+                        && firstError == android.app.Activity.RESULT_OK
+                    ) {
+                        firstError = resultCode
+                    }
+                    // 多段短信收齐所有段后再 resume；单段直接 resume
+                    if (receivedCount >= expectedCount) {
+                        runCatching { context.unregisterReceiver(this) }
+                        if (cont.isActive) cont.resumeWith(Result.success(firstError))
+                    }
+                }
+            }
+            val filter = IntentFilter(sentAction)
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            } else {
+                0
+            }
+            ContextCompat.registerReceiver(context, receiver, filter, flags)
+
+            cont.invokeOnCancellation { runCatching { context.unregisterReceiver(receiver) } }
+
+            try {
+                if (parts.size > 1) {
+                    val sentIntents = ArrayList<PendingIntent>(parts.size).apply {
+                        repeat(parts.size) {
+                            add(buildSentPendingIntent(sentAction, requestId * 100 + it))
+                        }
+                    }
+                    smsManager.sendMultipartTextMessage(
+                        address, null, parts, sentIntents, null
+                    )
+                } else {
+                    smsManager.sendTextMessage(
+                        address, null, message,
+                        buildSentPendingIntent(sentAction, requestId), null
+                    )
+                }
+            } catch (e: Exception) {
+                runCatching { context.unregisterReceiver(receiver) }
+                if (cont.isActive) cont.resumeWith(Result.success(SmsManager.RESULT_ERROR_GENERIC_FAILURE))
+            }
+        }
+    }
+
+    private fun buildSentPendingIntent(action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(action).setPackage(context.packageName)
+        return PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    /**
+     * 根据发送结果，将占位记录从 outbox 升级为 sent，失败则改为 failed。
+     */
+    private fun handleSendResult(uri: android.net.Uri?, resultCode: Int) {
+        if (uri == null) return
+        val success = resultCode == android.app.Activity.RESULT_OK
+        val values = ContentValues().apply {
+            if (success) {
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
+                put(Telephony.Sms.DATE_SENT, System.currentTimeMillis())
+            } else {
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_FAILED)
+                put(Telephony.Sms.ERROR_CODE, resultCode)
+            }
+        }
+        context.contentResolver.update(uri, values, null, null)
+
+        _sendResultEvents.trySend(
+            if (success) SendResultEvent.Success
+            else SendResultEvent.Failure(mapErrorMessage(resultCode))
+        )
+    }
+
+    private fun mapErrorMessage(resultCode: Int): String = when (resultCode) {
+        SmsManager.RESULT_ERROR_NO_SERVICE -> "无服务，发送失败"
+        SmsManager.RESULT_ERROR_RADIO_OFF -> "射频已关闭"
+        SmsManager.RESULT_ERROR_NULL_PDU -> "短信内容异常"
+        else -> "发送失败"
+    }
+
+    private fun refreshMessagesAfterSend() {
+        _messages.clear()
+        offset = 0
+        hasMore = true
+        fetchMessages()
+    }
+
+    companion object {
+        private const val ACTION_SMS_SENT = "vip.mystery0.pixel.text.action.SMS_SENT"
+        private val sendRequestCounter = AtomicInteger(0)
     }
 }

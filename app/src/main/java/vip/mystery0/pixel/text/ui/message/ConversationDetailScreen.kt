@@ -40,6 +40,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
@@ -77,11 +80,24 @@ fun ConversationDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val sending by viewModel.sending.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var messageText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // 监听发送结果事件，统一通过 Snackbar 提示
+    LaunchedEffect(Unit) {
+        viewModel.sendResultEvents.collect { event ->
+            when (event) {
+                is SendResultEvent.Success -> snackbarHostState.showSnackbar("已发送")
+                is SendResultEvent.Failure -> snackbarHostState.showSnackbar(event.reason)
+            }
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
         topBar = {
             if (selectedMessageIds.isNotEmpty()) {
                 TopAppBar(
@@ -233,12 +249,12 @@ fun ConversationDetailScreen(
                                 messageText = ""
                             }
                         },
-                        enabled = messageText.isNotBlank()
+                        enabled = messageText.isNotBlank() && !sending
                     ) {
                         Icon(
                             Icons.AutoMirrored.Rounded.Send,
                             contentDescription = "Send",
-                            tint = if (messageText.isNotBlank())
+                            tint = if (messageText.isNotBlank() && !sending)
                                 MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurfaceVariant
