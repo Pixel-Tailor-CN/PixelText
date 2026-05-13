@@ -11,6 +11,7 @@ import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.util.Log
+import androidx.core.net.toUri
 import vip.mystery0.pixel.text.mms.MmsDownloadReceiver
 import vip.mystery0.pixel.text.mms.WapPushPduParser
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -137,7 +138,7 @@ class MmsReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val locationUri = Uri.parse(notification.contentLocation)
+            val locationUri = notification.contentLocation.toUri()
             val configOverrides = Bundle()
 
             val smsManager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
