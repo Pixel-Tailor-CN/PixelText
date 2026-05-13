@@ -62,7 +62,7 @@ class SmsReceiver : BroadcastReceiver() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to insert SMS into database", e)
+                Log.e(TAG, "failed to insert SMS into database", e)
             }
 
             // 发送通知

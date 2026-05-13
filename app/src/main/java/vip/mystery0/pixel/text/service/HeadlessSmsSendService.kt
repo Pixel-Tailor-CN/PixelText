@@ -64,7 +64,7 @@ class HeadlessSmsSendService : Service() {
             // 否则任何短信应用（包括本应用自己）都看不到这条快速回复。
             saveSentMessageToDb(recipient, message, subId)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send headless SMS to $recipient", e)
+            Log.e(TAG, "failed to send headless SMS to $recipient", e)
         }
     }
 
@@ -85,7 +85,7 @@ class HeadlessSmsSendService : Service() {
             }
             contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save headless SMS to DB", e)
+            Log.e(TAG, "failed to save headless SMS to DB", e)
         }
     }
 

@@ -95,7 +95,7 @@ class MessageParser(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageParser", "Failed to load rules.json", e)
+            Log.e("MessageParser", "failed to load rules.json", e)
         }
     }
 

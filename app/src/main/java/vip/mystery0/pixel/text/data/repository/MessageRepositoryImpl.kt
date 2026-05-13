@@ -75,7 +75,7 @@ class MessageRepositoryImpl(
                     }
                 }
             } catch (e: Exception) {
-                Log.e("MessageRepository", "搜索 MMS 会话失败", e)
+                Log.e("MessageRepository", "failed to search MMS conversations", e)
             }
         }
 
@@ -211,7 +211,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "查询 MMS 会话详情失败", e)
+            Log.e("MessageRepository", "failed to fetch MMS conversation details", e)
         }
 
         return threadIds.mapNotNull { messagesMap[it] }
@@ -246,7 +246,7 @@ class MessageRepositoryImpl(
                 return resolvedName
             }
         } catch (e: Exception) {
-            Log.e("SIM_INFO", "Exception reading TelephonyManager for subId $subId", e)
+            Log.e("SIM_INFO", "exception reading TelephonyManager for subId $subId", e)
         }
 
         try {
@@ -282,7 +282,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("SIM_INFO", "Exception while querying siminfo for subId $subId", e)
+            Log.e("SIM_INFO", "exception while querying siminfo for subId $subId", e)
         }
 
         val fallbackName = "卡${simNameCache.size + 1}"
@@ -417,7 +417,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "搜索 MMS 消息失败", e)
+            Log.e("MessageRepository", "failed to search MMS messages", e)
         }
 
         emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
@@ -529,7 +529,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "查询 MMS 消息失败, threadId=$threadId", e)
+            Log.e("MessageRepository", "failed to query MMS messages, threadId=$threadId", e)
         }
 
         // 合并排序并分页
@@ -642,7 +642,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "查询全部 MMS 消息失败", e)
+            Log.e("MessageRepository", "failed to query all MMS messages", e)
         }
 
         emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
@@ -676,7 +676,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "获取 MMS 地址失败, mmsId=$mmsId", e)
+            Log.e("MessageRepository", "failed to get MMS address, mmsId=$mmsId", e)
         }
         return ""
     }
@@ -696,7 +696,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "获取 MMS 文本失败, mmsId=$mmsId", e)
+            Log.e("MessageRepository", "failed to get MMS text, mmsId=$mmsId", e)
         }
         return ""
     }
@@ -722,7 +722,7 @@ class MessageRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
-            Log.e("MessageRepository", "获取 MMS 图片失败, mmsId=$mmsId", e)
+            Log.e("MessageRepository", "failed to get MMS images, mmsId=$mmsId", e)
         }
         return uris
     }
@@ -804,7 +804,7 @@ class MessageRepositoryImpl(
                     arrayOf(threadId.toString())
                 )
             } catch (e: Exception) {
-                Log.e("MessageRepository", "Error updating SMS read status", e)
+                Log.e("MessageRepository", "error updating SMS read status", e)
             }
 
             try {
@@ -815,7 +815,7 @@ class MessageRepositoryImpl(
                     arrayOf(threadId.toString())
                 )
             } catch (e: Exception) {
-                Log.e("MessageRepository", "Error updating MMS read status", e)
+                Log.e("MessageRepository", "error updating MMS read status", e)
             }
         }
     }

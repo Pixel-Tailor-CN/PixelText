@@ -32,7 +32,7 @@ class MmsReceiver : BroadcastReceiver() {
 
         val notification = WapPushPduParser.parse(pushData)
         if (notification == null) {
-            Log.w(TAG, "Failed to parse WAP Push PDU as M-Notification.ind")
+            Log.w(TAG, "failed to parse WAP Push PDU as M-Notification.ind")
             return
         }
 
@@ -51,7 +51,7 @@ class MmsReceiver : BroadcastReceiver() {
         // 1. 在 Telephony.Mms 中插入占位记录
         val mmsUri = insertMmsPlaceholder(context, notification, subId)
         if (mmsUri == null) {
-            Log.e(TAG, "Failed to insert MMS placeholder")
+            Log.e(TAG, "failed to insert MMS placeholder")
             return
         }
 
@@ -97,7 +97,7 @@ class MmsReceiver : BroadcastReceiver() {
         return try {
             context.contentResolver.insert(Telephony.Mms.CONTENT_URI, values)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to insert MMS placeholder", e)
+            Log.e(TAG, "failed to insert MMS placeholder", e)
             null
         }
     }
@@ -114,7 +114,7 @@ class MmsReceiver : BroadcastReceiver() {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to query thread_id from MMS URI", e)
+            Log.e(TAG, "failed to query thread_id from MMS URI", e)
         }
         return 0L
     }
@@ -157,7 +157,7 @@ class MmsReceiver : BroadcastReceiver() {
             )
             Log.d(TAG, "MMS download triggered for ${notification.contentLocation}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to trigger MMS download", e)
+            Log.e(TAG, "failed to trigger MMS download", e)
             // 标记下载失败
             val values = ContentValues().apply {
                 put(Telephony.Mms.STATUS, 135) // STATUS_DEFERRED
