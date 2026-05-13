@@ -154,6 +154,11 @@ fun ConversationListScreen(
             true,
             contentObserver
         )
+        context.contentResolver.registerContentObserver(
+            Telephony.Mms.CONTENT_URI,
+            true,
+            contentObserver
+        )
 
         onDispose {
             context.contentResolver.unregisterContentObserver(contentObserver)
