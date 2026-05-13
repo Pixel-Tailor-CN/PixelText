@@ -71,7 +71,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     // 发送后必须更新通知，否则系统会一直显示转圈进度条
                     updateNotificationAfterReply(context, notificationId, sent)
                 } else {
-                    Log.w(TAG, "Reply skipped: replyText=$replyText, address=$address")
+                    Log.w(TAG, "reply skipped: replyText=$replyText, address=$address")
                     cancelNotification(context, notificationId)
                 }
             }
@@ -94,7 +94,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to mark thread $threadId as read", e)
+            Log.e(TAG, "failed to mark thread $threadId as read", e)
         }
     }
 
@@ -121,7 +121,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
             saveSentMessageToDb(context, recipient, text)
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send reply to $recipient", e)
+            Log.e(TAG, "failed to send reply to $recipient", e)
             false
         }
     }
@@ -147,7 +147,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
             }
             val uri = context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save sent message to DB", e)
+            Log.e(TAG, "failed to save sent message to DB", e)
         }
     }
 

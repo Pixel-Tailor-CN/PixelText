@@ -66,7 +66,7 @@ class MmsDownloadReceiver : BroadcastReceiver() {
             // 确保 addr 表有发件人记录（部分设备系统不会自动填充）
             ensureFromAddress(context, mmsUri)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update MMS after download", e)
+            Log.e(TAG, "failed to update MMS after download", e)
         }
     }
 
@@ -77,7 +77,7 @@ class MmsDownloadReceiver : BroadcastReceiver() {
             }
             context.contentResolver.update(mmsUri, values, null, null)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to mark MMS as deferred", e)
+            Log.e(TAG, "failed to mark MMS as deferred", e)
         }
     }
 
