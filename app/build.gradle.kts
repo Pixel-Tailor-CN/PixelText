@@ -85,6 +85,7 @@ android {
     androidResources {
         localeFilters.add("en")
         localeFilters.add("zh-rCN")
+        noCompress += "tflite"
     }
 }
 
@@ -104,6 +105,10 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.zhanghai.preference)
+
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.select.tf.ops)
+    implementation(libs.androidx.work.runtime.ktx)
 }
 
 apply(from = rootProject.file("signing.gradle"))
