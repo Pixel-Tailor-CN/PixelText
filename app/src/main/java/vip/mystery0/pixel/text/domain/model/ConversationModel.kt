@@ -6,5 +6,6 @@ data class ConversationModel(
     val snippet: String,
     val timestamp: Long,
     val unreadCount: Int = 0,
-    val isMms: Boolean = false
+    val isMms: Boolean = false,
+    val hasMms: Boolean = false
 )

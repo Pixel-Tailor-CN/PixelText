@@ -26,51 +26,18 @@ class MessageRepositoryImpl(
 
     override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
         val threadIds = mutableListOf<Long>()
-
-        // SMS conversations 视图排序可靠，用它做主分页
         context.contentResolver.query(
-            Uri.parse("content://sms/conversations"),
-            arrayOf(Telephony.Sms.THREAD_ID),
-            null,
-            null,
-            "${Telephony.Sms.DATE} DESC LIMIT $limit OFFSET $offset"
+            "content://mms-sms/conversations?simple=true".toUri(),
+            arrayOf("_id"),
+            null, null,
+            "date DESC LIMIT $limit OFFSET $offset"
         )?.use { cursor ->
-            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
-            while (cursor.moveToNext()) {
-                threadIds.add(cursor.getLong(threadIdIndex))
-            }
+            val idIdx = cursor.getColumnIndexOrThrow("_id")
+            while (cursor.moveToNext()) threadIds.add(cursor.getLong(idIdx))
         }
-
-        // 首页时补查 MMS-only 会话（没有任何 SMS 的纯彩信会话，极少见）
-        if (offset == 0) {
-            try {
-                val smsThreadIdSet = threadIds.toSet()
-                context.contentResolver.query(
-                    Telephony.Mms.CONTENT_URI,
-                    arrayOf(Telephony.Mms.THREAD_ID),
-                    null,
-                    null,
-                    "${Telephony.Mms.DATE} DESC"
-                )?.use { cursor ->
-                    val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Mms.THREAD_ID)
-                    val seen = mutableSetOf<Long>()
-                    while (cursor.moveToNext()) {
-                        val threadId = cursor.getLong(threadIdIndex)
-                        if (threadId > 0 && !smsThreadIdSet.contains(threadId) && seen.add(threadId)) {
-                            threadIds.add(threadId)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MessageRepository", "查询 MMS-only 会话失败", e)
-            }
-        }
-
         if (threadIds.isEmpty()) {
-            emit(emptyList())
-            return@flow
+            emit(emptyList()); return@flow
         }
-
         emit(fetchConversationDetails(threadIds).sortedByDescending { it.timestamp })
     }.flowOn(Dispatchers.IO)
 
@@ -216,7 +183,8 @@ class MessageRepositoryImpl(
                             snippet = snippet,
                             timestamp = mmsDate,
                             unreadCount = if (read) 0 else 1,
-                            isMms = true
+                            isMms = true,
+                            hasMms = true
                         )
                     } else {
                         if (mmsDate > existing.timestamp) {
@@ -231,11 +199,14 @@ class MessageRepositoryImpl(
                                 timestamp = mmsDate,
                                 address = address,
                                 unreadCount = existing.unreadCount + if (read) 0 else 1,
-                                isMms = true
+                                isMms = true,
+                                hasMms = true
                             )
-                        } else if (!read) {
-                            messagesMap[threadId] =
-                                existing.copy(unreadCount = existing.unreadCount + 1)
+                        } else {
+                            messagesMap[threadId] = existing.copy(
+                                unreadCount = existing.unreadCount + if (read) 0 else 1,
+                                hasMms = true
+                            )
                         }
                     }
                 }
