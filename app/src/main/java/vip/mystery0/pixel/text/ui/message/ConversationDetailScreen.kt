@@ -73,8 +73,6 @@ import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 
-private const val MMS_DISPLAY_PREFIX = "[多媒体信息]"
-
 @Composable
 fun ConversationDetailScreen(
     threadId: Long,
@@ -392,13 +390,21 @@ fun MessageItem(
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
             Column(horizontalAlignment = cardAlignment) {
+                if (!message.mmsSubject.isNullOrBlank()) {
+                    Text(
+                        text = message.mmsSubject,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
                 if (message.imageUris.isNotEmpty()) {
                     MmsImageCard(imageUris = message.imageUris, isSelected = isSelected)
-                    if (message.content.isNotBlank() && message.content != MMS_DISPLAY_PREFIX) {
+                    if (message.content.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                if (message.content.isNotBlank() && message.content != MMS_DISPLAY_PREFIX) {
+                if (message.content.isNotBlank()) {
                     if (showOriginal || message.parsedResult is ParsedResult.None) {
                         OriginalTextCard(content = message.content, isSelected = isSelected)
                     } else {
