@@ -19,8 +19,6 @@ import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import java.nio.charset.Charset
 
-private const val MMS_DISPLAY_PREFIX = "[多媒体信息]"
-
 class MessageRepositoryImpl(
     private val context: Context,
     private val messageParser: MessageParser
@@ -211,18 +209,19 @@ class MessageRepositoryImpl(
                     if (existing == null) {
                         // MMS-only 会话
                         val address = getMmsAddress(mmsId)
-                        val snippet = buildMmsDisplayText(subject, getMmsTextContent(mmsId))
+                        val snippet = subject ?: getMmsTextContent(mmsId) ?: ""
                         messagesMap[threadId] = ConversationModel(
                             threadId = threadId,
                             address = address,
                             snippet = snippet,
                             timestamp = mmsDate,
-                            unreadCount = if (read) 0 else 1
+                            unreadCount = if (read) 0 else 1,
+                            isMms = true
                         )
                     } else {
                         if (mmsDate > existing.timestamp) {
                             // MMS 比现有 SMS 更新，更新 snippet 和时间
-                            val snippet = buildMmsDisplayText(subject, getMmsTextContent(mmsId))
+                            val snippet = subject ?: getMmsTextContent(mmsId) ?: ""
                             val address =
                                 if (existing.address.isNotBlank()) existing.address else getMmsAddress(
                                     mmsId
@@ -231,7 +230,8 @@ class MessageRepositoryImpl(
                                 snippet = snippet,
                                 timestamp = mmsDate,
                                 address = address,
-                                unreadCount = existing.unreadCount + if (read) 0 else 1
+                                unreadCount = existing.unreadCount + if (read) 0 else 1,
+                                isMms = true
                             )
                         } else if (!read) {
                             messagesMap[threadId] =
@@ -428,19 +428,20 @@ class MessageRepositoryImpl(
                         cursor.getInt(subjectCsIndex)
                     )
                     val address = getMmsAddress(mmsId)
-                    val displayText = buildMmsDisplayText(subject, getMmsTextContent(mmsId))
+                    val textContent = getMmsTextContent(mmsId)
 
                     mmsMessages.add(
                         MessageModel(
                             id = -mmsId,
                             threadId = threadId,
                             sender = address,
-                            content = displayText,
+                            content = textContent ?: "",
                             timestamp = date,
                             simName = getSimName(subId),
                             isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
                             parsedResult = ParsedResult.None,
-                            imageUris = getMmsImageUris(mmsId)
+                            imageUris = getMmsImageUris(mmsId),
+                            mmsSubject = subject
                         )
                     )
                 }
@@ -540,19 +541,19 @@ class MessageRepositoryImpl(
                     )
                     val address = getMmsAddress(mmsId)
                     val textContent = getMmsTextContent(mmsId)
-                    val displayText = buildMmsDisplayText(subject, textContent)
 
                     mmsMessages.add(
                         MessageModel(
                             id = -mmsId, // 负数避免与 SMS ID 冲突
                             threadId = threadId,
                             sender = address,
-                            content = displayText,
+                            content = textContent ?: "",
                             timestamp = date,
                             simName = getSimName(subId),
                             isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
-                            parsedResult = messageParser.parse(address, textContent),
-                            imageUris = getMmsImageUris(mmsId)
+                            parsedResult = messageParser.parse(address, textContent ?: ""),
+                            imageUris = getMmsImageUris(mmsId),
+                            mmsSubject = subject
                         )
                     )
                 }
@@ -653,19 +654,19 @@ class MessageRepositoryImpl(
                     )
                     val address = getMmsAddress(mmsId)
                     val textContent = getMmsTextContent(mmsId)
-                    val displayText = buildMmsDisplayText(subject, textContent)
 
                     mmsMessages.add(
                         MessageModel(
                             id = -mmsId,
                             threadId = threadId,
                             sender = address,
-                            content = displayText,
+                            content = textContent ?: "",
                             timestamp = date,
                             simName = getSimName(subId),
                             isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
-                            parsedResult = messageParser.parse(address, textContent),
-                            imageUris = getMmsImageUris(mmsId)
+                            parsedResult = messageParser.parse(address, textContent ?: ""),
+                            imageUris = getMmsImageUris(mmsId),
+                            mmsSubject = subject
                         )
                     )
                 }
@@ -730,22 +731,6 @@ class MessageRepositoryImpl(
         return ""
     }
 
-    private fun buildMmsDisplayText(subject: String?, textContent: String? = null): String {
-        return buildString {
-            append(MMS_DISPLAY_PREFIX)
-            val hasSubject = !subject.isNullOrBlank()
-            val hasText = !textContent.isNullOrBlank()
-            if (hasSubject) {
-                append(" ")
-                append(subject)
-            }
-            if (hasText) {
-                if (hasSubject) append("\n") else append(" ")
-                append(textContent)
-            }
-        }
-    }
-
     private fun getMmsImageUris(mmsId: Long): List<String> {
         val uris = mutableListOf<String>()
         try {
@@ -800,19 +785,20 @@ class MessageRepositoryImpl(
                     cursor.getInt(cursor.getColumnIndexOrThrow(Telephony.Mms.SUBJECT_CHARSET))
                 )
                 val address = getMmsAddress(mmsId)
-                val displayText = buildMmsDisplayText(subject, getMmsTextContent(mmsId))
+                val textContent = getMmsTextContent(mmsId)
 
                 target.add(
                     MessageModel(
                         id = -mmsId,
                         threadId = threadId,
                         sender = address,
-                        content = displayText,
+                        content = textContent ?: "",
                         timestamp = date,
                         simName = getSimName(subId),
                         isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
                         parsedResult = ParsedResult.None,
-                        imageUris = getMmsImageUris(mmsId)
+                        imageUris = getMmsImageUris(mmsId),
+                        mmsSubject = subject
                     )
                 )
             }

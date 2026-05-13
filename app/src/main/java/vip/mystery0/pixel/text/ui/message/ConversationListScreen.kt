@@ -422,7 +422,8 @@ fun ConversationItem(
             }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = conversation.snippet,
+                text = if (conversation.isMms) "[多媒体信息] ${conversation.snippet}".trim()
+                else conversation.snippet,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
