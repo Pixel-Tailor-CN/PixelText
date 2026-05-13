@@ -68,5 +68,6 @@ data class MessageModel(
     val isReceived: Boolean = true,
     val parsedResult: ParsedResult = ParsedResult.None,
     val imageUris: List<String> = emptyList(),
-    val mmsSubject: String? = null
+    val mmsSubject: String? = null,
+    val spamScore: Float = -1f
 )

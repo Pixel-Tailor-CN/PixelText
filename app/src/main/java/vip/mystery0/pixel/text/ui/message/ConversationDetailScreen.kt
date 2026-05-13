@@ -69,6 +69,7 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
+import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
@@ -368,6 +369,7 @@ fun MessageItem(
     onLongClick: () -> Unit
 ) {
     var showOriginal by remember { mutableStateOf(false) }
+    val isSpam = message.spamScore >= 0.7f
     val interactionSource = remember { MutableInteractionSource() }
 
     val arrangement = if (message.isReceived) Arrangement.Start else Arrangement.End
@@ -399,7 +401,15 @@ fun MessageItem(
                 val hasTextContent =
                     message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
                 if (hasTextContent) {
-                    if (showOriginal || message.parsedResult is ParsedResult.None) {
+                    if (showOriginal) {
+                        OriginalTextCard(
+                            content = message.content,
+                            isSelected = isSelected,
+                            subject = message.mmsSubject
+                        )
+                    } else if (isSpam) {
+                        SpamMessageCard(isSelected = isSelected)
+                    } else if (message.parsedResult is ParsedResult.None) {
                         OriginalTextCard(
                             content = message.content,
                             isSelected = isSelected,
@@ -455,7 +465,7 @@ fun MessageItem(
                 }
             }
 
-            if (message.parsedResult !is ParsedResult.None) {
+            if (isSpam || message.parsedResult !is ParsedResult.None) {
                 Text(
                     text = if (showOriginal) "显示智能卡片" else "显示原文",
                     style = MaterialTheme.typography.labelSmall,

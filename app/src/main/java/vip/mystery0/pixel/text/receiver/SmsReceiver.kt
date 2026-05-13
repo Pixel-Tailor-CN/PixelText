@@ -8,6 +8,7 @@ import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
@@ -73,6 +74,12 @@ class SmsReceiver : BroadcastReceiver() {
                 threadId = threadId,
                 messageUri = insertedUri?.toString(),
             )
+
+            // 触发骚扰检测
+            val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
+            if (messageId != null && threadId > 0) {
+                SpamDetectionWorker.schedule(context, messageId, threadId, body)
+            }
         }
     }
 }

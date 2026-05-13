@@ -20,7 +20,8 @@ import java.nio.charset.Charset
 
 class MessageRepositoryImpl(
     private val context: Context,
-    private val messageParser: MessageParser
+    private val messageParser: MessageParser,
+    private val spamRepository: vip.mystery0.pixel.text.domain.spam.SpamRepository
 ) : MessageRepository {
 
     override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
@@ -471,7 +472,8 @@ class MessageRepositoryImpl(
                         timestamp = date,
                         simName = getSimName(subId),
                         isReceived = type == Telephony.Sms.MESSAGE_TYPE_INBOX,
-                        parsedResult = messageParser.parse(address, body)
+                        parsedResult = messageParser.parse(address, body),
+                        spamScore = spamRepository.getScore(id) ?: -1f
                     )
                 )
             }
