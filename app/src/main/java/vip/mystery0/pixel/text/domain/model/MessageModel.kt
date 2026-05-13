@@ -66,5 +66,6 @@ data class MessageModel(
     val timestamp: Long,
     val simName: String = "卡1",
     val isReceived: Boolean = true,
-    val parsedResult: ParsedResult = ParsedResult.None
+    val parsedResult: ParsedResult = ParsedResult.None,
+    val imageUris: List<String> = emptyList()
 )

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,15 +61,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
+import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
+
+private const val MMS_DISPLAY_PREFIX = "[多媒体信息]"
 
 @Composable
 fun ConversationDetailScreen(
@@ -256,10 +261,10 @@ fun ConversationDetailScreen(
                         placeholder = { Text("Text message") },
                         modifier = Modifier.weight(1f),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
                         ),
                         maxLines = 4
                     )
@@ -387,14 +392,22 @@ fun MessageItem(
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
             Column(horizontalAlignment = cardAlignment) {
-                if (showOriginal || message.parsedResult is ParsedResult.None) {
-                    OriginalTextCard(content = message.content, isSelected = isSelected)
-                } else {
-                    MessageCardFactory.CreateCard(
-                        content = message.content,
-                        parsedResult = message.parsedResult,
-                        isSelected = isSelected
-                    )
+                if (message.imageUris.isNotEmpty()) {
+                    MmsImageCard(imageUris = message.imageUris, isSelected = isSelected)
+                    if (message.content.isNotBlank() && message.content != MMS_DISPLAY_PREFIX) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+                if (message.content.isNotBlank() && message.content != MMS_DISPLAY_PREFIX) {
+                    if (showOriginal || message.parsedResult is ParsedResult.None) {
+                        OriginalTextCard(content = message.content, isSelected = isSelected)
+                    } else {
+                        MessageCardFactory.CreateCard(
+                            content = message.content,
+                            parsedResult = message.parsedResult,
+                            isSelected = isSelected
+                        )
+                    }
                 }
             }
         }
