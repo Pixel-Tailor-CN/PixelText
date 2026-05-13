@@ -2,7 +2,6 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.content.ContentValues
 import android.content.Context
-import android.net.Uri
 import android.provider.Telephony
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -349,7 +348,7 @@ class MessageRepositoryImpl(
 
             // 搜索 MMS 正文 (part 表，编码正确，优先搜索)
             context.contentResolver.query(
-                Uri.parse("content://mms/part"),
+                "content://mms/part".toUri(),
                 arrayOf("mid", "text"),
                 "ct = 'text/plain' AND text LIKE ?",
                 arrayOf("%$query%"),
@@ -652,7 +651,7 @@ class MessageRepositoryImpl(
     private fun getMmsAddress(mmsId: Long): String {
         try {
             context.contentResolver.query(
-                Uri.parse("content://mms/$mmsId/addr"),
+                "content://mms/$mmsId/addr".toUri(),
                 arrayOf(Telephony.Mms.Addr.ADDRESS),
                 "${Telephony.Mms.Addr.TYPE} = ?",
                 arrayOf("137"), // PduHeaders.FROM
@@ -665,7 +664,7 @@ class MessageRepositoryImpl(
             }
             // FROM 没查到，尝试不限 type
             context.contentResolver.query(
-                Uri.parse("content://mms/$mmsId/addr"),
+                "content://mms/$mmsId/addr".toUri(),
                 arrayOf(Telephony.Mms.Addr.ADDRESS),
                 null,
                 null,
@@ -685,7 +684,7 @@ class MessageRepositoryImpl(
     private fun getMmsTextContent(mmsId: Long): String {
         try {
             context.contentResolver.query(
-                Uri.parse("content://mms/$mmsId/part"),
+                "content://mms/$mmsId/part".toUri(),
                 arrayOf("text"),
                 "ct = ?",
                 arrayOf("text/plain"),
@@ -706,7 +705,7 @@ class MessageRepositoryImpl(
         val uris = mutableListOf<String>()
         try {
             context.contentResolver.query(
-                Uri.parse("content://mms/$mmsId/part"),
+                "content://mms/$mmsId/part".toUri(),
                 arrayOf("_id", "ct"),
                 null,
                 null,

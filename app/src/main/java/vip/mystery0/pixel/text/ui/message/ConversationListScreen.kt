@@ -80,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -743,7 +744,7 @@ private fun getAvailableSimCards(context: Context): List<String> {
     val simCards = mutableListOf<String>()
     try {
         context.contentResolver.query(
-            Uri.parse("content://telephony/siminfo"),
+            "content://telephony/siminfo".toUri(),
             arrayOf("display_name", "carrier_name"),
             null,
             null,

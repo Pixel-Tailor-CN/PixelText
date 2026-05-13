@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
+import androidx.core.net.toUri
 
 /**
  * 接收 MMS 下载完成的回调。
@@ -35,7 +36,7 @@ class MmsDownloadReceiver : BroadcastReceiver() {
             Log.w(TAG, "MMS URI is missing in download callback")
             return
         }
-        val mmsUri = Uri.parse(mmsUriStr)
+        val mmsUri = mmsUriStr.toUri()
 
         when (resultCode) {
             Activity.RESULT_OK -> {
@@ -85,7 +86,7 @@ class MmsDownloadReceiver : BroadcastReceiver() {
      */
     private fun ensureFromAddress(context: Context, mmsUri: Uri) {
         val mmsId = mmsUri.lastPathSegment ?: return
-        val addrUri = Uri.parse("content://mms/$mmsId/addr")
+        val addrUri = "content://mms/$mmsId/addr".toUri()
 
         // 检查是否已有 FROM 地址（type = 137 = PduHeaders.FROM）
         context.contentResolver.query(
