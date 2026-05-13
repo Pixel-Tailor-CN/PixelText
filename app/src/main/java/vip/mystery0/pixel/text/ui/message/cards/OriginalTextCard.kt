@@ -4,6 +4,8 @@ import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,12 +25,13 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 
 @Composable
-fun OriginalTextCard(content: String, isSelected: Boolean = false) {
+fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: String? = null) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(durationMillis = 200),
@@ -105,10 +108,24 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false) {
         modifier = Modifier.widthIn(max = 320.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = annotatedString,
-                style = MaterialTheme.typography.bodyMedium.copy(color = textColor)
-            )
+            if (!subject.isNullOrBlank()) {
+                Text(
+                    text = subject,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = textColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                if (content.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+            if (content.isNotBlank()) {
+                Text(
+                    text = annotatedString,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+                )
+            }
         }
     }
 

@@ -421,14 +421,30 @@ fun ConversationItem(
                 )
             }
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = if (conversation.isMms) "[多媒体信息] ${conversation.snippet}".trim()
-                else conversation.snippet,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (conversation.hasMms) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Text(
+                            text = "彩信",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = if (conversation.isMms) "[多媒体信息] ${conversation.snippet}".trim()
+                    else conversation.snippet,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

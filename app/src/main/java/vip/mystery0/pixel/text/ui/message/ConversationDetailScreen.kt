@@ -390,23 +390,21 @@ fun MessageItem(
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
             Column(horizontalAlignment = cardAlignment) {
-                if (!message.mmsSubject.isNullOrBlank()) {
-                    Text(
-                        text = message.mmsSubject,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
                 if (message.imageUris.isNotEmpty()) {
                     MmsImageCard(imageUris = message.imageUris, isSelected = isSelected)
-                    if (message.content.isNotBlank()) {
+                    if (message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                if (message.content.isNotBlank()) {
+                val hasTextContent =
+                    message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
+                if (hasTextContent) {
                     if (showOriginal || message.parsedResult is ParsedResult.None) {
-                        OriginalTextCard(content = message.content, isSelected = isSelected)
+                        OriginalTextCard(
+                            content = message.content,
+                            isSelected = isSelected,
+                            subject = message.mmsSubject
+                        )
                     } else {
                         MessageCardFactory.CreateCard(
                             content = message.content,
