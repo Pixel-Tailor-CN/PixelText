@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import vip.mystery0.pixel.text.ui.message.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.message.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.message.ConversationListScreen
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
@@ -35,7 +37,7 @@ fun AppNavigation(
     // 收到外部 deep link 时，直接跳转到对应会话详情
     LaunchedEffect(pendingDeepLink) {
         val link = pendingDeepLink ?: return@LaunchedEffect
-        navController.navigate("conversation_detail/${link.threadId}/${link.address}")
+        navController.navigate(conversationDetailRoute(link.threadId, link.address))
         onDeepLinkConsumed()
     }
 
@@ -56,13 +58,24 @@ fun AppNavigation(
             composable("conversations") {
                 ConversationListScreen(
                     onNavigateToDetail = { threadId, address ->
-                        navController.navigate("conversation_detail/$threadId/$address")
+                        navController.navigate(conversationDetailRoute(threadId, address))
                     },
                     onNavigateToSearch = {
                         navController.navigate("search")
                     },
                     onNavigateToMock = {
                         navController.navigate("mock_messages")
+                    },
+                    onNavigateToArchive = {
+                        navController.navigate("archived_conversations")
+                    }
+                )
+            }
+            composable("archived_conversations") {
+                ArchivedConversationListScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToDetail = { threadId, address ->
+                        navController.navigate(conversationDetailRoute(threadId, address))
                     }
                 )
             }
@@ -76,7 +89,12 @@ fun AppNavigation(
                 SearchScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onResultClick = { message ->
-                        navController.navigate("conversation_detail/${message.threadId}/${message.sender}")
+                        navController.navigate(
+                            conversationDetailRoute(
+                                message.threadId,
+                                message.sender
+                            )
+                        )
                     }
                 )
             }
@@ -98,4 +116,8 @@ fun AppNavigation(
         // 默认短信应用引导对话框：非默认时在任意页面自动弹出，用户可选择跳过
         DefaultSmsAppDialog()
     }
+}
+
+private fun conversationDetailRoute(threadId: Long, address: String): String {
+    return "conversation_detail/$threadId/${Uri.encode(address)}"
 }
