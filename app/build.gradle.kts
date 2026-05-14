@@ -43,6 +43,10 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = gitVersionCode
         versionName = appVersionName
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += "arm64-v8a"
+        }
     }
     packaging {
         resources {
@@ -55,7 +59,6 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            isShrinkResources = false
             versionNameSuffix = ".d$gitVersionCode.$gitVersionName"
         }
         release {

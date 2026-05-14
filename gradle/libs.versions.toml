@@ -2,7 +2,7 @@
 agp = "9.2.1"
 kotlin = "2.3.21"
 
-app-version = "1.9"
+app-version = "1.0.0"
 android-compileSdk = "37"
 android-minSdk = "31"
 android-targetSdk = "37"
@@ -17,8 +17,8 @@ material-icons = "1.7.8"
 koin = "4.2.1"
 datastore = "1.2.1"
 preference = "2.2.0"
-tflite = "2.16.1"
-work = "2.10.1"
+tflite = "2.17.0"
+work = "2.11.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
