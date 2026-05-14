@@ -5,6 +5,7 @@ data class ConversationModel(
     val address: String,
     val snippet: String,
     val timestamp: Long,
+    val displayName: String? = null,
     val unreadCount: Int = 0,
     val isMms: Boolean = false,
     val hasMms: Boolean = false
