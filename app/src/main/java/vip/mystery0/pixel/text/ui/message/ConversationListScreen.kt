@@ -109,6 +109,15 @@ fun ConversationListScreen(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
+    var hasContactPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_CONTACTS
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasRequestedContactPermission by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -117,10 +126,22 @@ fun ConversationListScreen(
             if (isGranted) viewModel.loadConversations()
         }
     )
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            hasContactPermission = isGranted
+            viewModel.loadConversations(force = true)
+        }
+    )
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
-            viewModel.loadConversations()
+            if (!hasContactPermission && !hasRequestedContactPermission) {
+                hasRequestedContactPermission = true
+                contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+            } else {
+                viewModel.loadConversations()
+            }
         } else {
             permissionLauncher.launch(Manifest.permission.READ_SMS)
         }
@@ -362,6 +383,8 @@ fun ConversationItem(
     conversation: ConversationModel,
     onClick: () -> Unit
 ) {
+    val title = conversation.displayName?.takeIf { it.isNotBlank() } ?: conversation.address
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -406,7 +429,7 @@ fun ConversationItem(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = conversation.address,
+                    text = title,
                     style = if (conversation.unreadCount > 0) MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Bold
                     ) else MaterialTheme.typography.bodyLarge,
