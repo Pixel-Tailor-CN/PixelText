@@ -60,6 +60,10 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
                 .collect { newList ->
                     if (newList.isEmpty()) {
                         hasMore = false
+                        if (archivedConversations.isEmpty()) {
+                            _uiState.value =
+                                ArchivedConversationListUiState.Success(emptyList())
+                        }
                     } else {
                         archivedConversations.addAll(newList)
                         offset += newList.size

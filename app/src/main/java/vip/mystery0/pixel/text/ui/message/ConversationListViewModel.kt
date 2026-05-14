@@ -51,6 +51,9 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
                 .collect { newList ->
                     if (newList.isEmpty()) {
                         hasMore = false
+                        if (allConversations.isEmpty()) {
+                            _uiState.value = ConversationListUiState.Success(emptyList())
+                        }
                     } else {
                         allConversations.addAll(newList)
                         offset += newList.size
