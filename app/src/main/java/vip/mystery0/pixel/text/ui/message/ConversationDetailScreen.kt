@@ -326,7 +326,10 @@ fun ConversationDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     reverseLayout = true
                 ) {
-                    items(state.messages) { message ->
+                    items(
+                        items = state.messages,
+                        key = { it.id }
+                    ) { message ->
                         val isSelected = selectedMessageIds.contains(message.id)
                         MessageItem(
                             message = message,

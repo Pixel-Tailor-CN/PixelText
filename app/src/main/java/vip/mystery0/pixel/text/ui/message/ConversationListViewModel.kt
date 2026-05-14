@@ -79,6 +79,14 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
             repository.markThreadAsRead(threadId)
         }
     }
+
+    fun archiveSelected(conversations: List<ConversationModel>) {
+        if (conversations.isEmpty()) return
+        viewModelScope.launch {
+            repository.archiveConversations(conversations)
+            loadConversations(force = true)
+        }
+    }
 }
 
 sealed class ConversationListUiState {

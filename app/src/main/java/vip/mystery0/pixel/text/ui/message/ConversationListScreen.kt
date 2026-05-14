@@ -16,6 +16,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,8 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
@@ -98,7 +101,8 @@ fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
     onNavigateToDetail: (Long, String) -> Unit,
     onNavigateToSearch: () -> Unit,
-    onNavigateToMock: () -> Unit
+    onNavigateToMock: () -> Unit,
+    onNavigateToArchive: () -> Unit
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -118,6 +122,8 @@ fun ConversationListScreen(
         )
     }
     var hasRequestedContactPermission by remember { mutableStateOf(false) }
+    var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    val selectionMode = selectedThreadIds.isNotEmpty()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -135,6 +141,7 @@ fun ConversationListScreen(
     )
 
     LaunchedEffect(hasPermission) {
+        selectedThreadIds = emptySet()
         if (hasPermission) {
             if (!hasContactPermission && !hasRequestedContactPermission) {
                 hasRequestedContactPermission = true
@@ -197,30 +204,65 @@ fun ConversationListScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        if (selectionMode) {
+                            IconButton(onClick = { selectedThreadIds = emptySet() }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Cancel selection")
+                            }
+                        }
+                    },
                     title = {
                         Text(
-                            text = stringResource(id = R.string.app_name),
+                            text = when {
+                                selectionMode -> "已选择 ${selectedThreadIds.size} 项"
+                                else -> stringResource(id = R.string.app_name)
+                            },
                             style = MaterialTheme.typography.titleLarge
                         )
                     },
                     actions = {
-                        IconButton(onClick = onNavigateToSearch) {
-                            Icon(Icons.Rounded.Search, contentDescription = "Search")
-                        }
-                        Box(
-                            modifier = Modifier
-                                .padding(end = 16.dp, start = 8.dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
-                                .clickable { showProfileSheet = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "P",
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                style = MaterialTheme.typography.labelLarge
-                            )
+                        if (selectionMode) {
+                            IconButton(
+                                onClick = {
+                                    val selected = selectedThreadIds
+                                    selectedThreadIds = emptySet()
+                                    val conversations =
+                                        (uiState as? ConversationListUiState.Success)
+                                            ?.conversations
+                                            .orEmpty()
+                                            .filter { it.threadId in selected }
+                                    viewModel.archiveSelected(conversations)
+                                }
+                            ) {
+                                Icon(Icons.Rounded.Archive, contentDescription = "Archive")
+                            }
+                            IconButton(
+                                onClick = {
+                                    Toast.makeText(context, "删除功能暂未实现", Toast.LENGTH_SHORT)
+                                        .show()
+                                }
+                            ) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete")
+                            }
+                        } else {
+                            IconButton(onClick = onNavigateToSearch) {
+                                Icon(Icons.Rounded.Search, contentDescription = "Search")
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 16.dp, start = 8.dp)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable { showProfileSheet = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "P",
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -229,7 +271,7 @@ fun ConversationListScreen(
                 )
             },
             floatingActionButton = {
-                if (hasPermission) {
+                if (hasPermission && !selectionMode) {
                     ExtendedFloatingActionButton(
                         text = { Text("Start chat") },
                         icon = { Icon(Icons.Rounded.ChatBubbleOutline, contentDescription = null) },
@@ -280,6 +322,20 @@ fun ConversationListScreen(
                             val listState = rememberLazyListState()
                             var isRefreshing by remember { mutableStateOf(false) }
 
+                            if (state.conversations.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "暂无会话",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                return@Box
+                            }
+
                             val shouldLoadMore = remember {
                                 derivedStateOf {
                                     val lastVisibleItem =
@@ -316,6 +372,7 @@ fun ConversationListScreen(
                                         state.conversations,
                                         key = { it.threadId }) { conversation ->
                                         val dismissState = rememberSwipeToDismissBoxState()
+                                        val selected = conversation.threadId in selectedThreadIds
                                         LaunchedEffect(dismissState.targetValue) {
                                             if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd) {
                                                 viewModel.markAsRead(conversation.threadId)
@@ -328,16 +385,27 @@ fun ConversationListScreen(
                                             backgroundContent = {
                                                 SwipeBackground(dismissState)
                                             },
-                                            enableDismissFromStartToEnd = conversation.unreadCount > 0,
+                                            enableDismissFromStartToEnd = conversation.unreadCount > 0 && !selectionMode,
                                             enableDismissFromEndToStart = false
                                         ) {
                                             ConversationItem(
                                                 conversation = conversation,
+                                                selected = selected,
                                                 onClick = {
-                                                    onNavigateToDetail(
-                                                        conversation.threadId,
-                                                        conversation.address
-                                                    )
+                                                    if (selectionMode) {
+                                                        selectedThreadIds =
+                                                            if (selected) selectedThreadIds - conversation.threadId
+                                                            else selectedThreadIds + conversation.threadId
+                                                    } else {
+                                                        onNavigateToDetail(
+                                                            conversation.threadId,
+                                                            conversation.address
+                                                        )
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    selectedThreadIds =
+                                                        selectedThreadIds + conversation.threadId
                                                 }
                                             )
                                         }
@@ -360,6 +428,10 @@ fun ConversationListScreen(
                 onMockClicked = {
                     showProfileSheet = false
                     onNavigateToMock()
+                },
+                onArchiveClicked = {
+                    showProfileSheet = false
+                    onNavigateToArchive()
                 }
             )
         }
@@ -381,14 +453,23 @@ fun ConversationListScreen(
 @Composable
 fun ConversationItem(
     conversation: ConversationModel,
-    onClick: () -> Unit
+    selected: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
 ) {
     val title = conversation.displayName?.takeIf { it.isNotBlank() } ?: conversation.address
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else Color.Transparent
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -397,7 +478,10 @@ fun ConversationItem(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(vip.mystery0.pixel.text.ui.theme.getAvatarColor(conversation.address)),
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else vip.mystery0.pixel.text.ui.theme.getAvatarColor(conversation.address)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 // 使用联系人头像图标
@@ -474,7 +558,10 @@ fun ConversationItem(
 }
 
 @Composable
-fun ProfileSheetContent(onMockClicked: () -> Unit) {
+fun ProfileSheetContent(
+    onMockClicked: () -> Unit,
+    onArchiveClicked: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -511,7 +598,7 @@ fun ProfileSheetContent(onMockClicked: () -> Unit) {
         ListItem(
             headlineContent = { Text("归档短信") },
             leadingContent = { Icon(Icons.Rounded.Archive, contentDescription = null) },
-            modifier = Modifier.clickable { }
+            modifier = Modifier.clickable { onArchiveClicked() }
         )
         ListItem(
             headlineContent = { Text("骚扰与拦截") },

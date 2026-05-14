@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 val packageName = "vip.mystery0.pixel.text"
@@ -111,6 +112,9 @@ dependencies {
 
     implementation(libs.tensorflow.lite)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 }
 
 apply(from = rootProject.file("signing.gradle"))

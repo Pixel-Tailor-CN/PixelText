@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
+import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
+import vip.mystery0.pixel.text.data.db.toConversationModel
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
@@ -25,28 +28,36 @@ import java.nio.charset.Charset
 class MessageRepositoryImpl(
     private val context: Context,
     private val messageParser: MessageParser,
-    private val spamRepository: vip.mystery0.pixel.text.domain.spam.SpamRepository
+    private val spamRepository: vip.mystery0.pixel.text.domain.spam.SpamRepository,
+    private val archiveDatabase: ConversationArchiveDatabase
 ) : MessageRepository {
 
     private val contactNameCache = mutableMapOf<String, String?>()
     private var contactNameCacheLoaded = false
+    private val archiveDao = archiveDatabase.archivedConversationDao()
 
     override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
-        val threadIds = mutableListOf<Long>()
-        context.contentResolver.query(
-            "content://mms-sms/conversations?simple=true".toUri(),
-            arrayOf("_id"),
-            null, null,
-            "date DESC LIMIT $limit OFFSET $offset"
-        )?.use { cursor ->
-            val idIdx = cursor.getColumnIndexOrThrow("_id")
-            while (cursor.moveToNext()) threadIds.add(cursor.getLong(idIdx))
-        }
+        val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
+        val threadIds = queryFilteredConversationThreadIds(
+            limit = limit,
+            offset = offset,
+            archivedThreadIds = archivedThreadIds
+        )
         if (threadIds.isEmpty()) {
             emit(emptyList()); return@flow
         }
         emit(fetchConversationDetails(threadIds).sortedByDescending { it.timestamp })
     }.flowOn(Dispatchers.IO)
+
+    override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
+        flow {
+            val conversations = archiveDao.getArchivedConversations(limit, offset)
+                .map { it.toConversationModel() }
+            if (conversations.isEmpty()) {
+                emit(emptyList()); return@flow
+            }
+            emit(conversations)
+        }.flowOn(Dispatchers.IO)
 
     override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
         val threadIds = mutableSetOf<Long>()
@@ -96,6 +107,59 @@ class MessageRepositoryImpl(
             .sortedByDescending { it.timestamp }
         emit(sorted)
     }.flowOn(Dispatchers.IO)
+
+    override suspend fun archiveConversations(conversations: List<ConversationModel>) {
+        if (conversations.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            val archivedAt = System.currentTimeMillis()
+            archiveDao.archive(conversations.map { it.toArchivedConversationEntity(archivedAt) })
+        }
+    }
+
+    override suspend fun unarchiveThreads(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            archiveDao.unarchive(threadIds)
+        }
+    }
+
+    private fun queryFilteredConversationThreadIds(
+        limit: Int,
+        offset: Int,
+        archivedThreadIds: Set<Long>
+    ): List<Long> {
+        val filteredThreadIds = mutableListOf<Long>()
+        val targetCount = offset + limit
+        var rawOffset = 0
+        val pageSize = maxOf(100, limit)
+
+        while (filteredThreadIds.size < targetCount) {
+            val page = queryConversationThreadIdsPage(pageSize, rawOffset)
+            if (page.isEmpty()) break
+
+            filteredThreadIds += page.filter { threadId ->
+                threadId !in archivedThreadIds
+            }
+            rawOffset += page.size
+        }
+
+        return filteredThreadIds.drop(offset).take(limit)
+    }
+
+    private fun queryConversationThreadIdsPage(limit: Int, offset: Int): List<Long> {
+        val threadIds = mutableListOf<Long>()
+        context.contentResolver.query(
+            "content://mms-sms/conversations?simple=true".toUri(),
+            arrayOf("_id"),
+            null,
+            null,
+            "date DESC LIMIT $limit OFFSET $offset"
+        )?.use { cursor ->
+            val idIdx = cursor.getColumnIndexOrThrow("_id")
+            while (cursor.moveToNext()) threadIds.add(cursor.getLong(idIdx))
+        }
+        return threadIds
+    }
 
     private fun fetchConversationDetails(threadIds: List<Long>): List<ConversationModel> {
         val messagesMap = mutableMapOf<Long, ConversationModel>()
