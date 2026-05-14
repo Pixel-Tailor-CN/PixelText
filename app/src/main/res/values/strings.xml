@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">PixelText</string>
+    <string name="app_name">Pixel Text</string>
     <string name="notification_action_mark_read">已阅</string>
     <string name="notification_action_reply">回复</string>
     <string name="notification_reply_hint">回复…</string>
