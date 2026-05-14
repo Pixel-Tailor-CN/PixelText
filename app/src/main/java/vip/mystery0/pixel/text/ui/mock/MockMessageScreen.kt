@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -149,7 +152,8 @@ fun MockMessageScreen() {
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.background // 给整个列表加一个主题底色，让表面卡片更凸显
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp),
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -162,6 +166,9 @@ fun MockMessageScreen() {
             items(mockMessages) { message ->
                 MessageItem(message)
             }
+            item {
+                Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
         }
     }
 }
@@ -169,7 +176,7 @@ fun MockMessageScreen() {
 @Composable
 private fun MessageItem(message: MessageModel) {
     var showOriginal by remember { mutableStateOf(false) }
-    
+
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {

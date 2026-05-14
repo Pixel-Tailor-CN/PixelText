@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(FlowPreview::class)
 class SearchViewModel(private val repository: MessageRepository) : ViewModel() {
@@ -24,7 +25,7 @@ class SearchViewModel(private val repository: MessageRepository) : ViewModel() {
 
     init {
         _searchQuery
-            .debounce(300)
+            .debounce(300.milliseconds)
             .distinctUntilChanged()
             .onEach { query ->
                 if (query.isBlank()) {
