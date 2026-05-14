@@ -75,7 +75,7 @@ class SpamDetectionWorker(
         }
         if (score >= 0f) {
             spamRepository.save(messageId, threadId, score)
-            Log.d(TAG, "消息 $messageId 骚扰概率: $score")
+            Log.d(TAG, "spam score message_id=$messageId score=$score")
             updateNotification(sender, threadId, content, score)
             notifySpamResult(messageId, threadId, score)
         }
