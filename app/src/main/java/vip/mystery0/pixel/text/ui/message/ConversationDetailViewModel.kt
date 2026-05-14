@@ -13,6 +13,7 @@ import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,8 +21,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
+import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -32,9 +38,16 @@ sealed interface SendResultEvent {
     data class Failure(val reason: String) : SendResultEvent
 }
 
+sealed interface ManualSpamCheckState {
+    data object Checking : ManualSpamCheckState
+    data class Result(val score: Float) : ManualSpamCheckState
+    data class Error(val message: String) : ManualSpamCheckState
+}
+
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
-    private val context: Context
+    private val context: Context,
+    private val spamClassifierFactory: SpamClassifierFactory
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
@@ -48,11 +61,40 @@ class ConversationDetailViewModel(
     private val _sendResultEvents = Channel<SendResultEvent>(Channel.BUFFERED)
     val sendResultEvents = _sendResultEvents.receiveAsFlow()
 
+    private val _manualSpamChecks = MutableStateFlow<Map<Long, ManualSpamCheckState>>(emptyMap())
+    val manualSpamChecks: StateFlow<Map<Long, ManualSpamCheckState>> =
+        _manualSpamChecks.asStateFlow()
+
     private var currentThreadId: Long = -1L
     private var offset = 0
     private var isLoadingMore = false
     private var hasMore = true
+    private var loadVersion = 0
     private val _messages = mutableListOf<MessageModel>()
+    private val manualClassificationMutex = Mutex()
+    private val spamDetectionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receivedContext: Context?, intent: Intent?) {
+            if (intent?.action != SpamDetectionWorker.ACTION_SPAM_DETECTED) return
+            val threadId = intent.getLongExtra(SpamDetectionWorker.KEY_THREAD_ID, -1L)
+            if (threadId == currentThreadId) {
+                refreshMessages()
+            }
+        }
+    }
+
+    init {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        } else {
+            0
+        }
+        ContextCompat.registerReceiver(
+            context,
+            spamDetectionReceiver,
+            IntentFilter(SpamDetectionWorker.ACTION_SPAM_DETECTED),
+            flags
+        )
+    }
 
     fun loadThread(threadId: Long, address: String) {
         _address.value = address
@@ -62,6 +104,7 @@ class ConversationDetailViewModel(
         _messages.clear()
         offset = 0
         hasMore = true
+        loadVersion++
 
         if (threadId == -1L) {
             // 新会话，没有历史消息
@@ -82,15 +125,18 @@ class ConversationDetailViewModel(
     }
 
     private fun fetchMessages() {
+        val requestVersion = loadVersion
         viewModelScope.launch {
             repository.getMessagesByThread(currentThreadId, 20, offset)
                 .catch { e ->
+                    if (requestVersion != loadVersion) return@catch
                     if (_messages.isEmpty()) {
                         _uiState.value = MessageUiState.Error(e.message ?: "Unknown error")
                     }
                     isLoadingMore = false
                 }
                 .collect { newMessages ->
+                    if (requestVersion != loadVersion) return@collect
                     if (newMessages.isEmpty()) {
                         hasMore = false
                     } else {
@@ -124,19 +170,53 @@ class ConversationDetailViewModel(
                 }
 
                 // 2. 立刻把占位插入到 UI 头部，给用户即时反馈
-                refreshMessagesAfterSend()
+                refreshMessages()
 
                 // 3. 用 PendingIntent 发短信，监听系统返回的发送结果
                 val resultCode = sendSmsAndAwaitResult(address, message, subId)
 
                 // 4. 根据结果更新数据库中的那条占位记录
                 handleSendResult(pendingUri, resultCode)
-                refreshMessagesAfterSend()
+                refreshMessages()
             } catch (e: Exception) {
                 _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
             } finally {
                 _sending.value = false
             }
+        }
+    }
+
+    fun checkSpamOnce(message: MessageModel) {
+        if (message.content.isBlank()) {
+            _manualSpamChecks.value =
+                _manualSpamChecks.value + (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
+            return
+        }
+        if (_manualSpamChecks.value[message.id] is ManualSpamCheckState.Checking) return
+
+        _manualSpamChecks.value =
+            _manualSpamChecks.value + (message.id to ManualSpamCheckState.Checking)
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.Default) {
+                    manualClassificationMutex.withLock {
+                        spamClassifierFactory.create().use { classifier ->
+                            classifier.classify(message.content)
+                        }
+                    }
+                }
+            }
+            val state = result.fold(
+                onSuccess = { score ->
+                    if (score >= 0f) {
+                        ManualSpamCheckState.Result(score)
+                    } else {
+                        ManualSpamCheckState.Error("识别失败")
+                    }
+                },
+                onFailure = { ManualSpamCheckState.Error(it.message ?: "识别失败") }
+            )
+            _manualSpamChecks.value = _manualSpamChecks.value + (message.id to state)
         }
     }
 
@@ -292,11 +372,17 @@ class ConversationDetailViewModel(
         else -> "发送失败"
     }
 
-    private fun refreshMessagesAfterSend() {
+    private fun refreshMessages() {
         _messages.clear()
         offset = 0
         hasMore = true
+        loadVersion++
         fetchMessages()
+    }
+
+    override fun onCleared() {
+        runCatching { context.unregisterReceiver(spamDetectionReceiver) }
+        super.onCleared()
     }
 
     companion object {

@@ -78,7 +78,7 @@ class SmsReceiver : BroadcastReceiver() {
             // 触发骚扰检测
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
             if (messageId != null && threadId > 0) {
-                SpamDetectionWorker.schedule(context, messageId, threadId, body)
+                SpamDetectionWorker.schedule(context, messageId, threadId, sender, body)
             }
         }
     }

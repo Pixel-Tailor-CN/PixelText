@@ -88,6 +88,7 @@ fun ConversationDetailScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val sending by viewModel.sending.collectAsState()
+    val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var messageText by remember { mutableStateOf("") }
@@ -330,6 +331,8 @@ fun ConversationDetailScreen(
                         MessageItem(
                             message = message,
                             isSelected = isSelected,
+                            manualSpamCheckState = manualSpamChecks[message.id],
+                            onCheckSpam = { viewModel.checkSpamOnce(message) },
                             onClick = {
                                 if (selectedMessageIds.isNotEmpty()) {
                                     if (isSelected) {
@@ -365,6 +368,8 @@ fun ConversationDetailScreen(
 fun MessageItem(
     message: MessageModel,
     isSelected: Boolean,
+    manualSpamCheckState: ManualSpamCheckState? = null,
+    onCheckSpam: () -> Unit = {},
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -471,6 +476,49 @@ fun MessageItem(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { showOriginal = !showOriginal }
+                )
+            }
+        }
+
+        if (message.content.isNotBlank()) {
+            val manualCheckText = when (manualSpamCheckState) {
+                ManualSpamCheckState.Checking -> "识别中..."
+                is ManualSpamCheckState.Result -> {
+                    val percent = (manualSpamCheckState.score * 100).toInt().coerceIn(0, 100)
+                    if (manualSpamCheckState.score >= 0.7f) {
+                        "手动识别: 骚扰概率 $percent%"
+                    } else {
+                        "手动识别: 风险较低 $percent%"
+                    }
+                }
+
+                is ManualSpamCheckState.Error -> manualSpamCheckState.message
+                null -> "手动识别"
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .padding(top = 4.dp),
+                horizontalArrangement = arrangement
+            ) {
+                Text(
+                    text = manualCheckText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when (manualSpamCheckState) {
+                        is ManualSpamCheckState.Error -> MaterialTheme.colorScheme.error
+                        is ManualSpamCheckState.Result ->
+                            if (manualSpamCheckState.score >= 0.7f) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
+
+                        else -> MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.clickable(
+                        enabled = manualSpamCheckState !is ManualSpamCheckState.Checking,
+                        onClick = onCheckSpam
+                    )
                 )
             }
         }

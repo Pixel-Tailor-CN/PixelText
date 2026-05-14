@@ -9,6 +9,7 @@ import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
+import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.ui.message.ConversationDetailViewModel
 import vip.mystery0.pixel.text.ui.message.ConversationListViewModel
@@ -18,11 +19,12 @@ import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 val appModule = module {
     single { MessageParser(androidContext()) }
     single { SpamDatabase(androidContext()) }
-    single { SpamClassifier(androidContext()) }
+    factory { SpamClassifier(androidContext()) }
+    single<SpamClassifierFactory> { SpamClassifierFactory { SpamClassifier(androidContext()) } }
     single<SpamRepository> { SpamRepositoryImpl(get()) }
     single<MessageRepository> { MessageRepositoryImpl(androidContext(), get(), get()) }
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
-    viewModel { ConversationDetailViewModel(get(), androidContext()) }
+    viewModel { ConversationDetailViewModel(get(), androidContext(), get()) }
     viewModel { SearchViewModel(get()) }
 }
