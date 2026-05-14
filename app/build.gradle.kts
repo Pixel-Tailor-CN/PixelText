@@ -107,7 +107,6 @@ dependencies {
     implementation(libs.zhanghai.preference)
 
     implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.select.tf.ops)
     implementation(libs.androidx.work.runtime.ktx)
 }
 
