@@ -46,7 +46,7 @@ class SpamClassifier(context: Context) : AutoCloseable {
             interpreter.run(input, output)
             output[0][0]
         } catch (e: Exception) {
-            Log.e(TAG, "推理失败: ${e.message}")
+            Log.e(TAG, "inference failed message=${e.message}")
             -1f
         }
     }
