@@ -56,8 +56,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
                             _uiState.value = ConversationListUiState.Success(emptyList())
                         }
                     } else {
-                        val visibleList = newList.filterNot { it.threadId in pendingDeletedThreadIds }
-                        allConversations.addAll(visibleList)
+                        mergeConversations(newList)
                         offset += newList.size
                         _uiState.value = ConversationListUiState.Success(allConversations.toList())
                     }
@@ -118,12 +117,30 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     }
 
     private fun replaceConversations(conversations: List<ConversationModel>) {
-        val visibleList = conversations.filterNot { it.threadId in pendingDeletedThreadIds }
+        val visibleList = conversations
+            .filterNot { it.threadId in pendingDeletedThreadIds }
+            .distinctBy { it.threadId }
         allConversations.clear()
         allConversations.addAll(visibleList)
         offset = conversations.size
         hasMore = conversations.isNotEmpty()
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
+
+    private fun mergeConversations(conversations: List<ConversationModel>) {
+        val currentByThreadId = allConversations.associateBy { it.threadId }
+        val merged = (allConversations + conversations)
+            .filterNot { it.threadId in pendingDeletedThreadIds }
+            .distinctBy { it.threadId }
+            .map { conversation ->
+                currentByThreadId[conversation.threadId]?.let { existing ->
+                    if (conversation.timestamp >= existing.timestamp) conversation else existing
+                } ?: conversation
+            }
+            .sortedByDescending { it.timestamp }
+
+        allConversations.clear()
+        allConversations.addAll(merged)
     }
 }
 
