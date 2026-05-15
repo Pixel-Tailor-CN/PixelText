@@ -106,6 +106,7 @@ class ConversationDetailViewModel(
         currentThreadId = threadId
         _messages.clear()
         offset = 0
+        isLoadingMore = false
         hasMore = true
         loadVersion++
 
@@ -122,12 +123,12 @@ class ConversationDetailViewModel(
     }
 
     fun loadMore() {
-        if (isLoadingMore || !hasMore) return
-        isLoadingMore = true
         fetchMessages()
     }
 
     private fun fetchMessages() {
+        if (isLoadingMore || !hasMore) return
+        isLoadingMore = true
         val requestVersion = loadVersion
         viewModelScope.launch {
             repository.getMessagesByThread(currentThreadId, 20, offset)
@@ -142,9 +143,18 @@ class ConversationDetailViewModel(
                     if (requestVersion != loadVersion) return@collect
                     if (newMessages.isEmpty()) {
                         hasMore = false
+                        if (_messages.isEmpty()) {
+                            _uiState.value = MessageUiState.Success(emptyList())
+                        }
                     } else {
-                        _messages.addAll(newMessages)
-                        offset += newMessages.size
+                        val existingKeys = _messages.map { it.stableKey }.toSet()
+                        val deduplicated = newMessages.filter { it.stableKey !in existingKeys }
+                        if (deduplicated.isEmpty()) {
+                            hasMore = false
+                        } else {
+                            _messages.addAll(deduplicated)
+                            offset += newMessages.size
+                        }
                         _uiState.value = MessageUiState.Success(_messages.toList())
                     }
                     isLoadingMore = false
@@ -378,6 +388,7 @@ class ConversationDetailViewModel(
     private fun refreshMessages() {
         _messages.clear()
         offset = 0
+        isLoadingMore = false
         hasMore = true
         loadVersion++
         fetchMessages()

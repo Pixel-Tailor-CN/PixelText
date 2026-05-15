@@ -339,7 +339,7 @@ fun ConversationDetailScreen(
                 ) {
                     items(
                         items = state.messages,
-                        key = { it.id }
+                        key = { it.stableKey }
                     ) { message ->
                         val isSelected = selectedMessageIds.contains(message.id)
                         MessageItem(
