@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import vip.mystery0.pixel.text.ui.message.ConversationDetailScreen
+import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class ComposeSmsActivity : ComponentActivity() {

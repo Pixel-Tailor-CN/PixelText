@@ -14,9 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import vip.mystery0.pixel.text.ui.message.ArchivedConversationListScreen
-import vip.mystery0.pixel.text.ui.message.ConversationDetailScreen
-import vip.mystery0.pixel.text.ui.message.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
+import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 
 /**
@@ -109,7 +109,7 @@ fun AppNavigation(
                 )
             }
             composable("mock_messages") {
-                vip.mystery0.pixel.text.ui.mock.MockMessageScreen()
+                vip.mystery0.pixel.text.ui.screen.mock.MockMessageScreen()
             }
         }
 

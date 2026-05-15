@@ -12,10 +12,10 @@ import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
-import vip.mystery0.pixel.text.ui.message.ArchivedConversationListViewModel
-import vip.mystery0.pixel.text.ui.message.ConversationDetailViewModel
-import vip.mystery0.pixel.text.ui.message.ConversationListViewModel
-import vip.mystery0.pixel.text.ui.message.MessageViewModel
+import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
+import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
+import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
+import vip.mystery0.pixel.text.viewmodel.MessageViewModel
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 
 val appModule = module {

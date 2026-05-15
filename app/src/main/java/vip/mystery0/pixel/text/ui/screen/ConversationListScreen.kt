@@ -1,4 +1,4 @@
-package vip.mystery0.pixel.text.ui.message
+package vip.mystery0.pixel.text.ui.screen
 
 import android.Manifest
 import android.content.Context
@@ -49,19 +49,24 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -94,6 +99,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.ui.theme.getAvatarColor
+import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
+import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -501,7 +509,7 @@ fun ConversationItem(
                     .clip(CircleShape)
                     .background(
                         if (selected) MaterialTheme.colorScheme.primary
-                        else vip.mystery0.pixel.text.ui.theme.getAvatarColor(conversation.address)
+                        else getAvatarColor(conversation.address)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -774,7 +782,7 @@ fun NewChatBottomSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    androidx.compose.material3.TextField(
+                    TextField(
                         value = phoneNumber,
                         onValueChange = {
                             phoneNumber = it
@@ -784,7 +792,7 @@ fun NewChatBottomSheet(
                         isError = showError,
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        colors = androidx.compose.material3.TextFieldDefaults.colors(
+                        colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             errorContainerColor = Color.Transparent,
@@ -810,7 +818,7 @@ fun NewChatBottomSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         simCards.forEachIndexed { index, simName ->
-                            androidx.compose.material3.FilterChip(
+                            FilterChip(
                                 selected = selectedSimSlot == index,
                                 onClick = { selectedSimSlot = index },
                                 label = { Text(simName) },
@@ -822,7 +830,7 @@ fun NewChatBottomSheet(
             }
         }
 
-        androidx.compose.material3.Button(
+        Button(
             onClick = {
                 if (isValidPhoneNumber) {
                     val trimmedNumber = phoneNumber.trim()
@@ -838,7 +846,7 @@ fun NewChatBottomSheet(
             Text("下一步")
         }
 
-        androidx.compose.material3.OutlinedButton(
+        OutlinedButton(
             onClick = {
                 if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                     contactPickerLauncher.launch(null)

@@ -1,4 +1,4 @@
-package vip.mystery0.pixel.text.ui.message
+package vip.mystery0.pixel.text.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
@@ -41,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListUiState
+import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 
 @Composable
 fun ArchivedConversationListScreen(

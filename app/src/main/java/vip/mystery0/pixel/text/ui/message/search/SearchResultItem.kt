@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.domain.model.MessageModel
-import vip.mystery0.pixel.text.ui.message.formatTimeShort
+import vip.mystery0.pixel.text.ui.screen.formatTimeShort
 
 @Composable
 fun SearchResultItem(
