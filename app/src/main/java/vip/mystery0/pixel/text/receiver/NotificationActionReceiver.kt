@@ -2,10 +2,13 @@ package vip.mystery0.pixel.text.receiver
 
 import android.Manifest
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
@@ -33,14 +36,24 @@ class NotificationActionReceiver : BroadcastReceiver() {
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
         const val ACTION_REPLY_SMS = "vip.mystery0.pixel.text.action.REPLY_SMS"
 
+        /** 复制验证码，并将对应短信标记为已读 */
+        const val ACTION_COPY_VERIFICATION_CODE =
+            "vip.mystery0.pixel.text.action.COPY_VERIFICATION_CODE"
+
         /** Intent extra：通知 ID，用于 cancel / update */
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
 
         /** Intent extra：会话 thread_id，标记已读时使用 */
         const val EXTRA_THREAD_ID = "extra_thread_id"
 
+        /** Intent extra：短信数据库 URI，优先用于精确标记单条短信已读 */
+        const val EXTRA_MESSAGE_URI = "extra_message_uri"
+
         /** Intent extra：回复目标的手机号 / 发件人地址 */
         const val EXTRA_REPLY_ADDRESS = "extra_reply_address"
+
+        /** Intent extra：待复制的验证码 */
+        const val EXTRA_VERIFICATION_CODE = "extra_verification_code"
 
         /**
          * RemoteInput result key：从通知栏输入框取出回复文本时使用的 key。
@@ -56,6 +69,18 @@ class NotificationActionReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_MARK_READ -> {
                 if (threadId != -1L) markThreadAsRead(context, threadId)
+                cancelNotification(context, notificationId)
+            }
+
+            ACTION_COPY_VERIFICATION_CODE -> {
+                val code = intent.getStringExtra(EXTRA_VERIFICATION_CODE)
+                val messageUri = intent.getStringExtra(EXTRA_MESSAGE_URI)
+                if (!code.isNullOrBlank()) {
+                    copyVerificationCode(context, code)
+                    markMessageAsRead(context, messageUri, threadId)
+                } else {
+                    Log.w(TAG, "copy verification skipped: code is blank")
+                }
                 cancelNotification(context, notificationId)
             }
 
@@ -89,12 +114,57 @@ class NotificationActionReceiver : BroadcastReceiver() {
         try {
             val updated = context.contentResolver.update(
                 Telephony.Sms.CONTENT_URI,
-                ContentValues().apply { put(Telephony.Sms.READ, 1) },
-                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0 AND ${Telephony.Sms.TYPE} = ?",
+                readValues(),
+                "${Telephony.Sms.THREAD_ID} = ? AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0) AND ${Telephony.Sms.TYPE} = ?",
                 arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
             )
         } catch (e: Exception) {
             Log.e(TAG, "failed to mark thread $threadId as read", e)
+        }
+    }
+
+    /**
+     * 优先将通知对应的单条短信标记为已读；URI 不可用时回退到会话级已读。
+     */
+    private fun markMessageAsRead(context: Context, messageUri: String?, threadId: Long) {
+        if (!messageUri.isNullOrBlank()) {
+            try {
+                val updated = context.contentResolver.update(
+                    Uri.parse(messageUri),
+                    readValues(),
+                    null,
+                    null
+                )
+                if (updated > 0) return
+            } catch (e: Exception) {
+                Log.e(TAG, "failed to mark message as read", e)
+            }
+        }
+
+        if (threadId != -1L) {
+            markThreadAsRead(context, threadId)
+        }
+    }
+
+    private fun readValues(): ContentValues {
+        return ContentValues().apply {
+            put(Telephony.Sms.READ, 1)
+            put(Telephony.Sms.SEEN, 1)
+        }
+    }
+
+    /**
+     * 将验证码写入系统剪贴板。
+     */
+    private fun copyVerificationCode(context: Context, code: String) {
+        try {
+            val clipboardManager =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboardManager.setPrimaryClip(
+                ClipData.newPlainText("verification code", code)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to copy verification code", e)
         }
     }
 
