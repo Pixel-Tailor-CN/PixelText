@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
@@ -90,6 +92,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -106,6 +109,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
+import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
@@ -145,6 +150,9 @@ fun ConversationListScreen(
     var hasRequestedContactPermission by remember { mutableStateOf(false) }
     var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val selectionMode = selectedThreadIds.isNotEmpty()
+    var isDefaultSmsRoleHeld by remember(context) {
+        mutableStateOf(context.isDefaultSmsApp())
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -160,6 +168,11 @@ fun ConversationListScreen(
             viewModel.loadConversations(force = true)
         }
     )
+    val defaultSmsAppLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isDefaultSmsRoleHeld = context.isDefaultSmsApp()
+    }
 
     LaunchedEffect(hasPermission) {
         selectedThreadIds = emptySet()
@@ -176,9 +189,10 @@ fun ConversationListScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, hasPermission) {
+    DisposableEffect(lifecycleOwner, hasPermission, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                isDefaultSmsRoleHeld = context.isDefaultSmsApp()
                 if (hasPermission) {
                     viewModel.refreshSilent()
                 }
@@ -220,7 +234,7 @@ fun ConversationListScreen(
     val sheetState = rememberModalBottomSheetState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    var showProfileSheet by remember { mutableStateOf(false) }
+    var showMenuSheet by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
@@ -272,19 +286,10 @@ fun ConversationListScreen(
                             IconButton(onClick = onNavigateToSearch) {
                                 Icon(Icons.Rounded.Search, contentDescription = "Search")
                             }
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 16.dp, start = 8.dp)
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .clickable { showProfileSheet = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "P",
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    style = MaterialTheme.typography.labelLarge
+                            IconButton(onClick = { showMenuSheet = true }) {
+                                Icon(
+                                    Icons.Rounded.MoreVert,
+                                    contentDescription = "More options"
                                 )
                             }
                         }
@@ -503,19 +508,26 @@ fun ConversationListScreen(
         )
     }
 
-    if (showProfileSheet) {
+    if (showMenuSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showProfileSheet = false },
+            onDismissRequest = { showMenuSheet = false },
             sheetState = sheetState
         ) {
-            ProfileSheetContent(
+            MenuSheetContent(
+                isDefaultSmsApp = isDefaultSmsRoleHeld,
                 onMockClicked = {
-                    showProfileSheet = false
+                    showMenuSheet = false
                     onNavigateToMock()
                 },
                 onArchiveClicked = {
-                    showProfileSheet = false
+                    showMenuSheet = false
                     onNavigateToArchive()
+                },
+                onSetDefaultSmsAppClicked = {
+                    if (!isDefaultSmsRoleHeld) {
+                        showMenuSheet = false
+                        defaultSmsAppLauncher.launch(context.createDefaultSmsAppRequestIntent())
+                    }
                 }
             )
         }
@@ -643,42 +655,28 @@ fun ConversationItem(
 }
 
 @Composable
-fun ProfileSheetContent(
+fun MenuSheetContent(
+    isDefaultSmsApp: Boolean,
     onMockClicked: () -> Unit,
-    onArchiveClicked: () -> Unit
+    onArchiveClicked: () -> Unit,
+    onSetDefaultSmsAppClicked: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                "P",
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.headlineMedium
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Pixel Text User", style = MaterialTheme.typography.titleLarge)
-        Spacer(modifier = Modifier.height(24.dp))
-
         ListItem(
-            headlineContent = { Text("开发测试 (Mock)") },
+            headlineContent = { Text("设置默认短信应用") },
             leadingContent = {
                 Icon(
-                    Icons.Rounded.Build,
+                    Icons.AutoMirrored.Rounded.Message,
                     contentDescription = null
                 )
             },
-            modifier = Modifier.clickable { onMockClicked() }
+            modifier = Modifier
+                .alpha(if (isDefaultSmsApp) 0.38f else 1f)
+                .clickable(enabled = !isDefaultSmsApp) { onSetDefaultSmsAppClicked() }
         )
         ListItem(
             headlineContent = { Text("归档短信") },
@@ -695,7 +693,19 @@ fun ProfileSheetContent(
             leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
             modifier = Modifier.clickable { }
         )
-        Spacer(modifier = Modifier.height(32.dp))
+        ListItem(
+            headlineContent = { Text("开发测试 (Mock)") },
+            leadingContent = {
+                Icon(
+                    Icons.Rounded.Build,
+                    contentDescription = null
+                )
+            },
+            modifier = Modifier.clickable { onMockClicked() }
+        )
+        Spacer(
+            modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+        )
     }
 }
 

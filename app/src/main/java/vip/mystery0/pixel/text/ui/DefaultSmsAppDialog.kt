@@ -3,7 +3,7 @@ package vip.mystery0.pixel.text.ui
 import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
-import android.provider.Telephony
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.size
@@ -30,13 +30,18 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 判断当前应用是否为默认短信应用。
- *
- * Android Q+ 使用 [RoleManager.isRoleHeld]（Role 系统的权威 API）；
- * 低版本回退到 [Telephony.Sms.getDefaultSmsPackage]。
  */
-private fun isDefaultSmsApp(context: Context): Boolean {
-    return context.getSystemService(RoleManager::class.java)
+fun Context.isDefaultSmsApp(): Boolean {
+    return getSystemService(RoleManager::class.java)
         .isRoleHeld(RoleManager.ROLE_SMS)
+}
+
+/**
+ * 创建引导用户授予默认短信应用角色的系统 Intent。
+ */
+fun Context.createDefaultSmsAppRequestIntent(): Intent {
+    return getSystemService(RoleManager::class.java)
+        .createRequestRoleIntent(RoleManager.ROLE_SMS)
 }
 
 /**
@@ -55,7 +60,7 @@ fun DefaultSmsAppDialog() {
 
     // 仅在首次进入时检测一次
     LaunchedEffect(Unit) {
-        showDialog = !isDefaultSmsApp(context)
+        showDialog = !context.isDefaultSmsApp()
     }
 
     val setDefaultLauncher = rememberLauncherForActivityResult(
@@ -68,7 +73,7 @@ fun DefaultSmsAppDialog() {
             // 用户取消或未授权 → 延迟 500ms 后重新检测
             scope.launch {
                 delay(500.milliseconds)
-                showDialog = !isDefaultSmsApp(context)
+                showDialog = !context.isDefaultSmsApp()
             }
         }
     }
@@ -95,9 +100,7 @@ fun DefaultSmsAppDialog() {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val intent = context.getSystemService(RoleManager::class.java)
-                            .createRequestRoleIntent(RoleManager.ROLE_SMS)
-                        setDefaultLauncher.launch(intent)
+                        setDefaultLauncher.launch(context.createDefaultSmsAppRequestIntent())
                     }
                 ) {
                     Text("去设置")
