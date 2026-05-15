@@ -56,7 +56,7 @@ fun SearchResultList(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(uiState.results, key = { it.id }) { message ->
+                    items(uiState.results, key = { it.stableKey }) { message ->
                         SearchResultItem(
                             message = message,
                             query = query,

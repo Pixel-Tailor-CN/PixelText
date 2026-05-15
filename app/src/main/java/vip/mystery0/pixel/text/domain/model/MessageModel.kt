@@ -70,4 +70,7 @@ data class MessageModel(
     val imageUris: List<String> = emptyList(),
     val mmsSubject: String? = null,
     val spamScore: Float = -1f
-)
+) {
+    val stableKey: String
+        get() = if (id < 0) "mms:${-id}" else "sms:$id"
+}

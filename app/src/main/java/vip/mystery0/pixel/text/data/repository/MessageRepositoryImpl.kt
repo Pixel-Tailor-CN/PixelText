@@ -129,6 +129,7 @@ class MessageRepositoryImpl(
         archivedThreadIds: Set<Long>
     ): List<Long> {
         val filteredThreadIds = mutableListOf<Long>()
+        val seenThreadIds = mutableSetOf<Long>()
         val targetCount = offset + limit
         var rawOffset = 0
         val pageSize = maxOf(100, limit)
@@ -137,10 +138,17 @@ class MessageRepositoryImpl(
             val page = queryConversationThreadIdsPage(pageSize, rawOffset)
             if (page.isEmpty()) break
 
-            filteredThreadIds += page.filter { threadId ->
-                threadId !in archivedThreadIds
+            var sawNewThreadId = false
+            val visiblePage = page.filter { threadId ->
+                val isNewThreadId = seenThreadIds.add(threadId)
+                if (isNewThreadId) {
+                    sawNewThreadId = true
+                }
+                isNewThreadId && threadId !in archivedThreadIds
             }
+            filteredThreadIds += visiblePage
             rawOffset += page.size
+            if (page.size < pageSize || !sawNewThreadId) break
         }
 
         return filteredThreadIds.drop(offset).take(limit)
