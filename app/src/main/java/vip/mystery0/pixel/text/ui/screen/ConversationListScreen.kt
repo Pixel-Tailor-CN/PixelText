@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -60,11 +61,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -80,6 +86,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,6 +109,8 @@ import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -209,11 +218,15 @@ fun ConversationListScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     val sheetState = rememberModalBottomSheetState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var showProfileSheet by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
+    var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     navigationIcon = {
@@ -250,8 +263,7 @@ fun ConversationListScreen(
                             }
                             IconButton(
                                 onClick = {
-                                    Toast.makeText(context, "删除功能暂未实现", Toast.LENGTH_SHORT)
-                                        .show()
+                                    deleteCandidateThreadIds = selectedThreadIds
                                 }
                             ) {
                                 Icon(Icons.Rounded.Delete, contentDescription = "Delete")
@@ -404,6 +416,7 @@ fun ConversationListScreen(
 
                                         SwipeToDismissBox(
                                             state = dismissState,
+                                            modifier = Modifier.animateItem(),
                                             backgroundContent = {
                                                 SwipeBackground(dismissState)
                                             },
@@ -448,6 +461,48 @@ fun ConversationListScreen(
         }
     }
 
+    if (deleteCandidateThreadIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { deleteCandidateThreadIds = emptySet() },
+            title = { Text("删除会话？") },
+            text = { Text("将删除所选 ${deleteCandidateThreadIds.size} 个会话中的短信和彩信。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selected = deleteCandidateThreadIds
+                        deleteCandidateThreadIds = emptySet()
+                        selectedThreadIds = emptySet()
+                        viewModel.hidePendingDelete(selected)
+                        coroutineScope.launch {
+                            val dismissJob = launch {
+                                delay(3000)
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                            }
+                            val result = snackbarHostState.showSnackbar(
+                                message = "已删除 ${selected.size} 个会话",
+                                actionLabel = "恢复",
+                                duration = SnackbarDuration.Indefinite
+                            )
+                            dismissJob.cancel()
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.restorePendingDelete(selected)
+                            } else {
+                                viewModel.deleteSelected(selected)
+                            }
+                        }
+                    }
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteCandidateThreadIds = emptySet() }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     if (showProfileSheet) {
         ModalBottomSheet(
             onDismissRequest = { showProfileSheet = false },
@@ -483,13 +538,14 @@ fun ConversationListScreen(
 fun ConversationItem(
     conversation: ConversationModel,
     selected: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
     val title = conversation.displayName?.takeIf { it.isNotBlank() } ?: conversation.address
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer

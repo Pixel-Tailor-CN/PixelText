@@ -16,6 +16,7 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
     val uiState: StateFlow<ArchivedConversationListUiState> = _uiState.asStateFlow()
 
     private val archivedConversations = mutableListOf<ConversationModel>()
+    private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private var offset = 0
     private var isLoadingMore = false
     private var hasMore = true
@@ -46,6 +47,47 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
         }
     }
 
+    fun deleteSelected(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        viewModelScope.launch {
+            repository.deleteThreads(threadIds)
+            pendingDeletedThreadIds.removeAll(threadIds)
+            syncLoadedConversations()
+        }
+    }
+
+    fun hidePendingDelete(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        pendingDeletedThreadIds.addAll(threadIds)
+        archivedConversations.removeAll { it.threadId in threadIds }
+        _uiState.value = ArchivedConversationListUiState.Success(archivedConversations.toList())
+    }
+
+    fun restorePendingDelete(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        pendingDeletedThreadIds.removeAll(threadIds)
+        syncLoadedConversations()
+    }
+
+    private fun syncLoadedConversations() {
+        viewModelScope.launch {
+            repository.getArchivedConversations(maxOf(100, offset), 0)
+                .catch { /* ignore error during silent refresh */ }
+                .collect { newList ->
+                    replaceConversations(newList)
+                }
+        }
+    }
+
+    private fun replaceConversations(conversations: List<ConversationModel>) {
+        val visibleList = conversations.filterNot { it.threadId in pendingDeletedThreadIds }
+        archivedConversations.clear()
+        archivedConversations.addAll(visibleList)
+        offset = conversations.size
+        hasMore = conversations.isNotEmpty()
+        _uiState.value = ArchivedConversationListUiState.Success(archivedConversations.toList())
+    }
+
     private fun fetchNextBatch(limit: Int) {
         isLoadingMore = true
         viewModelScope.launch {
@@ -65,7 +107,8 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
                                 ArchivedConversationListUiState.Success(emptyList())
                         }
                     } else {
-                        archivedConversations.addAll(newList)
+                        val visibleList = newList.filterNot { it.threadId in pendingDeletedThreadIds }
+                        archivedConversations.addAll(visibleList)
                         offset += newList.size
                         _uiState.value =
                             ArchivedConversationListUiState.Success(archivedConversations.toList())

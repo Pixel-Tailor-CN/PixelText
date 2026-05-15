@@ -13,5 +13,6 @@ interface MessageRepository {
     fun getMessages(): Flow<List<MessageModel>>
     suspend fun archiveConversations(conversations: List<ConversationModel>)
     suspend fun unarchiveThreads(threadIds: Set<Long>)
+    suspend fun deleteThreads(threadIds: Set<Long>)
     suspend fun markThreadAsRead(threadId: Long)
 }

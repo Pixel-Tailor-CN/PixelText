@@ -123,6 +123,32 @@ class MessageRepositoryImpl(
         }
     }
 
+    override suspend fun deleteThreads(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            val placeholders = threadIds.joinToString(",") { "?" }
+            val selectionArgs = threadIds.map { it.toString() }.toTypedArray()
+
+            context.contentResolver.delete(
+                Telephony.Sms.CONTENT_URI,
+                "${Telephony.Sms.THREAD_ID} IN ($placeholders)",
+                selectionArgs
+            )
+
+            try {
+                context.contentResolver.delete(
+                    Telephony.Mms.CONTENT_URI,
+                    "${Telephony.Mms.THREAD_ID} IN ($placeholders)",
+                    selectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e("MessageRepository", "failed to delete MMS threads", e)
+            }
+
+            archiveDao.unarchive(threadIds)
+        }
+    }
+
     private fun queryFilteredConversationThreadIds(
         limit: Int,
         offset: Int,
