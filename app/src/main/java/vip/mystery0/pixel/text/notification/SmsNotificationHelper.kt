@@ -8,12 +8,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.model.ParsedResult
+import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.receiver.NotificationActionReceiver
 
 object SmsNotificationHelper {
@@ -21,6 +24,9 @@ object SmsNotificationHelper {
     const val CHANNEL_ID_SMS = "channel_new_sms"
     private const val CHANNEL_NAME = "新短信"
     private const val CHANNEL_DESC = "收到新短信时的通知"
+    private const val TAG = "SmsNotificationHelper"
+
+    private var messageParser: MessageParser? = null
 
     /**
      * 在 Application.onCreate() 中调用，注册通知渠道（Android 8.0+ 必须）。
@@ -41,13 +47,14 @@ object SmsNotificationHelper {
     }
 
     /**
-     * 发送新短信通知，带"已阅"和"回复"操作按钮。
+     * 发送新短信通知，带"已阅"、"回复"操作按钮。
+     * 如果本地解析结果是验证码，会额外显示"复制 xxxxxx"操作。
      *
      * @param context       上下文
      * @param sender        发件人（号码或联系人名称）
      * @param body          短信内容
      * @param threadId      会话 ID，用于跳转、分组和标记已读
-     * @param messageUri    插入数据库后返回的 URI（目前未使用，预留）
+     * @param messageUri    插入数据库后返回的 URI，用于复制验证码后精确标记单条短信已读
      */
     fun showSmsNotification(
         context: Context,
@@ -124,8 +131,31 @@ object SmsNotificationHelper {
             replyPendingIntent
         ).addRemoteInput(remoteInput).build()
 
+        val verificationCode = parseVerificationCode(context, sender, body)
+        val copyCodeAction = verificationCode?.let { code ->
+            val copyIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_COPY_VERIFICATION_CODE
+                putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+                putExtra(NotificationActionReceiver.EXTRA_THREAD_ID, threadId)
+                putExtra(NotificationActionReceiver.EXTRA_MESSAGE_URI, messageUri)
+                putExtra(NotificationActionReceiver.EXTRA_VERIFICATION_CODE, code)
+            }
+            val copyPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId * 10 + 3,
+                copyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            NotificationCompat.Action.Builder(
+                0,
+                "复制 $code",
+                copyPendingIntent
+            ).build()
+        }
+
         // ── 构建通知 ─────────────────────────────────────────────────────────
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
+        val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
             .setSmallIcon(R.drawable.ic_notification_sms)
             .setContentTitle(sender)
             .setContentText(body)
@@ -141,10 +171,30 @@ object SmsNotificationHelper {
                 context.getString(R.string.notification_action_mark_read),
                 markReadPendingIntent
             )
+
+        copyCodeAction?.let { notificationBuilder.addAction(it) }
+
+        val notification = notificationBuilder
             // Action 2：回复
             .addAction(replyAction)
             .build()
 
         NotificationManagerCompat.from(context).notify(notificationId, notification)
+    }
+
+    private fun parseVerificationCode(context: Context, sender: String, body: String): String? {
+        return try {
+            val result = getMessageParser(context).parse(sender, body)
+            (result as? ParsedResult.VerificationCode)?.code
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to parse verification code for notification", e)
+            null
+        }
+    }
+
+    private fun getMessageParser(context: Context): MessageParser {
+        return messageParser ?: MessageParser(context.applicationContext).also {
+            messageParser = it
+        }
     }
 }
