@@ -80,12 +80,30 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
     }
 
     private fun replaceConversations(conversations: List<ConversationModel>) {
-        val visibleList = conversations.filterNot { it.threadId in pendingDeletedThreadIds }
+        val visibleList = conversations
+            .filterNot { it.threadId in pendingDeletedThreadIds }
+            .distinctBy { it.threadId }
         archivedConversations.clear()
         archivedConversations.addAll(visibleList)
         offset = conversations.size
         hasMore = conversations.isNotEmpty()
         _uiState.value = ArchivedConversationListUiState.Success(archivedConversations.toList())
+    }
+
+    private fun mergeConversations(conversations: List<ConversationModel>) {
+        val currentByThreadId = archivedConversations.associateBy { it.threadId }
+        val merged = (archivedConversations + conversations)
+            .filterNot { it.threadId in pendingDeletedThreadIds }
+            .distinctBy { it.threadId }
+            .map { conversation ->
+                currentByThreadId[conversation.threadId]?.let { existing ->
+                    if (conversation.timestamp >= existing.timestamp) conversation else existing
+                } ?: conversation
+            }
+            .sortedByDescending { it.timestamp }
+
+        archivedConversations.clear()
+        archivedConversations.addAll(merged)
     }
 
     private fun fetchNextBatch(limit: Int) {
@@ -107,8 +125,7 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
                                 ArchivedConversationListUiState.Success(emptyList())
                         }
                     } else {
-                        val visibleList = newList.filterNot { it.threadId in pendingDeletedThreadIds }
-                        archivedConversations.addAll(visibleList)
+                        mergeConversations(newList)
                         offset += newList.size
                         _uiState.value =
                             ArchivedConversationListUiState.Success(archivedConversations.toList())
