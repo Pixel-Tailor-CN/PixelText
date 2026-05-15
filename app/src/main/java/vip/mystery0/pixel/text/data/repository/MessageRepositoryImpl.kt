@@ -128,40 +128,21 @@ class MessageRepositoryImpl(
         offset: Int,
         archivedThreadIds: Set<Long>
     ): List<Long> {
-        val filteredThreadIds = mutableListOf<Long>()
-        val seenThreadIds = mutableSetOf<Long>()
-        val targetCount = offset + limit
-        var rawOffset = 0
-        val pageSize = maxOf(100, limit)
-
-        while (filteredThreadIds.size < targetCount) {
-            val page = queryConversationThreadIdsPage(pageSize, rawOffset)
-            if (page.isEmpty()) break
-
-            var sawNewThreadId = false
-            val visiblePage = page.filter { threadId ->
-                val isNewThreadId = seenThreadIds.add(threadId)
-                if (isNewThreadId) {
-                    sawNewThreadId = true
-                }
-                isNewThreadId && threadId !in archivedThreadIds
-            }
-            filteredThreadIds += visiblePage
-            rawOffset += page.size
-            if (page.size < pageSize || !sawNewThreadId) break
-        }
-
-        return filteredThreadIds.drop(offset).take(limit)
+        return queryConversationThreadIds()
+            .distinct()
+            .filter { threadId -> threadId !in archivedThreadIds }
+            .drop(offset)
+            .take(limit)
     }
 
-    private fun queryConversationThreadIdsPage(limit: Int, offset: Int): List<Long> {
+    private fun queryConversationThreadIds(): List<Long> {
         val threadIds = mutableListOf<Long>()
         context.contentResolver.query(
             "content://mms-sms/conversations?simple=true".toUri(),
             arrayOf("_id"),
             null,
             null,
-            "date DESC LIMIT $limit OFFSET $offset"
+            "date DESC"
         )?.use { cursor ->
             val idIdx = cursor.getColumnIndexOrThrow("_id")
             while (cursor.moveToNext()) threadIds.add(cursor.getLong(idIdx))
