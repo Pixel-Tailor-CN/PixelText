@@ -6,16 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,47 +49,53 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode,
         colors = CardDefaults.elevatedCardColors(
             containerColor = containerColor
         ),
-        modifier = Modifier.widthIn(max = 300.dp)
+        modifier = Modifier.widthIn(min = 260.dp, max = 360.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = onContainerColor.copy(alpha = 0.1f),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = result.code,
+                    style = MaterialTheme.typography.displaySmallEmphasized.copy(
+                        letterSpacing = 1.sp
+                    ),
+                    color = onContainerColor,
+                    maxLines = 1
+                )
+                Text(
+                    text = "验证码",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = onContainerColor.copy(alpha = 0.62f)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(20.dp))
+
+            Button(
                 onClick = {
                     clipboardManager.setText(AnnotatedString(result.code))
-                }
+                },
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = onContainerColor.copy(alpha = 0.1f),
+                    contentColor = onContainerColor
+                ),
+                modifier = Modifier
+                    .height(56.dp)
+                    .widthIn(min = 104.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        val titleText = if (result.signature != null) {
-                            "${result.signature} · 验证码"
-                        } else {
-                            "验证码"
-                        }
-                        Text(
-                            text = titleText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = onContainerColor.copy(alpha = 0.7f)
-                        )
-                        Text(
-                            text = result.code,
-                            style = MaterialTheme.typography.headlineSmallEmphasized,
-                            color = onContainerColor,
-                            letterSpacing = 4.sp
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy code",
-                        tint = if (isSelected) onContainerColor else MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text(
+                    text = "复制",
+                    style = MaterialTheme.typography.titleMediumEmphasized
+                )
             }
         }
     }
