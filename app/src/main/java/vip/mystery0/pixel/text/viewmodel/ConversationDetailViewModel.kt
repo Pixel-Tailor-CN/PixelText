@@ -1,11 +1,13 @@
-package vip.mystery0.pixel.text.ui.message
+package vip.mystery0.pixel.text.viewmodel
 
+import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -227,7 +230,7 @@ class ConversationDetailViewModel(
         address: String,
         message: String,
         subId: Int,
-    ): android.net.Uri? {
+    ): Uri? {
         val now = System.currentTimeMillis()
         val values = ContentValues().apply {
             put(Telephony.Sms.ADDRESS, address)
@@ -249,7 +252,7 @@ class ConversationDetailViewModel(
     /**
      * 从插入返回的 URI 读取 thread_id，避免靠 delay 等待系统填值。
      */
-    private fun queryThreadIdFromUri(uri: android.net.Uri?): Long? {
+    private fun queryThreadIdFromUri(uri: Uri?): Long? {
         if (uri == null) return null
         context.contentResolver.query(
             uri,
@@ -272,7 +275,7 @@ class ConversationDetailViewModel(
         val requestId = sendRequestCounter.incrementAndGet()
         val sentAction = "$ACTION_SMS_SENT.$requestId"
 
-        return kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        return suspendCancellableCoroutine { cont ->
             val baseSmsManager = context.getSystemService(SmsManager::class.java)
             val smsManager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
                 baseSmsManager.createForSubscriptionId(subId)
@@ -282,13 +285,13 @@ class ConversationDetailViewModel(
             val parts = smsManager.divideMessage(message)
             val expectedCount = parts.size.coerceAtLeast(1)
             var receivedCount = 0
-            var firstError = android.app.Activity.RESULT_OK
+            var firstError = Activity.RESULT_OK
 
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context?, intent: Intent?) {
                     receivedCount++
-                    if (resultCode != android.app.Activity.RESULT_OK
-                        && firstError == android.app.Activity.RESULT_OK
+                    if (resultCode != Activity.RESULT_OK
+                        && firstError == Activity.RESULT_OK
                     ) {
                         firstError = resultCode
                     }
@@ -345,9 +348,9 @@ class ConversationDetailViewModel(
     /**
      * 根据发送结果，将占位记录从 outbox 升级为 sent，失败则改为 failed。
      */
-    private fun handleSendResult(uri: android.net.Uri?, resultCode: Int) {
+    private fun handleSendResult(uri: Uri?, resultCode: Int) {
         if (uri == null) return
-        val success = resultCode == android.app.Activity.RESULT_OK
+        val success = resultCode == Activity.RESULT_OK
         val values = ContentValues().apply {
             if (success) {
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)

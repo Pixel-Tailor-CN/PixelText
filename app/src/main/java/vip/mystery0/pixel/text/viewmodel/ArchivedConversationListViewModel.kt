@@ -1,4 +1,4 @@
-package vip.mystery0.pixel.text.ui.message
+package vip.mystery0.pixel.text.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
