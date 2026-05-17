@@ -6,7 +6,7 @@ import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.SpamResultEntity
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
-class SpamRepositoryImpl(private val db: SpamDatabase) : SpamRepository {
+class SpamRepositoryImpl(db: SpamDatabase) : SpamRepository {
     private val dao = db.spamResultDao()
 
     override suspend fun getScore(messageId: Long): Float? =

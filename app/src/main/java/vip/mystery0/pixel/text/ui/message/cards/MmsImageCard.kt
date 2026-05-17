@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.cards
 
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -24,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "MmsImageCard"
 
 @Composable
 fun MmsImageCard(imageUris: List<String>, isSelected: Boolean = false) {
@@ -71,7 +74,8 @@ private fun MmsImage(uri: String) {
                         BitmapFactory.decodeStream(stream2, null, decodeOptions)?.asImageBitmap()
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "MmsImage: decode image failed", e)
                 null
             }
         }

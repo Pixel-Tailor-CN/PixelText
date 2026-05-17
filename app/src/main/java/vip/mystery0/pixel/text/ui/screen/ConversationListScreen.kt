@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -116,6 +117,7 @@ import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
+import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import java.time.Instant
@@ -856,7 +858,7 @@ fun NewChatBottomSheet(
     var selectedSimSlot by remember { mutableIntStateOf(0) }
 
     val simCards = remember {
-        getAvailableSimCards(context)
+        SimInfoProvider.getActiveSimList(context)
     }
 
     val contactPermissionLauncher = rememberLauncherForActivityResult(
@@ -961,11 +963,11 @@ fun NewChatBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        simCards.forEachIndexed { index, simName ->
+                        simCards.forEachIndexed { index, sim ->
                             FilterChip(
                                 selected = selectedSimSlot == index,
                                 onClick = { selectedSimSlot = index },
-                                label = { Text(simName) },
+                                label = { Text(sim.displayName) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -1021,37 +1023,4 @@ private fun getThreadIdForAddress(context: Context, address: String): Long {
         }
     }
     return -1L
-}
-
-private fun getAvailableSimCards(context: Context): List<String> {
-    val simCards = mutableListOf<String>()
-    try {
-        context.contentResolver.query(
-            "content://telephony/siminfo".toUri(),
-            arrayOf("display_name", "carrier_name"),
-            null,
-            null,
-            null
-        )?.use { cursor ->
-            val displayNameIdx = cursor.getColumnIndex("display_name")
-            val carrierNameIdx = cursor.getColumnIndex("carrier_name")
-            var index = 1
-            while (cursor.moveToNext()) {
-                val displayName =
-                    if (displayNameIdx >= 0) cursor.getString(displayNameIdx) else null
-                val carrierName =
-                    if (carrierNameIdx >= 0) cursor.getString(carrierNameIdx) else null
-                val name = when {
-                    !carrierName.isNullOrBlank() && carrierName != "null" -> carrierName
-                    !displayName.isNullOrBlank() && displayName != "null" -> displayName
-                    else -> "卡$index"
-                }
-                simCards.add(name)
-                index++
-            }
-        }
-    } catch (e: Exception) {
-        // 如果查询失败，返回空列表
-    }
-    return simCards
 }

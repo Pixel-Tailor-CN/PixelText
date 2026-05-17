@@ -6,19 +6,25 @@ import android.content.pm.PackageManager
 import android.telephony.SmsManager
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
+import android.util.Log
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 
 /**
  * 简化版的 SIM 卡信息描述，剥离系统对象方便在 UI 层使用。
  */
+@Stable
+@Immutable
 data class SimInfo(
     val subscriptionId: Int,
     val slotIndex: Int,
     val displayName: String,
-    val phoneNumber: String?,
 )
 
 object SimInfoProvider {
+    private const val TAG = "SimInfoProvider"
 
     /**
      * 读取当前激活的 SIM 卡列表。
@@ -36,7 +42,8 @@ object SimInfoProvider {
         val sm = context.getSystemService(SubscriptionManager::class.java) ?: return emptyList()
         val list: List<SubscriptionInfo> = try {
             sm.activeSubscriptionInfoList ?: emptyList()
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
+            Log.w(TAG, "getActiveSimList: failed to get sim list", e)
             emptyList()
         }
         return list.map { info ->
@@ -46,7 +53,6 @@ object SimInfoProvider {
                 displayName = info.displayName?.toString()?.takeIf { it.isNotBlank() }
                     ?: info.carrierName?.toString()?.takeIf { it.isNotBlank() }
                     ?: "卡${info.simSlotIndex + 1}",
-                phoneNumber = info.number?.takeIf { it.isNotBlank() },
             )
         }.sortedBy { it.slotIndex }
     }

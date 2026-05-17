@@ -3,15 +3,14 @@ package vip.mystery0.pixel.text.viewmodel
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
-import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +26,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
@@ -50,6 +50,7 @@ sealed interface ManualSpamCheckState {
 
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
+    private val telephonyDataSource: TelephonyDataSource,
     private val context: Context,
     private val spamClassifierFactory: SpamClassifierFactory,
     private val spamRepository: SpamRepository
@@ -178,8 +179,14 @@ class ConversationDetailViewModel(
         viewModelScope.launch {
             try {
                 // 1. 写入"发件箱"占位（pending），先把 UI 显示出来；获取 thread_id
-                val pendingUri = insertOutboxPlaceholder(address, message, subId)
-                val resolvedThreadId = queryThreadIdFromUri(pendingUri) ?: currentThreadId
+                val pendingUri = telephonyDataSource.insertOutboxPlaceholder(
+                    address = address,
+                    message = message,
+                    threadId = currentThreadId,
+                    subId = subId
+                )
+                val resolvedThreadId =
+                    telephonyDataSource.queryThreadIdFromUri(pendingUri) ?: currentThreadId
                 if (currentThreadId == -1L && resolvedThreadId != -1L) {
                     currentThreadId = resolvedThreadId
                 }
@@ -203,19 +210,16 @@ class ConversationDetailViewModel(
 
     fun checkSpamOnce(message: MessageModel) {
         if (message.content.isBlank()) {
-            _manualSpamChecks.value =
-                _manualSpamChecks.value + (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
+            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
             return
         }
         if (message.spamScore >= 0f) {
-            _manualSpamChecks.value =
-                _manualSpamChecks.value + (message.id to ManualSpamCheckState.Error("已有识别记录"))
+            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error("已有识别记录"))
             return
         }
         if (_manualSpamChecks.value[message.id] is ManualSpamCheckState.Checking) return
 
-        _manualSpamChecks.value =
-            _manualSpamChecks.value + (message.id to ManualSpamCheckState.Checking)
+        _manualSpamChecks.value += (message.id to ManualSpamCheckState.Checking)
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.Default) {
@@ -238,7 +242,7 @@ class ConversationDetailViewModel(
             } else {
                 ManualSpamCheckState.Error(result.exceptionOrNull()?.message ?: "识别失败")
             }
-            _manualSpamChecks.value = _manualSpamChecks.value + (message.id to state)
+            _manualSpamChecks.value += (message.id to state)
         }
     }
 
@@ -247,49 +251,6 @@ class ConversationDetailViewModel(
         if (index < 0) return
         _messages[index] = _messages[index].copy(spamScore = score)
         _uiState.value = MessageUiState.Success(_messages.toList())
-    }
-
-    /**
-     * 在 outbox 中插入占位消息，返回插入后的 URI。
-     */
-    private fun insertOutboxPlaceholder(
-        address: String,
-        message: String,
-        subId: Int,
-    ): Uri? {
-        val now = System.currentTimeMillis()
-        val values = ContentValues().apply {
-            put(Telephony.Sms.ADDRESS, address)
-            put(Telephony.Sms.BODY, message)
-            put(Telephony.Sms.DATE, now)
-            put(Telephony.Sms.READ, 1)
-            put(Telephony.Sms.SEEN, 1)
-            put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_OUTBOX)
-            if (currentThreadId != -1L) {
-                put(Telephony.Sms.THREAD_ID, currentThreadId)
-            }
-            if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                put(Telephony.Sms.SUBSCRIPTION_ID, subId)
-            }
-        }
-        return context.contentResolver.insert(Telephony.Sms.CONTENT_URI, values)
-    }
-
-    /**
-     * 从插入返回的 URI 读取 thread_id，避免靠 delay 等待系统填值。
-     */
-    private fun queryThreadIdFromUri(uri: Uri?): Long? {
-        if (uri == null) return null
-        context.contentResolver.query(
-            uri,
-            arrayOf(Telephony.Sms.THREAD_ID),
-            null, null, null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                return cursor.getLong(0)
-            }
-        }
-        return null
     }
 
     /**
@@ -355,6 +316,7 @@ class ConversationDetailViewModel(
                     )
                 }
             } catch (e: Exception) {
+                Log.w(TAG, "sendSmsAndAwaitResult: failed to send sms", e)
                 runCatching { context.unregisterReceiver(receiver) }
                 if (cont.isActive) cont.resumeWith(Result.success(SmsManager.RESULT_ERROR_GENERIC_FAILURE))
             }
@@ -377,16 +339,7 @@ class ConversationDetailViewModel(
     private fun handleSendResult(uri: Uri?, resultCode: Int) {
         if (uri == null) return
         val success = resultCode == Activity.RESULT_OK
-        val values = ContentValues().apply {
-            if (success) {
-                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
-                put(Telephony.Sms.DATE_SENT, System.currentTimeMillis())
-            } else {
-                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_FAILED)
-                put(Telephony.Sms.ERROR_CODE, resultCode)
-            }
-        }
-        context.contentResolver.update(uri, values, null, null)
+        telephonyDataSource.updateSmsSendResult(uri, resultCode, success)
 
         _sendResultEvents.trySend(
             if (success) SendResultEvent.Success
@@ -416,6 +369,7 @@ class ConversationDetailViewModel(
     }
 
     companion object {
+        private const val TAG = "ConversationDetailViewM"
         private const val ACTION_SMS_SENT = "vip.mystery0.pixel.text.action.SMS_SENT"
         private val sendRequestCounter = AtomicInteger(0)
     }

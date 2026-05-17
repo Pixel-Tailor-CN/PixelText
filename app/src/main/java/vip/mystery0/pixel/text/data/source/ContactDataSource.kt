@@ -61,8 +61,8 @@ class ContactDataSource(
                 }
             }
             contactNameCacheLoaded = true
-        } catch (_: SecurityException) {
-            Log.w(CONTACT_TAG, "missing contacts permission while loading contact names")
+        } catch (e: SecurityException) {
+            Log.w(CONTACT_TAG, "missing contacts permission while loading contact names", e)
         } catch (e: Exception) {
             Log.e(CONTACT_TAG, "failed to load contact names", e)
         }
