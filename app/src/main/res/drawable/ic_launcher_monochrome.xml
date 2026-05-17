@@ -9,23 +9,25 @@
         android:translateX="184.32"
         android:translateY="184.32">
         <path
-            android:fillColor="#212121"
+            android:fillColor="#00000000"
+            android:strokeWidth="24"
+            android:strokeColor="#212121"
+            android:strokeLineJoin="round"
             android:pathData="M267.4,265.7h486.4c62.1,0 112.2,57.9 112.2,129.8v171.7c0,71.9 -49.9,129.8 -112.2,129.8H593.5L484.9,820.8c-24.1,28 -65.4,8 -65.4,-31.9v-91.9H267.6c-62.1,0 -112.2,-57.9 -112.2,-129.8v-171.7c0,-71.9 49.9,-129.8 112.2,-129.8L267.4,265.7z" />
+
         <path
             android:pathData="M293.9,471.9h183M293.9,551.8h115.4"
             android:strokeWidth="18"
             android:strokeColor="#212121"
             android:strokeLineCap="round" />
+
         <group
-            android:translateX="754.2"
-            android:translateY="587.8">
+            android:translateX="752"
+            android:translateY="547.8">
             <path
-                android:fillColor="#212121"
-                android:pathData="M0,0a37.8,37.9 0,1 0,75.6 0a37.8,37.9 0,1 0,-75.6 0z" />
-            <path
-                android:pathData="M23.9,0h27.9M37.8,-14v28"
-                android:strokeWidth="6"
-                android:strokeColor="#FFFFFF"
+                android:pathData="M-38,0h76M0,-38v76"
+                android:strokeWidth="16"
+                android:strokeColor="#212121"
                 android:strokeLineCap="round" />
         </group>
     </group>
