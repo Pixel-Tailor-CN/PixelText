@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -126,7 +127,7 @@ fun ConversationDetailScreen(
         val resolved = simList.firstOrNull { it.subscriptionId == default }?.subscriptionId
             ?: simList.firstOrNull()?.subscriptionId
             ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID
-        mutableStateOf(resolved)
+        mutableIntStateOf(resolved)
     }
 
     // 监听发送结果事件，统一通过 Snackbar 提示
@@ -451,8 +452,7 @@ private fun SimSelectorButton(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = if (sim.phoneNumber.isNullOrBlank()) sim.displayName
-                            else "${sim.displayName}  ${sim.phoneNumber}"
+                            text = sim.displayName
                         )
                     },
                     onClick = {

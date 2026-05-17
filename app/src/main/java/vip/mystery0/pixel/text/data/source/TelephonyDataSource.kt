@@ -652,12 +652,14 @@ class TelephonyDataSource(
                 else -> "UTF-8"
             }
             String(raw.toByteArray(Charsets.ISO_8859_1), Charset.forName(charsetName))
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "decodeMmsSubject: failed to decode mms subject", e)
             raw
         }
     }
 
     private companion object {
+        private const val TAG = "TelephonyDataSource"
         val smsMessageProjection = arrayOf(
             Telephony.Sms._ID,
             Telephony.Sms.THREAD_ID,
