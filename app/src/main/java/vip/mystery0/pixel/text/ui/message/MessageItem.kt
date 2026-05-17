@@ -155,7 +155,7 @@ fun MessageItem(
             }
         }
 
-        if (message.content.isNotBlank()) {
+        if (message.content.isNotBlank() && manualSpamCheckState != null) {
             val manualCheckText = when (manualSpamCheckState) {
                 ManualSpamCheckState.Checking -> "识别中..."
                 is ManualSpamCheckState.Result -> {
@@ -168,7 +168,6 @@ fun MessageItem(
                 }
 
                 is ManualSpamCheckState.Error -> manualSpamCheckState.message
-                null -> "手动识别"
             }
             Row(
                 modifier = Modifier
@@ -191,7 +190,7 @@ fun MessageItem(
                         else -> MaterialTheme.colorScheme.primary
                     },
                     modifier = Modifier.clickable(
-                        enabled = manualSpamCheckState !is ManualSpamCheckState.Checking,
+                        enabled = manualSpamCheckState is ManualSpamCheckState.Error,
                         onClick = onCheckSpam
                     )
                 )

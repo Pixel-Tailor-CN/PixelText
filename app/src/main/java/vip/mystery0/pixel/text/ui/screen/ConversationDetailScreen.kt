@@ -105,6 +105,19 @@ fun ConversationDetailScreen(
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var messageText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    val selectedMessage = if (selectedMessageIds.size == 1) {
+        (uiState as? MessageUiState.Success)
+            ?.messages
+            ?.firstOrNull { it.id == selectedMessageIds.first() }
+    } else {
+        null
+    }
+    val selectedSpamCheckState = selectedMessage?.let { manualSpamChecks[it.id] }
+    val canCheckSelectedSpam =
+        selectedMessage != null &&
+            selectedMessage.content.isNotBlank() &&
+            selectedMessage.spamScore < 0f &&
+            selectedSpamCheckState !is ManualSpamCheckState.Checking
 
     // 双卡场景：加载当前激活的 SIM 列表，单卡 / 无权限时为空列表
     val simList = remember { SimInfoProvider.getActiveSimList(context) }
@@ -172,6 +185,15 @@ fun ConversationDetailScreen(
                                     expanded = showMoreMenu,
                                     onDismissRequest = { showMoreMenu = false }
                                 ) {
+                                    DropdownMenuItem(
+                                        text = { Text("识别骚扰内容") },
+                                        enabled = canCheckSelectedSpam,
+                                        onClick = {
+                                            showMoreMenu = false
+                                            selectedMessage?.let { viewModel.checkSpamOnce(it) }
+                                            selectedMessageIds.clear()
+                                        }
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("分享") },
                                         onClick = {

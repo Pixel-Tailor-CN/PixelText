@@ -17,6 +17,7 @@ import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MessageViewModel
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
+import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 
 val appModule = module {
     single { MessageParser(androidContext()) }
@@ -29,6 +30,7 @@ val appModule = module {
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
-    viewModel { ConversationDetailViewModel(get(), androidContext(), get()) }
+    viewModel { SpamConversationListViewModel(get()) }
+    viewModel { ConversationDetailViewModel(get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
 }

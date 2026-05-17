@@ -24,5 +24,8 @@ class SpamRepositoryImpl(private val db: SpamDatabase) : SpamRepository {
             )
         }
 
+    override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
+        withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
+
     override fun isEnabled(): Boolean = true
 }

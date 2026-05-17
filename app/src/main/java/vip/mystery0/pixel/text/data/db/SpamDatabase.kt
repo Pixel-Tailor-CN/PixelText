@@ -27,6 +27,18 @@ interface SpamResultDao {
     @Query("SELECT spam_score FROM spam_result WHERE message_id = :messageId")
     suspend fun getScore(messageId: Long): Float?
 
+    @Query(
+        """
+        SELECT thread_id
+        FROM spam_result
+        WHERE spam_score >= :threshold
+        GROUP BY thread_id
+        ORDER BY MAX(checked_at) DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(result: SpamResultEntity)
 }

@@ -25,6 +25,8 @@ import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import java.nio.charset.Charset
 
+private const val SPAM_THRESHOLD = 0.7f
+
 class MessageRepositoryImpl(
     private val context: Context,
     private val messageParser: MessageParser,
@@ -57,6 +59,15 @@ class MessageRepositoryImpl(
                 emit(emptyList()); return@flow
             }
             emit(conversations)
+        }.flowOn(Dispatchers.IO)
+
+    override fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
+        flow {
+            val threadIds = spamRepository.getSpamThreadIds(SPAM_THRESHOLD, limit, offset)
+            if (threadIds.isEmpty()) {
+                emit(emptyList()); return@flow
+            }
+            emit(fetchConversationDetails(threadIds).sortedByDescending { it.timestamp })
         }.flowOn(Dispatchers.IO)
 
     override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
@@ -683,7 +694,8 @@ class MessageRepositoryImpl(
                             isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
                             parsedResult = messageParser.parse(address, textContent ?: ""),
                             imageUris = getMmsImageUris(mmsId),
-                            mmsSubject = subject
+                            mmsSubject = subject,
+                            spamScore = spamRepository.getScore(-mmsId) ?: -1f
                         )
                     )
                 }
