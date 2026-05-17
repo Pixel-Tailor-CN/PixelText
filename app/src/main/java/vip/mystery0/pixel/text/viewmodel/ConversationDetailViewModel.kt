@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
+import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -50,7 +51,8 @@ sealed interface ManualSpamCheckState {
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
     private val context: Context,
-    private val spamClassifierFactory: SpamClassifierFactory
+    private val spamClassifierFactory: SpamClassifierFactory,
+    private val spamRepository: SpamRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
@@ -205,6 +207,11 @@ class ConversationDetailViewModel(
                 _manualSpamChecks.value + (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
             return
         }
+        if (message.spamScore >= 0f) {
+            _manualSpamChecks.value =
+                _manualSpamChecks.value + (message.id to ManualSpamCheckState.Error("已有识别记录"))
+            return
+        }
         if (_manualSpamChecks.value[message.id] is ManualSpamCheckState.Checking) return
 
         _manualSpamChecks.value =
@@ -219,18 +226,27 @@ class ConversationDetailViewModel(
                     }
                 }
             }
-            val state = result.fold(
-                onSuccess = { score ->
-                    if (score >= 0f) {
-                        ManualSpamCheckState.Result(score)
-                    } else {
-                        ManualSpamCheckState.Error("识别失败")
-                    }
-                },
-                onFailure = { ManualSpamCheckState.Error(it.message ?: "识别失败") }
-            )
+            val state = if (result.isSuccess) {
+                val score = result.getOrThrow()
+                if (score >= 0f) {
+                    spamRepository.save(message.id, message.threadId, score)
+                    updateMessageSpamScore(message.id, score)
+                    ManualSpamCheckState.Result(score)
+                } else {
+                    ManualSpamCheckState.Error("识别失败")
+                }
+            } else {
+                ManualSpamCheckState.Error(result.exceptionOrNull()?.message ?: "识别失败")
+            }
             _manualSpamChecks.value = _manualSpamChecks.value + (message.id to state)
         }
+    }
+
+    private fun updateMessageSpamScore(messageId: Long, score: Float) {
+        val index = _messages.indexOfFirst { it.id == messageId }
+        if (index < 0) return
+        _messages[index] = _messages[index].copy(spamScore = score)
+        _uiState.value = MessageUiState.Success(_messages.toList())
     }
 
     /**
