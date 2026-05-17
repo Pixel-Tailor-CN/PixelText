@@ -24,8 +24,23 @@ class SpamRepositoryImpl(db: SpamDatabase) : SpamRepository {
             )
         }
 
+    override suspend fun getIdentifiedMessageIds(messageIds: List<Long>): Set<Long> =
+        withContext(Dispatchers.IO) {
+            if (messageIds.isEmpty()) {
+                emptySet()
+            } else {
+                messageIds.chunked(MAX_QUERY_ARGS)
+                    .flatMap { dao.getExistingMessageIds(it) }
+                    .toSet()
+            }
+        }
+
     override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
         withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
 
     override fun isEnabled(): Boolean = true
+
+    private companion object {
+        private const val MAX_QUERY_ARGS = 900
+    }
 }

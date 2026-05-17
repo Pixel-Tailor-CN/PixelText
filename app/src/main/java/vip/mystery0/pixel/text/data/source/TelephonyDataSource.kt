@@ -53,6 +53,13 @@ data class MmsMessageRow(
     val imageUris: List<String>
 )
 
+data class SpamScanMessageRow(
+    val messageId: Long,
+    val threadId: Long,
+    val address: String,
+    val content: String
+)
+
 class TelephonyDataSource(
     private val context: Context,
     private val contentResolver: ContentResolver
@@ -357,6 +364,36 @@ class TelephonyDataSource(
         }
     }
 
+    fun getSmsMessagesForSpamScan(): List<SpamScanMessageRow> {
+        val rows = mutableListOf<SpamScanMessageRow>()
+        contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.THREAD_ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY
+            ),
+            null,
+            null,
+            "${Telephony.Sms.DATE} DESC"
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
+            while (cursor.moveToNext()) {
+                rows += SpamScanMessageRow(
+                    messageId = cursor.getLong(idIndex),
+                    threadId = cursor.getLong(threadIdIndex),
+                    address = cursor.getString(addressIndex).orEmpty(),
+                    content = cursor.getString(bodyIndex).orEmpty()
+                )
+            }
+        }
+        return rows
+    }
+
     fun insertOutboxPlaceholder(
         address: String,
         message: String,
@@ -653,13 +690,12 @@ class TelephonyDataSource(
             }
             String(raw.toByteArray(Charsets.ISO_8859_1), Charset.forName(charsetName))
         } catch (e: Exception) {
-            Log.w(TAG, "decodeMmsSubject: failed to decode mms subject", e)
+            Log.w(TELEPHONY_TAG, "failed to decode mms subject", e)
             raw
         }
     }
 
     private companion object {
-        private const val TAG = "TelephonyDataSource"
         val smsMessageProjection = arrayOf(
             Telephony.Sms._ID,
             Telephony.Sms.THREAD_ID,
