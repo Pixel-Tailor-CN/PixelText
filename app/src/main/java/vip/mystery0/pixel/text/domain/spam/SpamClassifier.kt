@@ -14,6 +14,7 @@ class SpamClassifier(context: Context) : AutoCloseable {
         private const val VOCAB_FILE = "vocab.txt"
         private const val SEQ_LEN = 40
         private const val UNKNOWN_TOKEN_ID = 1
+        private val whitespaceRegex = Regex("\\s+")
     }
 
     private val interpreter: Interpreter
@@ -54,7 +55,7 @@ class SpamClassifier(context: Context) : AutoCloseable {
     private fun encode(text: String): IntArray {
         val encoded = IntArray(SEQ_LEN)
         var index = 0
-        val iterator = text.codePoints().iterator()
+        val iterator = text.replace(whitespaceRegex, " ").codePoints().iterator()
         while (iterator.hasNext() && index < SEQ_LEN) {
             val token = String(Character.toChars(iterator.nextInt()))
             encoded[index] = vocabulary[token] ?: UNKNOWN_TOKEN_ID

@@ -86,6 +86,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,6 +107,8 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
@@ -114,8 +117,6 @@ import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -548,9 +549,9 @@ fun ConversationListScreen(
 
 @Composable
 fun ConversationItem(
+    modifier: Modifier = Modifier,
     conversation: ConversationModel,
     selected: Boolean = false,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {}
 ) {
@@ -775,7 +776,7 @@ fun NewChatBottomSheet(
     val context = LocalContext.current
     var phoneNumber by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
-    var selectedSimSlot by remember { mutableStateOf(0) }
+    var selectedSimSlot by remember { mutableIntStateOf(0) }
 
     val simCards = remember {
         getAvailableSimCards(context)
