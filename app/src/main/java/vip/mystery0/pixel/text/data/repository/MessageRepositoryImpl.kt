@@ -19,6 +19,7 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
 private const val SPAM_THRESHOLD = 0.7f
@@ -28,6 +29,7 @@ class MessageRepositoryImpl(
     private val contactDataSource: ContactDataSource,
     private val messageParser: MessageParser,
     private val spamRepository: SpamRepository,
+    private val settingsRepository: AppSettingsRepository,
     private val archiveDatabase: ConversationArchiveDatabase
 ) : MessageRepository {
 
@@ -121,14 +123,14 @@ class MessageRepositoryImpl(
         val smsMessages = telephonyDataSource.getSmsMessagesByThread(threadId, totalNeeded)
             .map { row ->
                 row.toMessageModel(
-                    parsedResult = messageParser.parse(row.address, row.body),
+                    parsedResult = parseMessage(row.address, row.body),
                     spamScore = spamRepository.getScore(row.id) ?: -1f
                 )
             }
         val mmsMessages = telephonyDataSource.getMmsMessagesByThread(threadId, totalNeeded)
             .map { row ->
                 row.toMessageModel(
-                    parsedResult = messageParser.parse(row.address, row.textContent),
+                    parsedResult = parseMessage(row.address, row.textContent),
                     spamScore = spamRepository.getScore(-row.mmsId) ?: -1f
                 )
             }
@@ -143,11 +145,11 @@ class MessageRepositoryImpl(
     override fun getMessages(): Flow<List<MessageModel>> = flow {
         val smsMessages = telephonyDataSource.getAllSmsMessages()
             .map { row ->
-                row.toMessageModel(parsedResult = messageParser.parse(row.address, row.body))
+                row.toMessageModel(parsedResult = parseMessage(row.address, row.body))
             }
         val mmsMessages = telephonyDataSource.getAllMmsMessages()
             .map { row ->
-                row.toMessageModel(parsedResult = messageParser.parse(row.address, row.textContent))
+                row.toMessageModel(parsedResult = parseMessage(row.address, row.textContent))
             }
 
         emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
@@ -270,5 +272,10 @@ class MessageRepositoryImpl(
             mmsSubject = subject,
             spamScore = spamScore
         )
+    }
+
+    private fun parseMessage(address: String, content: String): ParsedResult {
+        if (!settingsRepository.isSmartCardEnabled()) return ParsedResult.None
+        return messageParser.parse(address, content)
     }
 }

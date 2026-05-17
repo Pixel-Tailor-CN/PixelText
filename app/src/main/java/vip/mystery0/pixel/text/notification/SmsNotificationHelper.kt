@@ -17,6 +17,7 @@ import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
+import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.receiver.NotificationActionReceiver
 
 object SmsNotificationHelper {
@@ -183,6 +184,13 @@ object SmsNotificationHelper {
     }
 
     private fun parseVerificationCode(context: Context, sender: String, body: String): String? {
+        val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+        val isActionEnabled = prefs.getBoolean(
+            AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
+            AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED
+        )
+        if (!isActionEnabled) return null
+
         return try {
             val result = getMessageParser(context).parse(sender, body)
             (result as? ParsedResult.VerificationCode)?.code

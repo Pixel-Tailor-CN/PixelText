@@ -17,6 +17,7 @@ import androidx.navigation.compose.rememberNavController
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.SettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 
@@ -72,6 +73,9 @@ fun AppNavigation(
                     },
                     onNavigateToSpam = {
                         navController.navigate("spam_conversations")
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("settings")
                     }
                 )
             }
@@ -89,6 +93,11 @@ fun AppNavigation(
                     onNavigateToDetail = { threadId, address ->
                         navController.navigate(conversationDetailRoute(threadId, address))
                     }
+                )
+            }
+            composable("settings") {
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(

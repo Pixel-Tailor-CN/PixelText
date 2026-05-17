@@ -4,9 +4,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.SpamResultEntity
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
-class SpamRepositoryImpl(db: SpamDatabase) : SpamRepository {
+class SpamRepositoryImpl(
+    db: SpamDatabase,
+    private val settingsRepository: AppSettingsRepository
+) : SpamRepository {
     private val dao = db.spamResultDao()
 
     override suspend fun getScore(messageId: Long): Float? =
@@ -38,7 +42,7 @@ class SpamRepositoryImpl(db: SpamDatabase) : SpamRepository {
     override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
         withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
 
-    override fun isEnabled(): Boolean = true
+    override fun isEnabled(): Boolean = settingsRepository.isSpamDetectionEnabled()
 
     private companion object {
         private const val MAX_QUERY_ARGS = 900

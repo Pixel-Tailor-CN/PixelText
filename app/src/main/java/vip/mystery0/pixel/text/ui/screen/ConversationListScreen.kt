@@ -135,7 +135,8 @@ fun ConversationListScreen(
     onNavigateToSearch: () -> Unit,
     onNavigateToMock: () -> Unit,
     onNavigateToArchive: () -> Unit,
-    onNavigateToSpam: () -> Unit
+    onNavigateToSpam: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -602,6 +603,10 @@ fun ConversationListScreen(
                     showMenuSheet = false
                     onNavigateToSpam()
                 },
+                onSettingsClicked = {
+                    showMenuSheet = false
+                    onNavigateToSettings()
+                },
                 onSetDefaultSmsAppClicked = {
                     if (!isDefaultSmsRoleHeld) {
                         showMenuSheet = false
@@ -739,6 +744,7 @@ fun MenuSheetContent(
     onMockClicked: () -> Unit,
     onArchiveClicked: () -> Unit,
     onSpamClicked: () -> Unit,
+    onSettingsClicked: () -> Unit,
     onSetDefaultSmsAppClicked: () -> Unit
 ) {
     Column(
@@ -771,7 +777,7 @@ fun MenuSheetContent(
         ListItem(
             headlineContent = { Text("设置") },
             leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-            modifier = Modifier.clickable { }
+            modifier = Modifier.clickable { onSettingsClicked() }
         )
         ListItem(
             headlineContent = { Text("开发测试 (Mock)") },
