@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
@@ -121,7 +122,9 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
 
+private const val WRITE_SMS_PERMISSION = "android.permission.WRITE_SMS"
 
 @Composable
 fun ConversationListScreen(
@@ -148,25 +151,62 @@ fun ConversationListScreen(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    var hasRequestedContactPermission by remember { mutableStateOf(false) }
+    var hasNotificationPermission by remember {
+        mutableStateOf(
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasRequestedStartupPermissions by remember { mutableStateOf(false) }
+    var hasLoadedConversationsAfterPermission by remember { mutableStateOf(false) }
     var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val selectionMode = selectedThreadIds.isNotEmpty()
     var isDefaultSmsRoleHeld by remember(context) {
         mutableStateOf(context.isDefaultSmsApp())
     }
+    val hasAllStartupPermissions =
+        hasPermission && hasContactPermission && hasNotificationPermission
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            hasPermission = isGranted
-            if (isGranted) viewModel.loadConversations()
-        }
-    )
-    val contactPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            hasContactPermission = isGranted
-            viewModel.loadConversations(force = true)
+    val startupPermissions = remember {
+        buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            add(Manifest.permission.READ_SMS)
+            add(WRITE_SMS_PERMISSION)
+            add(Manifest.permission.READ_CONTACTS)
+        }.toTypedArray()
+    }
+
+    fun isPermissionGranted(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun missingStartupPermissions(): Array<String> {
+        return startupPermissions
+            .filterNot(::isPermissionGranted)
+            .toTypedArray()
+    }
+
+    fun refreshPermissionState() {
+        hasPermission = isPermissionGranted(Manifest.permission.READ_SMS)
+        hasContactPermission = isPermissionGranted(Manifest.permission.READ_CONTACTS)
+        hasNotificationPermission =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    isPermissionGranted(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    val startupPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = {
+            refreshPermissionState()
+            hasLoadedConversationsAfterPermission = false
         }
     )
     val defaultSmsAppLauncher = rememberLauncherForActivityResult(
@@ -175,17 +215,25 @@ fun ConversationListScreen(
         isDefaultSmsRoleHeld = context.isDefaultSmsApp()
     }
 
-    LaunchedEffect(hasPermission) {
+    LaunchedEffect(hasRequestedStartupPermissions, hasAllStartupPermissions) {
         selectedThreadIds = emptySet()
-        if (hasPermission) {
-            if (!hasContactPermission && !hasRequestedContactPermission) {
-                hasRequestedContactPermission = true
-                contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-            } else {
-                viewModel.loadConversations()
+        if (!hasRequestedStartupPermissions && !hasAllStartupPermissions) {
+            val missingPermissions = missingStartupPermissions()
+            if (missingPermissions.isNotEmpty()) {
+                hasRequestedStartupPermissions = true
+                startupPermissionLauncher.launch(missingPermissions)
             }
-        } else {
-            permissionLauncher.launch(Manifest.permission.READ_SMS)
+        }
+    }
+
+    LaunchedEffect(
+        hasPermission,
+        hasLoadedConversationsAfterPermission
+    ) {
+        if (!hasPermission) return@LaunchedEffect
+        if (!hasLoadedConversationsAfterPermission) {
+            hasLoadedConversationsAfterPermission = true
+            viewModel.loadConversations(force = true)
         }
     }
 
@@ -194,7 +242,14 @@ fun ConversationListScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isDefaultSmsRoleHeld = context.isDefaultSmsApp()
-                if (hasPermission) {
+                val currentHasPermission = isPermissionGranted(Manifest.permission.READ_SMS)
+                if (currentHasPermission != hasPermission) {
+                    if (!currentHasPermission) {
+                        hasLoadedConversationsAfterPermission = false
+                    }
+                }
+                refreshPermissionState()
+                if (currentHasPermission) {
                     viewModel.refreshSilent()
                 }
             }
@@ -324,7 +379,23 @@ fun ConversationListScreen(
         ) { paddingValues ->
             if (!hasPermission) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
+                        Button(
+                            onClick = {
+                                val missingPermissions = missingStartupPermissions()
+                                if (missingPermissions.isNotEmpty()) {
+                                    hasRequestedStartupPermissions = true
+                                    startupPermissionLauncher.launch(missingPermissions)
+                                }
+                            }
+                        ) {
+                            Text("授予权限")
+                        }
+                    }
                 }
                 return@Scaffold
             }
@@ -481,7 +552,7 @@ fun ConversationListScreen(
                         viewModel.hidePendingDelete(selected)
                         coroutineScope.launch {
                             val dismissJob = launch {
-                                delay(3000)
+                                delay(3000.milliseconds)
                                 snackbarHostState.currentSnackbarData?.dismiss()
                             }
                             val result = snackbarHostState.showSnackbar(
