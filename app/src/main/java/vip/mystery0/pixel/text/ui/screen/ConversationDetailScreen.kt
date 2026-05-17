@@ -4,11 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.telephony.SubscriptionManager
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,13 +16,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -68,26 +67,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
-import vip.mystery0.pixel.text.domain.model.MessageModel
-import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.MessageItem
-import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
-import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
-import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
-import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun ConversationDetailScreen(
@@ -419,8 +417,10 @@ private fun SimSelectorButton(
     onSelected: (Int) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var lastDismissedAtMillis by remember { mutableStateOf(0L) }
     val currentLabel = simList.firstOrNull { it.subscriptionId == selectedSubId }?.displayName
         ?: simList.firstOrNull()?.displayName.orEmpty()
+    val popupGapPx = with(LocalDensity.current) { 32.dp.roundToPx() }
 
     Box {
         Surface(
@@ -428,7 +428,15 @@ private fun SimSelectorButton(
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
                 .padding(horizontal = 4.dp)
-                .clickable { expanded = true }
+                .clickable {
+                    val now = SystemClock.uptimeMillis()
+                    if (expanded) {
+                        expanded = false
+                        lastDismissedAtMillis = now
+                    } else if (now - lastDismissedAtMillis > SIM_MENU_REOPEN_SUPPRESS_MILLIS) {
+                        expanded = true
+                    }
+                }
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -450,23 +458,70 @@ private fun SimSelectorButton(
                 )
             }
         }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            simList.forEach { sim ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = sim.displayName
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onSelected(sim.subscriptionId)
+        if (expanded) {
+            Popup(
+                popupPositionProvider = remember(popupGapPx) {
+                    AboveAnchorPositionProvider(verticalGapPx = popupGapPx)
+                },
+                onDismissRequest = {
+                    expanded = false
+                    lastDismissedAtMillis = SystemClock.uptimeMillis()
+                },
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .widthIn(min = 168.dp)
+                        .padding(horizontal = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    tonalElevation = 6.dp
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        simList.forEach { sim ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(text = sim.displayName)
+                                },
+                                trailingIcon = {
+                                    if (sim.subscriptionId == selectedSubId) {
+                                        Icon(
+                                            Icons.Rounded.Check,
+                                            contentDescription = "Selected",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    expanded = false
+                                    onSelected(sim.subscriptionId)
+                                }
+                            )
+                        }
                     }
-                )
+                }
             }
         }
+    }
+}
+
+private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
+
+private class AboveAnchorPositionProvider(
+    private val verticalGapPx: Int
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize
+    ): IntOffset {
+        val x = when (layoutDirection) {
+            LayoutDirection.Ltr -> anchorBounds.left
+            LayoutDirection.Rtl -> anchorBounds.right - popupContentSize.width
+        }.coerceIn(0, windowSize.width - popupContentSize.width)
+        val y = (anchorBounds.top - popupContentSize.height - verticalGapPx)
+            .coerceAtLeast(0)
+        return IntOffset(x, y)
     }
 }
