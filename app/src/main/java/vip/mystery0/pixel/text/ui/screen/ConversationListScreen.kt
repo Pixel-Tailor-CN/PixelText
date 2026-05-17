@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -105,7 +104,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -118,6 +116,7 @@ import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.util.SimInfoProvider
+import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import java.time.Instant
@@ -139,6 +138,7 @@ fun ConversationListScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    val showDebugMenu = isDebugModeEnabled()
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -591,6 +591,7 @@ fun ConversationListScreen(
         ) {
             MenuSheetContent(
                 isDefaultSmsApp = isDefaultSmsRoleHeld,
+                showDebugMenu = showDebugMenu,
                 onMockClicked = {
                     showMenuSheet = false
                     onNavigateToMock()
@@ -741,6 +742,7 @@ fun ConversationItem(
 @Composable
 fun MenuSheetContent(
     isDefaultSmsApp: Boolean,
+    showDebugMenu: Boolean,
     onMockClicked: () -> Unit,
     onArchiveClicked: () -> Unit,
     onSpamClicked: () -> Unit,
@@ -779,16 +781,18 @@ fun MenuSheetContent(
             leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
             modifier = Modifier.clickable { onSettingsClicked() }
         )
-        ListItem(
-            headlineContent = { Text("开发测试 (Mock)") },
-            leadingContent = {
-                Icon(
-                    Icons.Rounded.Build,
-                    contentDescription = null
-                )
-            },
-            modifier = Modifier.clickable { onMockClicked() }
-        )
+        if (showDebugMenu) {
+            ListItem(
+                headlineContent = { Text("开发测试（MOCK）") },
+                leadingContent = {
+                    Icon(
+                        Icons.Rounded.Build,
+                        contentDescription = null
+                    )
+                },
+                modifier = Modifier.clickable { onMockClicked() }
+            )
+        }
         Spacer(
             modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
         )

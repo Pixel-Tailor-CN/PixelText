@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -58,6 +59,8 @@ import me.zhanghai.compose.preference.preferenceCategory
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.enableDebugMode
+import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 
 @Composable
@@ -75,6 +78,7 @@ fun SettingsScreen(
     val permissionItems = remember(context, permissionRefreshKey) {
         buildPermissionItems(context)
     }
+    var versionCodeTapCount by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -220,7 +224,26 @@ fun SettingsScreen(
                             Preference(
                                 title = { Text("版本号") },
                                 summary = { Text(BuildConfig.VERSION_CODE.toString()) },
-                                icon = { Icon(Icons.Default.PrivacyTip, contentDescription = null) }
+                                icon = {
+                                    Icon(
+                                        Icons.Default.PrivacyTip,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    versionCodeTapCount += 1
+                                    if (versionCodeTapCount >= DEBUG_MODE_ENABLE_TAP_COUNT) {
+                                        if (!isDebugModeEnabled()) {
+                                            enableDebugMode()
+                                        }
+                                        versionCodeTapCount = 0
+                                        Toast.makeText(
+                                            context,
+                                            "调试模式已启用",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
                             )
                         }
                         item(key = "pixel_tailor", contentType = "Preference") {
@@ -371,3 +394,4 @@ private fun Context.openUrl(url: String) {
 }
 
 private const val WRITE_SMS_PERMISSION = "android.permission.WRITE_SMS"
+private const val DEBUG_MODE_ENABLE_TAP_COUNT = 6
