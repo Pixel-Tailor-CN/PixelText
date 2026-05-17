@@ -36,7 +36,7 @@ val appModule = module {
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
-    viewModel { SpamConversationListViewModel(get()) }
+    viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
 }

@@ -27,6 +27,9 @@ interface SpamResultDao {
     @Query("SELECT spam_score FROM spam_result WHERE message_id = :messageId")
     suspend fun getScore(messageId: Long): Float?
 
+    @Query("SELECT message_id FROM spam_result WHERE message_id IN (:messageIds)")
+    suspend fun getExistingMessageIds(messageIds: List<Long>): List<Long>
+
     @Query(
         """
         SELECT thread_id
