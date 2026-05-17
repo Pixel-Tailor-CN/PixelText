@@ -14,12 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
-import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 
 /**
  * 通知点击等外部入口带过来的会话跳转目标。
@@ -96,9 +96,7 @@ fun AppNavigation(
                 )
             }
             composable("settings") {
-                SettingsScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
+                SettingsScreen { navController.popBackStack() }
             }
             composable(
                 route = "search",
