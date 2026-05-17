@@ -22,7 +22,7 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -252,7 +252,7 @@ private fun HistoricalSpamScanProgressBanner(progress: HistorySpamScanProgress) 
                 style = MaterialTheme.typography.titleSmall
             )
             Spacer(modifier = Modifier.height(8.dp))
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 progress = { progress.fraction },
                 modifier = Modifier.fillMaxWidth()
             )

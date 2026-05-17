@@ -21,6 +21,7 @@ import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.worker.HistoricalSpamScanWorker
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 class SpamConversationListViewModel(
     private val repository: MessageRepository,
@@ -191,7 +192,7 @@ class SpamConversationListViewModel(
                     loadSpamConversations(force = true)
                     break
                 }
-                delay(800)
+                delay(800.milliseconds)
             }
         }
     }

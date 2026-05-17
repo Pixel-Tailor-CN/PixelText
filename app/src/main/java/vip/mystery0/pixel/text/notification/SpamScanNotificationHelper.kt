@@ -1,17 +1,21 @@
 package vip.mystery0.pixel.text.notification
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.R
 
 object SpamScanNotificationHelper {
+    private const val TAG = "SpamScanNotificationHel"
     const val CHANNEL_ID_SPAM_SCAN = "channel_spam_scan"
 
     private const val CHANNEL_NAME = "骚扰识别"
@@ -19,7 +23,6 @@ object SpamScanNotificationHelper {
     private const val NOTIFICATION_ID_SCAN_PROGRESS = 20010
 
     fun createNotificationChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID_SPAM_SCAN,
             CHANNEL_NAME,
@@ -48,7 +51,7 @@ object SpamScanNotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_SCAN_PROGRESS, notification)
+        postNotification(context, notification)
     }
 
     fun showCompleted(context: Context, processed: Int, spamCount: Int) {
@@ -66,7 +69,7 @@ object SpamScanNotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_SCAN_PROGRESS, notification)
+        postNotification(context, notification)
     }
 
     fun showFailed(context: Context) {
@@ -82,6 +85,15 @@ object SpamScanNotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
 
+        postNotification(context, notification)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun postNotification(context: Context, notification: Notification) {
+        if (canPostNotifications(context)) {
+            Log.w(TAG, "user not grant permission")
+            return
+        }
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_SCAN_PROGRESS, notification)
     }
 
