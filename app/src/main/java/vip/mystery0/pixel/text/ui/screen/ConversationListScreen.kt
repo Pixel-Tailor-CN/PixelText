@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
@@ -125,8 +124,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
 
-private const val WRITE_SMS_PERMISSION = "android.permission.WRITE_SMS"
-
 @Composable
 fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
@@ -147,42 +144,14 @@ fun ConversationListScreen(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    var hasContactPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_CONTACTS
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var hasNotificationPermission by remember {
-        mutableStateOf(
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var hasRequestedStartupPermissions by remember { mutableStateOf(false) }
+    var hasShownReadSmsPermissionDialog by remember { mutableStateOf(false) }
+    var showReadSmsPermissionDialog by remember { mutableStateOf(false) }
+    var pendingPermissionsAfterDefaultPrompt by remember { mutableStateOf<List<String>>(emptyList()) }
     var hasLoadedConversationsAfterPermission by remember { mutableStateOf(false) }
     var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val selectionMode = selectedThreadIds.isNotEmpty()
     var isDefaultSmsRoleHeld by remember(context) {
         mutableStateOf(context.isDefaultSmsApp())
-    }
-    val hasAllStartupPermissions =
-        hasPermission && hasContactPermission && hasNotificationPermission
-
-    val startupPermissions = remember {
-        buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-            add(Manifest.permission.READ_SMS)
-            add(WRITE_SMS_PERMISSION)
-            add(Manifest.permission.READ_CONTACTS)
-        }.toTypedArray()
     }
 
     fun isPermissionGranted(permission: String): Boolean {
@@ -193,17 +162,13 @@ fun ConversationListScreen(
     }
 
     fun missingStartupPermissions(): Array<String> {
-        return startupPermissions
+        return listOf(Manifest.permission.READ_SMS)
             .filterNot(::isPermissionGranted)
             .toTypedArray()
     }
 
     fun refreshPermissionState() {
         hasPermission = isPermissionGranted(Manifest.permission.READ_SMS)
-        hasContactPermission = isPermissionGranted(Manifest.permission.READ_CONTACTS)
-        hasNotificationPermission =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                    isPermissionGranted(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     val startupPermissionLauncher = rememberLauncherForActivityResult(
@@ -217,16 +182,28 @@ fun ConversationListScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         isDefaultSmsRoleHeld = context.isDefaultSmsApp()
+        val permissions = pendingPermissionsAfterDefaultPrompt
+        pendingPermissionsAfterDefaultPrompt = emptyList()
+        if (permissions.isNotEmpty()) {
+            startupPermissionLauncher.launch(permissions.toTypedArray())
+        }
     }
 
-    LaunchedEffect(hasRequestedStartupPermissions, hasAllStartupPermissions) {
+    fun requestPermissionsAfterDefaultPrompt(permissions: Array<String>) {
+        if (permissions.isEmpty()) return
+        if (context.isDefaultSmsApp()) {
+            startupPermissionLauncher.launch(permissions)
+        } else {
+            pendingPermissionsAfterDefaultPrompt = permissions.toList()
+            defaultSmsAppLauncher.launch(context.createDefaultSmsAppRequestIntent())
+        }
+    }
+
+    LaunchedEffect(hasPermission, hasShownReadSmsPermissionDialog) {
         selectedThreadIds = emptySet()
-        if (!hasRequestedStartupPermissions && !hasAllStartupPermissions) {
-            val missingPermissions = missingStartupPermissions()
-            if (missingPermissions.isNotEmpty()) {
-                hasRequestedStartupPermissions = true
-                startupPermissionLauncher.launch(missingPermissions)
-            }
+        if (!hasPermission && !hasShownReadSmsPermissionDialog) {
+            hasShownReadSmsPermissionDialog = true
+            showReadSmsPermissionDialog = true
         }
     }
 
@@ -390,11 +367,7 @@ fun ConversationListScreen(
                         Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
                         Button(
                             onClick = {
-                                val missingPermissions = missingStartupPermissions()
-                                if (missingPermissions.isNotEmpty()) {
-                                    hasRequestedStartupPermissions = true
-                                    startupPermissionLauncher.launch(missingPermissions)
-                                }
+                                showReadSmsPermissionDialog = true
                             }
                         ) {
                             Text("授予权限")
@@ -579,6 +552,33 @@ fun ConversationListScreen(
             dismissButton = {
                 TextButton(onClick = { deleteCandidateThreadIds = emptySet() }) {
                     Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showReadSmsPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showReadSmsPermissionDialog = false },
+            title = { Text("需要短信读取权限") },
+            text = {
+                Text(
+                    "PixelText 需要读取短信权限来显示本机会话列表和短信内容。点击申请后，如尚未设置默认短信应用，会先显示默认短信应用请求，再显示系统权限请求。"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showReadSmsPermissionDialog = false
+                        requestPermissionsAfterDefaultPrompt(missingStartupPermissions())
+                    }
+                ) {
+                    Text("申请")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReadSmsPermissionDialog = false }) {
+                    Text("稍后")
                 }
             }
         )
@@ -865,18 +865,11 @@ fun NewChatBottomSheet(
     val context = LocalContext.current
     var phoneNumber by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
+    var showContactPermissionDialog by remember { mutableStateOf(false) }
     var selectedSimSlot by remember { mutableIntStateOf(0) }
 
     val simCards = remember {
         SimInfoProvider.getActiveSimList(context)
-    }
-
-    val contactPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Toast.makeText(context, "需要联系人权限才能选择联系人", Toast.LENGTH_SHORT).show()
-        }
     }
 
     val contactPickerLauncher = rememberLauncherForActivityResult(
@@ -909,6 +902,30 @@ fun NewChatBottomSheet(
                     }
                 }
             }
+        }
+    }
+
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            contactPickerLauncher.launch(null)
+        } else {
+            Toast.makeText(context, "需要联系人权限才能选择联系人", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val contactDefaultSmsAppLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+    }
+
+    fun requestContactPermissionAfterDefaultPrompt() {
+        if (context.isDefaultSmsApp()) {
+            contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        } else {
+            contactDefaultSmsAppLauncher.launch(context.createDefaultSmsAppRequestIntent())
         }
     }
 
@@ -1007,7 +1024,7 @@ fun NewChatBottomSheet(
                 if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                     contactPickerLauncher.launch(null)
                 } else {
-                    contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                    showContactPermissionDialog = true
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -1017,6 +1034,33 @@ fun NewChatBottomSheet(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showContactPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showContactPermissionDialog = false },
+            title = { Text("需要联系人权限") },
+            text = {
+                Text(
+                    "PixelText 需要联系人权限来打开联系人选择器并填入收件人号码。点击申请后，如尚未设置默认短信应用，会先显示默认短信应用请求，再显示系统权限请求。"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showContactPermissionDialog = false
+                        requestContactPermissionAfterDefaultPrompt()
+                    }
+                ) {
+                    Text("申请")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showContactPermissionDialog = false }) {
+                    Text("稍后")
+                }
+            }
+        )
     }
 }
 
