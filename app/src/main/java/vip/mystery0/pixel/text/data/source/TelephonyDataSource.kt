@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.data.source
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
@@ -640,7 +641,7 @@ class TelephonyDataSource(
         return uris
     }
 
-    private fun android.database.Cursor.toSmsMessageRow(threadIdOverride: Long? = null): SmsMessageRow {
+    private fun Cursor.toSmsMessageRow(threadIdOverride: Long? = null): SmsMessageRow {
         val type = getInt(getColumnIndexOrThrow(Telephony.Sms.TYPE))
         return SmsMessageRow(
             id = getLong(getColumnIndexOrThrow(Telephony.Sms._ID)),
@@ -653,7 +654,7 @@ class TelephonyDataSource(
         )
     }
 
-    private fun android.database.Cursor.toMmsMessageRow(mmsId: Long): MmsMessageRow {
+    private fun Cursor.toMmsMessageRow(mmsId: Long): MmsMessageRow {
         val messageBox = getInt(getColumnIndexOrThrow(Telephony.Mms.MESSAGE_BOX))
         val subject = decodeMmsSubject(
             getString(getColumnIndexOrThrow(Telephony.Mms.SUBJECT)),
@@ -668,7 +669,7 @@ class TelephonyDataSource(
             subject = subject,
             address = getMmsAddress(mmsId),
             textContent = getMmsTextContent(mmsId),
-            imageUris = getMmsImageUris(mmsId)
+            imageUris = getMmsImageUris(mmsId),
         )
     }
 
