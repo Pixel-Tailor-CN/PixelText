@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.ui.message
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -102,6 +101,11 @@ fun MessageItem(
                             isSelected = isSelected
                         )
                     }
+                } else {
+                    OriginalTextCard(
+                        content = "【不支持的消息】",
+                        isSelected = isSelected,
+                    )
                 }
             }
         }
