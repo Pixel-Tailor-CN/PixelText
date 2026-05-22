@@ -131,9 +131,6 @@ fun AppNavigation(
                 vip.mystery0.pixel.text.ui.screen.mock.MockMessageScreen()
             }
         }
-
-        // 默认短信应用引导对话框：非默认时在任意页面自动弹出，用户可选择跳过
-        DefaultSmsAppDialog()
     }
 }
 

@@ -32,17 +32,20 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +62,8 @@ import me.zhanghai.compose.preference.preferenceCategory
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
+import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
@@ -71,14 +76,39 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
     var permissionRefreshKey by remember { mutableIntStateOf(0) }
+    var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { permissionRefreshKey++ }
+        onResult = {
+            pendingPermissionRequest = emptyList()
+            permissionRefreshKey++
+        }
+    )
+    val defaultSmsAppLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            val permissions = pendingPermissionRequest
+            pendingPermissionRequest = emptyList()
+            if (permissions.isNotEmpty()) {
+                permissionLauncher.launch(permissions.toTypedArray())
+            }
+        }
     )
     val permissionItems = remember(context, permissionRefreshKey) {
         buildPermissionItems(context)
     }
     var versionCodeTapCount by remember { mutableIntStateOf(0) }
+
+    fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
+        if (permissions.isEmpty()) return
+        if (context.isDefaultSmsApp()) {
+            permissionLauncher.launch(permissions.toTypedArray())
+        } else {
+            pendingPermissionRequest = permissions
+            defaultSmsAppLauncher.launch(context.createDefaultSmsAppRequestIntent())
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -199,9 +229,7 @@ fun SettingsScreen(
                                 PermissionPreference(
                                     item = permissionItem,
                                     onRequest = {
-                                        permissionLauncher.launch(
-                                            permissionItem.missingPermissions.toTypedArray()
-                                        )
+                                        pendingPermissionDialogItem = permissionItem
                                     }
                                 )
                             }
@@ -289,6 +317,33 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    pendingPermissionDialogItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { pendingPermissionDialogItem = null },
+            title = { Text("需要${item.title}权限") },
+            text = {
+                Text(
+                    item.summary + "\n\n点击申请后，如尚未设置默认短信应用，会先显示默认短信应用请求，再显示系统权限请求。"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingPermissionDialogItem = null
+                        requestPermissionsAfterDefaultPrompt(item.missingPermissions)
+                    }
+                ) {
+                    Text("申请")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPermissionDialogItem = null }) {
+                    Text("稍后")
+                }
+            }
+        )
     }
 }
 
