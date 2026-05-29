@@ -34,8 +34,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -90,6 +90,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -214,7 +215,7 @@ fun ConversationListScreen(
         if (!hasPermission) return@LaunchedEffect
         if (!hasLoadedConversationsAfterPermission) {
             hasLoadedConversationsAfterPermission = true
-            viewModel.loadConversations(force = true)
+            viewModel.refreshOrLoadConversations()
         }
     }
 
@@ -231,7 +232,7 @@ fun ConversationListScreen(
                 }
                 refreshPermissionState()
                 if (currentHasPermission) {
-                    viewModel.refreshSilent()
+                    viewModel.refreshOrLoadConversations()
                 }
             }
         }
@@ -267,6 +268,9 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     val sheetState = rememberModalBottomSheetState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -407,7 +411,6 @@ fun ConversationListScreen(
                         }
 
                         is ConversationListUiState.Success -> {
-                            val listState = rememberLazyListState()
                             var isRefreshing by remember { mutableStateOf(false) }
 
                             if (state.conversations.isEmpty()) {

@@ -19,9 +19,11 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private var offset = 0
     private var isLoadingMore = false
+    private var isRefreshingLoaded = false
     private var hasMore = true
 
     fun loadConversations(force: Boolean = false) {
+        if (isLoadingMore) return
         if (force) {
             offset = 0
             allConversations.clear()
@@ -32,6 +34,14 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         }
 
         fetchNextBatch(100)
+    }
+
+    fun refreshOrLoadConversations() {
+        if (allConversations.isEmpty()) {
+            loadConversations(force = true)
+        } else {
+            refreshSilent()
+        }
     }
 
     fun loadMore() {
@@ -66,17 +76,22 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     }
 
     fun refreshSilent() {
-        if (isLoadingMore || allConversations.isEmpty()) return
+        if (isLoadingMore || isRefreshingLoaded || allConversations.isEmpty()) return
         syncLoadedConversations()
     }
 
     private fun syncLoadedConversations() {
+        isRefreshingLoaded = true
         viewModelScope.launch {
-            repository.getConversations(maxOf(100, offset), 0)
-                .catch { /* ignore error during silent refresh */ }
-                .collect { newList ->
-                    replaceConversations(newList)
-                }
+            try {
+                repository.getConversations(maxOf(100, offset), 0)
+                    .catch { /* ignore error during silent refresh */ }
+                    .collect { newList ->
+                        replaceConversations(newList)
+                    }
+            } finally {
+                isRefreshingLoaded = false
+            }
         }
     }
 
