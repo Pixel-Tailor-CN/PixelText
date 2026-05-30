@@ -19,6 +19,7 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
@@ -115,10 +116,24 @@ class MessageRepositoryImpl(
         }
     }
 
-    override fun searchMessages(query: String): Flow<List<MessageModel>> = flow {
-        val smsMessages = telephonyDataSource.searchSmsMessages(query)
-            .map { it.toMessageModel(parsedResult = ParsedResult.None) }
-        val mmsMessages = telephonyDataSource.searchMmsMessages(query)
+    override fun searchMessages(
+        query: String,
+        filter: MessageSearchFilter
+    ): Flow<List<MessageModel>> = flow {
+        val smsMessages = if (filter.mmsOnly) {
+            emptyList()
+        } else {
+            telephonyDataSource.searchSmsMessages(
+                query = query,
+                unreadOnly = filter.unreadOnly,
+                simSubId = filter.simSubId
+            ).map { it.toMessageModel(parsedResult = ParsedResult.None) }
+        }
+        val mmsMessages = telephonyDataSource.searchMmsMessages(
+            query = query,
+            unreadOnly = filter.unreadOnly,
+            simSubId = filter.simSubId
+        )
             .map { it.toMessageModel(parsedResult = ParsedResult.None) }
 
         emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
@@ -289,7 +304,9 @@ class MessageRepositoryImpl(
             sender = address,
             content = body,
             timestamp = date,
+            subId = subId,
             simName = telephonyDataSource.getSimName(subId),
+            isRead = read,
             isReceived = isReceived,
             parsedResult = parsedResult,
             spamScore = spamScore
@@ -306,11 +323,14 @@ class MessageRepositoryImpl(
             sender = address,
             content = textContent,
             timestamp = date,
+            subId = subId,
             simName = telephonyDataSource.getSimName(subId),
+            isRead = read,
             isReceived = isReceived,
             parsedResult = parsedResult,
             imageUris = imageUris,
             mmsSubject = subject,
+            isMms = true,
             spamScore = spamScore
         )
     }

@@ -64,11 +64,14 @@ data class MessageModel(
     val sender: String,
     val content: String,
     val timestamp: Long,
+    val subId: Int = -1,
     val simName: String = "卡1",
+    val isRead: Boolean = true,
     val isReceived: Boolean = true,
     val parsedResult: ParsedResult = ParsedResult.None,
     val imageUris: List<String> = emptyList(),
     val mmsSubject: String? = null,
+    val isMms: Boolean = false,
     val spamScore: Float = -1f
 ) {
     val stableKey: String

@@ -39,6 +39,7 @@ data class SmsMessageRow(
     val body: String,
     val date: Long,
     val subId: Int,
+    val read: Boolean,
     val isReceived: Boolean
 )
 
@@ -47,6 +48,7 @@ data class MmsMessageRow(
     val threadId: Long,
     val date: Long,
     val subId: Int,
+    val read: Boolean,
     val isReceived: Boolean,
     val subject: String?,
     val address: String,
@@ -316,13 +318,30 @@ class TelephonyDataSource(
         }
     }
 
-    fun searchSmsMessages(query: String): List<SmsMessageRow> {
+    fun searchSmsMessages(
+        query: String,
+        unreadOnly: Boolean = false,
+        simSubId: Int? = null
+    ): List<SmsMessageRow> {
         val rows = mutableListOf<SmsMessageRow>()
+        val selectionParts = mutableListOf<String>()
+        val selectionArgs = mutableListOf<String>()
+        if (query.isNotBlank()) {
+            selectionParts += "${Telephony.Sms.BODY} LIKE ?"
+            selectionArgs += "%$query%"
+        }
+        if (unreadOnly) {
+            selectionParts += "${Telephony.Sms.READ} = 0"
+        }
+        if (simSubId != null) {
+            selectionParts += "${Telephony.Sms.SUBSCRIPTION_ID} = ?"
+            selectionArgs += simSubId.toString()
+        }
         contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             smsMessageProjection,
-            "${Telephony.Sms.BODY} LIKE ?",
-            arrayOf("%$query%"),
+            selectionParts.toSelection(),
+            selectionArgs.toTypedArrayOrNull(),
             "${Telephony.Sms.DATE} DESC"
         )?.use { cursor ->
             while (cursor.moveToNext()) {
@@ -332,31 +351,52 @@ class TelephonyDataSource(
         return rows
     }
 
-    fun searchMmsMessages(query: String): List<MmsMessageRow> {
+    fun searchMmsMessages(
+        query: String,
+        unreadOnly: Boolean = false,
+        simSubId: Int? = null
+    ): List<MmsMessageRow> {
         return try {
             val rows = mutableListOf<MmsMessageRow>()
             val matchedMmsIds = mutableSetOf<Long>()
 
-            contentResolver.query(
-                "content://mms/part".toUri(),
-                arrayOf("mid", "text"),
-                "ct = 'text/plain' AND text LIKE ?",
-                arrayOf("%$query%"),
-                null
-            )?.use { cursor ->
-                val midIndex = cursor.getColumnIndexOrThrow("mid")
-                while (cursor.moveToNext()) {
-                    val mmsId = cursor.getLong(midIndex)
-                    if (!matchedMmsIds.add(mmsId)) continue
-                    getMmsMessageRow(mmsId)?.let { rows += it }
+            if (query.isNotBlank()) {
+                contentResolver.query(
+                    "content://mms/part".toUri(),
+                    arrayOf("mid", "text"),
+                    "ct = 'text/plain' AND text LIKE ?",
+                    arrayOf("%$query%"),
+                    null
+                )?.use { cursor ->
+                    val midIndex = cursor.getColumnIndexOrThrow("mid")
+                    while (cursor.moveToNext()) {
+                        val mmsId = cursor.getLong(midIndex)
+                        if (!matchedMmsIds.add(mmsId)) continue
+                        getMmsMessageRow(mmsId)
+                            ?.takeIf { it.matchesSearchFilters(unreadOnly, simSubId) }
+                            ?.let { rows += it }
+                    }
                 }
             }
 
+            val selectionParts = mutableListOf<String>()
+            val selectionArgs = mutableListOf<String>()
+            if (query.isNotBlank()) {
+                selectionParts += "${Telephony.Mms.SUBJECT} LIKE ?"
+                selectionArgs += "%$query%"
+            }
+            if (unreadOnly) {
+                selectionParts += "${Telephony.Mms.READ} = 0"
+            }
+            if (simSubId != null) {
+                selectionParts += "${Telephony.Mms.SUBSCRIPTION_ID} = ?"
+                selectionArgs += simSubId.toString()
+            }
             contentResolver.query(
                 Telephony.Mms.CONTENT_URI,
                 mmsMessageProjection,
-                "${Telephony.Mms.SUBJECT} LIKE ?",
-                arrayOf("%$query%"),
+                selectionParts.toSelection(),
+                selectionArgs.toTypedArrayOrNull(),
                 "${Telephony.Mms.DATE} DESC"
             )?.use { cursor ->
                 val mmsIdIndex = cursor.getColumnIndexOrThrow(Telephony.Mms._ID)
@@ -734,6 +774,7 @@ class TelephonyDataSource(
             body = getString(getColumnIndexOrThrow(Telephony.Sms.BODY)).orEmpty(),
             date = getLong(getColumnIndexOrThrow(Telephony.Sms.DATE)),
             subId = getInt(getColumnIndexOrThrow(Telephony.Sms.SUBSCRIPTION_ID)),
+            read = getInt(getColumnIndexOrThrow(Telephony.Sms.READ)) == 1,
             isReceived = type == Telephony.Sms.MESSAGE_TYPE_INBOX
         )
     }
@@ -749,12 +790,30 @@ class TelephonyDataSource(
             threadId = getLong(getColumnIndexOrThrow(Telephony.Mms.THREAD_ID)),
             date = getLong(getColumnIndexOrThrow(Telephony.Mms.DATE)) * 1000,
             subId = getInt(getColumnIndexOrThrow(Telephony.Mms.SUBSCRIPTION_ID)),
+            read = getInt(getColumnIndexOrThrow(Telephony.Mms.READ)) == 1,
             isReceived = messageBox == Telephony.Mms.MESSAGE_BOX_INBOX,
             subject = subject,
             address = getMmsAddress(mmsId),
             textContent = getMmsTextContent(mmsId),
             imageUris = getMmsImageUris(mmsId),
         )
+    }
+
+    private fun MmsMessageRow.matchesSearchFilters(
+        unreadOnly: Boolean,
+        simSubId: Int?
+    ): Boolean {
+        if (unreadOnly && read) return false
+        if (simSubId != null && subId != simSubId) return false
+        return true
+    }
+
+    private fun List<String>.toSelection(): String? {
+        return takeIf { it.isNotEmpty() }?.joinToString(" AND ")
+    }
+
+    private fun List<String>.toTypedArrayOrNull(): Array<String>? {
+        return takeIf { it.isNotEmpty() }?.toTypedArray()
     }
 
     private fun buildThreadSelection(
@@ -790,6 +849,7 @@ class TelephonyDataSource(
             Telephony.Sms.BODY,
             Telephony.Sms.DATE,
             Telephony.Sms.SUBSCRIPTION_ID,
+            Telephony.Sms.READ,
             Telephony.Sms.TYPE
         )
 
@@ -798,6 +858,7 @@ class TelephonyDataSource(
             Telephony.Mms.THREAD_ID,
             Telephony.Mms.DATE,
             Telephony.Mms.SUBSCRIPTION_ID,
+            Telephony.Mms.READ,
             Telephony.Mms.MESSAGE_BOX,
             Telephony.Mms.SUBJECT,
             Telephony.Mms.SUBJECT_CHARSET

@@ -4,12 +4,21 @@ import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 
+data class MessageSearchFilter(
+    val unreadOnly: Boolean = false,
+    val simSubId: Int? = null,
+    val mmsOnly: Boolean = false
+)
+
 interface MessageRepository {
     fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun searchConversations(query: String): Flow<List<ConversationModel>>
-    fun searchMessages(query: String): Flow<List<MessageModel>>
+    fun searchMessages(
+        query: String,
+        filter: MessageSearchFilter = MessageSearchFilter()
+    ): Flow<List<MessageModel>>
     fun getMessagesByThread(threadId: Long, limit: Int, offset: Int): Flow<List<MessageModel>>
     fun getMessages(): Flow<List<MessageModel>>
     suspend fun archiveConversations(conversations: List<ConversationModel>)
