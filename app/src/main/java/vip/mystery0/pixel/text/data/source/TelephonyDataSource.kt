@@ -162,6 +162,58 @@ class TelephonyDataSource(
         return deletedCount
     }
 
+    fun getConversationMessageIdsByThread(threadIds: List<Long>): Map<Long, List<Long>> {
+        if (threadIds.isEmpty()) return emptyMap()
+
+        val result = linkedMapOf<Long, MutableList<Long>>()
+        threadIds.forEach { result[it] = mutableListOf() }
+
+        threadIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(Telephony.Sms.THREAD_ID, chunk)
+            contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID),
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                while (cursor.moveToNext()) {
+                    val threadId = cursor.getLong(threadIdIndex)
+                    result.getOrPut(threadId) { mutableListOf() }
+                        .add(cursor.getLong(idIndex))
+                }
+            }
+        }
+
+        threadIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            try {
+                val (selection, selectionArgs) =
+                    buildThreadSelection(Telephony.Mms.THREAD_ID, chunk)
+                contentResolver.query(
+                    Telephony.Mms.CONTENT_URI,
+                    arrayOf(Telephony.Mms._ID, Telephony.Mms.THREAD_ID),
+                    selection,
+                    selectionArgs,
+                    null
+                )?.use { cursor ->
+                    val idIndex = cursor.getColumnIndexOrThrow(Telephony.Mms._ID)
+                    val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Mms.THREAD_ID)
+                    while (cursor.moveToNext()) {
+                        val threadId = cursor.getLong(threadIdIndex)
+                        result.getOrPut(threadId) { mutableListOf() }
+                            .add(-cursor.getLong(idIndex))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to query mms message ids", e)
+            }
+        }
+
+        return result
+    }
+
     fun queryConversationThreadIds(): List<Long> {
         val threadIds = mutableListOf<Long>()
         contentResolver.query(

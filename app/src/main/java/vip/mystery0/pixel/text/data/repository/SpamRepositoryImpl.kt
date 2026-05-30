@@ -39,6 +39,17 @@ class SpamRepositoryImpl(
             }
         }
 
+    override suspend fun getSpamMessageIds(messageIds: List<Long>, threshold: Float): Set<Long> =
+        withContext(Dispatchers.IO) {
+            if (messageIds.isEmpty()) {
+                emptySet()
+            } else {
+                messageIds.chunked(MAX_QUERY_ARGS)
+                    .flatMap { dao.getSpamMessageIds(it, threshold) }
+                    .toSet()
+            }
+        }
+
     override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
         withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
 

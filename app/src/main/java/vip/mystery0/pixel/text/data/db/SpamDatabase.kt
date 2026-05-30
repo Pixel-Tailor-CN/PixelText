@@ -32,6 +32,15 @@ interface SpamResultDao {
 
     @Query(
         """
+        SELECT message_id
+        FROM spam_result
+        WHERE message_id IN (:messageIds) AND spam_score >= :threshold
+        """
+    )
+    suspend fun getSpamMessageIds(messageIds: List<Long>, threshold: Float): List<Long>
+
+    @Query(
+        """
         SELECT thread_id
         FROM spam_result
         WHERE spam_score >= :threshold

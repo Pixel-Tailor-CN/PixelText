@@ -23,6 +23,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
 private const val SPAM_THRESHOLD = 0.7f
+private const val FULLY_SPAM_FILTER_CHUNK_SIZE = 200
 
 class MessageRepositoryImpl(
     private val telephonyDataSource: TelephonyDataSource,
@@ -170,16 +171,47 @@ class MessageRepositoryImpl(
         }
     }
 
-    private fun queryFilteredConversationThreadIds(
+    private suspend fun queryFilteredConversationThreadIds(
         limit: Int,
         offset: Int,
         archivedThreadIds: Set<Long>
     ): List<Long> {
-        return telephonyDataSource.queryConversationThreadIds()
+        val threadIds = telephonyDataSource.queryConversationThreadIds()
             .distinct()
             .filter { threadId -> threadId !in archivedThreadIds }
-            .drop(offset)
-            .take(limit)
+
+        if (!settingsRepository.isHideFullySpamConversationsEnabled()) {
+            return threadIds
+                .drop(offset)
+                .take(limit)
+        }
+
+        val targetCount = offset + limit
+        val visibleThreadIds = mutableListOf<Long>()
+        threadIds.chunked(FULLY_SPAM_FILTER_CHUNK_SIZE).forEach { chunk ->
+            val fullySpamThreadIds = findFullySpamThreadIds(chunk)
+            visibleThreadIds += chunk.filterNot { it in fullySpamThreadIds }
+            if (visibleThreadIds.size >= targetCount) {
+                return visibleThreadIds.drop(offset).take(limit)
+            }
+        }
+
+        return visibleThreadIds.drop(offset).take(limit)
+    }
+
+    private suspend fun findFullySpamThreadIds(threadIds: List<Long>): Set<Long> {
+        if (threadIds.isEmpty()) return emptySet()
+
+        val messageIdsByThread = telephonyDataSource.getConversationMessageIdsByThread(threadIds)
+        val allMessageIds = messageIdsByThread.values.flatten()
+        if (allMessageIds.isEmpty()) return emptySet()
+
+        val spamMessageIds = spamRepository.getSpamMessageIds(allMessageIds, SPAM_THRESHOLD)
+        return messageIdsByThread
+            .filterValues { messageIds ->
+                messageIds.isNotEmpty() && messageIds.all { it in spamMessageIds }
+            }
+            .keys
     }
 
     private fun fetchConversationDetails(threadIds: List<Long>): List<ConversationModel> {
