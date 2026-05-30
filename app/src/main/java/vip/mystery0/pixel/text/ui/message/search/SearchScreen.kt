@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
@@ -34,10 +36,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.util.SimInfoProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +52,12 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchFilter by viewModel.searchFilter.collectAsState()
+    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+    val simList = remember { SimInfoProvider.getActiveSimList(context).take(2) }
+    val firstSim = simList.getOrNull(0)
+    val secondSim = simList.getOrNull(1)
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -120,24 +129,37 @@ fun SearchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 FilterChip(
-                    selected = false,
-                    onClick = { /* TODO */ },
+                    selected = searchFilter.unreadOnly,
+                    onClick = viewModel::toggleUnreadFilter,
                     label = { Text("未读") }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 FilterChip(
-                    selected = false,
-                    onClick = { /* TODO */ },
-                    label = { Text("卡一") }
+                    selected = searchFilter.simSubId == firstSim?.subscriptionId,
+                    onClick = {
+                        firstSim?.let { viewModel.toggleSimFilter(it.subscriptionId) }
+                    },
+                    enabled = firstSim != null,
+                    label = { Text(firstSim?.displayName ?: "卡一") }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 FilterChip(
-                    selected = false,
-                    onClick = { /* TODO */ },
-                    label = { Text("卡二") }
+                    selected = searchFilter.simSubId == secondSim?.subscriptionId,
+                    onClick = {
+                        secondSim?.let { viewModel.toggleSimFilter(it.subscriptionId) }
+                    },
+                    enabled = secondSim != null,
+                    label = { Text(secondSim?.displayName ?: "卡二") }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                FilterChip(
+                    selected = searchFilter.mmsOnly,
+                    onClick = viewModel::toggleMmsFilter,
+                    label = { Text("彩信") }
                 )
             }
 
