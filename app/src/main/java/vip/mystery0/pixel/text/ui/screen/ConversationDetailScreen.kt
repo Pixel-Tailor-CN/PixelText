@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.SystemClock
 import android.telephony.SubscriptionManager
 import androidx.compose.foundation.clickable
@@ -61,6 +62,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -77,6 +79,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import androidx.core.net.toUri
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.ui.message.MessageItem
@@ -106,6 +110,7 @@ fun ConversationDetailScreen(
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var messageText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val selectedMessage = if (selectedMessageIds.size == 1) {
         (uiState as? MessageUiState.Success)
             ?.messages
@@ -249,11 +254,22 @@ fun ConversationDetailScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { /* TODO */ }) {
+                        IconButton(
+                            onClick = {
+                                val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                                    data = "tel:${Uri.encode(address)}".toUri()
+                                }
+                                runCatching {
+                                    context.startActivity(dialIntent)
+                                }.onFailure {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("无法打开拨号器")
+                                    }
+                                }
+                            },
+                            enabled = address.isNotBlank()
+                        ) {
                             Icon(Icons.Rounded.Call, contentDescription = "Call")
-                        }
-                        IconButton(onClick = { /* TODO */ }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "More")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
