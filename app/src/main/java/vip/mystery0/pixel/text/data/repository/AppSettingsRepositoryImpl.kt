@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import vip.mystery0.pixel.text.domain.settings.AppSettings
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import androidx.core.content.edit
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
@@ -26,23 +27,35 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     }
 
     override fun setSpamDetectionEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled).apply()
+        prefs.edit { putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled) }
+    }
+
+    override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
+        prefs.edit {
+            putBoolean(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED, enabled)
+        }
     }
 
     override fun setSmartCardEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean(AppSettingsKeys.KEY_SMART_CARD_ENABLED, enabled).apply()
+        prefs.edit { putBoolean(AppSettingsKeys.KEY_SMART_CARD_ENABLED, enabled) }
     }
 
     override fun setVerificationCodeNotificationActionEnabled(enabled: Boolean) {
-        prefs.edit()
-            .putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED, enabled)
-            .apply()
+        prefs.edit {
+            putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED, enabled)
+        }
     }
 
     override fun isSpamDetectionEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
             AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED
+        )
+
+    override fun isHideFullySpamConversationsEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED,
+            AppSettingsKeys.DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED
         )
 
     override fun isSmartCardEnabled(): Boolean =
@@ -60,6 +73,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
+            hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
                 isVerificationCodeNotificationActionEnabled()

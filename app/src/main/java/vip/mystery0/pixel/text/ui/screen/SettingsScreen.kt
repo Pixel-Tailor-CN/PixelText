@@ -186,6 +186,23 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        item(
+                            key = "hide_fully_spam_conversations",
+                            contentType = "SwitchPreference"
+                        ) {
+                            SwitchPreference(
+                                value = settings.hideFullySpamConversationsEnabled,
+                                onValueChange =
+                                    viewModel::setHideFullySpamConversationsEnabled,
+                                title = { Text("隐藏完全骚扰会话") },
+                                summary = {
+                                    Text("会话中的短信和彩信全部被标记为骚扰时，从普通会话列表隐藏")
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Security, contentDescription = null)
+                                }
+                            )
+                        }
                         item(key = "smart_card", contentType = "SwitchPreference") {
                             SwitchPreference(
                                 value = settings.smartCardEnabled,
