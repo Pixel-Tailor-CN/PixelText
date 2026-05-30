@@ -130,6 +130,38 @@ class TelephonyDataSource(
         }
     }
 
+    fun deleteMessages(messageIds: Set<Long>): Int {
+        if (messageIds.isEmpty()) return 0
+
+        var deletedCount = 0
+        val smsIds = messageIds.filter { it > 0 }
+        val mmsIds = messageIds.filter { it < 0 }.map { -it }
+
+        smsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(Telephony.Sms._ID, chunk)
+            deletedCount += contentResolver.delete(
+                Telephony.Sms.CONTENT_URI,
+                selection,
+                selectionArgs
+            )
+        }
+
+        mmsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            try {
+                val (selection, selectionArgs) = buildThreadSelection(Telephony.Mms._ID, chunk)
+                deletedCount += contentResolver.delete(
+                    Telephony.Mms.CONTENT_URI,
+                    selection,
+                    selectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to delete mms messages", e)
+            }
+        }
+
+        return deletedCount
+    }
+
     fun queryConversationThreadIds(): List<Long> {
         val threadIds = mutableListOf<Long>()
         contentResolver.query(
@@ -697,6 +729,8 @@ class TelephonyDataSource(
     }
 
     private companion object {
+        const val MAX_QUERY_ARGS = 900
+
         val smsMessageProjection = arrayOf(
             Telephony.Sms._ID,
             Telephony.Sms.THREAD_ID,

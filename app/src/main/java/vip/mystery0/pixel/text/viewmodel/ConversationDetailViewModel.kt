@@ -42,6 +42,11 @@ sealed interface SendResultEvent {
     data class Failure(val reason: String) : SendResultEvent
 }
 
+sealed interface DeleteMessageResultEvent {
+    data class Success(val count: Int) : DeleteMessageResultEvent
+    data class Failure(val reason: String) : DeleteMessageResultEvent
+}
+
 sealed interface ManualSpamCheckState {
     data object Checking : ManualSpamCheckState
     data class Result(val score: Float) : ManualSpamCheckState
@@ -66,6 +71,10 @@ class ConversationDetailViewModel(
 
     private val _sendResultEvents = Channel<SendResultEvent>(Channel.BUFFERED)
     val sendResultEvents = _sendResultEvents.receiveAsFlow()
+
+    private val _deleteMessageResultEvents =
+        Channel<DeleteMessageResultEvent>(Channel.BUFFERED)
+    val deleteMessageResultEvents = _deleteMessageResultEvents.receiveAsFlow()
 
     private val _manualSpamChecks = MutableStateFlow<Map<Long, ManualSpamCheckState>>(emptyMap())
     val manualSpamChecks: StateFlow<Map<Long, ManualSpamCheckState>> =
@@ -204,6 +213,25 @@ class ConversationDetailViewModel(
                 _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
             } finally {
                 _sending.value = false
+            }
+        }
+    }
+
+    fun deleteMessages(messageIds: Set<Long>) {
+        if (messageIds.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                repository.deleteMessages(messageIds)
+            }.onSuccess { deletedCount ->
+                _manualSpamChecks.value = _manualSpamChecks.value - messageIds
+                refreshMessages()
+                _deleteMessageResultEvents.trySend(
+                    DeleteMessageResultEvent.Success(deletedCount)
+                )
+            }.onFailure { e ->
+                _deleteMessageResultEvents.trySend(
+                    DeleteMessageResultEvent.Failure(e.message ?: "删除失败")
+                )
             }
         }
     }

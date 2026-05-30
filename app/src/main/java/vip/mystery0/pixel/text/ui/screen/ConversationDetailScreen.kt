@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -50,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -87,6 +89,7 @@ import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
+import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
@@ -108,6 +111,7 @@ fun ConversationDetailScreen(
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
+    var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var messageText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -145,6 +149,25 @@ fun ConversationDetailScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.deleteMessageResultEvents.collect { event ->
+            when (event) {
+                is DeleteMessageResultEvent.Success -> {
+                    val message = if (event.count > 0) {
+                        "已删除 ${event.count} 条消息"
+                    } else {
+                        "未删除任何消息"
+                    }
+                    snackbarHostState.showSnackbar(message)
+                }
+
+                is DeleteMessageResultEvent.Failure -> {
+                    snackbarHostState.showSnackbar(event.reason)
+                }
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
         topBar = {
@@ -176,8 +199,7 @@ fun ConversationDetailScreen(
                             Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy")
                         }
                         IconButton(onClick = {
-                            // TODO: Delete messages
-                            selectedMessageIds.clear()
+                            deleteCandidateMessageIds = selectedMessageIds.toSet()
                         }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete")
                         }
@@ -417,6 +439,31 @@ fun ConversationDetailScreen(
                 }
             }
         }
+    }
+
+    if (deleteCandidateMessageIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { deleteCandidateMessageIds = emptySet() },
+            title = { Text("删除消息？") },
+            text = { Text("将删除所选 ${deleteCandidateMessageIds.size} 条短信或彩信。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selected = deleteCandidateMessageIds
+                        deleteCandidateMessageIds = emptySet()
+                        selectedMessageIds.clear()
+                        viewModel.deleteMessages(selected)
+                    }
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteCandidateMessageIds = emptySet() }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 

@@ -105,6 +105,15 @@ class MessageRepositoryImpl(
         }
     }
 
+    override suspend fun deleteMessages(messageIds: Set<Long>): Int {
+        if (messageIds.isEmpty()) return 0
+        return withContext(Dispatchers.IO) {
+            val deletedCount = telephonyDataSource.deleteMessages(messageIds)
+            spamRepository.delete(messageIds)
+            deletedCount
+        }
+    }
+
     override fun searchMessages(query: String): Flow<List<MessageModel>> = flow {
         val smsMessages = telephonyDataSource.searchSmsMessages(query)
             .map { it.toMessageModel(parsedResult = ParsedResult.None) }
