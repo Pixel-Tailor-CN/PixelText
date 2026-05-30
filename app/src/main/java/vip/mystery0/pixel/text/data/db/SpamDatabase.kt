@@ -42,6 +42,9 @@ interface SpamResultDao {
     )
     suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
 
+    @Query("DELETE FROM spam_result WHERE message_id IN (:messageIds)")
+    suspend fun deleteByMessageIds(messageIds: List<Long>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(result: SpamResultEntity)
 }

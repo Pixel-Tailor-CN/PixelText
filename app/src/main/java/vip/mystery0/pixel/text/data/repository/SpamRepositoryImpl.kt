@@ -42,6 +42,13 @@ class SpamRepositoryImpl(
     override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
         withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
 
+    override suspend fun delete(messageIds: Set<Long>) {
+        if (messageIds.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            messageIds.chunked(MAX_QUERY_ARGS).forEach { dao.deleteByMessageIds(it) }
+        }
+    }
+
     override fun isEnabled(): Boolean = settingsRepository.isSpamDetectionEnabled()
 
     private companion object {
