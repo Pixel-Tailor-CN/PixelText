@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.data.repository
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -22,6 +23,7 @@ import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
 private const val SPAM_THRESHOLD = 0.7f
 private const val FULLY_SPAM_FILTER_CHUNK_SIZE = 200
@@ -32,7 +34,8 @@ class MessageRepositoryImpl(
     private val messageParser: MessageParser,
     private val spamRepository: SpamRepository,
     private val settingsRepository: AppSettingsRepository,
-    private val archiveDatabase: ConversationArchiveDatabase
+    private val archiveDatabase: ConversationArchiveDatabase,
+    private val context: Context
 ) : MessageRepository {
 
     private val archiveDao = archiveDatabase.archivedConversationDao()
@@ -104,14 +107,17 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             telephonyDataSource.deleteThreads(threadIds)
             archiveDao.unarchive(threadIds)
+            SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
         }
     }
 
     override suspend fun deleteMessages(messageIds: Set<Long>): Int {
         if (messageIds.isEmpty()) return 0
         return withContext(Dispatchers.IO) {
+            val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val deletedCount = telephonyDataSource.deleteMessages(messageIds)
             spamRepository.delete(messageIds)
+            SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             deletedCount
         }
     }

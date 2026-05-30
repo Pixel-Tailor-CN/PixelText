@@ -205,4 +205,13 @@ object SmsNotificationHelper {
             messageParser = it
         }
     }
+
+    fun cancelThreadNotification(context: Context, threadId: Long) {
+        if (threadId <= 0L) return
+        NotificationManagerCompat.from(context).cancel(threadId.toInt())
+    }
+
+    fun cancelThreadNotifications(context: Context, threadIds: Set<Long>) {
+        threadIds.forEach { cancelThreadNotification(context, it) }
+    }
 }
