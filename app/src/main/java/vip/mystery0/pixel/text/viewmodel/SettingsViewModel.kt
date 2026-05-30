@@ -12,6 +12,10 @@ class SettingsViewModel(
         settingsRepository.setSpamDetectionEnabled(enabled)
     }
 
+    fun setMuteSpamNotificationsEnabled(enabled: Boolean) {
+        settingsRepository.setMuteSpamNotificationsEnabled(enabled)
+    }
+
     fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
         settingsRepository.setHideFullySpamConversationsEnabled(enabled)
     }

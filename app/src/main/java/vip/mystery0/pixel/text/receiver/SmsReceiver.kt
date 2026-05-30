@@ -7,6 +7,7 @@ import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
+import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 
@@ -66,20 +67,44 @@ class SmsReceiver : BroadcastReceiver() {
                 Log.e(TAG, "failed to insert SMS into database", e)
             }
 
-            // 发送通知
-            SmsNotificationHelper.showSmsNotification(
-                context = context,
-                sender = sender,
-                body = body,
-                threadId = threadId,
-                messageUri = insertedUri?.toString(),
-            )
-
             // 触发骚扰检测
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
-            if (messageId != null && threadId > 0) {
-                SpamDetectionWorker.schedule(context, messageId, threadId, sender, body)
+            val deferNotification = shouldDeferNotificationForSpamCheck(context)
+            val canScheduleSpamCheck = messageId != null && threadId > 0
+            if (canScheduleSpamCheck) {
+                SpamDetectionWorker.schedule(
+                    context = context,
+                    messageId = messageId,
+                    threadId = threadId,
+                    sender = sender,
+                    content = body,
+                    deferNotification = deferNotification,
+                    messageUri = insertedUri.toString()
+                )
+            }
+
+            if (!deferNotification || !canScheduleSpamCheck) {
+                SmsNotificationHelper.showSmsNotification(
+                    context = context,
+                    sender = sender,
+                    body = body,
+                    threadId = threadId,
+                    messageUri = insertedUri?.toString(),
+                )
             }
         }
+    }
+
+    private fun shouldDeferNotificationForSpamCheck(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+        val spamDetectionEnabled = prefs.getBoolean(
+            AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
+            AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED
+        )
+        val muteSpamNotificationsEnabled = prefs.getBoolean(
+            AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED,
+            AppSettingsKeys.DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED
+        )
+        return spamDetectionEnabled && muteSpamNotificationsEnabled
     }
 }
