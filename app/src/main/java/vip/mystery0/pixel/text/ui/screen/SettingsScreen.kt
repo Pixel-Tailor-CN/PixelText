@@ -187,6 +187,23 @@ fun SettingsScreen(
                             )
                         }
                         item(
+                            key = "mute_spam_notifications",
+                            contentType = "SwitchPreference"
+                        ) {
+                            SwitchPreference(
+                                value = settings.muteSpamNotificationsEnabled,
+                                onValueChange = viewModel::setMuteSpamNotificationsEnabled,
+                                title = { Text("骚扰短信不提醒") },
+                                summary = {
+                                    Text("开启骚扰短信识别后，收到骚扰短信时不显示通知且不做提醒")
+                                },
+                                enabled = settings.spamDetectionEnabled,
+                                icon = {
+                                    Icon(Icons.Rounded.Notifications, contentDescription = null)
+                                }
+                            )
+                        }
+                        item(
                             key = "hide_fully_spam_conversations",
                             contentType = "SwitchPreference"
                         ) {

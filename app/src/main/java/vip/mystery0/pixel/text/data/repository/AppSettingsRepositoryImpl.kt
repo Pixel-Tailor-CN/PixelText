@@ -30,6 +30,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         prefs.edit { putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled) }
     }
 
+    override fun setMuteSpamNotificationsEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED, enabled) }
+    }
+
     override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
         prefs.edit {
             putBoolean(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED, enabled)
@@ -50,6 +54,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
             AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED
+        )
+
+    override fun isMuteSpamNotificationsEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED,
+            AppSettingsKeys.DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED
         )
 
     override fun isHideFullySpamConversationsEnabled(): Boolean =
@@ -73,6 +83,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
+            muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
