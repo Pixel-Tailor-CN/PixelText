@@ -164,6 +164,52 @@ class TelephonyDataSource(
         return deletedCount
     }
 
+    fun getThreadIdsForMessages(messageIds: Set<Long>): Set<Long> {
+        if (messageIds.isEmpty()) return emptySet()
+
+        val threadIds = linkedSetOf<Long>()
+        val smsIds = messageIds.filter { it > 0 }
+        val mmsIds = messageIds.filter { it < 0 }.map { -it }
+
+        smsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(Telephony.Sms._ID, chunk)
+            contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(Telephony.Sms.THREAD_ID),
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                while (cursor.moveToNext()) {
+                    threadIds += cursor.getLong(threadIdIndex)
+                }
+            }
+        }
+
+        mmsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            try {
+                val (selection, selectionArgs) = buildThreadSelection(Telephony.Mms._ID, chunk)
+                contentResolver.query(
+                    Telephony.Mms.CONTENT_URI,
+                    arrayOf(Telephony.Mms.THREAD_ID),
+                    selection,
+                    selectionArgs,
+                    null
+                )?.use { cursor ->
+                    val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Mms.THREAD_ID)
+                    while (cursor.moveToNext()) {
+                        threadIds += cursor.getLong(threadIdIndex)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to query mms message thread ids", e)
+            }
+        }
+
+        return threadIds
+    }
+
     fun getConversationMessageIdsByThread(threadIds: List<Long>): Map<Long, List<Long>> {
         if (threadIds.isEmpty()) return emptyMap()
 

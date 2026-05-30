@@ -1,6 +1,8 @@
 package vip.mystery0.pixel.text.receiver
 
 import android.Manifest
+import android.app.Activity
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -20,6 +22,8 @@ import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 处理通知操作按钮（"已阅" / "回复"）的 BroadcastReceiver。
@@ -36,6 +40,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
         const val ACTION_REPLY_SMS = "vip.mystery0.pixel.text.action.REPLY_SMS"
+
+        /** 通知栏快捷回复的 SMS_SENT 回执 */
+        const val ACTION_REPLY_SMS_SENT = "vip.mystery0.pixel.text.action.REPLY_SMS_SENT"
+
+        /** 通知栏快捷回复的 SMS_DELIVERED 回执 */
+        const val ACTION_REPLY_SMS_DELIVERED =
+            "vip.mystery0.pixel.text.action.REPLY_SMS_DELIVERED"
 
         /** 复制验证码，并将对应消息标记为已读 */
         const val ACTION_COPY_VERIFICATION_CODE =
@@ -56,11 +67,20 @@ class NotificationActionReceiver : BroadcastReceiver() {
         /** Intent extra：待复制的验证码 */
         const val EXTRA_VERIFICATION_CODE = "extra_verification_code"
 
+        private const val EXTRA_REPLY_MESSAGE_URI = "extra_reply_message_uri"
+        private const val EXTRA_REPLY_REQUEST_ID = "extra_reply_request_id"
+        private const val EXTRA_REPLY_PART_COUNT = "extra_reply_part_count"
+        private const val EXTRA_REPLY_PART_INDEX = "extra_reply_part_index"
+
         /**
          * RemoteInput result key：从通知栏输入框取出回复文本时使用的 key。
          * 必须与 [SmsNotificationHelper] 中 RemoteInput.Builder 的 key 一致。
          */
         const val EXTRA_REPLY_TEXT = "extra_reply_text"
+
+        private val replyRequestCounter = AtomicInteger(0)
+        private val replySendStates = ConcurrentHashMap<Int, ReplySendState>()
+        private val replyDeliveryStates = ConcurrentHashMap<Int, ReplyDeliveryState>()
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -93,14 +113,30 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val address = intent.getStringExtra(EXTRA_REPLY_ADDRESS)
 
                 if (!replyText.isNullOrBlank() && !address.isNullOrBlank()) {
-                    val sent = sendSmsReply(context, address, replyText)
+                    val sent = sendSmsReply(context, notificationId, address, replyText)
                     // 发送后必须更新通知，否则系统会一直显示转圈进度条
-                    updateNotificationAfterReply(context, notificationId, sent)
+                    if (sent) {
+                        updateNotificationAfterReply(
+                            context = context,
+                            notificationId = notificationId,
+                            statusText = "正在发送"
+                        )
+                    } else {
+                        updateNotificationAfterReply(
+                            context = context,
+                            notificationId = notificationId,
+                            statusText = context.getString(R.string.notification_reply_failed)
+                        )
+                    }
                 } else {
                     Log.w(TAG, "reply skipped: replyText=$replyText, address=$address")
                     cancelNotification(context, notificationId)
                 }
             }
+
+            ACTION_REPLY_SMS_SENT -> handleReplySmsSent(context, intent, resultCode)
+
+            ACTION_REPLY_SMS_DELIVERED -> handleReplySmsDelivered(context, intent, resultCode)
         }
     }
 
@@ -184,7 +220,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
      *
      * @return true 表示调用 sendTextMessage / sendMultipartTextMessage 未抛异常
      */
-    private fun sendSmsReply(context: Context, recipient: String, text: String): Boolean {
+    private fun sendSmsReply(
+        context: Context,
+        notificationId: Int,
+        recipient: String,
+        text: String
+    ): Boolean {
+        var messageUri: Uri? = null
         return try {
             val defaultSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
             val baseSmsManager: SmsManager = context.getSystemService(SmsManager::class.java)
@@ -194,19 +236,78 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 Log.w(TAG, "default sms subscription unavailable, using system sms manager")
                 baseSmsManager
             }
+            messageUri = saveReplyOutboxToDb(context, recipient, text, defaultSubId)
+            val requestId = replyRequestCounter.incrementAndGet()
 
             val parts = smsManager.divideMessage(text)
             if (parts.size == 1) {
-                smsManager.sendTextMessage(recipient, null, text, null, null)
+                smsManager.sendTextMessage(
+                    recipient,
+                    null,
+                    text,
+                    buildReplyPendingIntent(
+                        context = context,
+                        action = ACTION_REPLY_SMS_SENT,
+                        requestCode = requestId * 100,
+                        notificationId = notificationId,
+                        messageUri = messageUri,
+                        requestId = requestId,
+                        partIndex = 0,
+                        partCount = 1
+                    ),
+                    buildReplyPendingIntent(
+                        context = context,
+                        action = ACTION_REPLY_SMS_DELIVERED,
+                        requestCode = requestId * 100 + 50,
+                        notificationId = notificationId,
+                        messageUri = messageUri,
+                        requestId = requestId,
+                        partIndex = 0,
+                        partCount = 1
+                    )
+                )
             } else {
-                smsManager.sendMultipartTextMessage(recipient, null, parts, null, null)
+                val sentIntents = ArrayList<PendingIntent>(parts.size)
+                val deliveredIntents = ArrayList<PendingIntent>(parts.size)
+                parts.forEachIndexed { index, _ ->
+                    sentIntents += buildReplyPendingIntent(
+                        context = context,
+                        action = ACTION_REPLY_SMS_SENT,
+                        requestCode = requestId * 100 + index,
+                        notificationId = notificationId,
+                        messageUri = messageUri,
+                        requestId = requestId,
+                        partIndex = index,
+                        partCount = parts.size
+                    )
+                    deliveredIntents += buildReplyPendingIntent(
+                        context = context,
+                        action = ACTION_REPLY_SMS_DELIVERED,
+                        requestCode = requestId * 100 + 50 + index,
+                        notificationId = notificationId,
+                        messageUri = messageUri,
+                        requestId = requestId,
+                        partIndex = index,
+                        partCount = parts.size
+                    )
+                }
+                smsManager.sendMultipartTextMessage(
+                    recipient,
+                    null,
+                    parts,
+                    sentIntents,
+                    deliveredIntents
+                )
             }
-
-            // 写入系统数据库，使所有短信应用均可看到该发送记录
-            saveSentMessageToDb(context, recipient, text, defaultSubId)
             true
         } catch (e: Exception) {
             Log.e(TAG, "failed to send reply to $recipient", e)
+            updateReplySendResult(
+                context = context,
+                messageUri = messageUri?.toString(),
+                resultCode = SmsManager.RESULT_ERROR_GENERIC_FAILURE,
+                success = false
+            )
             false
         }
     }
@@ -217,30 +318,156 @@ class NotificationActionReceiver : BroadcastReceiver() {
      * 作为默认短信应用，[SmsManager] 只负责发送无线信号，数据库持久化由应用自行负责。
      * 不写入数据库会导致：其他短信应用看不到、本应用重启后记录丢失、对话 thread_id 无法正确关联。
      */
-    private fun saveSentMessageToDb(
+    private fun saveReplyOutboxToDb(
         context: Context,
         recipient: String,
         text: String,
         subId: Int,
-    ) {
+    ): Uri? {
         try {
             val now = System.currentTimeMillis()
             val values = ContentValues().apply {
                 put(Telephony.Sms.ADDRESS, recipient)
                 put(Telephony.Sms.BODY, text)
                 put(Telephony.Sms.DATE, now)
-                put(Telephony.Sms.DATE_SENT, now)
                 // 已发送消息默认标记为"已读"
                 put(Telephony.Sms.READ, 1)
                 put(Telephony.Sms.SEEN, 1)
-                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_OUTBOX)
                 if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
                     put(Telephony.Sms.SUBSCRIPTION_ID, subId)
                 }
             }
-            context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+            return context.contentResolver.insert(Telephony.Sms.CONTENT_URI, values)
         } catch (e: Exception) {
-            Log.e(TAG, "failed to save sent message to DB", e)
+            Log.e(TAG, "failed to save reply outbox message", e)
+            return null
+        }
+    }
+
+    private fun buildReplyPendingIntent(
+        context: Context,
+        action: String,
+        requestCode: Int,
+        notificationId: Int,
+        messageUri: Uri?,
+        requestId: Int,
+        partIndex: Int,
+        partCount: Int,
+    ): PendingIntent {
+        val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+            this.action = action
+            putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+            putExtra(EXTRA_REPLY_MESSAGE_URI, messageUri?.toString())
+            putExtra(EXTRA_REPLY_REQUEST_ID, requestId)
+            putExtra(EXTRA_REPLY_PART_INDEX, partIndex)
+            putExtra(EXTRA_REPLY_PART_COUNT, partCount)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun handleReplySmsSent(context: Context, intent: Intent, resultCode: Int) {
+        val requestId = intent.getIntExtra(EXTRA_REPLY_REQUEST_ID, -1)
+        val partCount = intent.getIntExtra(EXTRA_REPLY_PART_COUNT, 1).coerceAtLeast(1)
+        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, -1)
+        val messageUri = intent.getStringExtra(EXTRA_REPLY_MESSAGE_URI)
+
+        val state = replySendStates.compute(requestId) { _, current ->
+            val next = current ?: ReplySendState(partCount)
+            next.receivedCount += 1
+            if (resultCode != Activity.RESULT_OK && next.firstError == Activity.RESULT_OK) {
+                next.firstError = resultCode
+            }
+            next
+        } ?: ReplySendState(partCount)
+
+        if (state.receivedCount < state.partCount) return
+        replySendStates.remove(requestId)
+
+        val success = state.firstError == Activity.RESULT_OK
+        updateReplySendResult(context, messageUri, state.firstError, success)
+        updateNotificationAfterReply(
+            context = context,
+            notificationId = notificationId,
+            statusText = context.getString(
+                if (success) R.string.notification_reply_sent
+                else R.string.notification_reply_failed
+            )
+        )
+    }
+
+    private fun handleReplySmsDelivered(context: Context, intent: Intent, resultCode: Int) {
+        val requestId = intent.getIntExtra(EXTRA_REPLY_REQUEST_ID, -1)
+        val partCount = intent.getIntExtra(EXTRA_REPLY_PART_COUNT, 1).coerceAtLeast(1)
+        val messageUri = intent.getStringExtra(EXTRA_REPLY_MESSAGE_URI)
+
+        val state = replyDeliveryStates.compute(requestId) { _, current ->
+            val next = current ?: ReplyDeliveryState(partCount)
+            next.receivedCount += 1
+            if (resultCode != Activity.RESULT_OK && next.firstError == Activity.RESULT_OK) {
+                next.firstError = resultCode
+            }
+            next
+        } ?: ReplyDeliveryState(partCount)
+
+        Log.d(
+            TAG,
+            "reply delivery result request_id=$requestId received=${state.receivedCount}/${state.partCount} result_code=$resultCode"
+        )
+
+        if (state.receivedCount < state.partCount) return
+        replyDeliveryStates.remove(requestId)
+        updateReplyDeliveryResult(
+            context = context,
+            messageUri = messageUri,
+            success = state.firstError == Activity.RESULT_OK
+        )
+    }
+
+    private fun updateReplySendResult(
+        context: Context,
+        messageUri: String?,
+        resultCode: Int,
+        success: Boolean,
+    ) {
+        if (messageUri.isNullOrBlank()) return
+        val values = ContentValues().apply {
+            if (success) {
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
+                put(Telephony.Sms.DATE_SENT, System.currentTimeMillis())
+            } else {
+                put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_FAILED)
+                put(Telephony.Sms.ERROR_CODE, resultCode)
+            }
+        }
+        try {
+            context.contentResolver.update(Uri.parse(messageUri), values, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to update reply send result", e)
+        }
+    }
+
+    private fun updateReplyDeliveryResult(
+        context: Context,
+        messageUri: String?,
+        success: Boolean,
+    ) {
+        if (messageUri.isNullOrBlank()) return
+        val values = ContentValues().apply {
+            put(
+                Telephony.Sms.STATUS,
+                if (success) Telephony.Sms.STATUS_COMPLETE else Telephony.Sms.STATUS_FAILED
+            )
+        }
+        try {
+            context.contentResolver.update(Uri.parse(messageUri), values, null, null)
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to update reply delivery result", e)
         }
     }
 
@@ -253,7 +480,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     private fun updateNotificationAfterReply(
         context: Context,
         notificationId: Int,
-        success: Boolean,
+        statusText: String,
     ) {
         if (notificationId == -1) return
 
@@ -266,12 +493,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 cancelNotification(context, notificationId)
                 return
             }
-        }
-
-        val statusText = if (success) {
-            context.getString(R.string.notification_reply_sent)
-        } else {
-            context.getString(R.string.notification_reply_failed)
         }
 
         val updatedNotification =
@@ -294,4 +515,16 @@ class NotificationActionReceiver : BroadcastReceiver() {
             NotificationManagerCompat.from(context).cancel(notificationId)
         }
     }
+
+    private data class ReplySendState(
+        val partCount: Int,
+        var receivedCount: Int = 0,
+        var firstError: Int = Activity.RESULT_OK,
+    )
+
+    private data class ReplyDeliveryState(
+        val partCount: Int,
+        var receivedCount: Int = 0,
+        var firstError: Int = Activity.RESULT_OK,
+    )
 }

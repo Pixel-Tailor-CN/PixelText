@@ -36,7 +36,9 @@ val appModule = module {
     factory { SpamClassifier(androidContext()) }
     single<SpamClassifierFactory> { SpamClassifierFactory { SpamClassifier(androidContext()) } }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
-    single<MessageRepository> { MessageRepositoryImpl(get(), get(), get(), get(), get(), get()) }
+    single<MessageRepository> {
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), androidContext())
+    }
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
