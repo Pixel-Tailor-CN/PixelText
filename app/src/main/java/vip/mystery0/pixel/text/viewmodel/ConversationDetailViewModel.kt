@@ -47,6 +47,11 @@ sealed interface DeleteMessageResultEvent {
     data class Failure(val reason: String) : DeleteMessageResultEvent
 }
 
+sealed interface MarkSpamResultEvent {
+    data class Success(val markedAsSpam: Boolean) : MarkSpamResultEvent
+    data class Failure(val reason: String) : MarkSpamResultEvent
+}
+
 sealed interface ManualSpamCheckState {
     data object Checking : ManualSpamCheckState
     data class Result(val score: Float) : ManualSpamCheckState
@@ -75,6 +80,9 @@ class ConversationDetailViewModel(
     private val _deleteMessageResultEvents =
         Channel<DeleteMessageResultEvent>(Channel.BUFFERED)
     val deleteMessageResultEvents = _deleteMessageResultEvents.receiveAsFlow()
+
+    private val _markSpamResultEvents = Channel<MarkSpamResultEvent>(Channel.BUFFERED)
+    val markSpamResultEvents = _markSpamResultEvents.receiveAsFlow()
 
     private val _manualSpamChecks = MutableStateFlow<Map<Long, ManualSpamCheckState>>(emptyMap())
     val manualSpamChecks: StateFlow<Map<Long, ManualSpamCheckState>> =
@@ -231,6 +239,24 @@ class ConversationDetailViewModel(
             }.onFailure { e ->
                 _deleteMessageResultEvents.trySend(
                     DeleteMessageResultEvent.Failure(e.message ?: "删除失败")
+                )
+            }
+        }
+    }
+
+    fun markMessageSpam(message: MessageModel, markedAsSpam: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                val score = if (markedAsSpam) MANUAL_SPAM_SCORE else MANUAL_NON_SPAM_SCORE
+                spamRepository.save(message.id, message.threadId, score)
+                updateMessageSpamScore(message.id, score)
+                _manualSpamChecks.value += (message.id to ManualSpamCheckState.Result(score))
+                markedAsSpam
+            }.onSuccess { isSpam ->
+                _markSpamResultEvents.trySend(MarkSpamResultEvent.Success(isSpam))
+            }.onFailure { e ->
+                _markSpamResultEvents.trySend(
+                    MarkSpamResultEvent.Failure(e.message ?: "标记失败")
                 )
             }
         }
@@ -399,6 +425,8 @@ class ConversationDetailViewModel(
     companion object {
         private const val TAG = "ConversationDetailViewM"
         private const val ACTION_SMS_SENT = "vip.mystery0.pixel.text.action.SMS_SENT"
+        private const val MANUAL_SPAM_SCORE = 1f
+        private const val MANUAL_NON_SPAM_SCORE = 0f
         private val sendRequestCounter = AtomicInteger(0)
     }
 }

@@ -90,6 +90,7 @@ import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
+import vip.mystery0.pixel.text.viewmodel.MarkSpamResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
@@ -128,6 +129,9 @@ fun ConversationDetailScreen(
             selectedMessage.content.isNotBlank() &&
             selectedMessage.spamScore < 0f &&
             selectedSpamCheckState !is ManualSpamCheckState.Checking
+    val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
+    val spamMarkMenuText =
+        if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
 
     // 双卡场景：加载当前激活的 SIM 列表，单卡 / 无权限时为空列表
     val simList = remember { SimInfoProvider.getActiveSimList(context) }
@@ -162,6 +166,25 @@ fun ConversationDetailScreen(
                 }
 
                 is DeleteMessageResultEvent.Failure -> {
+                    snackbarHostState.showSnackbar(event.reason)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.markSpamResultEvents.collect { event ->
+            when (event) {
+                is MarkSpamResultEvent.Success -> {
+                    val message = if (event.markedAsSpam) {
+                        "已标记为骚扰短信"
+                    } else {
+                        "已标记为非骚扰短信"
+                    }
+                    snackbarHostState.showSnackbar(message)
+                }
+
+                is MarkSpamResultEvent.Failure -> {
                     snackbarHostState.showSnackbar(event.reason)
                 }
             }
@@ -219,6 +242,20 @@ fun ConversationDetailScreen(
                                         onClick = {
                                             showMoreMenu = false
                                             selectedMessage?.let { viewModel.checkSpamOnce(it) }
+                                            selectedMessageIds.clear()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(spamMarkMenuText) },
+                                        enabled = selectedMessage != null,
+                                        onClick = {
+                                            showMoreMenu = false
+                                            selectedMessage?.let {
+                                                viewModel.markMessageSpam(
+                                                    message = it,
+                                                    markedAsSpam = !selectedMessageIsSpam
+                                                )
+                                            }
                                             selectedMessageIds.clear()
                                         }
                                     )
@@ -568,6 +605,7 @@ private fun SimSelectorButton(
     }
 }
 
+private const val SPAM_THRESHOLD = 0.7f
 private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
 
 private class AboveAnchorPositionProvider(
