@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -30,13 +31,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "NotificationActionReceiver"
 
-        /** 将当前会话的所有未读短信标记为已读 */
+        /** 将当前会话的所有未读短信 / 彩信标记为已读 */
         const val ACTION_MARK_READ = "vip.mystery0.pixel.text.action.MARK_READ"
 
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
         const val ACTION_REPLY_SMS = "vip.mystery0.pixel.text.action.REPLY_SMS"
 
-        /** 复制验证码，并将对应短信标记为已读 */
+        /** 复制验证码，并将对应消息标记为已读 */
         const val ACTION_COPY_VERIFICATION_CODE =
             "vip.mystery0.pixel.text.action.COPY_VERIFICATION_CODE"
 
@@ -46,7 +47,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         /** Intent extra：会话 thread_id，标记已读时使用 */
         const val EXTRA_THREAD_ID = "extra_thread_id"
 
-        /** Intent extra：短信数据库 URI，优先用于精确标记单条短信已读 */
+        /** Intent extra：消息数据库 URI，优先用于精确标记单条消息已读 */
         const val EXTRA_MESSAGE_URI = "extra_message_uri"
 
         /** Intent extra：回复目标的手机号 / 发件人地址 */
@@ -108,23 +109,30 @@ class NotificationActionReceiver : BroadcastReceiver() {
     // -------------------------------------------------------------------------
 
     /**
-     * 将指定会话中所有未读的收件箱短信标记为已读。
+     * 将指定会话中所有未读的收件箱短信 / 彩信标记为已读。
      */
     private fun markThreadAsRead(context: Context, threadId: Long) {
         try {
-            val updated = context.contentResolver.update(
+            val smsUpdated = context.contentResolver.update(
                 Telephony.Sms.CONTENT_URI,
                 readValues(),
                 "${Telephony.Sms.THREAD_ID} = ? AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0) AND ${Telephony.Sms.TYPE} = ?",
                 arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
             )
+            val mmsUpdated = context.contentResolver.update(
+                Telephony.Mms.CONTENT_URI,
+                readValues(),
+                "${Telephony.Mms.THREAD_ID} = ? AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0) AND ${Telephony.Mms.MESSAGE_BOX} = ?",
+                arrayOf(threadId.toString(), Telephony.Mms.MESSAGE_BOX_INBOX.toString())
+            )
+            Log.d(TAG, "mark thread read thread_id=$threadId sms=$smsUpdated mms=$mmsUpdated")
         } catch (e: Exception) {
             Log.e(TAG, "failed to mark thread $threadId as read", e)
         }
     }
 
     /**
-     * 优先将通知对应的单条短信标记为已读；URI 不可用时回退到会话级已读。
+     * 优先将通知对应的单条消息标记为已读；URI 不可用时回退到会话级已读。
      */
     private fun markMessageAsRead(context: Context, messageUri: String?, threadId: Long) {
         if (!messageUri.isNullOrBlank()) {
@@ -178,7 +186,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
      */
     private fun sendSmsReply(context: Context, recipient: String, text: String): Boolean {
         return try {
-            val smsManager: SmsManager = context.getSystemService(SmsManager::class.java)
+            val defaultSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
+            val baseSmsManager: SmsManager = context.getSystemService(SmsManager::class.java)
+            val smsManager = if (defaultSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                baseSmsManager.createForSubscriptionId(defaultSubId)
+            } else {
+                Log.w(TAG, "default sms subscription unavailable, using system sms manager")
+                baseSmsManager
+            }
 
             val parts = smsManager.divideMessage(text)
             if (parts.size == 1) {
@@ -188,7 +203,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
             }
 
             // 写入系统数据库，使所有短信应用均可看到该发送记录
-            saveSentMessageToDb(context, recipient, text)
+            saveSentMessageToDb(context, recipient, text, defaultSubId)
             true
         } catch (e: Exception) {
             Log.e(TAG, "failed to send reply to $recipient", e)
@@ -202,7 +217,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
      * 作为默认短信应用，[SmsManager] 只负责发送无线信号，数据库持久化由应用自行负责。
      * 不写入数据库会导致：其他短信应用看不到、本应用重启后记录丢失、对话 thread_id 无法正确关联。
      */
-    private fun saveSentMessageToDb(context: Context, recipient: String, text: String) {
+    private fun saveSentMessageToDb(
+        context: Context,
+        recipient: String,
+        text: String,
+        subId: Int,
+    ) {
         try {
             val now = System.currentTimeMillis()
             val values = ContentValues().apply {
@@ -214,8 +234,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 put(Telephony.Sms.READ, 1)
                 put(Telephony.Sms.SEEN, 1)
                 put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT)
+                if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    put(Telephony.Sms.SUBSCRIPTION_ID, subId)
+                }
             }
-            val uri = context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+            context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
         } catch (e: Exception) {
             Log.e(TAG, "failed to save sent message to DB", e)
         }

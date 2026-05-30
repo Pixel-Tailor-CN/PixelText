@@ -84,6 +84,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.util.SimInfo
@@ -101,6 +102,7 @@ fun ConversationDetailScreen(
     address: String,
     onNavigateBack: () -> Unit,
     isTablet: Boolean = false,
+    initialMessageText: String = "",
     viewModel: ConversationDetailViewModel = koinViewModel()
 ) {
     LaunchedEffect(threadId, address) {
@@ -113,7 +115,9 @@ fun ConversationDetailScreen(
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var messageText by remember { mutableStateOf("") }
+    var messageText by remember(threadId, address, initialMessageText) {
+        mutableStateOf(initialMessageText)
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val selectedMessage = if (selectedMessageIds.size == 1) {
@@ -287,7 +291,18 @@ fun ConversationDetailScreen(
                                         text = { Text("转发") },
                                         onClick = {
                                             showMoreMenu = false
-                                            // TODO: Forward message
+                                            selectedMessage?.let { message ->
+                                                val forwardIntent = Intent(
+                                                    context,
+                                                    ComposeSmsActivity::class.java
+                                                ).apply {
+                                                    action = Intent.ACTION_SENDTO
+                                                    data = "smsto:".toUri()
+                                                    putExtra("sms_body", message.content)
+                                                    putExtra(Intent.EXTRA_TEXT, message.content)
+                                                }
+                                                context.startActivity(forwardIntent)
+                                            }
                                             selectedMessageIds.clear()
                                         }
                                     )
