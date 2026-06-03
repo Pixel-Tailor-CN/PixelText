@@ -15,6 +15,9 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         MutableStateFlow<ConversationListUiState>(ConversationListUiState.Loading)
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
 
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private var offset = 0
@@ -24,6 +27,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     fun loadConversations(force: Boolean = false) {
         if (isLoadingMore) return
+        repository.startCacheObserving()
         if (force) {
             offset = 0
             allConversations.clear()
@@ -52,14 +56,19 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     private fun fetchNextBatch(limit: Int) {
         isLoadingMore = true
         viewModelScope.launch {
+            if (offset == 0 && !repository.isCacheReady()) {
+                _isSyncing.value = true
+            }
             repository.getConversations(limit, offset)
                 .catch { e ->
+                    _isSyncing.value = false
                     if (allConversations.isEmpty()) {
                         _uiState.value = ConversationListUiState.Error(e.message ?: "Unknown error")
                     }
                     isLoadingMore = false
                 }
                 .collect { newList ->
+                    _isSyncing.value = false
                     if (newList.isEmpty()) {
                         hasMore = false
                         if (allConversations.isEmpty()) {

@@ -5,8 +5,10 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
+import vip.mystery0.pixel.text.data.db.ConversationCacheDatabase
 import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.repository.AppSettingsRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.data.source.ContactDataSource
@@ -31,13 +33,18 @@ val appModule = module {
     single { MessageParser(androidContext()) }
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
+    single { ConversationCacheDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
     single { TelephonyDataSource(androidContext(), get()) }
     factory { SpamClassifier(androidContext()) }
     single<SpamClassifierFactory> { SpamClassifierFactory { SpamClassifier(androidContext()) } }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
+    single {
+        val db = get<ConversationCacheDatabase>()
+        ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
+    }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get()) }

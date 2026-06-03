@@ -268,6 +268,7 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
@@ -557,6 +558,15 @@ fun ConversationListScreen(
                     Text("取消")
                 }
             }
+        )
+    }
+
+    if (isSyncing) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("正在同步数据") },
+            text = { Text("首次启动需要同步短信数据，请稍候…") },
+            confirmButton = {}
         )
     }
 
