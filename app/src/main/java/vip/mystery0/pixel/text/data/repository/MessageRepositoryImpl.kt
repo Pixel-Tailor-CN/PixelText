@@ -35,23 +35,37 @@ class MessageRepositoryImpl(
     private val spamRepository: SpamRepository,
     private val settingsRepository: AppSettingsRepository,
     private val archiveDatabase: ConversationArchiveDatabase,
+    val conversationCacheRepository: ConversationCacheRepository,
     private val context: Context
 ) : MessageRepository {
 
     private val archiveDao = archiveDatabase.archivedConversationDao()
 
+    override fun startCacheObserving() {
+        conversationCacheRepository.startObserving()
+    }
+
+    override suspend fun isCacheReady(): Boolean = conversationCacheRepository.isCacheReady()
+
     override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
         val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-        val threadIds = queryFilteredConversationThreadIds(
-            limit = limit,
-            offset = offset,
-            archivedThreadIds = archivedThreadIds
-        )
-        if (threadIds.isEmpty()) {
-            emit(emptyList())
-            return@flow
+
+        if (!conversationCacheRepository.isCacheReady()) {
+            conversationCacheRepository.fullSync(archivedThreadIds)
         }
-        emit(fetchConversationDetails(threadIds).sortedByDescending { it.timestamp })
+
+        val conversations = conversationCacheRepository.getConversations(limit, offset, archivedThreadIds)
+            .map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
+
+        if (conversations.isEmpty() && offset == 0) {
+            // 缓存为空可能是首次或数据清空，尝试全量同步一次
+            conversationCacheRepository.fullSync(archivedThreadIds)
+            val retry = conversationCacheRepository.getConversations(limit, offset, archivedThreadIds)
+                .map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
+            emit(retry)
+        } else {
+            emit(conversations)
+        }
     }.flowOn(Dispatchers.IO)
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
