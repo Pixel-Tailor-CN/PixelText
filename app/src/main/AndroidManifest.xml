@@ -103,8 +103,8 @@
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="vip.mystery0.pixel.text.action.MARK_READ" />
-                <action android:name="vip.mystery0.pixel.text.action.REPLY_SMS" />
+                <action android:name="${applicationId}.action.MARK_READ" />
+                <action android:name="${applicationId}.action.REPLY_SMS" />
             </intent-filter>
         </receiver>
 
@@ -113,7 +113,7 @@
             android:name=".mms.MmsDownloadReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="vip.mystery0.pixel.text.action.MMS_DOWNLOADED" />
+                <action android:name="${applicationId}.action.MMS_DOWNLOADED" />
             </intent-filter>
         </receiver>
     </application>

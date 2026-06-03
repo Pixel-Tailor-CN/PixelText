@@ -60,6 +60,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            applicationIdSuffix = ".debug"
             versionNameSuffix = ".d$gitVersionCode.$gitVersionName"
         }
         release {
