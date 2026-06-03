@@ -9,6 +9,7 @@ import android.net.Uri
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.net.toUri
+import vip.mystery0.pixel.text.BuildConfig
 
 /**
  * 接收 MMS 下载完成的回调。
@@ -23,7 +24,7 @@ class MmsDownloadReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "MmsDownloadReceiver"
-        const val ACTION_MMS_DOWNLOADED = "vip.mystery0.pixel.text.action.MMS_DOWNLOADED"
+        val ACTION_MMS_DOWNLOADED = "${BuildConfig.APPLICATION_ID}.action.MMS_DOWNLOADED"
         const val EXTRA_MMS_URI = "extra_mms_uri"
         const val EXTRA_CONTENT_LOCATION = "extra_content_location"
     }

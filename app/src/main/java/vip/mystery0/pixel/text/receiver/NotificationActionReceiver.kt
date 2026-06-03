@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import java.util.concurrent.ConcurrentHashMap
@@ -36,21 +37,21 @@ class NotificationActionReceiver : BroadcastReceiver() {
         private const val TAG = "NotificationActionReceiver"
 
         /** 将当前会话的所有未读短信 / 彩信标记为已读 */
-        const val ACTION_MARK_READ = "vip.mystery0.pixel.text.action.MARK_READ"
+        val ACTION_MARK_READ = "${BuildConfig.APPLICATION_ID}.action.MARK_READ"
 
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
-        const val ACTION_REPLY_SMS = "vip.mystery0.pixel.text.action.REPLY_SMS"
+        val ACTION_REPLY_SMS = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS"
 
         /** 通知栏快捷回复的 SMS_SENT 回执 */
-        const val ACTION_REPLY_SMS_SENT = "vip.mystery0.pixel.text.action.REPLY_SMS_SENT"
+        val ACTION_REPLY_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS_SENT"
 
         /** 通知栏快捷回复的 SMS_DELIVERED 回执 */
-        const val ACTION_REPLY_SMS_DELIVERED =
-            "vip.mystery0.pixel.text.action.REPLY_SMS_DELIVERED"
+        val ACTION_REPLY_SMS_DELIVERED =
+            "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS_DELIVERED"
 
         /** 复制验证码，并将对应消息标记为已读 */
-        const val ACTION_COPY_VERIFICATION_CODE =
-            "vip.mystery0.pixel.text.action.COPY_VERIFICATION_CODE"
+        val ACTION_COPY_VERIFICATION_CODE =
+            "${BuildConfig.APPLICATION_ID}.action.COPY_VERIFICATION_CODE"
 
         /** Intent extra：通知 ID，用于 cancel / update */
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"

@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -27,7 +28,7 @@ class SpamDetectionWorker(
         private const val SPAM_THRESHOLD = 0.7f
         private val classificationSemaphore = Semaphore(MAX_CONCURRENT_CLASSIFICATIONS)
 
-        const val ACTION_SPAM_DETECTED = "vip.mystery0.pixel.text.action.SPAM_DETECTED"
+        val ACTION_SPAM_DETECTED = "${BuildConfig.APPLICATION_ID}.action.SPAM_DETECTED"
         const val KEY_MESSAGE_ID = "message_id"
         const val KEY_THREAD_ID = "thread_id"
         const val KEY_SENDER = "sender"

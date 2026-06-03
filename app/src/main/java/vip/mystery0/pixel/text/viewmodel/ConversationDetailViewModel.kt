@@ -26,6 +26,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -424,7 +425,7 @@ class ConversationDetailViewModel(
 
     companion object {
         private const val TAG = "ConversationDetailViewM"
-        private const val ACTION_SMS_SENT = "vip.mystery0.pixel.text.action.SMS_SENT"
+        private val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f
         private val sendRequestCounter = AtomicInteger(0)
