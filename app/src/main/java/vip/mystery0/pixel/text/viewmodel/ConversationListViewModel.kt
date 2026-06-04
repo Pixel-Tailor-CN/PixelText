@@ -20,24 +20,20 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
-    private var offset = 0
-    private var isLoadingMore = false
+    private var isLoading = false
     private var isRefreshingLoaded = false
-    private var hasMore = true
 
     fun loadConversations(force: Boolean = false) {
-        if (isLoadingMore) return
+        if (isLoading) return
         repository.startCacheObserving()
         if (force) {
-            offset = 0
             allConversations.clear()
-            hasMore = true
             _uiState.value = ConversationListUiState.Loading
         } else if (allConversations.isNotEmpty()) {
             return
         }
 
-        fetchNextBatch(100)
+        loadAllConversations()
     }
 
     fun refreshOrLoadConversations() {
@@ -48,53 +44,39 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         }
     }
 
-    fun loadMore() {
-        if (isLoadingMore || !hasMore) return
-        fetchNextBatch(50)
-    }
-
-    private fun fetchNextBatch(limit: Int) {
-        isLoadingMore = true
+    private fun loadAllConversations() {
+        isLoading = true
         viewModelScope.launch {
-            if (offset == 0 && !repository.isCacheReady()) {
+            if (!repository.isCacheReady()) {
                 _isSyncing.value = true
             }
-            repository.getConversations(limit, offset)
+            repository.getAllConversations()
                 .catch { e ->
                     _isSyncing.value = false
                     if (allConversations.isEmpty()) {
                         _uiState.value = ConversationListUiState.Error(e.message ?: "Unknown error")
                     }
-                    isLoadingMore = false
+                    isLoading = false
                 }
-                .collect { newList ->
+                .collect { conversations ->
                     _isSyncing.value = false
-                    if (newList.isEmpty()) {
-                        hasMore = false
-                        if (allConversations.isEmpty()) {
-                            _uiState.value = ConversationListUiState.Success(emptyList())
-                        }
-                    } else {
-                        mergeConversations(newList)
-                        offset += newList.size
-                        _uiState.value = ConversationListUiState.Success(allConversations.toList())
-                    }
-                    isLoadingMore = false
+                    replaceConversations(conversations)
+                    isLoading = false
                 }
         }
     }
 
     fun refreshSilent() {
-        if (isLoadingMore || isRefreshingLoaded || allConversations.isEmpty()) return
-        syncLoadedConversations()
+        if (isLoading || isRefreshingLoaded || allConversations.isEmpty()) return
+        syncAllConversations()
     }
 
-    private fun syncLoadedConversations() {
+    private fun syncAllConversations() {
         isRefreshingLoaded = true
         viewModelScope.launch {
             try {
-                repository.getConversations(maxOf(100, offset), 0)
-                    .catch { /* ignore error during silent refresh */ }
+                repository.getAllConversations()
+                    .catch { }
                     .collect { newList ->
                         replaceConversations(newList)
                     }
@@ -123,7 +105,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         viewModelScope.launch {
             repository.deleteThreads(threadIds)
             pendingDeletedThreadIds.removeAll(threadIds)
-            syncLoadedConversations()
+            refreshSilent()
         }
     }
 
@@ -137,7 +119,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     fun restorePendingDelete(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         pendingDeletedThreadIds.removeAll(threadIds)
-        syncLoadedConversations()
+        refreshSilent()
     }
 
     private fun replaceConversations(conversations: List<ConversationModel>) {
@@ -146,25 +128,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
             .distinctBy { it.threadId }
         allConversations.clear()
         allConversations.addAll(visibleList)
-        offset = conversations.size
-        hasMore = conversations.isNotEmpty()
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
-    }
-
-    private fun mergeConversations(conversations: List<ConversationModel>) {
-        val currentByThreadId = allConversations.associateBy { it.threadId }
-        val merged = (allConversations + conversations)
-            .filterNot { it.threadId in pendingDeletedThreadIds }
-            .distinctBy { it.threadId }
-            .map { conversation ->
-                currentByThreadId[conversation.threadId]?.let { existing ->
-                    if (conversation.timestamp >= existing.timestamp) conversation else existing
-                } ?: conversation
-            }
-            .sortedByDescending { it.timestamp }
-
-        allConversations.clear()
-        allConversations.addAll(merged)
     }
 }
 

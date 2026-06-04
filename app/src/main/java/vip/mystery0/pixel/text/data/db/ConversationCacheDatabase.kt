@@ -31,6 +31,9 @@ interface CachedConversationDao {
     @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
     suspend fun getConversations(limit: Int, offset: Int): List<CachedConversationEntity>
 
+    @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC")
+    suspend fun getAllConversations(): List<CachedConversationEntity>
+
     @Query("SELECT thread_id FROM cached_conversation")
     suspend fun getAllThreadIds(): List<Long>
 
