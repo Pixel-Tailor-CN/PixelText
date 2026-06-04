@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
@@ -56,8 +56,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -74,7 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -99,8 +97,8 @@ import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
-import vip.mystery0.pixel.text.viewmodel.MarkSpamResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
+import vip.mystery0.pixel.text.viewmodel.MarkSpamResultEvent
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
 
@@ -418,18 +416,31 @@ fun ConversationDetailScreen(
                                 onSelected = { selectedSubId = it },
                             )
                         }
-                        TextField(
+                        BasicTextField(
                             value = messageText,
                             onValueChange = { messageText = it },
-                            placeholder = { Text("Text message") },
-                            modifier = Modifier.weight(1f),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface
                             ),
-                            maxLines = 4
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            maxLines = 4,
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    if (messageText.isEmpty()) {
+                                        Text(
+                                            text = "请输入",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            }
                         )
                         IconButton(
                             onClick = {
