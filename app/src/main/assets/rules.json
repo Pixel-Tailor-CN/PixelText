@@ -84,6 +84,20 @@
       }
     },
     {
+      "id": "verification_oppo_open_platform",
+      "target_card": "VerificationCode",
+      "priority": 90,
+      "fast_fail": {
+        "signature_equals": "OPPO",
+        "keywords": [
+          "验证码"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?<code>[0-9a-zA-Z]{4,8})（OPPO开放平台验证码）"
+      }
+    },
+    {
       "id": "verification_code_general",
       "target_card": "VerificationCode",
       "priority": 10,
