@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Security
@@ -58,6 +59,7 @@ fun SpamConversationListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val historyStatsState by viewModel.historyStatsState.collectAsState()
     val scanProgress by viewModel.historyScanProgress.collectAsState()
+    val isCompletedScanProgressHidden by viewModel.isCompletedScanProgressHidden.collectAsState()
     var showHistoryDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -108,8 +110,13 @@ fun SpamConversationListScreen(
                 .padding(paddingValues)
                 .consumeWindowInsets(paddingValues)
         ) {
-            scanProgress?.let { progress ->
-                HistoricalSpamScanProgressBanner(progress)
+            scanProgress
+                ?.takeUnless { it.isCompleted && isCompletedScanProgressHidden }
+                ?.let { progress ->
+                    HistoricalSpamScanProgressBanner(
+                        progress = progress,
+                        onHide = viewModel::hideCompletedScanProgress
+                    )
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -231,11 +238,17 @@ fun SpamConversationListScreen(
 }
 
 @Composable
-private fun HistoricalSpamScanProgressBanner(progress: HistorySpamScanProgress) {
+private fun HistoricalSpamScanProgressBanner(
+    progress: HistorySpamScanProgress,
+    onHide: () -> Unit
+) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
             modifier = Modifier
@@ -247,10 +260,21 @@ private fun HistoricalSpamScanProgressBanner(progress: HistorySpamScanProgress) 
                 progress.isFailed -> "历史短信识别失败"
                 else -> "正在识别历史短信"
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                if (progress.isCompleted) {
+                    TextButton(onClick = onHide) {
+                        Text("隐藏")
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             LinearWavyProgressIndicator(
                 progress = { progress.fraction },

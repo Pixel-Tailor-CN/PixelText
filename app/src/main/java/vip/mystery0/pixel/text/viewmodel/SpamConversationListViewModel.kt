@@ -41,6 +41,10 @@ class SpamConversationListViewModel(
     val historyScanProgress: StateFlow<HistorySpamScanProgress?> =
         _historyScanProgress.asStateFlow()
 
+    private val _isCompletedScanProgressHidden = MutableStateFlow(false)
+    val isCompletedScanProgressHidden: StateFlow<Boolean> =
+        _isCompletedScanProgressHidden.asStateFlow()
+
     private val conversations = mutableListOf<ConversationModel>()
     private val appContext = context.applicationContext
     private val workManager = WorkManager.getInstance(appContext)
@@ -95,8 +99,15 @@ class SpamConversationListViewModel(
     }
 
     fun startHistoricalScan() {
+        _isCompletedScanProgressHidden.value = false
         val workId = HistoricalSpamScanWorker.schedule(appContext)
         observeHistoricalScan(workId)
+    }
+
+    fun hideCompletedScanProgress() {
+        if (_historyScanProgress.value?.isCompleted == true) {
+            _isCompletedScanProgressHidden.value = true
+        }
     }
 
     fun clearHistoryStats() {
@@ -176,6 +187,9 @@ class SpamConversationListViewModel(
                 val total = data.getInt(HistoricalSpamScanWorker.KEY_TOTAL, 0)
                 val processed = data.getInt(HistoricalSpamScanWorker.KEY_PROCESSED, 0)
                 val spamCount = data.getInt(HistoricalSpamScanWorker.KEY_SPAM_COUNT, 0)
+                if (workInfo.state.isActiveScanState()) {
+                    _isCompletedScanProgressHidden.value = false
+                }
 
                 _historyScanProgress.value = HistorySpamScanProgress(
                     processed = processed,
