@@ -47,25 +47,20 @@ class MessageRepositoryImpl(
 
     override suspend fun isCacheReady(): Boolean = conversationCacheRepository.isCacheReady()
 
-    override fun getConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> = flow {
+    override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
         val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
+        val hiddenThreadIds = getHiddenFullySpamThreadIds(archivedThreadIds)
 
         if (!conversationCacheRepository.isCacheReady()) {
             conversationCacheRepository.fullSync(archivedThreadIds)
         }
 
-        val conversations = conversationCacheRepository.getConversations(limit, offset, archivedThreadIds)
-            .map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
+        val conversations = conversationCacheRepository.getAllConversations(
+            archivedThreadIds = archivedThreadIds,
+            hiddenThreadIds = hiddenThreadIds
+        ).map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
 
-        if (conversations.isEmpty() && offset == 0) {
-            // 缓存为空可能是首次或数据清空，尝试全量同步一次
-            conversationCacheRepository.fullSync(archivedThreadIds)
-            val retry = conversationCacheRepository.getConversations(limit, offset, archivedThreadIds)
-                .map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
-            emit(retry)
-        } else {
-            emit(conversations)
-        }
+        emit(conversations)
     }.flowOn(Dispatchers.IO)
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
@@ -204,6 +199,23 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             telephonyDataSource.markThreadAsRead(threadId)
         }
+    }
+
+    private suspend fun getHiddenFullySpamThreadIds(archivedThreadIds: Set<Long>): Set<Long> {
+        if (!settingsRepository.isHideFullySpamConversationsEnabled()) {
+            return emptySet()
+        }
+
+        val allThreadIds = telephonyDataSource.queryConversationThreadIds()
+            .distinct()
+            .filter { threadId -> threadId !in archivedThreadIds }
+        if (allThreadIds.isEmpty()) {
+            return emptySet()
+        }
+
+        return allThreadIds.chunked(FULLY_SPAM_FILTER_CHUNK_SIZE)
+            .flatMap { chunk -> findFullySpamThreadIds(chunk) }
+            .toSet()
     }
 
     private suspend fun queryFilteredConversationThreadIds(

@@ -68,9 +68,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -79,7 +76,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -428,21 +424,6 @@ fun ConversationListScreen(
                                 return@Box
                             }
 
-                            val shouldLoadMore = remember {
-                                derivedStateOf {
-                                    val lastVisibleItem =
-                                        listState.layoutInfo.visibleItemsInfo.lastOrNull()
-                                            ?: return@derivedStateOf false
-                                    lastVisibleItem.index >= listState.layoutInfo.totalItemsCount - 5
-                                }
-                            }
-
-                            LaunchedEffect(shouldLoadMore.value) {
-                                if (shouldLoadMore.value) {
-                                    viewModel.loadMore()
-                                }
-                            }
-
                             PullToRefreshBox(
                                 isRefreshing = isRefreshing,
                                 onRefresh = {
@@ -463,45 +444,28 @@ fun ConversationListScreen(
                                     items(
                                         state.conversations,
                                         key = { it.threadId }) { conversation ->
-                                        val dismissState = rememberSwipeToDismissBoxState()
                                         val selected = conversation.threadId in selectedThreadIds
-                                        LaunchedEffect(dismissState.targetValue) {
-                                            if (dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd) {
-                                                viewModel.markAsRead(conversation.threadId)
-                                                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-                                            }
-                                        }
-
-                                        SwipeToDismissBox(
-                                            state = dismissState,
-                                            modifier = Modifier.animateItem(),
-                                            backgroundContent = {
-                                                SwipeBackground(dismissState)
-                                            },
-                                            enableDismissFromStartToEnd = conversation.unreadCount > 0 && !selectionMode,
-                                            enableDismissFromEndToStart = false
-                                        ) {
-                                            ConversationItem(
-                                                conversation = conversation,
-                                                selected = selected,
-                                                onClick = {
-                                                    if (selectionMode) {
-                                                        selectedThreadIds =
-                                                            if (selected) selectedThreadIds - conversation.threadId
-                                                            else selectedThreadIds + conversation.threadId
-                                                    } else {
-                                                        onNavigateToDetail(
-                                                            conversation.threadId,
-                                                            conversation.address
-                                                        )
-                                                    }
-                                                },
-                                                onLongClick = {
+                                        ConversationItem(
+                                            modifier = Modifier,
+                                            conversation = conversation,
+                                            selected = selected,
+                                            onClick = {
+                                                if (selectionMode) {
                                                     selectedThreadIds =
-                                                        selectedThreadIds + conversation.threadId
+                                                        if (selected) selectedThreadIds - conversation.threadId
+                                                        else selectedThreadIds + conversation.threadId
+                                                } else {
+                                                    onNavigateToDetail(
+                                                        conversation.threadId,
+                                                        conversation.address
+                                                    )
                                                 }
-                                            )
-                                        }
+                                            },
+                                            onLongClick = {
+                                                selectedThreadIds =
+                                                    selectedThreadIds + conversation.threadId
+                                            }
+                                        )
                                     }
                                     item {
                                         Spacer(
@@ -839,34 +803,6 @@ fun formatTimeShort(timestamp: Long): String {
         else -> {
             dateTime.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日"))
         }
-    }
-}
-
-@Composable
-fun SwipeBackground(dismissState: SwipeToDismissBoxState) {
-    val color = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
-        else -> Color.Transparent
-    }
-    val alignment = Alignment.CenterStart
-    val icon = Icons.Rounded.DoneAll
-    val scale by animateFloatAsState(
-        if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.75f else 1.2f
-    )
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(color)
-            .padding(horizontal = 24.dp),
-        contentAlignment = alignment
-    ) {
-        Icon(
-            icon,
-            contentDescription = "Mark as read",
-            modifier = Modifier.scale(scale),
-            tint = MaterialTheme.colorScheme.onPrimaryContainer
-        )
     }
 }
 

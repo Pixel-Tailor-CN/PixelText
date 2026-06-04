@@ -150,24 +150,12 @@ class ConversationCacheRepository(
         return threadIds.mapNotNull { map[it] }
     }
 
-    suspend fun getConversations(
-        limit: Int,
-        offset: Int,
-        archivedThreadIds: Set<Long>
+    suspend fun getAllConversations(
+        archivedThreadIds: Set<Long>,
+        hiddenThreadIds: Set<Long> = emptySet()
     ): List<ConversationModel> = withContext(Dispatchers.IO) {
-        // 过滤掉已归档，Room 里无法动态排除，通过多取再过滤实现
-        val result = mutableListOf<ConversationModel>()
-        var currentOffset = offset
-        while (result.size < limit) {
-            val batch = dao.getConversations(limit * 2, currentOffset)
-            if (batch.isEmpty()) break
-            val filtered = batch
-                .filter { it.threadId !in archivedThreadIds }
-                .map { it.toConversationModel() }
-            result.addAll(filtered)
-            currentOffset += batch.size
-            if (batch.size < limit * 2) break
-        }
-        result.take(limit)
+        dao.getAllConversations()
+            .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
+            .map { it.toConversationModel() }
     }
 }
