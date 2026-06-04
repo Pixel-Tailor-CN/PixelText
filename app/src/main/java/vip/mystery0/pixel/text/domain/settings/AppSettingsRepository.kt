@@ -11,6 +11,8 @@ data class AppSettings(
     val smartCardEnabled: Boolean = AppSettingsKeys.DEFAULT_SMART_CARD_ENABLED,
     val verificationCodeNotificationActionEnabled: Boolean =
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
+    val conversationDetailTextScale: Float =
+        AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
 )
 
 interface AppSettingsRepository {
@@ -21,12 +23,14 @@ interface AppSettingsRepository {
     fun setHideFullySpamConversationsEnabled(enabled: Boolean)
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
+    fun setConversationDetailTextScale(scale: Float)
 
     fun isSpamDetectionEnabled(): Boolean
     fun isMuteSpamNotificationsEnabled(): Boolean
     fun isHideFullySpamConversationsEnabled(): Boolean
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
+    fun getConversationDetailTextScale(): Float
 }
 
 object AppSettingsKeys {
@@ -38,10 +42,12 @@ object AppSettingsKeys {
     const val KEY_SMART_CARD_ENABLED = "smart_card_enabled"
     const val KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED =
         "verification_code_notification_action_enabled"
+    const val KEY_CONVERSATION_DETAIL_TEXT_SCALE = "conversation_detail_text_scale"
 
     const val DEFAULT_SPAM_DETECTION_ENABLED = true
     const val DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED = false
     const val DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED = true
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
+    const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
 }

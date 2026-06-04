@@ -43,10 +43,12 @@ import java.util.Locale
 fun MessageItem(
     message: MessageModel,
     isSelected: Boolean,
+    textScale: Float,
     manualSpamCheckState: ManualSpamCheckState? = null,
     onCheckSpam: () -> Unit = {},
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    interactionEnabled: Boolean = true,
 ) {
     var showOriginal by remember { mutableStateOf(false) }
     val isSpam = message.spamScore >= 0.7f
@@ -59,6 +61,7 @@ fun MessageItem(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
+                enabled = interactionEnabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
                 indication = null,
@@ -84,7 +87,8 @@ fun MessageItem(
                         OriginalTextCard(
                             content = message.content,
                             isSelected = isSelected,
-                            subject = message.mmsSubject
+                            subject = message.mmsSubject,
+                            textScale = textScale
                         )
                     } else if (isSpam) {
                         SpamMessageCard(isSelected = isSelected)
@@ -92,7 +96,8 @@ fun MessageItem(
                         OriginalTextCard(
                             content = message.content,
                             isSelected = isSelected,
-                            subject = message.mmsSubject
+                            subject = message.mmsSubject,
+                            textScale = textScale
                         )
                     } else {
                         MessageCardFactory.CreateCard(
@@ -105,6 +110,7 @@ fun MessageItem(
                     OriginalTextCard(
                         content = "【不支持的消息】",
                         isSelected = isSelected,
+                        textScale = textScale,
                     )
                 }
             }
