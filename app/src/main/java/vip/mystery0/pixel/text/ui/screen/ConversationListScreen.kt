@@ -12,7 +12,6 @@ import android.provider.Telephony
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,7 +45,6 @@ import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
@@ -80,7 +78,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -92,7 +89,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -265,6 +261,7 @@ fun ConversationListScreen(
 
     val uiState by viewModel.uiState.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
@@ -408,8 +405,6 @@ fun ConversationListScreen(
                         }
 
                         is ConversationListUiState.Success -> {
-                            var isRefreshing by remember { mutableStateOf(false) }
-
                             if (state.conversations.isEmpty()) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
@@ -427,15 +422,10 @@ fun ConversationListScreen(
                             PullToRefreshBox(
                                 isRefreshing = isRefreshing,
                                 onRefresh = {
-                                    isRefreshing = true
-                                    viewModel.loadConversations(force = true)
+                                    viewModel.refreshConversations()
                                 },
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                LaunchedEffect(state) {
-                                    isRefreshing = false
-                                }
-
                                 LazyColumn(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),

@@ -18,6 +18,9 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private var isLoading = false
@@ -41,6 +44,15 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
             loadConversations(force = true)
         } else {
             refreshSilent()
+        }
+    }
+
+    fun refreshConversations() {
+        if (isLoading || isRefreshingLoaded) return
+        if (allConversations.isEmpty()) {
+            loadConversations(force = true)
+        } else {
+            refreshLoaded(showRefreshIndicator = true)
         }
     }
 
@@ -68,11 +80,14 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     fun refreshSilent() {
         if (isLoading || isRefreshingLoaded || allConversations.isEmpty()) return
-        syncAllConversations()
+        refreshLoaded(showRefreshIndicator = false)
     }
 
-    private fun syncAllConversations() {
+    private fun refreshLoaded(showRefreshIndicator: Boolean) {
         isRefreshingLoaded = true
+        if (showRefreshIndicator) {
+            _isRefreshing.value = true
+        }
         viewModelScope.launch {
             try {
                 repository.getAllConversations()
@@ -81,6 +96,9 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
                         replaceConversations(newList)
                     }
             } finally {
+                if (showRefreshIndicator) {
+                    _isRefreshing.value = false
+                }
                 isRefreshingLoaded = false
             }
         }
