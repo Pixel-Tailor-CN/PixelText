@@ -27,11 +27,20 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 
+private val DefaultOriginalTextScale = 1f
+
 @Composable
-fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: String? = null) {
+fun OriginalTextCard(
+    content: String,
+    isSelected: Boolean = false,
+    subject: String? = null,
+    textScale: Float = DefaultOriginalTextScale,
+) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(durationMillis = 200),
@@ -51,6 +60,14 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: Stri
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
     var pendingUrl by remember { mutableStateOf("") }
+    val bodyFontSize = MaterialTheme.typography.bodyLarge.fontSize
+    val subjectFontSize = MaterialTheme.typography.titleMedium.fontSize
+    val scaledBodyFontSize = remember(bodyFontSize, textScale) {
+        bodyFontSize.scaledBy(textScale)
+    }
+    val scaledSubjectFontSize = remember(subjectFontSize, textScale) {
+        subjectFontSize.scaledBy(textScale)
+    }
 
     // URL 正则表达式（支持带 schema 和不带 schema 的链接，避免误匹配纯数字）
     val urlPattern = remember {
@@ -111,9 +128,10 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: Stri
             if (!subject.isNullOrBlank()) {
                 Text(
                     text = subject,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                    style = MaterialTheme.typography.titleMedium.copy(
                         color = textColor,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = scaledSubjectFontSize
                     )
                 )
                 if (content.isNotBlank()) {
@@ -123,7 +141,10 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: Stri
             if (content.isNotBlank()) {
                 Text(
                     text = annotatedString,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = textColor,
+                        fontSize = scaledBodyFontSize
+                    )
                 )
             }
         }
@@ -163,3 +184,6 @@ fun OriginalTextCard(content: String, isSelected: Boolean = false, subject: Stri
         )
     }
 }
+
+private fun TextUnit.scaledBy(scale: Float): TextUnit =
+    (value * scale).coerceAtLeast(1f).sp

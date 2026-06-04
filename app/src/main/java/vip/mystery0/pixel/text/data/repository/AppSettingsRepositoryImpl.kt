@@ -50,6 +50,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setConversationDetailTextScale(scale: Float) {
+        prefs.edit {
+            putFloat(AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE, scale)
+        }
+    }
+
     override fun isSpamDetectionEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
@@ -80,6 +86,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED
         )
 
+    override fun getConversationDetailTextScale(): Float =
+        prefs.getFloat(
+            AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
+            AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
+        )
+
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
@@ -87,7 +99,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
-                isVerificationCodeNotificationActionEnabled()
+                isVerificationCodeNotificationActionEnabled(),
+            conversationDetailTextScale = getConversationDetailTextScale()
         )
     }
 }

@@ -8,6 +8,10 @@ import android.net.Uri
 import android.os.SystemClock
 import android.telephony.SubscriptionManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +75,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -84,8 +90,10 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
@@ -103,7 +111,8 @@ fun ConversationDetailScreen(
     onNavigateBack: () -> Unit,
     isTablet: Boolean = false,
     initialMessageText: String = "",
-    viewModel: ConversationDetailViewModel = koinViewModel()
+    viewModel: ConversationDetailViewModel = koinViewModel(),
+    settingsRepository: AppSettingsRepository = koinInject(),
 ) {
     LaunchedEffect(threadId, address) {
         viewModel.loadThread(threadId, address)
@@ -117,6 +126,42 @@ fun ConversationDetailScreen(
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var messageText by remember(threadId, address, initialMessageText) {
         mutableStateOf(initialMessageText)
+    }
+    var textScale by remember {
+        mutableFloatStateOf(settingsRepository.getConversationDetailTextScale())
+    }
+    var isZoomGestureActive by remember { mutableStateOf(false) }
+    val zoomGestureModifier = Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var zoomActive = false
+            var gestureScale = textScale
+            do {
+                val event = awaitPointerEvent()
+                val multiTouch = event.changes.count { it.pressed } > 1
+                if (multiTouch) {
+                    isZoomGestureActive = true
+                    val zoom = event.calculateZoom()
+                    if (zoom != 1f) {
+                        val updatedScale = (gestureScale * zoom)
+                            .coerceIn(
+                                MIN_CONVERSATION_DETAIL_TEXT_SCALE,
+                                MAX_CONVERSATION_DETAIL_TEXT_SCALE
+                            )
+                        if (updatedScale != gestureScale) {
+                            gestureScale = updatedScale
+                            textScale = updatedScale
+                            settingsRepository.setConversationDetailTextScale(updatedScale)
+                        }
+                        zoomActive = true
+                    }
+                    if (zoomActive) {
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+            isZoomGestureActive = false
+        }
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -444,49 +489,59 @@ fun ConversationDetailScreen(
                         }
                 }
 
-                LazyColumn(
-                    state = listState,
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                    reverseLayout = true
+                        .then(zoomGestureModifier)
                 ) {
-                    items(
-                        items = state.messages,
-                        key = { it.stableKey }
-                    ) { message ->
-                        val isSelected = selectedMessageIds.contains(message.id)
-                        MessageItem(
-                            message = message,
-                            isSelected = isSelected,
-                            manualSpamCheckState = manualSpamChecks[message.id],
-                            onCheckSpam = { viewModel.checkSpamOnce(message) },
-                            onClick = {
-                                if (selectedMessageIds.isNotEmpty()) {
-                                    if (isSelected) {
-                                        selectedMessageIds.remove(message.id)
-                                    } else {
-                                        selectedMessageIds.add(message.id)
+                    LazyColumn(
+                        state = listState,
+                        userScrollEnabled = !isZoomGestureActive,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                        reverseLayout = true
+                    ) {
+                        items(
+                            items = state.messages,
+                            key = { it.stableKey }
+                        ) { message ->
+                            val isSelected = selectedMessageIds.contains(message.id)
+                            MessageItem(
+                                message = message,
+                                isSelected = isSelected,
+                                textScale = textScale,
+                                manualSpamCheckState = manualSpamChecks[message.id],
+                                onCheckSpam = { viewModel.checkSpamOnce(message) },
+                                onClick = {
+                                    if (selectedMessageIds.isNotEmpty()) {
+                                        if (isSelected) {
+                                            selectedMessageIds.remove(message.id)
+                                        } else {
+                                            selectedMessageIds.add(message.id)
+                                        }
                                     }
-                                }
-                            },
-                            onLongClick = {
-                                if (selectedMessageIds.isEmpty()) {
-                                    // 首次长按，进入多选模式
-                                    selectedMessageIds.add(message.id)
-                                } else {
-                                    // 已在多选模式，长按也切换选中状态
-                                    if (isSelected) {
-                                        selectedMessageIds.remove(message.id)
-                                    } else {
+                                },
+                                onLongClick = {
+                                    if (selectedMessageIds.isEmpty()) {
+                                        // 首次长按，进入多选模式
                                         selectedMessageIds.add(message.id)
+                                    } else {
+                                        // 已在多选模式，长按也切换选中状态
+                                        if (isSelected) {
+                                            selectedMessageIds.remove(message.id)
+                                        } else {
+                                            selectedMessageIds.add(message.id)
+                                        }
                                     }
-                                }
-                            }
-                        )
+                                },
+                                interactionEnabled = !isZoomGestureActive,
+                            )
+                        }
                     }
                 }
             }
@@ -622,6 +677,8 @@ private fun SimSelectorButton(
 
 private const val SPAM_THRESHOLD = 0.7f
 private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
+private const val MIN_CONVERSATION_DETAIL_TEXT_SCALE = 0.85f
+private const val MAX_CONVERSATION_DETAIL_TEXT_SCALE = 1.8f
 
 private class AboveAnchorPositionProvider(
     private val verticalGapPx: Int

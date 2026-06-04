@@ -149,7 +149,7 @@ fun MockMessageScreen() {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             items(mockMessages) { message ->
-                MessageItem(message, false, onClick = {}, onLongClick = {})
+                MessageItem(message, false, 1f, onClick = {}, onLongClick = {})
             }
             item {
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
