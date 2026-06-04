@@ -5,10 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +29,11 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
-fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode, isSelected: Boolean = false) {
+fun VerificationCodeCard(
+    content: String,
+    result: ParsedResult.VerificationCode,
+    isSelected: Boolean = false
+) {
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
@@ -71,7 +75,7 @@ fun VerificationCodeCard(content: String, result: ParsedResult.VerificationCode,
                     maxLines = 1
                 )
                 Text(
-                    text = "验证码",
+                    text = result.signature ?: "验证码",
                     style = MaterialTheme.typography.titleMedium,
                     color = onContainerColor.copy(alpha = 0.62f)
                 )
