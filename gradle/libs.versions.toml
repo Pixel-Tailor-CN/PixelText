@@ -1,19 +1,19 @@
 [versions]
 agp = "9.2.1"
-kotlin = "2.3.21"
+kotlin = "2.4.0"
 ksp = "2.3.7"
 
-app-version = "1.0.0"
+app-version = "1.0.1"
 android-compileSdk = "37"
 android-minSdk = "31"
 android-targetSdk = "37"
 
-coreKtx = "1.18.0"
+coreKtx = "1.19.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
 composeBom = "2026.05.01"
 androidx-navigation-compose = "2.9.8"
-material3 = "1.5.0-alpha20"
+material3 = "1.5.0-alpha21"
 material-icons = "1.7.8"
 koin = "4.2.1"
 datastore = "1.2.1"
