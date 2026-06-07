@@ -62,6 +62,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -74,7 +75,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -269,7 +270,7 @@ fun ConversationListScreen(
         LazyListState()
     }
 
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var showMenuSheet by remember { mutableStateOf(false) }
@@ -632,7 +633,7 @@ fun ConversationListScreen(
     if (showNewChatSheet) {
         ModalBottomSheet(
             onDismissRequest = { showNewChatSheet = false },
-            sheetState = rememberModalBottomSheetState()
+            sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
         ) {
             NewChatBottomSheet(
                 onDismiss = { showNewChatSheet = false },
