@@ -28,4 +28,5 @@ interface MessageRepository {
     suspend fun deleteThreads(threadIds: Set<Long>)
     suspend fun deleteMessages(messageIds: Set<Long>): Int
     suspend fun markThreadAsRead(threadId: Long)
+    suspend fun markThreadsAsRead(threadIds: Set<Long>)
 }

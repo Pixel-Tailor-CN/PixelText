@@ -620,31 +620,43 @@ class TelephonyDataSource(
     }
 
     fun markThreadAsRead(threadId: Long) {
+        markThreadsAsRead(setOf(threadId))
+    }
+
+    fun markThreadsAsRead(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+
         val values = ContentValues().apply {
             put(Telephony.Sms.READ, 1)
             put(Telephony.Sms.SEEN, 1)
         }
 
-        try {
-            contentResolver.update(
-                Telephony.Sms.CONTENT_URI,
-                values,
-                "${Telephony.Sms.THREAD_ID} = ? AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0)",
-                arrayOf(threadId.toString())
-            )
-        } catch (e: Exception) {
-            Log.e(TELEPHONY_TAG, "error updating sms read status", e)
-        }
+        threadIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (smsSelection, smsSelectionArgs) =
+                buildThreadSelection(Telephony.Sms.THREAD_ID, chunk)
+            try {
+                contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "$smsSelection AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0)",
+                    smsSelectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to update sms read status", e)
+            }
 
-        try {
-            contentResolver.update(
-                Telephony.Mms.CONTENT_URI,
-                values,
-                "${Telephony.Mms.THREAD_ID} = ? AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0)",
-                arrayOf(threadId.toString())
-            )
-        } catch (e: Exception) {
-            Log.e(TELEPHONY_TAG, "error updating mms read status", e)
+            val (mmsSelection, mmsSelectionArgs) =
+                buildThreadSelection(Telephony.Mms.THREAD_ID, chunk)
+            try {
+                contentResolver.update(
+                    Telephony.Mms.CONTENT_URI,
+                    values,
+                    "$mmsSelection AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0)",
+                    mmsSelectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to update mms read status", e)
+            }
         }
     }
 

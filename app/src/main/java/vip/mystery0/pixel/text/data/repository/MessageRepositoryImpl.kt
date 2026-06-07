@@ -196,8 +196,14 @@ class MessageRepositoryImpl(
     }.flowOn(Dispatchers.IO)
 
     override suspend fun markThreadAsRead(threadId: Long) {
+        markThreadsAsRead(setOf(threadId))
+    }
+
+    override suspend fun markThreadsAsRead(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
-            telephonyDataSource.markThreadAsRead(threadId)
+            telephonyDataSource.markThreadsAsRead(threadIds)
+            SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
         }
     }
 
