@@ -2,10 +2,12 @@ package vip.mystery0.pixel.text.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -20,6 +22,14 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _markAllReadProgress = MutableStateFlow<MarkAllReadProgress?>(null)
+    val markAllReadProgress: StateFlow<MarkAllReadProgress?> =
+        _markAllReadProgress.asStateFlow()
+
+    private val _markAllReadResultEvents =
+        Channel<MarkAllReadResultEvent>(Channel.BUFFERED)
+    val markAllReadResultEvents = _markAllReadResultEvents.receiveAsFlow()
 
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
@@ -110,6 +120,48 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         }
     }
 
+    fun markAllConversationsAsRead() {
+        if (_markAllReadProgress.value != null) return
+
+        val unreadThreadIds = allConversations
+            .filter { it.unreadCount > 0 }
+            .map { it.threadId }
+            .toSet()
+
+        if (unreadThreadIds.isEmpty()) {
+            _markAllReadResultEvents.trySend(MarkAllReadResultEvent.NoUnread)
+            return
+        }
+
+        _markAllReadProgress.value =
+            MarkAllReadProgress(completed = 0, total = unreadThreadIds.size)
+        viewModelScope.launch {
+            val completedThreadIds = mutableSetOf<Long>()
+            runCatching {
+                unreadThreadIds.forEach { threadId ->
+                    repository.markThreadAsRead(threadId)
+                    completedThreadIds += threadId
+                    _markAllReadProgress.value = MarkAllReadProgress(
+                        completed = completedThreadIds.size,
+                        total = unreadThreadIds.size
+                    )
+                }
+            }.onSuccess {
+                markLoadedConversationsAsRead(completedThreadIds)
+                _markAllReadResultEvents.trySend(
+                    MarkAllReadResultEvent.Success(completedThreadIds.size)
+                )
+                refreshSilent()
+            }.onFailure { e ->
+                markLoadedConversationsAsRead(completedThreadIds)
+                _markAllReadResultEvents.trySend(
+                    MarkAllReadResultEvent.Failure(e.message ?: "标记失败")
+                )
+            }
+            _markAllReadProgress.value = null
+        }
+    }
+
     fun archiveSelected(conversations: List<ConversationModel>) {
         if (conversations.isEmpty()) return
         viewModelScope.launch {
@@ -148,10 +200,32 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         allConversations.addAll(visibleList)
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
     }
+
+    private fun markLoadedConversationsAsRead(threadIds: Set<Long>) {
+        allConversations.replaceAll { conversation ->
+            if (conversation.threadId in threadIds) conversation.copy(unreadCount = 0)
+            else conversation
+        }
+        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
 }
 
 sealed class ConversationListUiState {
     data object Loading : ConversationListUiState()
     data class Success(val conversations: List<ConversationModel>) : ConversationListUiState()
     data class Error(val message: String) : ConversationListUiState()
+}
+
+sealed interface MarkAllReadResultEvent {
+    data class Success(val conversationCount: Int) : MarkAllReadResultEvent
+    data object NoUnread : MarkAllReadResultEvent
+    data class Failure(val reason: String) : MarkAllReadResultEvent
+}
+
+data class MarkAllReadProgress(
+    val completed: Int,
+    val total: Int
+) {
+    val percent: Int
+        get() = if (total <= 0) 0 else (completed * 100 / total).coerceIn(0, 100)
 }

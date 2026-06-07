@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
@@ -111,6 +112,7 @@ import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
+import vip.mystery0.pixel.text.viewmodel.MarkAllReadResultEvent
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -262,6 +264,7 @@ fun ConversationListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val markAllReadProgress by viewModel.markAllReadProgress.collectAsState()
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
@@ -272,6 +275,19 @@ fun ConversationListScreen(
     var showMenuSheet by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    LaunchedEffect(viewModel, snackbarHostState) {
+        viewModel.markAllReadResultEvents.collect { event ->
+            val message = when (event) {
+                is MarkAllReadResultEvent.Success ->
+                    "已标记 ${event.conversationCount} 个会话为已读"
+
+                MarkAllReadResultEvent.NoUnread -> "没有未读会话"
+                is MarkAllReadResultEvent.Failure -> event.reason
+            }
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -524,6 +540,30 @@ fun ConversationListScreen(
         )
     }
 
+    markAllReadProgress?.let { progress ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("正在标记已读") },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    LoadingIndicator(modifier = Modifier.size(32.dp))
+                    Column {
+                        Text("正在标记所有会话为已读，请稍候…")
+                        Text(
+                            "${progress.completed}/${progress.total} ${progress.percent}%",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     if (showReadSmsPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showReadSmsPermissionDialog = false },
@@ -570,6 +610,10 @@ fun ConversationListScreen(
                 onSpamClicked = {
                     showMenuSheet = false
                     onNavigateToSpam()
+                },
+                onMarkAllReadClicked = {
+                    showMenuSheet = false
+                    viewModel.markAllConversationsAsRead()
                 },
                 onSettingsClicked = {
                     showMenuSheet = false
@@ -713,6 +757,7 @@ fun MenuSheetContent(
     onMockClicked: () -> Unit,
     onArchiveClicked: () -> Unit,
     onSpamClicked: () -> Unit,
+    onMarkAllReadClicked: () -> Unit,
     onSettingsClicked: () -> Unit,
     onSetDefaultSmsAppClicked: () -> Unit
 ) {
@@ -737,6 +782,11 @@ fun MenuSheetContent(
             headlineContent = { Text("归档短信") },
             leadingContent = { Icon(Icons.Rounded.Archive, contentDescription = null) },
             modifier = Modifier.clickable { onArchiveClicked() }
+        )
+        ListItem(
+            headlineContent = { Text("标记所有会话为已读") },
+            leadingContent = { Icon(Icons.Rounded.DoneAll, contentDescription = null) },
+            modifier = Modifier.clickable { onMarkAllReadClicked() }
         )
         ListItem(
             headlineContent = { Text("骚扰与拦截") },
