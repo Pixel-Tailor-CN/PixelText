@@ -8,7 +8,10 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -37,6 +41,7 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
@@ -47,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,9 +64,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceTheme
 import me.zhanghai.compose.preference.SwitchPreference
@@ -76,6 +85,7 @@ import vip.mystery0.pixel.text.viewmodel.ResourceUpdateDetail
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun SettingsScreen(
@@ -549,6 +559,7 @@ private fun ResourceUpdateDetailContent(detail: ResourceUpdateDetail) {
             label = "规则文件大小",
             value = formatSizeBytes(detail.ruleSizeBytes)
         )
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text = "版本说明",
@@ -572,16 +583,55 @@ private fun ResourceUpdateDetailLine(label: String, value: String) {
     ) {
         Text(
             text = label,
-            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = value,
+        Box(
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium
-                .copy(textAlign = TextAlign.End)
-        )
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            val scrollState = rememberScrollState()
+            LaunchedEffect(value, scrollState.maxValue) {
+                scrollState.scrollTo(0)
+                if (scrollState.maxValue <= 0) return@LaunchedEffect
+
+                delay(MARQUEE_EDGE_PAUSE_MS)
+                while (isActive) {
+                    val maxScroll = scrollState.maxValue
+                    val durationMillis =
+                        (maxScroll * MARQUEE_MILLIS_PER_PIXEL)
+                            .coerceIn(MARQUEE_MIN_DURATION_MS, MARQUEE_MAX_DURATION_MS)
+                    scrollState.animateScrollTo(
+                        value = maxScroll,
+                        animationSpec = tween(
+                            durationMillis = durationMillis,
+                            easing = LinearEasing
+                        )
+                    )
+                    delay(MARQUEE_EDGE_PAUSE_MS)
+                    scrollState.animateScrollTo(
+                        value = 0,
+                        animationSpec = tween(
+                            durationMillis = durationMillis,
+                            easing = LinearEasing
+                        )
+                    )
+                    delay(MARQUEE_EDGE_PAUSE_MS)
+                }
+            }
+            Text(
+                text = value,
+                modifier = Modifier.horizontalScroll(
+                    state = scrollState,
+                    enabled = false
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
+                style = MaterialTheme.typography.bodyMedium
+                    .copy(textAlign = TextAlign.End)
+            )
+        }
     }
 }
 
@@ -702,3 +752,7 @@ private fun formatSizeBytes(sizeBytes: Long?): String {
 
 private const val WRITE_SMS_PERMISSION = "android.permission.WRITE_SMS"
 private const val DEBUG_MODE_ENABLE_TAP_COUNT = 6
+private val MARQUEE_EDGE_PAUSE_MS = 900L.milliseconds
+private const val MARQUEE_MILLIS_PER_PIXEL = 18
+private const val MARQUEE_MIN_DURATION_MS = 1200
+private const val MARQUEE_MAX_DURATION_MS = 6000
