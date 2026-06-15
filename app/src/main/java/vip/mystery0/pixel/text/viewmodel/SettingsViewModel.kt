@@ -43,6 +43,10 @@ class SettingsViewModel(
         settingsRepository.setVerificationCodeNotificationActionEnabled(enabled)
     }
 
+    fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean) {
+        settingsRepository.setHideVerificationCodeOnLockScreenEnabled(enabled)
+    }
+
     fun checkResourceUpdates() {
         if (_resourceUpdateState.value is ResourceUpdateState.Checking) return
         _resourceUpdateState.value = ResourceUpdateState.Checking
