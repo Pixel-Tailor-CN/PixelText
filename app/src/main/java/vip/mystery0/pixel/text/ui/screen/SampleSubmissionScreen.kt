@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,13 +45,22 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 
+internal const val SAMPLE_SUBMISSION_DRAFT_CONTENT = "sample_submission_draft_content"
+internal const val SAMPLE_SUBMISSION_DRAFT_SENDER = "sample_submission_draft_sender"
+
 @Composable
 fun SampleSubmissionScreen(
     viewModel: SampleSubmissionViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
+    initialContent: String = "",
+    initialSender: String = "",
 ) {
     var categoryMenuExpanded by remember { mutableStateOf(false) }
     val canSubmit = viewModel.agreed && viewModel.content.isNotBlank() && !viewModel.submitting
+
+    LaunchedEffect(initialContent, initialSender) {
+        viewModel.applyDraft(initialContent, initialSender)
+    }
 
     Scaffold(
         topBar = {
@@ -65,7 +75,7 @@ fun SampleSubmissionScreen(
                 },
                 title = {
                     Text(
-                        "贡献脱敏样本",
+                        "上报脱敏样本",
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -141,7 +151,7 @@ fun SampleSubmissionScreen(
                     value = viewModel.content,
                     onValueChange = viewModel::updateContent,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("脱敏短信样本") },
+                    label = { Text("短信样本（提交前请先脱敏）") },
                     minLines = 8
                 )
             }
@@ -155,7 +165,7 @@ fun SampleSubmissionScreen(
                         onCheckedChange = viewModel::updateAgreed
                     )
                     Text(
-                        text = "我确认已经自行删除或替换姓名、手机号、地址、订单号、银行卡号等敏感信息，并同意提交此脱敏样本及 Android 设备标识用于规则、模型改进和反滥用风控。",
+                        text = "我确认已删除或替换姓名、手机号、地址、订单号、银行卡号等敏感信息，并同意提交该样本及 Android 设备标识用于规则改进、模型优化和反滥用风控。",
                         modifier = Modifier
                             .weight(1f)
                             .padding(top = 12.dp),
@@ -172,7 +182,7 @@ fun SampleSubmissionScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
                     Text(
-                        if (viewModel.submitting) "提交中..." else "提交",
+                        if (viewModel.submitting) "上报中..." else "上报样本",
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
@@ -188,7 +198,7 @@ fun SampleSubmissionScreen(
     viewModel.resultMessage?.let { message ->
         AlertDialog(
             onDismissRequest = viewModel::clearResult,
-            title = { Text("提交结果") },
+            title = { Text("上报结果") },
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = viewModel::clearResult) {

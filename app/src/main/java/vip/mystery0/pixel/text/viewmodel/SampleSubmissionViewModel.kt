@@ -24,6 +24,7 @@ class SampleSubmissionViewModel(
         private set
     var resultMessage by mutableStateOf<String?>(null)
         private set
+    private var draftApplied = false
 
     fun updateContent(value: String) {
         content = value
@@ -41,6 +42,21 @@ class SampleSubmissionViewModel(
         agreed = value
     }
 
+    fun applyDraft(
+        content: String,
+        sender: String,
+        category: String = DRAFT_CATEGORY
+    ) {
+        if (draftApplied) return
+        if (content.isBlank() && sender.isBlank()) return
+        draftApplied = true
+        this.content = content
+        this.sender = sender
+        this.category = category
+        agreed = false
+        resultMessage = null
+    }
+
     fun clearResult() {
         resultMessage = null
     }
@@ -55,7 +71,7 @@ class SampleSubmissionViewModel(
                 HubOperationResult.Failure(error.message ?: "提交失败")
             }
             resultMessage = when (result) {
-                HubOperationResult.Success -> "样本已提交"
+                HubOperationResult.Success -> "样本已上报"
                 is HubOperationResult.Failure -> result.message
             }
             submitting = false
@@ -64,5 +80,6 @@ class SampleSubmissionViewModel(
 
     private companion object {
         private const val DEFAULT_CATEGORY = "verification_code"
+        private const val DRAFT_CATEGORY = "normal"
     }
 }
