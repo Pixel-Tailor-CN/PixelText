@@ -60,7 +60,8 @@ class SettingsViewModel(
                         remoteModelVersion == currentModelVersion
                     ) {
                         pendingManifest = null
-                        _resourceUpdateState.value = ResourceUpdateState.Success("无更新版本")
+                        _resourceUpdateState.value =
+                            ResourceUpdateState.NoUpdate("当前规则和模型已经是最新版本")
                     } else {
                         pendingManifest = manifest
                         _resourceUpdateState.value =
@@ -95,7 +96,10 @@ class SettingsViewModel(
     }
 
     fun dismissResourceUpdateDialog() {
-        if (_resourceUpdateState.value is ResourceUpdateState.Available) {
+        if (
+            _resourceUpdateState.value is ResourceUpdateState.Available ||
+            _resourceUpdateState.value is ResourceUpdateState.NoUpdate
+        ) {
             pendingManifest = null
             _resourceUpdateState.value = ResourceUpdateState.Idle
         }
@@ -106,6 +110,7 @@ sealed interface ResourceUpdateState {
     data object Idle : ResourceUpdateState
     data object Checking : ResourceUpdateState
     data class Available(val summary: String) : ResourceUpdateState
+    data class NoUpdate(val message: String) : ResourceUpdateState
     data object Updating : ResourceUpdateState
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState
