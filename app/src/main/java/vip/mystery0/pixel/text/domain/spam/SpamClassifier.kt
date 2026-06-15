@@ -3,11 +3,15 @@ package vip.mystery0.pixel.text.domain.spam
 import android.content.Context
 import android.util.Log
 import org.tensorflow.lite.Interpreter
+import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import java.io.FileInputStream
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
-class SpamClassifier(context: Context) : AutoCloseable {
+class SpamClassifier(
+    context: Context,
+    private val resourceStore: HubResourceStore,
+) : AutoCloseable {
     companion object {
         private const val TAG = "SpamClassifier"
         private const val MODEL_FILE = "spam_classifier.tflite"
@@ -28,6 +32,12 @@ class SpamClassifier(context: Context) : AutoCloseable {
     }
 
     private fun loadModel(context: Context): MappedByteBuffer {
+        val activeModel = resourceStore.activeModelFile()
+        if (activeModel.isFile) {
+            return FileInputStream(activeModel).channel.use { channel ->
+                channel.map(FileChannel.MapMode.READ_ONLY, 0, activeModel.length())
+            }
+        }
         val fd = context.assets.openFd(MODEL_FILE)
         return FileInputStream(fd.fileDescriptor).channel.map(
             FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength
@@ -35,6 +45,12 @@ class SpamClassifier(context: Context) : AutoCloseable {
     }
 
     private fun loadVocabulary(context: Context): Map<String, Int> {
+        val activeVocab = resourceStore.activeVocabFile()
+        if (activeVocab.isFile) {
+            return activeVocab.bufferedReader(Charsets.UTF_8).useLines { lines ->
+                lines.mapIndexed { index, token -> token to index + 1 }.toMap()
+            }
+        }
         return context.assets.open(VOCAB_FILE).bufferedReader(Charsets.UTF_8).useLines { lines ->
             lines.mapIndexed { index, token -> token to index + 1 }.toMap()
         }

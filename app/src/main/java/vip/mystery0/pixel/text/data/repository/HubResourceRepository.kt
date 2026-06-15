@@ -1,0 +1,77 @@
+package vip.mystery0.pixel.text.data.repository
+
+import org.json.JSONObject
+import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.data.resource.HubResourceStore
+import vip.mystery0.pixel.text.data.source.PixelTextHubClient
+import vip.mystery0.pixel.text.domain.hub.HubOperationResult
+import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
+import vip.mystery0.pixel.text.domain.parser.MessageParser
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+
+class HubResourceRepository(
+    private val client: PixelTextHubClient,
+    private val store: HubResourceStore,
+    private val settings: AppSettingsRepository,
+    private val messageParser: MessageParser,
+) {
+    suspend fun checkManifest(): HubResourceManifest = client.fetchManifest()
+
+    suspend fun updateAll(manifest: HubResourceManifest): HubOperationResult {
+        return runCatching {
+            manifest.rules?.let { rules ->
+                if (rules.minAppVersionCode <= BuildConfig.VERSION_CODE) {
+                    val temp = store.tempFile("rules-${safeVersion(rules.version)}.json")
+                    client.downloadTo(rules.downloadUrl, temp)
+                    store.verifySize(temp, rules.sizeBytes)
+                    store.verifySha256(temp, rules.sha256)
+                    verifyRulesJson(temp.readText(Charsets.UTF_8))
+                    store.activateRules(temp)
+                    settings.setRuleResourceVersion(rules.version)
+                    messageParser.reloadRules()
+                }
+            }
+
+            manifest.spamModel?.let { spamModel ->
+                if (spamModel.minAppVersionCode <= BuildConfig.VERSION_CODE) {
+                    val safeVersion = safeVersion(spamModel.version)
+                    val modelTemp = store.tempFile("spam-model-$safeVersion.tflite")
+                    val vocabTemp = store.tempFile("vocab-$safeVersion.txt")
+                    client.downloadTo(spamModel.model.downloadUrl, modelTemp)
+                    client.downloadTo(spamModel.vocab.downloadUrl, vocabTemp)
+                    store.verifySize(modelTemp, spamModel.model.sizeBytes)
+                    store.verifySize(vocabTemp, spamModel.vocab.sizeBytes)
+                    store.verifySha256(modelTemp, spamModel.model.sha256)
+                    store.verifySha256(vocabTemp, spamModel.vocab.sha256)
+                    store.activateModelAndVocab(modelTemp, vocabTemp)
+                    settings.setSpamModelResourceVersion(spamModel.version)
+                    settings.setVocabResourceVersion(spamModel.version)
+                }
+            }
+
+            settings.setResourceUpdatedAt(System.currentTimeMillis())
+            HubOperationResult.Success
+        }.getOrElse { error ->
+            HubOperationResult.Failure(error.message ?: "update failed")
+        }
+    }
+
+    private fun safeVersion(version: String): String {
+        return version.replace(unsafeFileNameChars, "_")
+    }
+
+    private fun verifyRulesJson(json: String) {
+        val rules = JSONObject(json).optJSONArray("rules")
+            ?: throw IllegalStateException("rules array missing")
+        for (index in 0 until rules.length()) {
+            val rule = rules.getJSONObject(index)
+            rule.getString("id")
+            rule.getString("target_card")
+            rule.getJSONObject("conditions").getString("content_regex")
+        }
+    }
+
+    private companion object {
+        private val unsafeFileNameChars = Regex("[^A-Za-z0-9._-]")
+    }
+}

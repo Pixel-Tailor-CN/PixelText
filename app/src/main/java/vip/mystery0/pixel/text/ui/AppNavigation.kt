@@ -18,6 +18,7 @@ import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
 
@@ -96,7 +97,17 @@ fun AppNavigation(
                 )
             }
             composable("settings") {
-                SettingsScreen { navController.popBackStack() }
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSampleSubmission = {
+                        navController.navigate("sample_submission")
+                    }
+                )
+            }
+            composable("sample_submission") {
+                SampleSubmissionScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(
                 route = "search",

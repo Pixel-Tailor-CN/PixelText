@@ -66,15 +66,18 @@ import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
+import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
+    onNavigateToSampleSubmission: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
+    val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
     var permissionRefreshKey by remember { mutableIntStateOf(0) }
     var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
@@ -99,6 +102,17 @@ fun SettingsScreen(
         buildPermissionItems(context)
     }
     var versionCodeTapCount by remember { mutableIntStateOf(0) }
+    val resourceUpdateSummary = when (val state = resourceUpdateState) {
+        ResourceUpdateState.Idle -> "手动检查规则和模型资源更新"
+        ResourceUpdateState.Checking -> "正在检查更新..."
+        is ResourceUpdateState.Available -> "发现可安装资源：${state.summary}"
+        ResourceUpdateState.Updating -> "正在更新资源..."
+        is ResourceUpdateState.Success -> state.message
+        is ResourceUpdateState.Error -> state.message
+    }
+    val resourceUpdateEnabled =
+        resourceUpdateState !is ResourceUpdateState.Checking &&
+            resourceUpdateState !is ResourceUpdateState.Updating
 
     fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
         if (permissions.isEmpty()) return
@@ -156,8 +170,7 @@ fun SettingsScreen(
                         item(key = "offline_model_version", contentType = "Preference") {
                             Preference(
                                 title = { Text("离线模型版本") },
-                                summary = { Text("内置") },
-                                enabled = false,
+                                summary = { Text(settings.spamModelResourceVersion) },
                                 icon = {
                                     Icon(Icons.Rounded.CloudOff, contentDescription = null)
                                 }
@@ -166,11 +179,31 @@ fun SettingsScreen(
                         item(key = "smart_card_rule_version", contentType = "Preference") {
                             Preference(
                                 title = { Text("智能卡片规则版本") },
-                                summary = { Text("内置") },
-                                enabled = false,
+                                summary = { Text(settings.ruleResourceVersion) },
                                 icon = {
                                     Icon(Icons.Rounded.Style, contentDescription = null)
                                 }
+                            )
+                        }
+                        item(key = "resource_update", contentType = "Preference") {
+                            Preference(
+                                title = { Text("检查资源更新") },
+                                summary = { Text(resourceUpdateSummary) },
+                                enabled = resourceUpdateEnabled,
+                                icon = {
+                                    Icon(Icons.Rounded.Settings, contentDescription = null)
+                                },
+                                onClick = viewModel::checkResourceUpdates
+                            )
+                        }
+                        item(key = "sample_submission", contentType = "Preference") {
+                            Preference(
+                                title = { Text("贡献脱敏短信样本") },
+                                summary = { Text("手动提交脱敏样本，帮助改进本地规则和模型") },
+                                icon = {
+                                    Icon(Icons.Rounded.Forum, contentDescription = null)
+                                },
+                                onClick = onNavigateToSampleSubmission
                             )
                         }
                         item(key = "spam_detection", contentType = "SwitchPreference") {
@@ -374,6 +407,24 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingPermissionDialogItem = null }) {
+                    Text("稍后")
+                }
+            }
+        )
+    }
+
+    (resourceUpdateState as? ResourceUpdateState.Available)?.let { state ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResourceUpdateDialog,
+            title = { Text("发现资源更新") },
+            text = { Text(state.summary) },
+            confirmButton = {
+                TextButton(onClick = viewModel::installResourceUpdates) {
+                    Text("更新")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissResourceUpdateDialog) {
                     Text("稍后")
                 }
             }
