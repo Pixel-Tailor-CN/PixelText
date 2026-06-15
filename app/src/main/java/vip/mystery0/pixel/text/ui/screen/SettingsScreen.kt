@@ -164,8 +164,8 @@ fun SettingsScreen(
                         )
                     ) {
                         preferenceCategory(
-                            key = "category_app_features",
-                            title = { Text("应用功能") }
+                            key = "category_model_rule",
+                            title = { Text("模型与规则") }
                         )
                         item(key = "offline_model_version", contentType = "Preference") {
                             Preference(
@@ -206,6 +206,10 @@ fun SettingsScreen(
                                 onClick = onNavigateToSampleSubmission
                             )
                         }
+                        preferenceCategory(
+                            key = "category_app_features",
+                            title = { Text("应用功能") }
+                        )
                         item(key = "spam_detection", contentType = "SwitchPreference") {
                             SwitchPreference(
                                 value = settings.spamDetectionEnabled,
