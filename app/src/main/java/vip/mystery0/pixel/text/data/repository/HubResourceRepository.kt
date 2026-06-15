@@ -3,12 +3,15 @@ package vip.mystery0.pixel.text.data.repository
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.parser.MessageParser
+import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 
 class HubResourceRepository(
@@ -55,6 +58,30 @@ class HubResourceRepository(
             HubOperationResult.Success
         }.getOrElse { error ->
             HubOperationResult.Failure(error.message ?: "update failed")
+        }
+    }
+
+    suspend fun deleteDownloadedRules(): HubOperationResult = withContext(Dispatchers.IO) {
+        runCatching {
+            store.deleteActiveRules()
+            settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+            settings.setResourceUpdatedAt(System.currentTimeMillis())
+            messageParser.reloadRules()
+            HubOperationResult.Success
+        }.getOrElse { error ->
+            HubOperationResult.Failure(error.message ?: "delete rules failed")
+        }
+    }
+
+    suspend fun deleteDownloadedModel(): HubOperationResult = withContext(Dispatchers.IO) {
+        runCatching {
+            store.deleteActiveModelAndVocab()
+            settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+            settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+            settings.setResourceUpdatedAt(System.currentTimeMillis())
+            HubOperationResult.Success
+        }.getOrElse { error ->
+            HubOperationResult.Failure(error.message ?: "delete model failed")
         }
     }
 

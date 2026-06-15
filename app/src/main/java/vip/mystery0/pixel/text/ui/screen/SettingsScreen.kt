@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -70,8 +72,10 @@ import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
+import vip.mystery0.pixel.text.viewmodel.ResourceUpdateDetail
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -106,18 +110,20 @@ fun SettingsScreen(
         buildPermissionItems(context)
     }
     var versionCodeTapCount by remember { mutableIntStateOf(0) }
+    val showDebugResourceActions = isDebugModeEnabled()
     val resourceUpdateSummary = when (val state = resourceUpdateState) {
         ResourceUpdateState.Idle -> "手动检查规则和模型资源更新"
         ResourceUpdateState.Checking -> "手动检查规则和模型资源更新"
-        is ResourceUpdateState.Available -> "发现可安装资源：${state.summary}"
+        is ResourceUpdateState.Available ->
+            "发现可安装资源：模型 ${state.detail.modelVersion}，规则 ${state.detail.ruleVersion}"
         is ResourceUpdateState.NoUpdate -> "手动检查规则和模型资源更新"
         ResourceUpdateState.Updating -> "正在更新资源..."
+        is ResourceUpdateState.Working -> state.message
         is ResourceUpdateState.Success -> state.message
         is ResourceUpdateState.Error -> state.message
     }
     val resourceUpdateEnabled =
-        resourceUpdateState !is ResourceUpdateState.Checking &&
-            resourceUpdateState !is ResourceUpdateState.Updating
+        resourceUpdateState !is ResourceUpdateState.Busy
 
     fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
         if (permissions.isEmpty()) return
@@ -200,6 +206,36 @@ fun SettingsScreen(
                                 },
                                 onClick = viewModel::checkResourceUpdates
                             )
+                        }
+                        if (showDebugResourceActions) {
+                            item(
+                                key = "debug_delete_downloaded_model",
+                                contentType = "Preference"
+                            ) {
+                                Preference(
+                                    title = { Text("删除下载的模型文件") },
+                                    summary = { Text("删除已下载的离线模型和词表，回退到内置模型") },
+                                    enabled = resourceUpdateEnabled,
+                                    icon = {
+                                        Icon(Icons.Rounded.CloudOff, contentDescription = null)
+                                    },
+                                    onClick = viewModel::deleteDownloadedModelResource
+                                )
+                            }
+                            item(
+                                key = "debug_delete_downloaded_rules",
+                                contentType = "Preference"
+                            ) {
+                                Preference(
+                                    title = { Text("删除下载的智能卡片规则文件") },
+                                    summary = { Text("删除已下载的规则文件，回退到内置规则版本") },
+                                    enabled = resourceUpdateEnabled,
+                                    icon = {
+                                        Icon(Icons.Rounded.Style, contentDescription = null)
+                                    },
+                                    onClick = viewModel::deleteDownloadedRulesResource
+                                )
+                            }
                         }
                         item(key = "sample_submission", contentType = "Preference") {
                             Preference(
@@ -464,7 +500,9 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = viewModel::dismissResourceUpdateDialog,
             title = { Text("发现资源更新") },
-            text = { Text(state.summary) },
+            text = {
+                ResourceUpdateDetailContent(detail = state.detail)
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::installResourceUpdates) {
                     Text("更新")
@@ -488,6 +526,61 @@ fun SettingsScreen(
                     Text("知道了")
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun ResourceUpdateDetailContent(detail: ResourceUpdateDetail) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ResourceUpdateDetailLine(
+            label = "模型版本",
+            value = detail.modelVersion
+        )
+        ResourceUpdateDetailLine(
+            label = "模型文件大小",
+            value = formatSizeBytes(detail.modelSizeBytes)
+        )
+        ResourceUpdateDetailLine(
+            label = "规则版本",
+            value = detail.ruleVersion
+        )
+        ResourceUpdateDetailLine(
+            label = "规则文件大小",
+            value = formatSizeBytes(detail.ruleSizeBytes)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "版本说明",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = detail.releaseNotes,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResourceUpdateDetailLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium
+                .copy(textAlign = TextAlign.End)
         )
     }
 }
@@ -591,6 +684,20 @@ private fun Context.openUrl(url: String) {
     runCatching {
         startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
     }
+}
+
+private fun formatSizeBytes(sizeBytes: Long?): String {
+    if (sizeBytes == null || sizeBytes < 0) return "未提供"
+    if (sizeBytes < 1024) return "$sizeBytes B"
+
+    val units = listOf("KB", "MB", "GB")
+    var size = sizeBytes / 1024.0
+    var unitIndex = 0
+    while (size >= 1024 && unitIndex < units.lastIndex) {
+        size /= 1024.0
+        unitIndex += 1
+    }
+    return String.format(Locale.getDefault(), "%.1f %s", size, units[unitIndex])
 }
 
 private const val WRITE_SMS_PERMISSION = "android.permission.WRITE_SMS"
