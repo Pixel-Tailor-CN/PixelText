@@ -2,13 +2,13 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import vip.mystery0.pixel.text.domain.settings.AppSettings
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
-import androidx.core.content.edit
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
@@ -47,6 +47,15 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     override fun setVerificationCodeNotificationActionEnabled(enabled: Boolean) {
         prefs.edit {
             putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED, enabled)
+        }
+    }
+
+    override fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean) {
+        prefs.edit {
+            putBoolean(
+                AppSettingsKeys.KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+                enabled
+            )
         }
     }
 
@@ -102,6 +111,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED
         )
 
+    override fun isHideVerificationCodeOnLockScreenEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+            AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED
+        )
+
     override fun getConversationDetailTextScale(): Float =
         prefs.getFloat(
             AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -140,6 +155,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
                 isVerificationCodeNotificationActionEnabled(),
+            hideVerificationCodeOnLockScreenEnabled =
+                isHideVerificationCodeOnLockScreenEnabled(),
             conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),

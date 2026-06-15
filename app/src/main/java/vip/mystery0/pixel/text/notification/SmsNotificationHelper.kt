@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.notification
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -176,6 +177,25 @@ object SmsNotificationHelper {
 
         copyCodeAction?.let { notificationBuilder.addAction(it) }
 
+        verificationCode
+            ?.takeIf { shouldHideVerificationCodeOnLockScreen(context) }
+            ?.let { code ->
+                notificationBuilder
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setPublicVersion(
+                        buildLockScreenSafeNotification(
+                            context = context,
+                            sender = sender,
+                            body = body,
+                            threadId = threadId,
+                            verificationCode = code,
+                            contentPendingIntent = contentPendingIntent,
+                            markReadPendingIntent = markReadPendingIntent,
+                            replyAction = replyAction
+                        )
+                    )
+            }
+
         val notification = notificationBuilder
             // Action 2：回复
             .addAction(replyAction)
@@ -199,6 +219,56 @@ object SmsNotificationHelper {
             Log.e(TAG, "failed to parse verification code for notification", e)
             null
         }
+    }
+
+    private fun shouldHideVerificationCodeOnLockScreen(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+        val isActionEnabled = prefs.getBoolean(
+            AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
+            AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED
+        )
+        val isHideEnabled = prefs.getBoolean(
+            AppSettingsKeys.KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+            AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED
+        )
+        return isActionEnabled && isHideEnabled
+    }
+
+    private fun buildLockScreenSafeNotification(
+        context: Context,
+        sender: String,
+        body: String,
+        threadId: Long,
+        verificationCode: String,
+        contentPendingIntent: PendingIntent,
+        markReadPendingIntent: PendingIntent,
+        replyAction: NotificationCompat.Action,
+    ): Notification {
+        val maskedBody = maskVerificationCode(body, verificationCode)
+        return NotificationCompat.Builder(context, CHANNEL_ID_SMS)
+            .setSmallIcon(R.drawable.ic_notification_sms)
+            .setContentTitle(sender)
+            .setContentText(maskedBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(maskedBody))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(contentPendingIntent)
+            .setAutoCancel(true)
+            .setGroup("sms_group_$threadId")
+            .addAction(
+                0,
+                context.getString(R.string.notification_action_mark_read),
+                markReadPendingIntent
+            )
+            .addAction(replyAction)
+            .build()
+    }
+
+    private fun maskVerificationCode(body: String, verificationCode: String): String {
+        if (verificationCode.isBlank()) return body
+        val mask = "*".repeat(verificationCode.length)
+        return body.replace(verificationCode, mask)
     }
 
     private fun getMessageParser(context: Context): MessageParser {

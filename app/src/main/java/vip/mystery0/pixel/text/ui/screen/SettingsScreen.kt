@@ -292,6 +292,24 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        item(
+                            key = "hide_verification_code_on_lock_screen",
+                            contentType = "SwitchPreference"
+                        ) {
+                            SwitchPreference(
+                                value = settings.hideVerificationCodeOnLockScreenEnabled,
+                                onValueChange =
+                                    viewModel::setHideVerificationCodeOnLockScreenEnabled,
+                                title = { Text("锁屏时隐藏验证码") },
+                                summary = {
+                                    Text("锁屏通知中隐藏验证码内容，并暂不显示复制验证码操作")
+                                },
+                                enabled = settings.verificationCodeNotificationActionEnabled,
+                                icon = {
+                                    Icon(Icons.Default.PrivacyTip, contentDescription = null)
+                                }
+                            )
+                        }
 
                         preferenceCategory(
                             key = "category_permissions",
