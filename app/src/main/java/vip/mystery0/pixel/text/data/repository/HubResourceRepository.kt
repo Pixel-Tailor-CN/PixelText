@@ -1,6 +1,8 @@
 package vip.mystery0.pixel.text.data.repository
 
-import org.json.JSONObject
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.Moshi
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
@@ -61,17 +63,32 @@ class HubResourceRepository(
     }
 
     private fun verifyRulesJson(json: String) {
-        val rules = JSONObject(json).optJSONArray("rules")
-            ?: throw IllegalStateException("rules array missing")
-        for (index in 0 until rules.length()) {
-            val rule = rules.getJSONObject(index)
-            rule.getString("id")
-            rule.getString("target_card")
-            rule.getJSONObject("conditions").getString("content_regex")
-        }
+        rulesFileAdapter.fromJson(json) ?: throw IllegalStateException("rules file empty")
     }
 
     private companion object {
         private val unsafeFileNameChars = Regex("[^A-Za-z0-9._-]")
+        private val rulesFileAdapter = Moshi.Builder()
+            .build()
+            .adapter(HubRulesFile::class.java)
     }
 }
+
+@JsonClass(generateAdapter = true)
+internal data class HubRulesFile(
+    val rules: List<HubRule>,
+)
+
+@JsonClass(generateAdapter = true)
+internal data class HubRule(
+    val id: String,
+    @Json(name = "target_card")
+    val targetCard: String,
+    val conditions: HubRuleConditions,
+)
+
+@JsonClass(generateAdapter = true)
+internal data class HubRuleConditions(
+    @Json(name = "content_regex")
+    val contentRegex: String,
+)

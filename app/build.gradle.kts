@@ -115,7 +115,12 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.okhttp)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.moshi)
+    implementation(libs.moshi)
     ksp(libs.androidx.room.compiler)
+    ksp(libs.moshi.kotlin.codegen)
 }
 
 apply(from = rootProject.file("signing.gradle"))

@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
+import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 
 class SettingsViewModel(
@@ -48,11 +49,25 @@ class SettingsViewModel(
         viewModelScope.launch {
             runCatching { hubResourceRepository.checkManifest() }
                 .onSuccess { manifest ->
-                    pendingManifest = manifest
-                    val rules = manifest.rules?.version ?: "无规则"
-                    val model = manifest.spamModel?.version ?: "无模型"
-                    _resourceUpdateState.value =
-                        ResourceUpdateState.Available("规则 $rules，模型 $model")
+                    val remoteRuleVersion =
+                        manifest.rules?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+                    val remoteModelVersion =
+                        manifest.spamModel?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+                    val currentRuleVersion = settingsRepository.getRuleResourceVersion()
+                    val currentModelVersion = settingsRepository.getSpamModelResourceVersion()
+                    if (
+                        remoteRuleVersion == currentRuleVersion &&
+                        remoteModelVersion == currentModelVersion
+                    ) {
+                        pendingManifest = null
+                        _resourceUpdateState.value = ResourceUpdateState.Success("无更新版本")
+                    } else {
+                        pendingManifest = manifest
+                        _resourceUpdateState.value =
+                            ResourceUpdateState.Available(
+                                "规则 $remoteRuleVersion，模型 $remoteModelVersion"
+                            )
+                    }
                 }
                 .onFailure { error ->
                     _resourceUpdateState.value =
