@@ -198,8 +198,8 @@ fun SettingsScreen(
                         }
                         item(key = "sample_submission", contentType = "Preference") {
                             Preference(
-                                title = { Text("贡献脱敏短信样本") },
-                                summary = { Text("手动提交脱敏样本，帮助改进本地规则和模型") },
+                                title = { Text("上报脱敏短信样本") },
+                                summary = { Text("手动提交已脱敏的短信样本，帮助改进本地规则和模型") },
                                 icon = {
                                     Icon(Icons.Rounded.Forum, contentDescription = null)
                                 },

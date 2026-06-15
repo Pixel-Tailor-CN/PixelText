@@ -107,6 +107,7 @@ fun ConversationDetailScreen(
     threadId: Long,
     address: String,
     onNavigateBack: () -> Unit,
+    onNavigateToSampleSubmission: (content: String, sender: String) -> Unit = { _, _ -> },
     isTablet: Boolean = false,
     initialMessageText: String = "",
     viewModel: ConversationDetailViewModel = koinViewModel(),
@@ -301,6 +302,20 @@ fun ConversationDetailScreen(
                                                 viewModel.markMessageSpam(
                                                     message = it,
                                                     markedAsSpam = !selectedMessageIsSpam
+                                                )
+                                            }
+                                            selectedMessageIds.clear()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("上报样本") },
+                                        enabled = selectedMessage?.content?.isNotBlank() == true,
+                                        onClick = {
+                                            showMoreMenu = false
+                                            selectedMessage?.let { message ->
+                                                onNavigateToSampleSubmission(
+                                                    message.content,
+                                                    message.sender.ifBlank { address }
                                                 )
                                             }
                                             selectedMessageIds.clear()

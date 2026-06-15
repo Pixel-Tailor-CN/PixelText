@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,6 +19,8 @@ import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
+import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
@@ -105,8 +108,17 @@ fun AppNavigation(
                 )
             }
             composable("sample_submission") {
+                val draftHandle = navController.previousBackStackEntry?.savedStateHandle
+                val initialContent = remember(it) {
+                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CONTENT).orEmpty()
+                }
+                val initialSender = remember(it) {
+                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_SENDER).orEmpty()
+                }
                 SampleSubmissionScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    initialContent = initialContent,
+                    initialSender = initialSender
                 )
             }
             composable(
@@ -135,7 +147,14 @@ fun AppNavigation(
                 ConversationDetailScreen(
                     threadId = threadId,
                     address = address,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSampleSubmission = { content, sender ->
+                        navController.currentBackStackEntry?.savedStateHandle?.apply {
+                            set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
+                            set(SAMPLE_SUBMISSION_DRAFT_SENDER, sender)
+                        }
+                        navController.navigate("sample_submission")
+                    }
                 )
             }
             composable("mock_messages") {
