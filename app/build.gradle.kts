@@ -44,10 +44,6 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = gitVersionCode
         versionName = appVersionName
-        val hubBaseUrl = providers.gradleProperty("PIXEL_TEXT_HUB_BASE_URL")
-            .orElse("https://hub.example.com")
-            .get()
-        buildConfigField("String", "PIXEL_TEXT_HUB_BASE_URL", "\"$hubBaseUrl\"")
         ndk {
             //noinspection ChromeOsAbiSupport
             abiFilters += "arm64-v8a"
