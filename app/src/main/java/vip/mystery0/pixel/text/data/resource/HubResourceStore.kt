@@ -28,6 +28,15 @@ class HubResourceStore(
         moveIntoPlace(vocabTemp, activeVocabFile())
     }
 
+    fun deleteActiveRules() {
+        activeRulesFile().deleteIfExists()
+    }
+
+    fun deleteActiveModelAndVocab() {
+        activeModelFile().deleteIfExists()
+        activeVocabFile().deleteIfExists()
+    }
+
     fun verifySha256(file: File, expected: String) {
         val actual = sha256(file)
         if (!actual.equals(expected, ignoreCase = true)) {
@@ -64,6 +73,12 @@ class HubResourceStore(
         if (!source.renameTo(target)) {
             source.copyTo(target, overwrite = true)
             source.delete()
+        }
+    }
+
+    private fun File.deleteIfExists() {
+        if (exists() && !delete()) {
+            throw IllegalStateException("delete file failed path=$absolutePath")
         }
     }
 

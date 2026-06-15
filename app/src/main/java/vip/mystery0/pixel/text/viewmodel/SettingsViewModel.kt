@@ -48,7 +48,7 @@ class SettingsViewModel(
     }
 
     fun checkResourceUpdates() {
-        if (_resourceUpdateState.value is ResourceUpdateState.Checking) return
+        if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
         _resourceUpdateState.value = ResourceUpdateState.Checking
         viewModelScope.launch {
             runCatching { hubResourceRepository.checkManifest() }
@@ -69,9 +69,7 @@ class SettingsViewModel(
                     } else {
                         pendingManifest = manifest
                         _resourceUpdateState.value =
-                            ResourceUpdateState.Available(
-                                "规则 $remoteRuleVersion，模型 $remoteModelVersion"
-                            )
+                            ResourceUpdateState.Available(manifest.toResourceUpdateDetail())
                     }
                 }
                 .onFailure { error ->
@@ -83,7 +81,7 @@ class SettingsViewModel(
 
     fun installResourceUpdates() {
         val manifest = pendingManifest ?: return
-        if (_resourceUpdateState.value is ResourceUpdateState.Updating) return
+        if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
         _resourceUpdateState.value = ResourceUpdateState.Updating
         viewModelScope.launch {
             when (val result = hubResourceRepository.updateAll(manifest)) {
@@ -99,6 +97,22 @@ class SettingsViewModel(
         }
     }
 
+    fun deleteDownloadedModelResource() {
+        runResourceMaintenance(
+            busyState = ResourceUpdateState.Working("正在删除下载的模型文件"),
+            successMessage = "已删除下载的模型文件，已回退到内置模型",
+            action = hubResourceRepository::deleteDownloadedModel
+        )
+    }
+
+    fun deleteDownloadedRulesResource() {
+        runResourceMaintenance(
+            busyState = ResourceUpdateState.Working("正在删除下载的智能卡片规则文件"),
+            successMessage = "已删除下载的智能卡片规则文件，已回退到内置规则",
+            action = hubResourceRepository::deleteDownloadedRules
+        )
+    }
+
     fun dismissResourceUpdateDialog() {
         if (
             _resourceUpdateState.value is ResourceUpdateState.Available ||
@@ -108,14 +122,65 @@ class SettingsViewModel(
             _resourceUpdateState.value = ResourceUpdateState.Idle
         }
     }
+
+    private fun runResourceMaintenance(
+        busyState: ResourceUpdateState.Working,
+        successMessage: String,
+        action: suspend () -> HubOperationResult,
+    ) {
+        if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
+        pendingManifest = null
+        _resourceUpdateState.value = busyState
+        viewModelScope.launch {
+            when (val result = action()) {
+                HubOperationResult.Success -> {
+                    _resourceUpdateState.value = ResourceUpdateState.Success(successMessage)
+                }
+
+                is HubOperationResult.Failure -> {
+                    _resourceUpdateState.value = ResourceUpdateState.Error(result.message)
+                }
+            }
+        }
+    }
 }
 
+data class ResourceUpdateDetail(
+    val modelVersion: String,
+    val modelSizeBytes: Long?,
+    val ruleVersion: String,
+    val ruleSizeBytes: Long?,
+    val releaseNotes: String,
+)
+
 sealed interface ResourceUpdateState {
+    sealed interface Busy : ResourceUpdateState
+
     data object Idle : ResourceUpdateState
-    data object Checking : ResourceUpdateState
-    data class Available(val summary: String) : ResourceUpdateState
+    data object Checking : ResourceUpdateState, Busy
+    data class Available(val detail: ResourceUpdateDetail) : ResourceUpdateState
     data class NoUpdate(val message: String) : ResourceUpdateState
-    data object Updating : ResourceUpdateState
+    data object Updating : ResourceUpdateState, Busy
+    data class Working(val message: String) : ResourceUpdateState, Busy
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState
+}
+
+private fun HubResourceManifest.toResourceUpdateDetail(): ResourceUpdateDetail {
+    val notes = listOfNotNull(
+        spamModel?.releaseNotes
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "模型：$it" },
+        rules?.releaseNotes
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "规则：$it" }
+    ).joinToString(separator = "\n")
+
+    return ResourceUpdateDetail(
+        modelVersion = spamModel?.version ?: "未提供",
+        modelSizeBytes = spamModel?.model?.sizeBytes,
+        ruleVersion = rules?.version ?: "未提供",
+        ruleSizeBytes = rules?.sizeBytes,
+        releaseNotes = notes.ifBlank { "暂无版本说明" }
+    )
 }
