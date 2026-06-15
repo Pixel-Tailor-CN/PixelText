@@ -4,14 +4,19 @@ import android.content.ContentResolver
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.ConversationCacheDatabase
 import vip.mystery0.pixel.text.data.db.SpamDatabase
+import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.repository.AppSettingsRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
+import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.data.source.ContactDataSource
+import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -23,6 +28,7 @@ import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MessageViewModel
+import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
@@ -30,14 +36,20 @@ import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
     single<AppSettingsRepository> { AppSettingsRepositoryImpl(androidContext()) }
-    single { MessageParser(androidContext()) }
+    single { HubResourceStore(androidContext()) }
+    single { PixelTextHubClient(BuildConfig.PIXEL_TEXT_HUB_BASE_URL.trimEnd('/')) }
+    single { MessageParser(androidContext(), get()) }
+    single { HubResourceRepository(get(), get(), get(), get()) }
+    single { SampleSubmissionRepository(androidContext(), get(), get()) }
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
     single { ConversationCacheDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
     single { TelephonyDataSource(androidContext(), get()) }
-    factory { SpamClassifier(androidContext()) }
-    single<SpamClassifierFactory> { SpamClassifierFactory { SpamClassifier(androidContext()) } }
+    factory { SpamClassifier(androidContext(), get()) }
+    single<SpamClassifierFactory> {
+        SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
+    }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
@@ -52,5 +64,6 @@ val appModule = module {
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get()) }
+    viewModel { SettingsViewModel(get(), get()) }
+    viewModel { SampleSubmissionViewModel(get()) }
 }

@@ -15,6 +15,7 @@ import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
@@ -201,7 +202,8 @@ object SmsNotificationHelper {
     }
 
     private fun getMessageParser(context: Context): MessageParser {
-        return messageParser ?: MessageParser(context.applicationContext).also {
+        val appContext = context.applicationContext
+        return messageParser ?: MessageParser(appContext, HubResourceStore(appContext)).also {
             messageParser = it
         }
     }

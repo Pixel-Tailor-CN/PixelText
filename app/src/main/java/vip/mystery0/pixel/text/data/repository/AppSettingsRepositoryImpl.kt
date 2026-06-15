@@ -56,6 +56,22 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setRuleResourceVersion(version: String) {
+        prefs.edit { putString(AppSettingsKeys.KEY_RULE_RESOURCE_VERSION, version) }
+    }
+
+    override fun setSpamModelResourceVersion(version: String) {
+        prefs.edit { putString(AppSettingsKeys.KEY_SPAM_MODEL_RESOURCE_VERSION, version) }
+    }
+
+    override fun setVocabResourceVersion(version: String) {
+        prefs.edit { putString(AppSettingsKeys.KEY_VOCAB_RESOURCE_VERSION, version) }
+    }
+
+    override fun setResourceUpdatedAt(timestamp: Long) {
+        prefs.edit { putLong(AppSettingsKeys.KEY_RESOURCE_UPDATED_AT, timestamp) }
+    }
+
     override fun isSpamDetectionEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
@@ -92,6 +108,30 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
         )
 
+    override fun getRuleResourceVersion(): String =
+        prefs.getString(
+            AppSettingsKeys.KEY_RULE_RESOURCE_VERSION,
+            AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        ) ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+
+    override fun getSpamModelResourceVersion(): String =
+        prefs.getString(
+            AppSettingsKeys.KEY_SPAM_MODEL_RESOURCE_VERSION,
+            AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        ) ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+
+    override fun getVocabResourceVersion(): String =
+        prefs.getString(
+            AppSettingsKeys.KEY_VOCAB_RESOURCE_VERSION,
+            AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        ) ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+
+    override fun getResourceUpdatedAt(): Long =
+        prefs.getLong(
+            AppSettingsKeys.KEY_RESOURCE_UPDATED_AT,
+            AppSettingsKeys.DEFAULT_RESOURCE_UPDATED_AT
+        )
+
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
@@ -100,7 +140,11 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
                 isVerificationCodeNotificationActionEnabled(),
-            conversationDetailTextScale = getConversationDetailTextScale()
+            conversationDetailTextScale = getConversationDetailTextScale(),
+            ruleResourceVersion = getRuleResourceVersion(),
+            spamModelResourceVersion = getSpamModelResourceVersion(),
+            vocabResourceVersion = getVocabResourceVersion(),
+            resourceUpdatedAt = getResourceUpdatedAt()
         )
     }
 }

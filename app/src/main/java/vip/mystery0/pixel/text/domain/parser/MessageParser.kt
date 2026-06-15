@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
+import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.ParsedResult
-import java.io.InputStreamReader
 
 data class ParseRule(
     val id: String,
@@ -17,7 +17,10 @@ data class ParseRule(
     val contentRegex: Regex
 )
 
-class MessageParser(private val context: Context) {
+class MessageParser(
+    private val context: Context,
+    private val resourceStore: HubResourceStore,
+) {
     private val rules = mutableListOf<ParseRule>()
 
     // L1 Index
@@ -36,8 +39,7 @@ class MessageParser(private val context: Context) {
 
     private fun loadRules() {
         try {
-            val inputStream = context.assets.open("rules.json")
-            val jsonString = InputStreamReader(inputStream).readText()
+            val jsonString = readRulesJson()
             val jsonObject = JSONObject(jsonString)
             val jsonRules = jsonObject.optJSONArray("rules") ?: JSONArray()
 
@@ -97,6 +99,25 @@ class MessageParser(private val context: Context) {
         } catch (e: Exception) {
             Log.e("MessageParser", "failed to load rules.json", e)
         }
+    }
+
+    private fun readRulesJson(): String {
+        val activeRules = resourceStore.activeRulesFile()
+        if (activeRules.isFile) {
+            return activeRules.readText(Charsets.UTF_8)
+        }
+        return context.assets.open("rules.json").bufferedReader(Charsets.UTF_8).use {
+            it.readText()
+        }
+    }
+
+    fun reloadRules() {
+        rules.clear()
+        senderIndex.clear()
+        signatureIndex.clear()
+        keywordRules.clear()
+        genericRules.clear()
+        loadRules()
     }
 
     fun extractSignature(content: String): String? {

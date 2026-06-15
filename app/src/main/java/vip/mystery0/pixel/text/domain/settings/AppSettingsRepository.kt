@@ -13,6 +13,10 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
     val conversationDetailTextScale: Float =
         AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
+    val ruleResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
+    val spamModelResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
+    val vocabResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
+    val resourceUpdatedAt: Long = AppSettingsKeys.DEFAULT_RESOURCE_UPDATED_AT,
 )
 
 interface AppSettingsRepository {
@@ -24,6 +28,10 @@ interface AppSettingsRepository {
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
     fun setConversationDetailTextScale(scale: Float)
+    fun setRuleResourceVersion(version: String)
+    fun setSpamModelResourceVersion(version: String)
+    fun setVocabResourceVersion(version: String)
+    fun setResourceUpdatedAt(timestamp: Long)
 
     fun isSpamDetectionEnabled(): Boolean
     fun isMuteSpamNotificationsEnabled(): Boolean
@@ -31,6 +39,10 @@ interface AppSettingsRepository {
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
     fun getConversationDetailTextScale(): Float
+    fun getRuleResourceVersion(): String
+    fun getSpamModelResourceVersion(): String
+    fun getVocabResourceVersion(): String
+    fun getResourceUpdatedAt(): Long
 }
 
 object AppSettingsKeys {
@@ -43,6 +55,10 @@ object AppSettingsKeys {
     const val KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED =
         "verification_code_notification_action_enabled"
     const val KEY_CONVERSATION_DETAIL_TEXT_SCALE = "conversation_detail_text_scale"
+    const val KEY_RULE_RESOURCE_VERSION = "rule_resource_version"
+    const val KEY_SPAM_MODEL_RESOURCE_VERSION = "spam_model_resource_version"
+    const val KEY_VOCAB_RESOURCE_VERSION = "vocab_resource_version"
+    const val KEY_RESOURCE_UPDATED_AT = "resource_updated_at"
 
     const val DEFAULT_SPAM_DETECTION_ENABLED = true
     const val DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED = false
@@ -50,4 +66,6 @@ object AppSettingsKeys {
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
     const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
+    const val DEFAULT_RESOURCE_VERSION = "builtin"
+    const val DEFAULT_RESOURCE_UPDATED_AT = 0L
 }
