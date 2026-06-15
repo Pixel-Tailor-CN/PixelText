@@ -12,11 +12,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +38,7 @@ import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -104,8 +108,9 @@ fun SettingsScreen(
     var versionCodeTapCount by remember { mutableIntStateOf(0) }
     val resourceUpdateSummary = when (val state = resourceUpdateState) {
         ResourceUpdateState.Idle -> "手动检查规则和模型资源更新"
-        ResourceUpdateState.Checking -> "正在检查更新..."
+        ResourceUpdateState.Checking -> "手动检查规则和模型资源更新"
         is ResourceUpdateState.Available -> "发现可安装资源：${state.summary}"
+        is ResourceUpdateState.NoUpdate -> "手动检查规则和模型资源更新"
         ResourceUpdateState.Updating -> "正在更新资源..."
         is ResourceUpdateState.Success -> state.message
         is ResourceUpdateState.Error -> state.message
@@ -417,6 +422,26 @@ fun SettingsScreen(
         )
     }
 
+    if (resourceUpdateState is ResourceUpdateState.Checking) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("正在检查资源更新") },
+            text = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LoadingIndicator(modifier = Modifier.size(32.dp))
+                    Text(
+                        text = "正在连接服务端获取最新规则和模型信息",
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     (resourceUpdateState as? ResourceUpdateState.Available)?.let { state ->
         AlertDialog(
             onDismissRequest = viewModel::dismissResourceUpdateDialog,
@@ -430,6 +455,19 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = viewModel::dismissResourceUpdateDialog) {
                     Text("稍后")
+                }
+            }
+        )
+    }
+
+    (resourceUpdateState as? ResourceUpdateState.NoUpdate)?.let { state ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResourceUpdateDialog,
+            title = { Text("暂无可用更新") },
+            text = { Text(state.message) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissResourceUpdateDialog) {
+                    Text("知道了")
                 }
             }
         )
