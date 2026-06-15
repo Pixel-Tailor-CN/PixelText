@@ -2,8 +2,9 @@ package vip.mystery0.pixel.text.domain.parser
 
 import android.content.Context
 import android.util.Log
-import org.json.JSONArray
-import org.json.JSONObject
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
+import com.squareup.moshi.Moshi
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
@@ -40,39 +41,22 @@ class MessageParser(
     private fun loadRules() {
         try {
             val jsonString = readRulesJson()
-            val jsonObject = JSONObject(jsonString)
-            val jsonRules = jsonObject.optJSONArray("rules") ?: JSONArray()
+            val jsonRules = rulesFileAdapter.fromJson(jsonString)?.rules.orEmpty()
 
             val tempRules = mutableListOf<ParseRule>()
 
-            for (i in 0 until jsonRules.length()) {
-                val ruleObj = jsonRules.getJSONObject(i)
-                val id = ruleObj.getString("id")
-                val targetCard = ruleObj.getString("target_card")
-                val priority = ruleObj.optInt("priority", 0)
-
-                val fastFail = ruleObj.optJSONObject("fast_fail")
-                val senderEquals =
-                    fastFail?.optString("sender_equals", "")?.takeIf { it.isNotBlank() }
-                val signatureEquals =
-                    fastFail?.optString("signature_equals", "")?.takeIf { it.isNotBlank() }
-                val keywordsArray = fastFail?.optJSONArray("keywords")
-                val keywords = mutableListOf<String>()
-                if (keywordsArray != null) {
-                    for (j in 0 until keywordsArray.length()) {
-                        keywords.add(keywordsArray.getString(j))
-                    }
-                }
-
-                val conditions = ruleObj.getJSONObject("conditions")
-                val contentRegexStr = conditions.getString("content_regex")
-                val contentRegex = Regex(contentRegexStr)
+            for (ruleObj in jsonRules) {
+                val fastFail = ruleObj.fastFail
+                val senderEquals = fastFail?.senderEquals?.takeIf { it.isNotBlank() }
+                val signatureEquals = fastFail?.signatureEquals?.takeIf { it.isNotBlank() }
+                val keywords = fastFail?.keywords.orEmpty()
+                val contentRegex = Regex(ruleObj.conditions.contentRegex)
 
                 tempRules.add(
                     ParseRule(
-                        id = id,
-                        targetCard = targetCard,
-                        priority = priority,
+                        id = ruleObj.id,
+                        targetCard = ruleObj.targetCard,
+                        priority = ruleObj.priority,
                         fastFailSenderEquals = senderEquals,
                         fastFailSignatureEquals = signatureEquals,
                         fastFailKeywords = keywords.takeIf { it.isNotEmpty() },
@@ -267,4 +251,41 @@ class MessageParser(
             null
         }
     }
+
+    private companion object {
+        private val rulesFileAdapter = Moshi.Builder()
+            .build()
+            .adapter(MessageRulesFile::class.java)
+    }
 }
+
+@JsonClass(generateAdapter = true)
+internal data class MessageRulesFile(
+    val rules: List<MessageRuleJson> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+internal data class MessageRuleJson(
+    val id: String,
+    @Json(name = "target_card")
+    val targetCard: String,
+    val priority: Int = 0,
+    @Json(name = "fast_fail")
+    val fastFail: MessageRuleFastFail? = null,
+    val conditions: MessageRuleConditions,
+)
+
+@JsonClass(generateAdapter = true)
+internal data class MessageRuleFastFail(
+    @Json(name = "sender_equals")
+    val senderEquals: String? = null,
+    @Json(name = "signature_equals")
+    val signatureEquals: String? = null,
+    val keywords: List<String> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+internal data class MessageRuleConditions(
+    @Json(name = "content_regex")
+    val contentRegex: String,
+)
