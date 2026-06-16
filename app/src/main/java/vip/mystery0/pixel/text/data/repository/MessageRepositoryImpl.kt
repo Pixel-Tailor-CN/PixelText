@@ -126,6 +126,7 @@ class MessageRepositoryImpl(
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val deletedCount = telephonyDataSource.deleteMessages(messageIds)
             spamRepository.delete(messageIds)
+            conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             deletedCount
         }

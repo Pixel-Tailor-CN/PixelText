@@ -85,7 +85,7 @@ class ConversationCacheRepository(
         }
     }
 
-    private suspend fun syncThreads(threadIds: List<Long>) {
+    suspend fun syncThreads(threadIds: List<Long>) {
         val conversations = fetchAndBuildConversations(threadIds)
         if (conversations.isEmpty()) {
             dao.delete(threadIds.toSet())
