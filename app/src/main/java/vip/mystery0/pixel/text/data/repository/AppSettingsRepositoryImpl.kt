@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import vip.mystery0.pixel.text.domain.settings.AppSettings
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
@@ -32,6 +33,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
 
     override fun setMuteSpamNotificationsEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED, enabled) }
+    }
+
+    override fun setSpamAutoAction(action: SpamAutoAction) {
+        prefs.edit { putString(AppSettingsKeys.KEY_SPAM_AUTO_ACTION, action.storageValue) }
     }
 
     override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
@@ -93,6 +98,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED
         )
 
+    override fun getSpamAutoAction(): SpamAutoAction =
+        SpamAutoAction.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_SPAM_AUTO_ACTION,
+                AppSettingsKeys.DEFAULT_SPAM_AUTO_ACTION.storageValue
+            )
+        )
+
     override fun isHideFullySpamConversationsEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED,
@@ -151,6 +164,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
+            spamAutoAction = getSpamAutoAction(),
             hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =

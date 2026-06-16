@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.UploadFile
@@ -52,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,6 +86,7 @@ import me.zhanghai.compose.preference.preferenceCategory
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
@@ -105,6 +109,7 @@ fun SettingsScreen(
     var permissionRefreshKey by remember { mutableIntStateOf(0) }
     var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
+    var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = {
@@ -140,6 +145,8 @@ fun SettingsScreen(
     }
     val resourceUpdateEnabled =
         resourceUpdateState !is ResourceUpdateState.Busy
+    val spamAutoActionEnabled =
+        settings.spamDetectionEnabled && settings.muteSpamNotificationsEnabled
 
     fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
         if (permissions.isEmpty()) return
@@ -294,6 +301,29 @@ fun SettingsScreen(
                                 enabled = settings.spamDetectionEnabled,
                                 icon = {
                                     Icon(Icons.Rounded.NotificationsOff, contentDescription = null)
+                                }
+                            )
+                        }
+                        item(key = "spam_auto_action", contentType = "Preference") {
+                            Preference(
+                                title = { Text("骚扰短信自动执行") },
+                                summary = {
+                                    Text(
+                                        if (spamAutoActionEnabled) {
+                                            settings.spamAutoAction.preferenceSummary()
+                                        } else {
+                                            "需要先开启骚扰短信识别和骚扰短信不提醒"
+                                        }
+                                    )
+                                },
+                                enabled = spamAutoActionEnabled,
+                                icon = {
+                                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                                },
+                                onClick = {
+                                    if (spamAutoActionEnabled) {
+                                        showSpamAutoActionDialog = true
+                                    }
                                 }
                             )
                         }
@@ -495,6 +525,32 @@ fun SettingsScreen(
         )
     }
 
+    if (showSpamAutoActionDialog) {
+        AlertDialog(
+            onDismissRequest = { showSpamAutoActionDialog = false },
+            title = { Text("骚扰短信自动执行") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    SpamAutoAction.entries.forEach { action ->
+                        SpamAutoActionOption(
+                            action = action,
+                            selected = settings.spamAutoAction == action,
+                            onClick = {
+                                viewModel.setSpamAutoAction(action)
+                                showSpamAutoActionDialog = false
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSpamAutoActionDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     if (resourceUpdateState is ResourceUpdateState.Checking) {
         AlertDialog(
             onDismissRequest = {},
@@ -546,6 +602,65 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SpamAutoActionOption(
+    action: SpamAutoAction,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text(
+                text = action.title(),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = action.dialogSummary(),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (action == SpamAutoAction.DELETE) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
+}
+
+private fun SpamAutoAction.title(): String {
+    return when (this) {
+        SpamAutoAction.NONE -> "不处理"
+        SpamAutoAction.MARK_READ -> "已读"
+        SpamAutoAction.DELETE -> "删除"
+    }
+}
+
+private fun SpamAutoAction.preferenceSummary(): String {
+    return when (this) {
+        SpamAutoAction.NONE -> "新收到的骚扰短信仅不提醒，不额外处理"
+        SpamAutoAction.MARK_READ -> "新收到的骚扰短信会自动标记为已读"
+        SpamAutoAction.DELETE -> "新收到的骚扰短信会自动删除"
+    }
+}
+
+private fun SpamAutoAction.dialogSummary(): String {
+    return when (this) {
+        SpamAutoAction.NONE -> "识别为骚扰后只隐藏提醒，保留短信状态"
+        SpamAutoAction.MARK_READ -> "识别为骚扰后自动标记这条短信为已读"
+        SpamAutoAction.DELETE -> "模型判断不一定完全准确，正常短信也可能被当作骚扰并被移除"
     }
 }
 
