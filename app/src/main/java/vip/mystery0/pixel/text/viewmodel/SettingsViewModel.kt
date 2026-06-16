@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
@@ -29,6 +30,10 @@ class SettingsViewModel(
 
     fun setMuteSpamNotificationsEnabled(enabled: Boolean) {
         settingsRepository.setMuteSpamNotificationsEnabled(enabled)
+    }
+
+    fun setSpamAutoAction(action: SpamAutoAction) {
+        settingsRepository.setSpamAutoAction(action)
     }
 
     fun setHideFullySpamConversationsEnabled(enabled: Boolean) {

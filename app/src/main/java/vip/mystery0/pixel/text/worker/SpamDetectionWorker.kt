@@ -13,6 +13,9 @@ import kotlinx.coroutines.sync.withPermit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -63,6 +66,8 @@ class SpamDetectionWorker(
 
     private val spamRepository: SpamRepository by inject()
     private val spamClassifier: SpamClassifier by inject()
+    private val settingsRepository: AppSettingsRepository by inject()
+    private val telephonyDataSource: TelephonyDataSource by inject()
 
     override suspend fun doWork(): Result {
         val messageId = inputData.getLong(KEY_MESSAGE_ID, -1L)
@@ -107,6 +112,12 @@ class SpamDetectionWorker(
         if (score >= 0f) {
             spamRepository.save(messageId, threadId, score)
             Log.d(TAG, "spam score message_id=$messageId score=$score")
+            applySpamAutoAction(
+                messageId = messageId,
+                threadId = threadId,
+                score = score,
+                deferNotification = deferNotification
+            )
             updateNotification(
                 sender = sender,
                 threadId = threadId,
@@ -118,6 +129,48 @@ class SpamDetectionWorker(
             notifySpamResult(messageId, threadId, score)
         }
         return Result.success()
+    }
+
+    private suspend fun applySpamAutoAction(
+        messageId: Long,
+        threadId: Long,
+        score: Float,
+        deferNotification: Boolean
+    ) {
+        if (score < SPAM_THRESHOLD) return
+        val action = effectiveSpamAutoAction(deferNotification)
+        when (action) {
+            SpamAutoAction.NONE -> Unit
+            SpamAutoAction.MARK_READ -> {
+                val updatedCount = telephonyDataSource.markMessagesAsRead(setOf(messageId))
+                Log.d(
+                    TAG,
+                    "spam auto action mark_read message_id=$messageId updated=$updatedCount"
+                )
+            }
+
+            SpamAutoAction.DELETE -> {
+                val deletedCount = telephonyDataSource.deleteMessages(setOf(messageId))
+                if (deletedCount > 0) {
+                    spamRepository.delete(setOf(messageId))
+                    SmsNotificationHelper.cancelThreadNotifications(
+                        applicationContext,
+                        setOf(threadId)
+                    )
+                }
+                Log.d(
+                    TAG,
+                    "spam auto action delete message_id=$messageId deleted=$deletedCount"
+                )
+            }
+        }
+    }
+
+    private fun effectiveSpamAutoAction(deferNotification: Boolean): SpamAutoAction {
+        if (!deferNotification) return SpamAutoAction.NONE
+        if (!settingsRepository.isSpamDetectionEnabled()) return SpamAutoAction.NONE
+        if (!settingsRepository.isMuteSpamNotificationsEnabled()) return SpamAutoAction.NONE
+        return settingsRepository.getSpamAutoAction()
     }
 
     private fun updateNotification(

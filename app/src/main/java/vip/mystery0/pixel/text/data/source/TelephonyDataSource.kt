@@ -164,6 +164,48 @@ class TelephonyDataSource(
         return deletedCount
     }
 
+    fun markMessagesAsRead(messageIds: Set<Long>): Int {
+        if (messageIds.isEmpty()) return 0
+
+        val values = ContentValues().apply {
+            put(Telephony.Sms.READ, 1)
+            put(Telephony.Sms.SEEN, 1)
+        }
+        var updatedCount = 0
+        val smsIds = messageIds.filter { it > 0 }
+        val mmsIds = messageIds.filter { it < 0 }.map { -it }
+
+        smsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(Telephony.Sms._ID, chunk)
+            try {
+                updatedCount += contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "$selection AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0)",
+                    selectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to update sms read status", e)
+            }
+        }
+
+        mmsIds.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(Telephony.Mms._ID, chunk)
+            try {
+                updatedCount += contentResolver.update(
+                    Telephony.Mms.CONTENT_URI,
+                    values,
+                    "$selection AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0)",
+                    selectionArgs
+                )
+            } catch (e: Exception) {
+                Log.e(TELEPHONY_TAG, "failed to update mms read status", e)
+            }
+        }
+
+        return updatedCount
+    }
+
     fun getThreadIdsForMessages(messageIds: Set<Long>): Set<Long> {
         if (messageIds.isEmpty()) return emptySet()
 
