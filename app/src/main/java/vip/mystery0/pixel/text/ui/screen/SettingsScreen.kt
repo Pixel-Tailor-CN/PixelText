@@ -30,16 +30,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Rule
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DashboardCustomize
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Style
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -193,7 +199,7 @@ fun SettingsScreen(
                                 title = { Text("离线模型版本") },
                                 summary = { Text(settings.spamModelResourceVersion) },
                                 icon = {
-                                    Icon(Icons.Rounded.CloudOff, contentDescription = null)
+                                    Icon(Icons.Rounded.Memory, contentDescription = null)
                                 }
                             )
                         }
@@ -202,7 +208,7 @@ fun SettingsScreen(
                                 title = { Text("智能卡片规则版本") },
                                 summary = { Text(settings.ruleResourceVersion) },
                                 icon = {
-                                    Icon(Icons.Rounded.Style, contentDescription = null)
+                                    Icon(Icons.AutoMirrored.Rounded.Rule, contentDescription = null)
                                 }
                             )
                         }
@@ -212,7 +218,7 @@ fun SettingsScreen(
                                 summary = { Text(resourceUpdateSummary) },
                                 enabled = resourceUpdateEnabled,
                                 icon = {
-                                    Icon(Icons.Rounded.Settings, contentDescription = null)
+                                    Icon(Icons.Rounded.Sync, contentDescription = null)
                                 },
                                 onClick = viewModel::checkResourceUpdates
                             )
@@ -227,7 +233,7 @@ fun SettingsScreen(
                                     summary = { Text("删除已下载的离线模型和词表，回退到内置模型") },
                                     enabled = resourceUpdateEnabled,
                                     icon = {
-                                        Icon(Icons.Rounded.CloudOff, contentDescription = null)
+                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
                                     },
                                     onClick = viewModel::deleteDownloadedModelResource
                                 )
@@ -241,7 +247,7 @@ fun SettingsScreen(
                                     summary = { Text("删除已下载的规则文件，回退到内置规则版本") },
                                     enabled = resourceUpdateEnabled,
                                     icon = {
-                                        Icon(Icons.Rounded.Style, contentDescription = null)
+                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
                                     },
                                     onClick = viewModel::deleteDownloadedRulesResource
                                 )
@@ -252,7 +258,7 @@ fun SettingsScreen(
                                 title = { Text("上报脱敏短信样本") },
                                 summary = { Text("手动提交已脱敏的短信样本，帮助改进本地规则和模型") },
                                 icon = {
-                                    Icon(Icons.Rounded.Forum, contentDescription = null)
+                                    Icon(Icons.Rounded.UploadFile, contentDescription = null)
                                 },
                                 onClick = onNavigateToSampleSubmission
                             )
@@ -270,7 +276,7 @@ fun SettingsScreen(
                                     Text("接收新短信和扫描历史短信时调用本地模型识别骚扰内容")
                                 },
                                 icon = {
-                                    Icon(Icons.Rounded.Security, contentDescription = null)
+                                    Icon(Icons.Rounded.Shield, contentDescription = null)
                                 }
                             )
                         }
@@ -287,7 +293,7 @@ fun SettingsScreen(
                                 },
                                 enabled = settings.spamDetectionEnabled,
                                 icon = {
-                                    Icon(Icons.Rounded.Notifications, contentDescription = null)
+                                    Icon(Icons.Rounded.NotificationsOff, contentDescription = null)
                                 }
                             )
                         }
@@ -304,7 +310,7 @@ fun SettingsScreen(
                                     Text("会话中的短信和彩信全部被标记为骚扰时，从普通会话列表隐藏")
                                 },
                                 icon = {
-                                    Icon(Icons.Rounded.Security, contentDescription = null)
+                                    Icon(Icons.Rounded.VisibilityOff, contentDescription = null)
                                 }
                             )
                         }
@@ -317,7 +323,10 @@ fun SettingsScreen(
                                     Text("在会话详情中将验证码、票务、动账等短信渲染为结构化卡片")
                                 },
                                 icon = {
-                                    Icon(Icons.Rounded.Settings, contentDescription = null)
+                                    Icon(
+                                        Icons.Rounded.DashboardCustomize,
+                                        contentDescription = null
+                                    )
                                 }
                             )
                         }
@@ -334,7 +343,7 @@ fun SettingsScreen(
                                     Text("验证码短信通知中显示复制验证码操作")
                                 },
                                 icon = {
-                                    Icon(Icons.Rounded.Notifications, contentDescription = null)
+                                    Icon(Icons.Rounded.ContentCopy, contentDescription = null)
                                 }
                             )
                         }
@@ -352,7 +361,7 @@ fun SettingsScreen(
                                 },
                                 enabled = settings.verificationCodeNotificationActionEnabled,
                                 icon = {
-                                    Icon(Icons.Default.PrivacyTip, contentDescription = null)
+                                    Icon(Icons.Rounded.Lock, contentDescription = null)
                                 }
                             )
                         }
