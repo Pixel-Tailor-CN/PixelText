@@ -8,9 +8,13 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
+import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
+import vip.mystery0.pixel.text.domain.sample.SampleDesensitizationAssistant
+import vip.mystery0.pixel.text.domain.sample.SensitiveType
 
 class SampleSubmissionViewModel(
     private val repository: SampleSubmissionRepository,
+    private val desensitizationAssistant: SampleDesensitizationAssistant = SampleDesensitizationAssistant(),
 ) : ViewModel() {
     var content by mutableStateOf("")
         private set
@@ -23,6 +27,8 @@ class SampleSubmissionViewModel(
     var submitting by mutableStateOf(false)
         private set
     var resultMessage by mutableStateOf<String?>(null)
+        private set
+    var desensitizationState by mutableStateOf(DesensitizationAssistantState())
         private set
     private var draftApplied = false
 
@@ -40,6 +46,51 @@ class SampleSubmissionViewModel(
 
     fun updateAgreed(value: Boolean) {
         agreed = value
+    }
+
+    fun openDesensitizationAssistant() {
+        if (content.isBlank()) return
+        desensitizationState = desensitizationAssistant.open(content)
+    }
+
+    fun requestCloseDesensitizationAssistant(): Boolean {
+        if (desensitizationState.dirty) return false
+        discardDesensitizedDraft()
+        return true
+    }
+
+    fun discardDesensitizedDraft() {
+        desensitizationState = desensitizationAssistant.close()
+    }
+
+    fun selectSensitiveRange(
+        start: Int,
+        end: Int,
+    ) {
+        desensitizationState = desensitizationAssistant.selectRange(
+            state = desensitizationState,
+            start = start,
+            end = end
+        )
+    }
+
+    fun updateSensitiveType(type: SensitiveType) {
+        desensitizationState = desensitizationAssistant.updateType(
+            state = desensitizationState,
+            type = type
+        )
+    }
+
+    fun replaceSelectedSensitiveText() {
+        desensitizationState = desensitizationAssistant.replaceSelected(desensitizationState)
+    }
+
+    fun applyDesensitizedDraft() {
+        val draft = desensitizationState.draft
+        if (draft.isBlank()) return
+        content = draft
+        agreed = false
+        discardDesensitizedDraft()
     }
 
     fun applyDraft(
