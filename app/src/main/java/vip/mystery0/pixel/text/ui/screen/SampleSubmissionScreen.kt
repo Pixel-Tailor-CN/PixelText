@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,16 +35,19 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -232,12 +236,37 @@ fun SampleSubmissionScreen(
     }
 
     if (viewModel.desensitizationState.visible) {
+        val latestDesensitizationState = rememberUpdatedState(viewModel.desensitizationState)
+        val requestDiscardDialog = rememberUpdatedState {
+            showDiscardDialog = true
+        }
+        val sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(
+                SheetValue.Hidden,
+                SheetValue.Expanded
+            ),
+            confirmValueChange = remember {
+                { targetValue ->
+                    if (
+                        targetValue == SheetValue.Hidden &&
+                        latestDesensitizationState.value.dirty
+                    ) {
+                        requestDiscardDialog.value()
+                        false
+                    } else {
+                        true
+                    }
+                }
+            }
+        )
         ModalBottomSheet(
             onDismissRequest = {
                 if (!viewModel.requestCloseDesensitizationAssistant()) {
                     showDiscardDialog = true
                 }
             },
+            sheetState = sheetState,
         ) {
             DesensitizationAssistantSheet(
                 state = viewModel.desensitizationState,
@@ -280,7 +309,7 @@ fun SampleSubmissionScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DesensitizationAssistantSheet(
+private fun ColumnScope.DesensitizationAssistantSheet(
     state: DesensitizationAssistantState,
     onSelectRange: (Int, Int) -> Unit,
     onTypeSelected: (SensitiveType) -> Unit,
@@ -289,7 +318,9 @@ private fun DesensitizationAssistantSheet(
     onDismissRequest: () -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
