@@ -24,6 +24,94 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Sync bundled resources
+        env:
+          PIXEL_TEXT_HUB_BASE_URL: ${{ vars.PIXEL_TEXT_HUB_BASE_URL || 'https://pixeltext.api.mystery0.vip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_URL="${PIXEL_TEXT_HUB_BASE_URL%/}"
+          MANIFEST_URL="${BASE_URL}/api/v1/resources/manifest"
+          ASSETS_DIR="app/src/main/assets"
+          MANIFEST_FILE="$(mktemp)"
+
+          fail() {
+            echo "resource sync failed: $1" >&2
+            exit 1
+          }
+
+          resolve_url() {
+            local url="$1"
+            if [[ "$url" == http://* || "$url" == https://* ]]; then
+              echo "$url"
+            else
+              echo "${BASE_URL}/${url#/}"
+            fi
+          }
+
+          download_artifact() {
+            local name="$1"
+            local url="$2"
+            local target="$3"
+            local expected_sha256="$4"
+            local expected_size="$5"
+            local artifact_url
+            local actual_size
+            local actual_sha256
+            local normalized_expected_sha256
+
+            artifact_url="$(resolve_url "$url")"
+            echo "downloading ${name} url=${artifact_url}"
+            mkdir -p "$(dirname "$target")"
+            curl -fsSL --retry 3 --connect-timeout 30 --max-time 120 "$artifact_url" -o "$target"
+
+            actual_size="$(wc -c < "$target" | tr -d '[:space:]')"
+            if [[ "$actual_size" != "$expected_size" ]]; then
+              fail "${name} size mismatch expected=${expected_size} actual=${actual_size}"
+            fi
+
+            actual_sha256="$(sha256sum "$target" | awk '{print $1}')"
+            normalized_expected_sha256="$(echo "$expected_sha256" | tr '[:upper:]' '[:lower:]')"
+            if [[ "$actual_sha256" != "$normalized_expected_sha256" ]]; then
+              fail "${name} sha256 mismatch expected=${expected_sha256} actual=${actual_sha256}"
+            fi
+
+            echo "synced ${name} path=${target} size=${actual_size} sha256=${actual_sha256}"
+          }
+
+          trap 'rm -f "$MANIFEST_FILE"' EXIT
+
+          echo "fetching resource manifest url=${MANIFEST_URL}"
+          curl -fsSL --retry 3 --connect-timeout 30 --max-time 60 \
+            -H "Accept: application/json" \
+            "$MANIFEST_URL" \
+            -o "$MANIFEST_FILE"
+
+          RULES_VERSION="$(jq -er '.rules.version' "$MANIFEST_FILE")" || fail "rules artifact missing"
+          RULES_URL="$(jq -er '.rules.downloadUrl' "$MANIFEST_FILE")" || fail "rules download url missing"
+          RULES_SHA256="$(jq -er '.rules.sha256' "$MANIFEST_FILE")" || fail "rules sha256 missing"
+          RULES_SIZE="$(jq -er '.rules.sizeBytes' "$MANIFEST_FILE")" || fail "rules size missing"
+
+          SPAM_MODEL_VERSION="$(jq -er '.spamModel.version' "$MANIFEST_FILE")" || fail "spam model artifact missing"
+          MODEL_URL="$(jq -er '.spamModel.model.downloadUrl' "$MANIFEST_FILE")" || fail "spam model download url missing"
+          MODEL_SHA256="$(jq -er '.spamModel.model.sha256' "$MANIFEST_FILE")" || fail "spam model sha256 missing"
+          MODEL_SIZE="$(jq -er '.spamModel.model.sizeBytes' "$MANIFEST_FILE")" || fail "spam model size missing"
+          VOCAB_URL="$(jq -er '.spamModel.vocab.downloadUrl' "$MANIFEST_FILE")" || fail "vocab download url missing"
+          VOCAB_SHA256="$(jq -er '.spamModel.vocab.sha256' "$MANIFEST_FILE")" || fail "vocab sha256 missing"
+          VOCAB_SIZE="$(jq -er '.spamModel.vocab.sizeBytes' "$MANIFEST_FILE")" || fail "vocab size missing"
+
+          download_artifact "rules" "$RULES_URL" "${ASSETS_DIR}/rules.json" "$RULES_SHA256" "$RULES_SIZE"
+          download_artifact "spam model" "$MODEL_URL" "${ASSETS_DIR}/spam_classifier.tflite" "$MODEL_SHA256" "$MODEL_SIZE"
+          download_artifact "vocab" "$VOCAB_URL" "${ASSETS_DIR}/vocab.txt" "$VOCAB_SHA256" "$VOCAB_SIZE"
+
+          echo "resource sync completed rules_version=${RULES_VERSION} spam_model_version=${SPAM_MODEL_VERSION}"
+
       - name: Decode Keystore
         run: |
           echo "${{ secrets.SIGN_KEY_STORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
