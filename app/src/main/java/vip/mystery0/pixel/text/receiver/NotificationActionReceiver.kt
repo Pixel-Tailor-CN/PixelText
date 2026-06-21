@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -90,7 +91,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
         when (intent.action) {
             ACTION_MARK_READ -> {
-                if (threadId != -1L) markThreadAsRead(context, threadId)
+                if (threadId != -1L) {
+                    markThreadAsRead(context, threadId)
+                    SmartspacerIntegration.notifyChanged(context)
+                }
                 cancelNotification(context, notificationId)
             }
 
@@ -100,6 +104,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 if (!code.isNullOrBlank()) {
                     copyVerificationCode(context, code)
                     markMessageAsRead(context, messageUri, threadId)
+                    SmartspacerIntegration.notifyChanged(context)
                 } else {
                     Log.w(TAG, "copy verification skipped: code is blank")
                 }

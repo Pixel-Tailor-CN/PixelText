@@ -63,6 +63,15 @@ data class SpamScanMessageRow(
     val content: String
 )
 
+data class SmartspacerSmsRow(
+    val id: Long,
+    val threadId: Long,
+    val address: String,
+    val body: String,
+    val date: Long,
+    val read: Boolean
+)
+
 class TelephonyDataSource(
     private val context: Context,
     private val contentResolver: ContentResolver
@@ -605,6 +614,57 @@ class TelephonyDataSource(
             }
         }
         return rows
+    }
+
+    fun getRecentSmsMessagesForSmartspacer(limit: Int): List<SmartspacerSmsRow> {
+        val rows = mutableListOf<SmartspacerSmsRow>()
+        contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.THREAD_ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+                Telephony.Sms.READ
+            ),
+            "${Telephony.Sms.TYPE} = ?",
+            arrayOf(Telephony.Sms.MESSAGE_TYPE_INBOX.toString()),
+            "${Telephony.Sms.DATE} DESC LIMIT $limit"
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
+            val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
+            val readIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.READ)
+            while (cursor.moveToNext()) {
+                rows += SmartspacerSmsRow(
+                    id = cursor.getLong(idIndex),
+                    threadId = cursor.getLong(threadIdIndex),
+                    address = cursor.getString(addressIndex).orEmpty(),
+                    body = cursor.getString(bodyIndex).orEmpty(),
+                    date = cursor.getLong(dateIndex),
+                    read = cursor.getInt(readIndex) == 1
+                )
+            }
+        }
+        return rows
+    }
+
+    fun getUnreadSmsCountForSmartspacer(): Int {
+        contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf("COUNT(*)"),
+            "${Telephony.Sms.READ} = 0 AND ${Telephony.Sms.TYPE} = ?",
+            arrayOf(Telephony.Sms.MESSAGE_TYPE_INBOX.toString()),
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return cursor.getInt(0)
+            }
+        }
+        return 0
     }
 
     fun insertOutboxPlaceholder(

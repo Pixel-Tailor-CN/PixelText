@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.data.db.CacheMetadataEntity
 import vip.mystery0.pixel.text.data.db.CachedConversationDao
 import vip.mystery0.pixel.text.data.db.toCachedConversationEntity
 import vip.mystery0.pixel.text.data.db.toConversationModel
@@ -48,7 +49,7 @@ class ConversationCacheRepository(
     }
 
     suspend fun isCacheReady(): Boolean = withContext(Dispatchers.IO) {
-        dao.count() > 0
+        dao.getMetadataValue(KEY_CACHE_INITIALIZED) == 1
     }
 
     suspend fun fullSync(archivedThreadIds: Set<Long>) = withContext(Dispatchers.IO) {
@@ -59,6 +60,7 @@ class ConversationCacheRepository(
 
         if (allThreadIds.isEmpty()) {
             dao.deleteAll()
+            markCacheInitialized()
             return@withContext
         }
 
@@ -68,6 +70,7 @@ class ConversationCacheRepository(
 
         dao.upsert(conversations.map { it.toCachedConversationEntity() })
         if (deletedIds.isNotEmpty()) dao.delete(deletedIds)
+        markCacheInitialized()
         Log.d(TAG, "full sync done: upserted=${conversations.size} deleted=${deletedIds.size}")
     }
 
@@ -77,11 +80,7 @@ class ConversationCacheRepository(
         if (threadId != null) {
             syncThreads(listOf(threadId))
         } else {
-            // URI 不含具体 ID，刷新最近变化的少量会话（取前50个）
-            val recentThreadIds = telephonyDataSource.queryConversationThreadIds()
-                .take(50)
-            if (recentThreadIds.isEmpty()) return
-            syncThreads(recentThreadIds)
+            syncAllKnownThreads()
         }
     }
 
@@ -95,6 +94,25 @@ class ConversationCacheRepository(
             val missingIds = threadIds.toSet() - fetchedIds
             if (missingIds.isNotEmpty()) dao.delete(missingIds)
         }
+    }
+
+    private suspend fun syncAllKnownThreads() {
+        val currentThreadIds = telephonyDataSource.queryConversationThreadIds()
+            .distinct()
+        val cachedThreadIds = dao.getAllThreadIds()
+
+        val deletedThreadIds = cachedThreadIds.toSet() - currentThreadIds.toSet()
+        if (deletedThreadIds.isNotEmpty()) {
+            dao.delete(deletedThreadIds)
+        }
+
+        if (currentThreadIds.isNotEmpty()) {
+            syncThreads(currentThreadIds)
+        }
+    }
+
+    private suspend fun markCacheInitialized() {
+        dao.upsertMetadata(CacheMetadataEntity(KEY_CACHE_INITIALIZED, 1))
     }
 
     private fun fetchAndBuildConversations(threadIds: List<Long>): List<ConversationModel> {
@@ -157,5 +175,9 @@ class ConversationCacheRepository(
         dao.getAllConversations()
             .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
             .map { it.toConversationModel() }
+    }
+
+    private companion object {
+        const val KEY_CACHE_INITIALIZED = "cache_initialized"
     }
 }

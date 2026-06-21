@@ -119,6 +119,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.moshi)
     implementation(libs.moshi)
+    implementation(libs.smartspacer.sdk.plugin)
     ksp(libs.androidx.room.compiler)
     ksp(libs.moshi.kotlin.codegen)
 }

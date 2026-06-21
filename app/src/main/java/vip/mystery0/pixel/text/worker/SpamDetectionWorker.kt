@@ -19,6 +19,7 @@ import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 
 class SpamDetectionWorker(
     context: Context,
@@ -143,6 +144,9 @@ class SpamDetectionWorker(
             SpamAutoAction.NONE -> Unit
             SpamAutoAction.MARK_READ -> {
                 val updatedCount = telephonyDataSource.markMessagesAsRead(setOf(messageId))
+                if (updatedCount > 0) {
+                    SmartspacerIntegration.notifyChanged(applicationContext)
+                }
                 Log.d(
                     TAG,
                     "spam auto action mark_read message_id=$messageId updated=$updatedCount"
@@ -157,6 +161,7 @@ class SpamDetectionWorker(
                         applicationContext,
                         setOf(threadId)
                     )
+                    SmartspacerIntegration.notifyChanged(applicationContext)
                 }
                 Log.d(
                     TAG,
