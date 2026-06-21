@@ -3,7 +3,7 @@ agp = "9.2.1"
 kotlin = "2.4.0"
 ksp = "2.3.7"
 
-app-version = "1.1.0"
+app-version = "1.1.1"
 android-compileSdk = "37"
 android-minSdk = "31"
 android-targetSdk = "37"
@@ -24,6 +24,7 @@ room = "2.8.4"
 okhttp = "5.4.0"
 retrofit = "3.0.0"
 moshi = "1.15.2"
+smartspacer = "1.1.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,6 +51,7 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit-converter-moshi = { group = "com.squareup.retrofit2", name = "converter-moshi", version.ref = "retrofit" }
 moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
 moshi-kotlin-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
+smartspacer-sdk-plugin = { group = "com.kieronquinn.smartspacer", name = "sdk-plugin", version.ref = "smartspacer" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -9,6 +9,7 @@ import android.telephony.SubscriptionManager
 import android.util.Log
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 
 class SmsReceiver : BroadcastReceiver() {
@@ -92,6 +93,8 @@ class SmsReceiver : BroadcastReceiver() {
                     messageUri = insertedUri?.toString(),
                 )
             }
+
+            SmartspacerIntegration.notifyChanged(context)
         }
     }
 

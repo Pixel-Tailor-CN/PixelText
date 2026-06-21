@@ -24,6 +24,7 @@ import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 
 private const val SPAM_THRESHOLD = 0.7f
 private const val FULLY_SPAM_FILTER_CHUNK_SIZE = 200
@@ -116,7 +117,9 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             telephonyDataSource.deleteThreads(threadIds)
             archiveDao.unarchive(threadIds)
+            conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
+            SmartspacerIntegration.notifyChanged(context)
         }
     }
 
@@ -128,6 +131,7 @@ class MessageRepositoryImpl(
             spamRepository.delete(messageIds)
             conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
+            SmartspacerIntegration.notifyChanged(context)
             deletedCount
         }
     }
@@ -205,6 +209,7 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             telephonyDataSource.markThreadsAsRead(threadIds)
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
+            SmartspacerIntegration.notifyChanged(context)
         }
     }
 

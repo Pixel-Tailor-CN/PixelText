@@ -116,5 +116,31 @@
                 <action android:name="${applicationId}.action.MMS_DOWNLOADED" />
             </intent-filter>
         </receiver>
+
+        <!-- 7. Smartspacer 验证码 Target -->
+        <provider
+            android:name=".smartspacer.VerificationCodeTargetProvider"
+            android:authorities="${applicationId}.smartspacer.target.verification_code"
+            android:exported="true"
+            android:permission="com.kieronquinn.app.smartspacer.permission.ACCESS_SMARTSPACER_TARGETS">
+            <intent-filter>
+                <action android:name="com.kieronquinn.app.smartspacer.TARGET" />
+            </intent-filter>
+        </provider>
+
+        <!-- 8. Smartspacer 未读短信数量 Complication -->
+        <provider
+            android:name=".smartspacer.UnreadSmsComplicationProvider"
+            android:authorities="${applicationId}.smartspacer.complication.unread_sms"
+            android:exported="true"
+            android:permission="com.kieronquinn.app.smartspacer.permission.ACCESS_SMARTSPACER_COMPLICATIONS">
+            <intent-filter>
+                <action android:name="com.kieronquinn.app.smartspacer.COMPLICATION" />
+            </intent-filter>
+        </provider>
+
+        <receiver
+            android:name=".smartspacer.VerificationCodeSmartspacerActionReceiver"
+            android:exported="false" />
     </application>
 </manifest>

@@ -23,6 +23,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.smartspacer.SmartspacerSmsRepository
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
@@ -50,6 +51,7 @@ val appModule = module {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
+    single { SmartspacerSmsRepository(get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
