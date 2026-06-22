@@ -4,6 +4,11 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,10 +62,10 @@ fun AppNavigation(
             navController = navController,
             startDestination = "conversations",
             modifier = Modifier.fillMaxSize(),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            enterTransition = { activityLikeEnterTransition() },
+            exitTransition = { activityLikeExitTransition() },
+            popEnterTransition = { activityLikePopEnterTransition() },
+            popExitTransition = { activityLikePopExitTransition() }
         ) {
             composable("conversations") {
                 ConversationListScreen(
@@ -130,13 +135,7 @@ fun AppNavigation(
                     initialSender = initialSender
                 )
             }
-            composable(
-                route = "search",
-                enterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
-                exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left) },
-                popEnterTransition = { slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right) },
-                popExitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) }
-            ) {
+            composable("search") {
                 SearchScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onResultClick = { message ->
@@ -175,4 +174,58 @@ fun AppNavigation(
 
 private fun conversationDetailRoute(threadId: Long, address: String): String {
     return "conversation_detail/$threadId/${Uri.encode(address)}"
+}
+
+private fun AnimatedContentTransitionScope<*>.activityLikeEnterTransition(): EnterTransition {
+    return slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+        animationSpec = tween(
+            durationMillis = NAV_TRANSITION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        )
+    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS))
+}
+
+private fun AnimatedContentTransitionScope<*>.activityLikeExitTransition(): ExitTransition {
+    return slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+        animationSpec = tween(
+            durationMillis = NAV_TRANSITION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        )
+    ) + delayedExitFadeOut()
+}
+
+private fun AnimatedContentTransitionScope<*>.activityLikePopEnterTransition(): EnterTransition {
+    return slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+        animationSpec = tween(
+            durationMillis = NAV_TRANSITION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        )
+    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS))
+}
+
+private fun AnimatedContentTransitionScope<*>.activityLikePopExitTransition(): ExitTransition {
+    return slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+        animationSpec = tween(
+            durationMillis = NAV_TRANSITION_DURATION_MS,
+            easing = FastOutSlowInEasing
+        )
+    ) + delayedExitFadeOut()
+}
+
+private const val NAV_TRANSITION_DURATION_MS = 300
+private const val NAV_ENTER_FADE_DURATION_MS = 90
+private const val NAV_EXIT_FADE_HOLD_MS = 225
+
+private fun delayedExitFadeOut(): ExitTransition {
+    return fadeOut(
+        animationSpec = keyframes {
+            durationMillis = NAV_TRANSITION_DURATION_MS
+            1f at NAV_EXIT_FADE_HOLD_MS
+            0f at NAV_TRANSITION_DURATION_MS
+        }
+    )
 }
