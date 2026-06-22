@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
 class SettingsViewModel(
@@ -50,6 +51,10 @@ class SettingsViewModel(
 
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean) {
         settingsRepository.setHideVerificationCodeOnLockScreenEnabled(enabled)
+    }
+
+    fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
+        settingsRepository.setMessageTimeDisplayFormat(format)
     }
 
     fun checkResourceUpdates() {

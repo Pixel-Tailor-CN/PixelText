@@ -120,6 +120,7 @@ fun ConversationDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val sending by viewModel.sending.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
+    val appSettings by settingsRepository.settings.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -566,6 +567,7 @@ fun ConversationDetailScreen(
                                     }
                                 },
                                 interactionEnabled = !isZoomGestureActive,
+                                timeDisplayFormat = appSettings.messageTimeDisplayFormat,
                             )
                         }
                     }

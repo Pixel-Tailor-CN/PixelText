@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.UploadFile
@@ -86,6 +87,7 @@ import me.zhanghai.compose.preference.preferenceCategory
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
@@ -110,6 +112,7 @@ fun SettingsScreen(
     var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
+    var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = {
@@ -360,6 +363,18 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        item(key = "message_time_display_format", contentType = "Preference") {
+                            Preference(
+                                title = { Text("短信时间显示格式") },
+                                summary = {
+                                    Text(settings.messageTimeDisplayFormat.preferenceSummary())
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Schedule, contentDescription = null)
+                                },
+                                onClick = { showMessageTimeFormatDialog = true }
+                            )
+                        }
                         item(
                             key = "verification_code_notification_action",
                             contentType = "SwitchPreference"
@@ -525,6 +540,32 @@ fun SettingsScreen(
         )
     }
 
+    if (showMessageTimeFormatDialog) {
+        AlertDialog(
+            onDismissRequest = { showMessageTimeFormatDialog = false },
+            title = { Text("短信时间显示格式") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    MessageTimeDisplayFormat.entries.forEach { format ->
+                        MessageTimeFormatOption(
+                            format = format,
+                            selected = settings.messageTimeDisplayFormat == format,
+                            onClick = {
+                                viewModel.setMessageTimeDisplayFormat(format)
+                                showMessageTimeFormatDialog = false
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMessageTimeFormatDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     if (showSpamAutoActionDialog) {
         AlertDialog(
             onDismissRequest = { showSpamAutoActionDialog = false },
@@ -606,6 +647,37 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun MessageTimeFormatOption(
+    format: MessageTimeDisplayFormat,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick
+        )
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            Text(
+                text = format.title(),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = format.dialogSummary(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun SpamAutoActionOption(
     action: SpamAutoAction,
     selected: Boolean,
@@ -637,6 +709,27 @@ private fun SpamAutoActionOption(
                 }
             )
         }
+    }
+}
+
+private fun MessageTimeDisplayFormat.title(): String {
+    return when (this) {
+        MessageTimeDisplayFormat.HUMANIZED -> "人性化时间"
+        MessageTimeDisplayFormat.DETAILED -> "详细时间"
+    }
+}
+
+private fun MessageTimeDisplayFormat.preferenceSummary(): String {
+    return when (this) {
+        MessageTimeDisplayFormat.HUMANIZED -> "默认显示“刚刚、5分钟前、2小时前”等相对时间"
+        MessageTimeDisplayFormat.DETAILED -> "默认显示“2026年6月22日 17:38:05”等完整时间"
+    }
+}
+
+private fun MessageTimeDisplayFormat.dialogSummary(): String {
+    return when (this) {
+        MessageTimeDisplayFormat.HUMANIZED -> "例如：刚刚、5分钟前、2小时前；点按消息时间可临时切换为详细时间"
+        MessageTimeDisplayFormat.DETAILED -> "例如：2026年6月22日 17:38:05；点按消息时间可临时切换为人性化时间"
     }
 }
 
