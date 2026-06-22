@@ -16,6 +16,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,8 +98,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,6 +132,15 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
+
+private enum class ConversationSwipeGestureDirection {
+    Horizontal,
+    Vertical
+}
+
+private const val CONVERSATION_VERTICAL_LOCK_RATIO = 1.05f
+private const val CONVERSATION_HORIZONTAL_LOCK_RATIO = 1.25f
+private const val CONVERSATION_SWIPE_THRESHOLD_FRACTION = 0.5f
 
 @Composable
 fun ConversationListScreen(
@@ -278,6 +292,7 @@ fun ConversationListScreen(
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
+    val conversationSwipeGesturesEnabled = !selectionMode && !listState.isScrollInProgress
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -497,7 +512,7 @@ fun ConversationListScreen(
                                             selected = selected,
                                             rightSwipeAction = settings.rightSwipeAction,
                                             leftSwipeAction = settings.leftSwipeAction,
-                                            gesturesEnabled = !selectionMode,
+                                            gesturesEnabled = conversationSwipeGesturesEnabled,
                                             onSwipeAction = { action, swipedConversation ->
                                                 when (action) {
                                                     ConversationSwipeAction.ARCHIVE -> {
@@ -709,11 +724,15 @@ private fun SwipeableConversationItem(
     onLongClick: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { distance -> distance * 0.35f }
+        positionalThreshold = { distance -> distance * CONVERSATION_SWIPE_THRESHOLD_FRACTION }
     )
     val density = LocalDensity.current
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     val rightSwipeEnabled = rightSwipeAction != ConversationSwipeAction.NONE
     val leftSwipeEnabled = leftSwipeAction != ConversationSwipeAction.NONE
+    var lockedGestureDirection by remember(conversation.threadId) {
+        mutableStateOf<ConversationSwipeGestureDirection?>(null)
+    }
 
     if (!rightSwipeEnabled && !leftSwipeEnabled) {
         ConversationItem(
@@ -726,12 +745,57 @@ private fun SwipeableConversationItem(
         return
     }
 
+    LaunchedEffect(gesturesEnabled) {
+        if (!gesturesEnabled) {
+            lockedGestureDirection = null
+        }
+    }
+
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier,
+        modifier = modifier.pointerInput(gesturesEnabled, conversation.threadId, touchSlop) {
+            if (!gesturesEnabled) {
+                return@pointerInput
+            }
+
+            awaitEachGesture {
+                lockedGestureDirection = null
+                val down = awaitFirstDown(
+                    requireUnconsumed = false,
+                    pass = PointerEventPass.Initial
+                )
+                val downPosition = down.position
+                val pointerId = down.id
+
+                do {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == pointerId } ?: continue
+                    val dragOffset = change.position - downPosition
+                    val absDx = abs(dragOffset.x)
+                    val absDy = abs(dragOffset.y)
+
+                    if (lockedGestureDirection == null) {
+                        lockedGestureDirection = when {
+                            absDy > touchSlop &&
+                                    absDy > absDx * CONVERSATION_VERTICAL_LOCK_RATIO ->
+                                ConversationSwipeGestureDirection.Vertical
+
+                            absDx > touchSlop &&
+                                    absDx > absDy * CONVERSATION_HORIZONTAL_LOCK_RATIO ->
+                                ConversationSwipeGestureDirection.Horizontal
+
+                            else -> null
+                        }
+                    }
+                } while (event.changes.any { it.pressed })
+
+                lockedGestureDirection = null
+            }
+        },
         enableDismissFromStartToEnd = rightSwipeEnabled,
         enableDismissFromEndToStart = leftSwipeEnabled,
-        gesturesEnabled = gesturesEnabled,
+        gesturesEnabled = gesturesEnabled &&
+                lockedGestureDirection != ConversationSwipeGestureDirection.Vertical,
         backgroundContent = {
             val swipeDistancePx = abs(
                 runCatching { dismissState.requireOffset() }.getOrDefault(0f)
