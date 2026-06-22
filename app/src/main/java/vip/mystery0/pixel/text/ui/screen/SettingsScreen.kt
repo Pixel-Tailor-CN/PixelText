@@ -208,7 +208,13 @@ fun SettingsScreen(
                         item(key = "offline_model_version", contentType = "Preference") {
                             Preference(
                                 title = { Text("离线模型版本") },
-                                summary = { Text(settings.spamModelResourceVersion) },
+                                summary = {
+                                    Text(
+                                        viewModel.displaySpamModelResourceVersion(
+                                            settings.spamModelResourceVersion
+                                        )
+                                    )
+                                },
                                 icon = {
                                     Icon(Icons.Rounded.Memory, contentDescription = null)
                                 }
@@ -217,7 +223,13 @@ fun SettingsScreen(
                         item(key = "smart_card_rule_version", contentType = "Preference") {
                             Preference(
                                 title = { Text("智能卡片规则版本") },
-                                summary = { Text(settings.ruleResourceVersion) },
+                                summary = {
+                                    Text(
+                                        viewModel.displayRuleResourceVersion(
+                                            settings.ruleResourceVersion
+                                        )
+                                    )
+                                },
                                 icon = {
                                     Icon(Icons.AutoMirrored.Rounded.Rule, contentDescription = null)
                                 }

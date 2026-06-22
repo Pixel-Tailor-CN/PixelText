@@ -13,6 +13,7 @@ import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
+import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
@@ -36,6 +37,7 @@ import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
     single<AppSettingsRepository> { AppSettingsRepositoryImpl(androidContext()) }
+    single { BundledResourceVersionProvider(androidContext()) }
     single { HubResourceStore(androidContext()) }
     single { PixelTextHubClient("https://pixeltext.api.mystery0.vip") }
     single { MessageParser(androidContext(), get()) }
@@ -65,6 +67,6 @@ val appModule = module {
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
 }

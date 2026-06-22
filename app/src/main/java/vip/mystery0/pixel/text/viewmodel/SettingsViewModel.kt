@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
+import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
@@ -14,12 +15,15 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
 
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
     private val hubResourceRepository: HubResourceRepository,
+    bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
     val settings = settingsRepository.settings
+    private val bundledResourceVersions = bundledResourceVersionProvider.read()
     private val _resourceUpdateState =
         MutableStateFlow<ResourceUpdateState>(ResourceUpdateState.Idle)
     val resourceUpdateState: StateFlow<ResourceUpdateState> =
@@ -64,6 +68,14 @@ class SettingsViewModel(
 
     fun setLeftSwipeAction(action: ConversationSwipeAction) {
         settingsRepository.setLeftSwipeAction(action)
+    }
+
+    fun displayRuleResourceVersion(version: String): String {
+        return formatResourceVersionForDisplay(version, bundledResourceVersions.rulesVersion)
+    }
+
+    fun displaySpamModelResourceVersion(version: String): String {
+        return formatResourceVersionForDisplay(version, bundledResourceVersions.spamModelVersion)
     }
 
     fun checkResourceUpdates() {

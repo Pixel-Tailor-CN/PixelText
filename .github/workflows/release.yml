@@ -109,6 +109,11 @@ jobs:
           download_artifact "rules" "$RULES_URL" "${ASSETS_DIR}/rules.json" "$RULES_SHA256" "$RULES_SIZE"
           download_artifact "spam model" "$MODEL_URL" "${ASSETS_DIR}/spam_classifier.tflite" "$MODEL_SHA256" "$MODEL_SIZE"
           download_artifact "vocab" "$VOCAB_URL" "${ASSETS_DIR}/vocab.txt" "$VOCAB_SHA256" "$VOCAB_SIZE"
+          jq -n \
+            --arg rulesVersion "$RULES_VERSION" \
+            --arg spamModelVersion "$SPAM_MODEL_VERSION" \
+            '{rulesVersion: $rulesVersion, spamModelVersion: $spamModelVersion}' \
+            > "${ASSETS_DIR}/bundled_resource_versions.json"
 
           echo "resource sync completed rules_version=${RULES_VERSION} spam_model_version=${SPAM_MODEL_VERSION}"
 
