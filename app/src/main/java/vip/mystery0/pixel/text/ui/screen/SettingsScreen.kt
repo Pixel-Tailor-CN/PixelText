@@ -104,6 +104,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: () -> Unit = {},
+    onNavigateToSwipeActions: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
@@ -373,6 +374,21 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Schedule, contentDescription = null)
                                 },
                                 onClick = { showMessageTimeFormatDialog = true }
+                            )
+                        }
+                        item(key = "conversation_swipe_actions", contentType = "Preference") {
+                            Preference(
+                                title = { Text("滑动操作") },
+                                summary = {
+                                    Text(
+                                        "向右滑动：${settings.rightSwipeAction.settingTitle()}；" +
+                                                "向左滑动：${settings.leftSwipeAction.settingTitle()}"
+                                    )
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                                },
+                                onClick = onNavigateToSwipeActions
                             )
                         }
                         item(

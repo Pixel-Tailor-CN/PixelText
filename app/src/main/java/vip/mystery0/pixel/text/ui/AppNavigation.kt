@@ -24,6 +24,7 @@ import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.SwipeActionSettingsScreen
 
 /**
  * 通知点击等外部入口带过来的会话跳转目标。
@@ -104,7 +105,15 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = {
                         navController.navigate("sample_submission")
+                    },
+                    onNavigateToSwipeActions = {
+                        navController.navigate("swipe_actions")
                     }
+                )
+            }
+            composable("swipe_actions") {
+                SwipeActionSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable("sample_submission") {

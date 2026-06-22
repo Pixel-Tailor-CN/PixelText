@@ -68,6 +68,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -76,6 +78,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -92,7 +95,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,6 +111,7 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
@@ -118,6 +124,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -263,6 +270,7 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val settings by viewModel.settings.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val markAllReadProgress by viewModel.markAllReadProgress.collectAsState()
@@ -276,6 +284,28 @@ fun ConversationListScreen(
     var showMenuSheet by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    fun deleteWithUndo(threadIds: Set<Long>) {
+        if (threadIds.isEmpty()) return
+        viewModel.hidePendingDelete(threadIds)
+        coroutineScope.launch {
+            val dismissJob = launch {
+                delay(3000.milliseconds)
+                snackbarHostState.currentSnackbarData?.dismiss()
+            }
+            val result = snackbarHostState.showSnackbar(
+                message = "已删除 ${threadIds.size} 个会话",
+                actionLabel = "恢复",
+                duration = SnackbarDuration.Indefinite
+            )
+            dismissJob.cancel()
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.restorePendingDelete(threadIds)
+            } else {
+                viewModel.deleteSelected(threadIds)
+            }
+        }
+    }
 
     LaunchedEffect(viewModel, snackbarHostState) {
         viewModel.markAllReadResultEvents.collect { event ->
@@ -452,10 +482,47 @@ fun ConversationListScreen(
                                         state.conversations,
                                         key = { it.threadId }) { conversation ->
                                         val selected = conversation.threadId in selectedThreadIds
-                                        ConversationItem(
-                                            modifier = Modifier,
+                                        SwipeableConversationItem(
+                                            modifier = Modifier.animateItem(),
                                             conversation = conversation,
                                             selected = selected,
+                                            rightSwipeAction = settings.rightSwipeAction,
+                                            leftSwipeAction = settings.leftSwipeAction,
+                                            gesturesEnabled = !selectionMode,
+                                            onSwipeAction = { action, swipedConversation ->
+                                                when (action) {
+                                                    ConversationSwipeAction.ARCHIVE -> {
+                                                        viewModel.archiveConversation(
+                                                            swipedConversation
+                                                        )
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                "已归档 1 个会话"
+                                                            )
+                                                        }
+                                                    }
+
+                                                    ConversationSwipeAction.DELETE ->
+                                                        deleteWithUndo(
+                                                            setOf(swipedConversation.threadId)
+                                                        )
+
+                                                    ConversationSwipeAction.TOGGLE_READ -> {
+                                                        viewModel.toggleRead(swipedConversation)
+                                                        coroutineScope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                if (swipedConversation.unreadCount > 0) {
+                                                                    "已标记为已读"
+                                                                } else {
+                                                                    "已标记为未读"
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+
+                                                    ConversationSwipeAction.NONE -> Unit
+                                                }
+                                            },
                                             onClick = {
                                                 if (selectionMode) {
                                                     selectedThreadIds =
@@ -501,24 +568,7 @@ fun ConversationListScreen(
                         val selected = deleteCandidateThreadIds
                         deleteCandidateThreadIds = emptySet()
                         selectedThreadIds = emptySet()
-                        viewModel.hidePendingDelete(selected)
-                        coroutineScope.launch {
-                            val dismissJob = launch {
-                                delay(3000.milliseconds)
-                                snackbarHostState.currentSnackbarData?.dismiss()
-                            }
-                            val result = snackbarHostState.showSnackbar(
-                                message = "已删除 ${selected.size} 个会话",
-                                actionLabel = "恢复",
-                                duration = SnackbarDuration.Indefinite
-                            )
-                            dismissJob.cancel()
-                            if (result == SnackbarResult.ActionPerformed) {
-                                viewModel.restorePendingDelete(selected)
-                            } else {
-                                viewModel.deleteSelected(selected)
-                            }
-                        }
+                        deleteWithUndo(selected)
                     }
                 ) {
                     Text("删除")
@@ -644,6 +694,149 @@ fun ConversationListScreen(
 }
 
 @Composable
+private fun SwipeableConversationItem(
+    modifier: Modifier = Modifier,
+    conversation: ConversationModel,
+    selected: Boolean,
+    rightSwipeAction: ConversationSwipeAction,
+    leftSwipeAction: ConversationSwipeAction,
+    gesturesEnabled: Boolean,
+    onSwipeAction: (ConversationSwipeAction, ConversationModel) -> Unit,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { distance -> distance * 0.35f }
+    )
+    val density = LocalDensity.current
+    val rightSwipeEnabled = rightSwipeAction != ConversationSwipeAction.NONE
+    val leftSwipeEnabled = leftSwipeAction != ConversationSwipeAction.NONE
+
+    if (!rightSwipeEnabled && !leftSwipeEnabled) {
+        ConversationItem(
+            modifier = modifier,
+            conversation = conversation,
+            selected = selected,
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+        return
+    }
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        enableDismissFromStartToEnd = rightSwipeEnabled,
+        enableDismissFromEndToStart = leftSwipeEnabled,
+        gesturesEnabled = gesturesEnabled,
+        backgroundContent = {
+            val swipeDistancePx = abs(
+                runCatching { dismissState.requireOffset() }.getOrDefault(0f)
+            )
+            val backgroundAlpha = calculateSwipeBackgroundAlpha(
+                distancePx = swipeDistancePx,
+                startPx = with(density) { 8.dp.toPx() },
+                endPx = with(density) { 40.dp.toPx() }
+            )
+            val direction = dismissState.dismissDirection
+            val action = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> rightSwipeAction
+                SwipeToDismissBoxValue.EndToStart -> leftSwipeAction
+                SwipeToDismissBoxValue.Settled -> ConversationSwipeAction.NONE
+            }
+            ConversationSwipeActionBackground(
+                action = action,
+                direction = direction,
+                unread = conversation.unreadCount > 0,
+                alpha = backgroundAlpha
+            )
+        }
+    ) {
+        ConversationItem(
+            conversation = conversation,
+            selected = selected,
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    }
+
+    LaunchedEffect(dismissState.settledValue) {
+        val direction = dismissState.settledValue
+        if (direction == SwipeToDismissBoxValue.Settled) return@LaunchedEffect
+
+        val action = when (direction) {
+            SwipeToDismissBoxValue.StartToEnd -> rightSwipeAction
+            SwipeToDismissBoxValue.EndToStart -> leftSwipeAction
+            SwipeToDismissBoxValue.Settled -> ConversationSwipeAction.NONE
+        }
+        onSwipeAction(action, conversation)
+        if (action == ConversationSwipeAction.TOGGLE_READ ||
+            action == ConversationSwipeAction.NONE
+        ) {
+            dismissState.reset()
+        }
+    }
+}
+
+@Composable
+private fun ConversationSwipeActionBackground(
+    action: ConversationSwipeAction,
+    direction: SwipeToDismissBoxValue,
+    unread: Boolean,
+    alpha: Float
+) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val containerColor = when (action) {
+        ConversationSwipeAction.ARCHIVE -> MaterialTheme.colorScheme.primaryContainer
+        ConversationSwipeAction.DELETE -> MaterialTheme.colorScheme.errorContainer
+        ConversationSwipeAction.TOGGLE_READ -> MaterialTheme.colorScheme.secondaryContainer
+        ConversationSwipeAction.NONE -> Color.Transparent
+    }.copy(alpha = alpha)
+    val contentColor = when (action) {
+        ConversationSwipeAction.ARCHIVE -> MaterialTheme.colorScheme.onPrimaryContainer
+        ConversationSwipeAction.DELETE -> MaterialTheme.colorScheme.onErrorContainer
+        ConversationSwipeAction.TOGGLE_READ -> MaterialTheme.colorScheme.onSecondaryContainer
+        ConversationSwipeAction.NONE -> Color.Transparent
+    }.copy(alpha = alpha)
+    val arrangement = when (direction) {
+        SwipeToDismissBoxValue.EndToStart -> Arrangement.End
+        else -> Arrangement.Start
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(surfaceColor)
+            .background(containerColor)
+            .padding(horizontal = 24.dp),
+        horizontalArrangement = arrangement,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (direction == SwipeToDismissBoxValue.EndToStart) {
+            Text(
+                text = action.swipeLabel(unread),
+                style = MaterialTheme.typography.labelLarge,
+                color = contentColor
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Icon(
+            imageVector = action.swipeIcon(),
+            contentDescription = null,
+            tint = contentColor
+        )
+        if (direction != SwipeToDismissBoxValue.EndToStart) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = action.swipeLabel(unread),
+                style = MaterialTheme.typography.labelLarge,
+                color = contentColor
+            )
+        }
+    }
+}
+
+@Composable
 fun ConversationItem(
     modifier: Modifier = Modifier,
     conversation: ConversationModel,
@@ -652,14 +845,16 @@ fun ConversationItem(
     onLongClick: () -> Unit = {}
 ) {
     val title = conversation.displayName?.takeIf { it.isNotBlank() } ?: conversation.address
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                if (selected) MaterialTheme.colorScheme.secondaryContainer
-                else Color.Transparent
-            )
+            .background(containerColor)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -694,7 +889,7 @@ fun ConversationItem(
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.error)
                         .align(Alignment.TopEnd)
-                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                        .border(2.dp, containerColor, CircleShape)
                 )
             }
         }
@@ -815,6 +1010,33 @@ fun MenuSheetContent(
             modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
         )
     }
+}
+
+private fun ConversationSwipeAction.swipeLabel(unread: Boolean): String {
+    return when (this) {
+        ConversationSwipeAction.ARCHIVE -> "归档"
+        ConversationSwipeAction.DELETE -> "删除"
+        ConversationSwipeAction.TOGGLE_READ -> if (unread) "标为已读" else "标为未读"
+        ConversationSwipeAction.NONE -> ""
+    }
+}
+
+private fun ConversationSwipeAction.swipeIcon(): ImageVector {
+    return when (this) {
+        ConversationSwipeAction.ARCHIVE -> Icons.Rounded.Archive
+        ConversationSwipeAction.DELETE -> Icons.Rounded.Delete
+        ConversationSwipeAction.TOGGLE_READ -> Icons.Rounded.DoneAll
+        ConversationSwipeAction.NONE -> Icons.Rounded.Close
+    }
+}
+
+private fun calculateSwipeBackgroundAlpha(
+    distancePx: Float,
+    startPx: Float,
+    endPx: Float
+): Float {
+    if (endPx <= startPx) return 1f
+    return ((distancePx - startPx) / (endPx - startPx)).coerceIn(0f, 1f)
 }
 
 fun formatTimeShort(timestamp: Long): String {

@@ -214,6 +214,15 @@ class MessageRepositoryImpl(
         }
     }
 
+    override suspend fun markThreadAsUnread(threadId: Long) {
+        if (threadId < 0) return
+        withContext(Dispatchers.IO) {
+            telephonyDataSource.markLatestIncomingMessageAsUnread(threadId)
+            conversationCacheRepository.syncThreads(listOf(threadId))
+            SmartspacerIntegration.notifyChanged(context)
+        }
+    }
+
     private suspend fun getHiddenFullySpamThreadIds(archivedThreadIds: Set<Long>): Set<Long> {
         if (!settingsRepository.isHideFullySpamConversationsEnabled()) {
             return emptySet()

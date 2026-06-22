@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
@@ -55,6 +56,14 @@ class SettingsViewModel(
 
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
         settingsRepository.setMessageTimeDisplayFormat(format)
+    }
+
+    fun setRightSwipeAction(action: ConversationSwipeAction) {
+        settingsRepository.setRightSwipeAction(action)
+    }
+
+    fun setLeftSwipeAction(action: ConversationSwipeAction) {
+        settingsRepository.setLeftSwipeAction(action)
     }
 
     fun checkResourceUpdates() {
