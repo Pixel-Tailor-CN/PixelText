@@ -20,8 +20,15 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import java.util.concurrent.ConcurrentHashMap
@@ -32,7 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * 使用 BroadcastReceiver 而非 Activity，确保在后台也能静默处理，无需唤起 UI。
  */
-class NotificationActionReceiver : BroadcastReceiver() {
+class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
+    private val conversationCacheRepository: ConversationCacheRepository by inject()
 
     companion object {
         private const val TAG = "NotificationActionReceiver"
@@ -93,7 +101,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
             ACTION_MARK_READ -> {
                 if (threadId != -1L) {
                     markThreadAsRead(context, threadId)
-                    SmartspacerIntegration.notifyChanged(context)
+                    syncReadStateAsync(context, threadId)
                 }
                 cancelNotification(context, notificationId)
             }
@@ -104,7 +112,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 if (!code.isNullOrBlank()) {
                     copyVerificationCode(context, code)
                     markMessageAsRead(context, messageUri, threadId)
-                    SmartspacerIntegration.notifyChanged(context)
+                    syncReadStateAsync(context, resolveThreadId(context, messageUri, threadId))
                 } else {
                     Log.w(TAG, "copy verification skipped: code is blank")
                 }
@@ -143,6 +151,44 @@ class NotificationActionReceiver : BroadcastReceiver() {
             ACTION_REPLY_SMS_SENT -> handleReplySmsSent(context, intent, resultCode)
 
             ACTION_REPLY_SMS_DELIVERED -> handleReplySmsDelivered(context, intent, resultCode)
+        }
+    }
+
+    private fun syncReadStateAsync(context: Context, threadId: Long?) {
+        if (threadId == null || threadId <= 0L) {
+            SmartspacerIntegration.notifyChanged(context)
+            return
+        }
+        val pendingResult = goAsync()
+        val cacheRepository = conversationCacheRepository
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                cacheRepository.syncThreads(listOf(threadId))
+            } catch (e: Exception) {
+                Log.e(TAG, "failed to sync conversation cache thread_id=$threadId", e)
+            } finally {
+                SmartspacerIntegration.notifyChanged(context)
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private fun resolveThreadId(context: Context, messageUri: String?, fallbackThreadId: Long): Long? {
+        if (fallbackThreadId > 0L) return fallbackThreadId
+        if (messageUri.isNullOrBlank()) return null
+        return try {
+            context.contentResolver.query(
+                Uri.parse(messageUri),
+                arrayOf(Telephony.Sms.THREAD_ID),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "failed to resolve thread id message_uri=$messageUri", e)
+            null
         }
     }
 

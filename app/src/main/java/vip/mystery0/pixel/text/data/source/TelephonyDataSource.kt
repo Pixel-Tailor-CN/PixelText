@@ -707,6 +707,19 @@ class TelephonyDataSource(
         return null
     }
 
+    fun queryThreadIdFromChangedMessageUri(uri: Uri?): Long? {
+        if (uri == null) return null
+        val isMessageProvider = uri.authority == "sms" || uri.authority == "mms"
+        val hasMessageId = uri.lastPathSegment?.toLongOrNull() != null
+        if (!isMessageProvider || !hasMessageId) return null
+        return try {
+            queryThreadIdFromUri(uri)
+        } catch (e: Exception) {
+            Log.e(TELEPHONY_TAG, "failed to query changed message thread id uri=$uri", e)
+            null
+        }
+    }
+
     fun updateSmsSendResult(uri: Uri?, resultCode: Int, success: Boolean) {
         if (uri == null) return
         val values = ContentValues().apply {

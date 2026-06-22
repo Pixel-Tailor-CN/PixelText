@@ -75,8 +75,8 @@ class ConversationCacheRepository(
     }
 
     private suspend fun syncChangedThreads(uri: Uri?) {
-        // 从 URI 提取受影响的 threadId（如有），否则做局部刷新
-        val threadId = uri?.lastPathSegment?.toLongOrNull()
+        // 系统通知的 URI 通常是单条消息 URI，末尾 ID 是 messageId，不是 threadId。
+        val threadId = telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
         if (threadId != null) {
             syncThreads(listOf(threadId))
         } else {

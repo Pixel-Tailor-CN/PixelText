@@ -17,3 +17,4 @@ local.properties
 .kotlin
 /samples/
 /app/release/
+.codex-remote-attachments/
