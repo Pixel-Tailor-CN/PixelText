@@ -11,11 +11,16 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 
-class ConversationListViewModel(private val repository: MessageRepository) : ViewModel() {
+class ConversationListViewModel(
+    private val repository: MessageRepository,
+    settingsRepository: AppSettingsRepository
+) : ViewModel() {
     private val _uiState =
         MutableStateFlow<ConversationListUiState>(ConversationListUiState.Loading)
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
+    val settings = settingsRepository.settings
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -33,6 +38,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
+    private val pendingArchivedThreadIds = mutableSetOf<Long>()
     private var isLoading = false
     private var isRefreshingLoaded = false
 
@@ -117,6 +123,21 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     fun markAsRead(threadId: Long) {
         viewModelScope.launch {
             repository.markThreadAsRead(threadId)
+            markLoadedConversationsAsRead(setOf(threadId))
+            refreshSilent()
+        }
+    }
+
+    fun toggleRead(conversation: ConversationModel) {
+        viewModelScope.launch {
+            if (conversation.unreadCount > 0) {
+                repository.markThreadAsRead(conversation.threadId)
+                markLoadedConversationsAsRead(setOf(conversation.threadId))
+            } else {
+                repository.markThreadAsUnread(conversation.threadId)
+                markLoadedConversationAsUnread(conversation.threadId)
+            }
+            refreshSilent()
         }
     }
 
@@ -170,6 +191,22 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         }
     }
 
+    fun archiveConversation(conversation: ConversationModel) {
+        pendingArchivedThreadIds += conversation.threadId
+        removeLoadedConversations(setOf(conversation.threadId))
+        viewModelScope.launch {
+            runCatching {
+                repository.archiveConversations(listOf(conversation))
+            }.onSuccess {
+                pendingArchivedThreadIds -= conversation.threadId
+                refreshSilent()
+            }.onFailure {
+                pendingArchivedThreadIds -= conversation.threadId
+                restoreLoadedConversation(conversation)
+            }
+        }
+    }
+
     fun deleteSelected(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         viewModelScope.launch {
@@ -182,8 +219,7 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
     fun hidePendingDelete(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         pendingDeletedThreadIds.addAll(threadIds)
-        allConversations.removeAll { it.threadId in threadIds }
-        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+        removeLoadedConversations(threadIds)
     }
 
     fun restorePendingDelete(threadIds: Set<Long>) {
@@ -194,10 +230,25 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
 
     private fun replaceConversations(conversations: List<ConversationModel>) {
         val visibleList = conversations
-            .filterNot { it.threadId in pendingDeletedThreadIds }
+            .filterNot {
+                it.threadId in pendingDeletedThreadIds ||
+                        it.threadId in pendingArchivedThreadIds
+            }
             .distinctBy { it.threadId }
         allConversations.clear()
         allConversations.addAll(visibleList)
+        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
+
+    private fun removeLoadedConversations(threadIds: Set<Long>) {
+        allConversations.removeAll { it.threadId in threadIds }
+        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
+
+    private fun restoreLoadedConversation(conversation: ConversationModel) {
+        allConversations.removeAll { it.threadId == conversation.threadId }
+        allConversations += conversation
+        allConversations.sortByDescending { it.timestamp }
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
     }
 
@@ -205,6 +256,17 @@ class ConversationListViewModel(private val repository: MessageRepository) : Vie
         allConversations.replaceAll { conversation ->
             if (conversation.threadId in threadIds) conversation.copy(unreadCount = 0)
             else conversation
+        }
+        _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
+
+    private fun markLoadedConversationAsUnread(threadId: Long) {
+        allConversations.replaceAll { conversation ->
+            if (conversation.threadId == threadId) {
+                conversation.copy(unreadCount = conversation.unreadCount.coerceAtLeast(1))
+            } else {
+                conversation
+            }
         }
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
     }

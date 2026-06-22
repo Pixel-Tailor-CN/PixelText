@@ -60,7 +60,7 @@ val appModule = module {
         MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
-    viewModel { ConversationListViewModel(get()) }
+    viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }

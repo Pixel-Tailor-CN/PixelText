@@ -72,6 +72,12 @@ data class SmartspacerSmsRow(
     val read: Boolean
 )
 
+private data class IncomingMessageRef(
+    val id: Long,
+    val timestamp: Long,
+    val isMms: Boolean
+)
+
 class TelephonyDataSource(
     private val context: Context,
     private val contentResolver: ContentResolver
@@ -775,6 +781,44 @@ class TelephonyDataSource(
         }
     }
 
+    fun markLatestIncomingMessageAsUnread(threadId: Long): Int {
+        val latestMessage = listOfNotNull(
+            queryLatestIncomingSms(threadId),
+            queryLatestIncomingMms(threadId)
+        ).maxByOrNull { it.timestamp } ?: return 0
+
+        val values = ContentValues().apply {
+            if (latestMessage.isMms) {
+                put(Telephony.Mms.READ, 0)
+                put(Telephony.Mms.SEEN, 0)
+            } else {
+                put(Telephony.Sms.READ, 0)
+                put(Telephony.Sms.SEEN, 0)
+            }
+        }
+
+        return try {
+            if (latestMessage.isMms) {
+                contentResolver.update(
+                    Telephony.Mms.CONTENT_URI,
+                    values,
+                    "${Telephony.Mms._ID} = ?",
+                    arrayOf(latestMessage.id.toString())
+                )
+            } else {
+                contentResolver.update(
+                    Telephony.Sms.CONTENT_URI,
+                    values,
+                    "${Telephony.Sms._ID} = ?",
+                    arrayOf(latestMessage.id.toString())
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TELEPHONY_TAG, "failed to mark message unread", e)
+            0
+        }
+    }
+
     fun getSimName(subId: Int): String {
         if (subId <= 0) return "默认卡"
         simNameCache[subId]?.let { return it }
@@ -970,6 +1014,68 @@ class TelephonyDataSource(
             textContent = getMmsTextContent(mmsId),
             imageUris = getMmsImageUris(mmsId),
         )
+    }
+
+    private fun queryLatestIncomingSms(threadId: Long): IncomingMessageRef? {
+        return try {
+            contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(
+                    Telephony.Sms._ID,
+                    Telephony.Sms.DATE
+                ),
+                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.TYPE} = ?",
+                arrayOf(
+                    threadId.toString(),
+                    Telephony.Sms.MESSAGE_TYPE_INBOX.toString()
+                ),
+                "${Telephony.Sms.DATE} DESC LIMIT 1"
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    IncomingMessageRef(
+                        id = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms._ID)),
+                        timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)),
+                        isMms = false
+                    )
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TELEPHONY_TAG, "failed to query latest incoming sms", e)
+            null
+        }
+    }
+
+    private fun queryLatestIncomingMms(threadId: Long): IncomingMessageRef? {
+        return try {
+            contentResolver.query(
+                Telephony.Mms.CONTENT_URI,
+                arrayOf(
+                    Telephony.Mms._ID,
+                    Telephony.Mms.DATE
+                ),
+                "${Telephony.Mms.THREAD_ID} = ? AND ${Telephony.Mms.MESSAGE_BOX} = ?",
+                arrayOf(
+                    threadId.toString(),
+                    Telephony.Mms.MESSAGE_BOX_INBOX.toString()
+                ),
+                "${Telephony.Mms.DATE} DESC LIMIT 1"
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    IncomingMessageRef(
+                        id = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Mms._ID)),
+                        timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Mms.DATE)) * 1000,
+                        isMms = true
+                    )
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TELEPHONY_TAG, "failed to query latest incoming mms", e)
+            null
+        }
     }
 
     private fun MmsMessageRow.matchesSearchFilters(

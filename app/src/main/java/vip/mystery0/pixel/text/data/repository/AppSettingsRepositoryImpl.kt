@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import vip.mystery0.pixel.text.domain.settings.AppSettings
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
@@ -68,6 +69,18 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
         prefs.edit {
             putString(AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT, format.storageValue)
+        }
+    }
+
+    override fun setRightSwipeAction(action: ConversationSwipeAction) {
+        prefs.edit {
+            putString(AppSettingsKeys.KEY_RIGHT_SWIPE_ACTION, action.storageValue)
+        }
+    }
+
+    override fun setLeftSwipeAction(action: ConversationSwipeAction) {
+        prefs.edit {
+            putString(AppSettingsKeys.KEY_LEFT_SWIPE_ACTION, action.storageValue)
         }
     }
 
@@ -145,6 +158,22 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             )
         )
 
+    override fun getRightSwipeAction(): ConversationSwipeAction =
+        ConversationSwipeAction.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_RIGHT_SWIPE_ACTION,
+                AppSettingsKeys.DEFAULT_RIGHT_SWIPE_ACTION.storageValue
+            )
+        )
+
+    override fun getLeftSwipeAction(): ConversationSwipeAction =
+        ConversationSwipeAction.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_LEFT_SWIPE_ACTION,
+                AppSettingsKeys.DEFAULT_LEFT_SWIPE_ACTION.storageValue
+            )
+        )
+
     override fun getConversationDetailTextScale(): Float =
         prefs.getFloat(
             AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -187,6 +216,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             hideVerificationCodeOnLockScreenEnabled =
                 isHideVerificationCodeOnLockScreenEnabled(),
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
+            rightSwipeAction = getRightSwipeAction(),
+            leftSwipeAction = getLeftSwipeAction(),
             conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),
