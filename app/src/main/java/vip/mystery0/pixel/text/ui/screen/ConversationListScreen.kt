@@ -106,6 +106,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -281,9 +282,17 @@ fun ConversationListScreen(
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    var transientSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var showMenuSheet by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    fun showTransientSnackbar(message: String) {
+        transientSnackbarJob?.cancel()
+        transientSnackbarJob = coroutineScope.launch {
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     fun deleteWithUndo(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
@@ -316,7 +325,7 @@ fun ConversationListScreen(
                 MarkAllReadResultEvent.NoUnread -> "没有未读会话"
                 is MarkAllReadResultEvent.Failure -> event.reason
             }
-            snackbarHostState.showSnackbar(message)
+            showTransientSnackbar(message)
         }
     }
 
@@ -495,11 +504,7 @@ fun ConversationListScreen(
                                                         viewModel.archiveConversation(
                                                             swipedConversation
                                                         )
-                                                        coroutineScope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                "已归档 1 个会话"
-                                                            )
-                                                        }
+                                                        showTransientSnackbar("已归档 1 个会话")
                                                     }
 
                                                     ConversationSwipeAction.DELETE ->
@@ -509,15 +514,13 @@ fun ConversationListScreen(
 
                                                     ConversationSwipeAction.TOGGLE_READ -> {
                                                         viewModel.toggleRead(swipedConversation)
-                                                        coroutineScope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                if (swipedConversation.unreadCount > 0) {
-                                                                    "已标记为已读"
-                                                                } else {
-                                                                    "已标记为未读"
-                                                                }
-                                                            )
-                                                        }
+                                                        showTransientSnackbar(
+                                                            if (swipedConversation.unreadCount > 0) {
+                                                                "已标记为已读"
+                                                            } else {
+                                                                "已标记为未读"
+                                                            }
+                                                        )
                                                     }
 
                                                     ConversationSwipeAction.NONE -> Unit
