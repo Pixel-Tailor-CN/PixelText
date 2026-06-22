@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import vip.mystery0.pixel.text.domain.settings.AppSettings
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
@@ -61,6 +62,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 AppSettingsKeys.KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
                 enabled
             )
+        }
+    }
+
+    override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
+        prefs.edit {
+            putString(AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT, format.storageValue)
         }
     }
 
@@ -130,6 +137,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED
         )
 
+    override fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat =
+        MessageTimeDisplayFormat.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT,
+                AppSettingsKeys.DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT.storageValue
+            )
+        )
+
     override fun getConversationDetailTextScale(): Float =
         prefs.getFloat(
             AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -171,6 +186,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 isVerificationCodeNotificationActionEnabled(),
             hideVerificationCodeOnLockScreenEnabled =
                 isHideVerificationCodeOnLockScreenEnabled(),
+            messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),

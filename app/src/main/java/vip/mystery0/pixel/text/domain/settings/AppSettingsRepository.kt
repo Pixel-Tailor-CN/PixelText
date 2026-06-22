@@ -14,6 +14,8 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
     val hideVerificationCodeOnLockScreenEnabled: Boolean =
         AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+    val messageTimeDisplayFormat: MessageTimeDisplayFormat =
+        AppSettingsKeys.DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT,
     val conversationDetailTextScale: Float =
         AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
     val ruleResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
@@ -34,6 +36,17 @@ enum class SpamAutoAction(val storageValue: String) {
     }
 }
 
+enum class MessageTimeDisplayFormat(val storageValue: String) {
+    HUMANIZED("humanized"),
+    DETAILED("detailed");
+
+    companion object {
+        fun fromStorageValue(value: String?): MessageTimeDisplayFormat {
+            return entries.firstOrNull { it.storageValue == value } ?: HUMANIZED
+        }
+    }
+}
+
 interface AppSettingsRepository {
     val settings: StateFlow<AppSettings>
 
@@ -44,6 +57,7 @@ interface AppSettingsRepository {
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean)
+    fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat)
     fun setConversationDetailTextScale(scale: Float)
     fun setRuleResourceVersion(version: String)
     fun setSpamModelResourceVersion(version: String)
@@ -57,6 +71,7 @@ interface AppSettingsRepository {
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
     fun isHideVerificationCodeOnLockScreenEnabled(): Boolean
+    fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat
     fun getConversationDetailTextScale(): Float
     fun getRuleResourceVersion(): String
     fun getSpamModelResourceVersion(): String
@@ -76,6 +91,7 @@ object AppSettingsKeys {
         "verification_code_notification_action_enabled"
     const val KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED =
         "hide_verification_code_on_lock_screen_enabled"
+    const val KEY_MESSAGE_TIME_DISPLAY_FORMAT = "message_time_display_format"
     const val KEY_CONVERSATION_DETAIL_TEXT_SCALE = "conversation_detail_text_scale"
     const val KEY_RULE_RESOURCE_VERSION = "rule_resource_version"
     const val KEY_SPAM_MODEL_RESOURCE_VERSION = "spam_model_resource_version"
@@ -89,6 +105,7 @@ object AppSettingsKeys {
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
     const val DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED = true
+    val DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT = MessageTimeDisplayFormat.HUMANIZED
     const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
     const val DEFAULT_RESOURCE_VERSION = "builtin"
     const val DEFAULT_RESOURCE_UPDATED_AT = 0L

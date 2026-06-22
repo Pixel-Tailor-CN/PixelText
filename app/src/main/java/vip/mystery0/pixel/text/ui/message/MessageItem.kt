@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
@@ -49,8 +50,12 @@ fun MessageItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     interactionEnabled: Boolean = true,
+    timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
 ) {
     var showOriginal by remember { mutableStateOf(false) }
+    var currentTimeDisplayFormat by remember(message.stableKey, timeDisplayFormat) {
+        mutableStateOf(timeDisplayFormat)
+    }
     val isSpam = message.spamScore >= 0.7f
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -124,9 +129,12 @@ fun MessageItem(
             horizontalArrangement = arrangement
         ) {
             Text(
-                text = formatTimeAgo(message.timestamp),
+                text = formatMessageTime(message.timestamp, currentTimeDisplayFormat),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.clickable(enabled = interactionEnabled) {
+                    currentTimeDisplayFormat = currentTimeDisplayFormat.toggled()
+                }
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -221,10 +229,25 @@ fun formatTimeAgo(timestamp: Long): String {
         diff < oneHour -> "${diff / oneMinute}分钟前"
         diff < oneDay -> "${diff / oneHour}小时前"
         diff < sevenDays -> "${diff / oneDay}天前"
-        else -> {
-            val formatter =
-                SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault())
-            formatter.format(Date(timestamp))
-        }
+        else -> formatDetailedTime(timestamp)
+    }
+}
+
+fun formatDetailedTime(timestamp: Long): String {
+    val formatter = SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault())
+    return formatter.format(Date(timestamp))
+}
+
+private fun formatMessageTime(timestamp: Long, format: MessageTimeDisplayFormat): String {
+    return when (format) {
+        MessageTimeDisplayFormat.HUMANIZED -> formatTimeAgo(timestamp)
+        MessageTimeDisplayFormat.DETAILED -> formatDetailedTime(timestamp)
+    }
+}
+
+private fun MessageTimeDisplayFormat.toggled(): MessageTimeDisplayFormat {
+    return when (this) {
+        MessageTimeDisplayFormat.HUMANIZED -> MessageTimeDisplayFormat.DETAILED
+        MessageTimeDisplayFormat.DETAILED -> MessageTimeDisplayFormat.HUMANIZED
     }
 }
