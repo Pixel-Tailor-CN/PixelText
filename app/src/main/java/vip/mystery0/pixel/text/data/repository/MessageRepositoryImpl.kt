@@ -208,6 +208,7 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
             telephonyDataSource.markThreadsAsRead(threadIds)
+            conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
         }
