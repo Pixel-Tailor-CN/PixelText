@@ -69,7 +69,7 @@ jobs:
             artifact_url="$(resolve_url "$url")"
             echo "downloading ${name} url=${artifact_url}"
             mkdir -p "$(dirname "$target")"
-            curl -fsSL --retry 3 --connect-timeout 30 --max-time 120 "$artifact_url" -o "$target"
+            curl -fsSL --retry 10 --connect-timeout 30 --max-time 120 "$artifact_url" -o "$target"
 
             actual_size="$(wc -c < "$target" | tr -d '[:space:]')"
             if [[ "$actual_size" != "$expected_size" ]]; then
@@ -88,7 +88,7 @@ jobs:
           trap 'rm -f "$MANIFEST_FILE"' EXIT
 
           echo "fetching resource manifest url=${MANIFEST_URL}"
-          curl -fsSL --retry 3 --connect-timeout 30 --max-time 60 \
+          curl -fsSL --retry 10 --connect-timeout 30 --max-time 60 \
             -H "Accept: application/json" \
             "$MANIFEST_URL" \
             -o "$MANIFEST_FILE"
