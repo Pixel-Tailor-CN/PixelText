@@ -17,48 +17,38 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
         context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
     private val _settings = MutableStateFlow(readSettings())
-
-    private val listener =
-        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-            _settings.value = readSettings()
-        }
-
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
-    init {
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-    }
-
     override fun setSpamDetectionEnabled(enabled: Boolean) {
-        prefs.edit { putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled) }
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled) }
     }
 
     override fun setMuteSpamNotificationsEnabled(enabled: Boolean) {
-        prefs.edit { putBoolean(AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED, enabled) }
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED, enabled) }
     }
 
     override fun setSpamAutoAction(action: SpamAutoAction) {
-        prefs.edit { putString(AppSettingsKeys.KEY_SPAM_AUTO_ACTION, action.storageValue) }
+        updatePrefs { putString(AppSettingsKeys.KEY_SPAM_AUTO_ACTION, action.storageValue) }
     }
 
     override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
-        prefs.edit {
+        updatePrefs {
             putBoolean(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED, enabled)
         }
     }
 
     override fun setSmartCardEnabled(enabled: Boolean) {
-        prefs.edit { putBoolean(AppSettingsKeys.KEY_SMART_CARD_ENABLED, enabled) }
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_SMART_CARD_ENABLED, enabled) }
     }
 
     override fun setVerificationCodeNotificationActionEnabled(enabled: Boolean) {
-        prefs.edit {
+        updatePrefs {
             putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED, enabled)
         }
     }
 
     override fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean) {
-        prefs.edit {
+        updatePrefs {
             putBoolean(
                 AppSettingsKeys.KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
                 enabled
@@ -67,43 +57,43 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     }
 
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
-        prefs.edit {
+        updatePrefs {
             putString(AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT, format.storageValue)
         }
     }
 
     override fun setRightSwipeAction(action: ConversationSwipeAction) {
-        prefs.edit {
+        updatePrefs {
             putString(AppSettingsKeys.KEY_RIGHT_SWIPE_ACTION, action.storageValue)
         }
     }
 
     override fun setLeftSwipeAction(action: ConversationSwipeAction) {
-        prefs.edit {
+        updatePrefs {
             putString(AppSettingsKeys.KEY_LEFT_SWIPE_ACTION, action.storageValue)
         }
     }
 
     override fun setConversationDetailTextScale(scale: Float) {
-        prefs.edit {
+        updatePrefs {
             putFloat(AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE, scale)
         }
     }
 
     override fun setRuleResourceVersion(version: String) {
-        prefs.edit { putString(AppSettingsKeys.KEY_RULE_RESOURCE_VERSION, version) }
+        updatePrefs { putString(AppSettingsKeys.KEY_RULE_RESOURCE_VERSION, version) }
     }
 
     override fun setSpamModelResourceVersion(version: String) {
-        prefs.edit { putString(AppSettingsKeys.KEY_SPAM_MODEL_RESOURCE_VERSION, version) }
+        updatePrefs { putString(AppSettingsKeys.KEY_SPAM_MODEL_RESOURCE_VERSION, version) }
     }
 
     override fun setVocabResourceVersion(version: String) {
-        prefs.edit { putString(AppSettingsKeys.KEY_VOCAB_RESOURCE_VERSION, version) }
+        updatePrefs { putString(AppSettingsKeys.KEY_VOCAB_RESOURCE_VERSION, version) }
     }
 
     override fun setResourceUpdatedAt(timestamp: Long) {
-        prefs.edit { putLong(AppSettingsKeys.KEY_RESOURCE_UPDATED_AT, timestamp) }
+        updatePrefs { putLong(AppSettingsKeys.KEY_RESOURCE_UPDATED_AT, timestamp) }
     }
 
     override fun isSpamDetectionEnabled(): Boolean =
@@ -224,5 +214,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             vocabResourceVersion = getVocabResourceVersion(),
             resourceUpdatedAt = getResourceUpdatedAt()
         )
+    }
+
+    private inline fun updatePrefs(action: SharedPreferences.Editor.() -> Unit) {
+        prefs.edit(action = action)
+        refreshSettings()
+    }
+
+    private fun refreshSettings() {
+        _settings.value = readSettings()
     }
 }
