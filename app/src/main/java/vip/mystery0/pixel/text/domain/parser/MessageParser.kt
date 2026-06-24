@@ -183,6 +183,21 @@ class MessageParser(
                     details = details
                 )
             }
+            "Flight" -> {
+                return ParsedResult.Ticket.Flight(
+                    date = getGroupOrNull(matcher, "date") ?: "",
+                    flightNumber = getGroupOrNull(matcher, "flightNo") ?: "--",
+                    departureCode = getGroupOrNull(matcher, "departureCode") ?: "--",
+                    departureCity = getGroupOrNull(matcher, "departureCity") ?: "--",
+                    departureTime = getGroupOrNull(matcher, "departureTime") ?: "--",
+                    flightType = getGroupOrNull(matcher, "flightType") ?: "直飞",
+                    arrivalCode = getGroupOrNull(matcher, "arrivalCode") ?: "--",
+                    arrivalCity = getGroupOrNull(matcher, "arrivalCity") ?: "--",
+                    arrivalTime = getGroupOrNull(matcher, "arrivalTime") ?: "--",
+                    terminal = getGroupOrNull(matcher, "terminal") ?: "--",
+                    boardingTime = getGroupOrNull(matcher, "boardingTime") ?: "--"
+                )
+            }
             "BankTransaction" -> {
                 val details = mutableMapOf<String, String>()
                 getGroupOrNull(matcher, "account")?.let { details["交易账户"] = it }
