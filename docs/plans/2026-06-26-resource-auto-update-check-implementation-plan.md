@@ -1,78 +1,78 @@
-# Resource Auto Update Check Implementation Plan
+# 资源自动检查更新实现计划
 
-> **For agentic workers:** Use `executing-plans` or equivalent step-by-step execution. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给执行 Agent 的说明：** 按任务逐步执行。任务步骤使用复选框（`- [ ]`）跟踪进度。
 
-**Goal:** Add optional automatic resource update checks that periodically fetch only the PixelText Hub manifest, notify the user when rules/model updates are available, and leave resource installation fully manual.
+**目标：** 增加一个可选的资源自动检查能力：定期只拉取 PixelText Hub 的 manifest，发现规则或模型资源有更新时通知用户，资源安装仍然完全由用户手动确认。
 
-**Architecture:** Reuse the existing Hub manifest API and manual update flow. Add persisted auto-check settings, a WorkManager worker/scheduler pair for background manifest checks, a dedicated low-priority notification helper, and a settings deep link that opens the settings screen and triggers one manual check. No background path downloads or activates resources.
+**架构：** 复用现有 Hub manifest API 和手动更新流程。新增自动检查相关设置、WorkManager 后台检查 Worker、统一调度器、独立的低优先级通知 helper，以及通知点击进入设置页并触发一次检查的 deep link。后台路径只检查 manifest，不下载、不安装、不激活任何资源。
 
-**Tech Stack:** Kotlin, Jetpack Compose, Material 3, Koin, SharedPreferences, WorkManager, Retrofit/Moshi, Android notifications.
+**技术栈：** Kotlin、Jetpack Compose、Material 3、Koin、SharedPreferences、WorkManager、Retrofit/Moshi、Android Notifications。
 
-## Global Constraints
+## 全局约束
 
-- Follow `AGENTS.md`: do not add unit tests, do not add test dependencies, and do not run `testDebugUnitTest` or `test`.
-- The worker must only call the manifest endpoint and must not call `updateAll()`.
-- The update notification must use a dedicated low-priority notification channel.
-- The update notification must not accumulate; only one update notification may exist at a time.
-- Notification click must open the settings screen and trigger one check for resource updates.
-- Notification click must not automatically download, install, or activate resources.
-- The interval is user-entered in hours and must be a positive integer greater than `0`.
-- When automatic checking is enabled, the first interval is calculated from the enable time.
-- When the interval is changed while automatic checking is enabled, restart the interval calculation from the change time.
-- On app startup, if automatic checking is enabled and the last probe time is older than the configured interval, enqueue one immediate check job.
+- 遵循 `AGENTS.md`：不新增单元测试，不新增测试依赖，不运行 `testDebugUnitTest` 或 `test`。
+- Worker 只能请求 manifest，不能调用 `updateAll()`。
+- 更新提醒必须使用独立的低优先级通知渠道。
+- 更新提醒不能累积；同一时间最多只显示一条资源更新通知。
+- 点击通知只能打开设置页，并触发一次资源更新检查。
+- 点击通知不能自动下载、安装或激活资源。
+- 检查间隔由用户输入，单位为小时，必须是大于 `0` 的正整数。
+- 开启自动检查时，第一次间隔从开启时间开始计算。
+- 自动检查开启状态下修改间隔时，从修改时间重新计算下一次间隔。
+- App 启动时，如果自动检查已开启且上次探测时间已经超过配置间隔，需要立即 enqueue 一次检查 job。
 
 ---
 
-## File Structure
+## 文件结构
 
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/domain/settings/AppSettingsRepository.kt`
-  - Add auto-check settings fields, defaults, keys, setters, and getters.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/AppSettingsRepositoryImpl.kt`
-  - Persist auto-check settings in SharedPreferences and expose them through `settings`.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/domain/hub/HubModels.kt`
-  - Add `ResourceUpdateDetail` and `ResourceUpdateAvailability` domain models shared by settings UI and worker.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/HubResourceRepository.kt`
-  - Add a shared manifest-only availability check method.
-- Create: `app/src/main/java/vip/mystery0/pixel/text/notification/ResourceUpdateNotificationHelper.kt`
-  - Create the low-priority channel, show/cancel a single fixed notification, and build the settings PendingIntent.
-- Create: `app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateCheckWorker.kt`
-  - Run manifest-only automatic checks and notify when updates are available.
-- Create: `app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateScheduler.kt`
-  - Own all WorkManager scheduling, cancellation, interval changes, and app-start overdue checks.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
-  - Register `ResourceUpdateScheduler`.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/PixelTextApp.kt`
-  - Create the resource update notification channel and synchronize scheduling at app startup.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/MainActivity.kt`
-  - Parse notification extras for settings deep link and one-time check trigger.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
-  - Navigate to settings when requested by `MainActivity` and forward the one-time check trigger to `SettingsScreen`.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
-  - Add setters for automatic check settings and reuse repository availability checking.
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
-  - Add the switch and interval input UI; trigger a check when opened from notification.
-- Modify: `PRIVACY.md`
-  - Document optional automatic manifest checks and clarify that SMS content is not uploaded.
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/domain/settings/AppSettingsRepository.kt`
+  - 增加自动检查相关设置字段、默认值、key、setter 和 getter。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/data/repository/AppSettingsRepositoryImpl.kt`
+  - 使用 SharedPreferences 持久化自动检查设置，并通过 `settings` 暴露。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/domain/hub/HubModels.kt`
+  - 增加设置页和 Worker 共用的 `ResourceUpdateDetail` 与 `ResourceUpdateAvailability` 领域模型。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/data/repository/HubResourceRepository.kt`
+  - 增加一个只检查 manifest 的更新可用性判断方法。
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/notification/ResourceUpdateNotificationHelper.kt`
+  - 创建低优先级通知渠道、显示/取消固定 ID 的单条通知、构造进入设置页的 PendingIntent。
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateCheckWorker.kt`
+  - 执行后台 manifest 检查，发现更新后发通知。
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateScheduler.kt`
+  - 统一管理 WorkManager 的定时调度、取消、间隔变更和 App 启动 overdue 检查。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
+  - 注册 `ResourceUpdateScheduler`。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/PixelTextApp.kt`
+  - 创建资源更新通知渠道，并在 App 启动时同步调度状态。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/MainActivity.kt`
+  - 解析通知 extra，用于进入设置页并触发一次检查。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
+  - 根据 `MainActivity` 传入的 deep link 跳转设置页，并把一次性检查请求传给 `SettingsScreen`。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
+  - 增加自动检查设置的写入逻辑，并复用 repository 的更新可用性判断。
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
+  - 增加自动检查开关和检查间隔输入 UI；从通知打开时触发一次检查。
+- 修改：`PRIVACY.md`
+  - 说明可选的自动 manifest 检查行为，并明确不会上传短信内容。
 
-## Task 1: Persist Automatic Check Settings
+## 任务 1：持久化自动检查设置
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/domain/settings/AppSettingsRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/AppSettingsRepositoryImpl.kt`
+**文件：**
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/domain/settings/AppSettingsRepository.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/data/repository/AppSettingsRepositoryImpl.kt`
 
-**Interfaces:**
-- Produces:
+**接口：**
+- 产出：
   - `AppSettings.resourceAutoCheckEnabled: Boolean`
   - `AppSettings.resourceAutoCheckIntervalHours: Long`
   - `AppSettings.resourceAutoCheckLastCheckedAt: Long`
   - `AppSettingsRepository.setResourceAutoCheckEnabled(enabled: Boolean)`
   - `AppSettingsRepository.setResourceAutoCheckIntervalHours(hours: Long)`
   - `AppSettingsRepository.setResourceAutoCheckLastCheckedAt(timestamp: Long)`
-  - matching getters.
+  - 对应 getter。
 
-- [ ] **Step 1: Add settings fields and repository methods**
+- [ ] **步骤 1：增加设置字段和 repository 方法**
 
-Add to `AppSettings`:
+在 `AppSettings` 中增加：
 
 ```kotlin
 val resourceAutoCheckEnabled: Boolean =
@@ -83,7 +83,7 @@ val resourceAutoCheckLastCheckedAt: Long =
     AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT,
 ```
 
-Add to `AppSettingsRepository`:
+在 `AppSettingsRepository` 中增加：
 
 ```kotlin
 fun setResourceAutoCheckEnabled(enabled: Boolean)
@@ -94,7 +94,7 @@ fun getResourceAutoCheckIntervalHours(): Long
 fun getResourceAutoCheckLastCheckedAt(): Long
 ```
 
-Add to `AppSettingsKeys`:
+在 `AppSettingsKeys` 中增加：
 
 ```kotlin
 const val KEY_RESOURCE_AUTO_CHECK_ENABLED = "resource_auto_check_enabled"
@@ -105,42 +105,42 @@ const val DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS = 24L
 const val DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT = 0L
 ```
 
-- [ ] **Step 2: Implement SharedPreferences persistence**
+- [ ] **步骤 2：实现 SharedPreferences 持久化**
 
-In `AppSettingsRepositoryImpl`, add setters/getters using `putBoolean`, `putLong`, `getBoolean`, and `getLong`.
+在 `AppSettingsRepositoryImpl` 中增加 setter/getter，分别使用 `putBoolean`、`putLong`、`getBoolean` 和 `getLong`。
 
-`setResourceAutoCheckIntervalHours(hours)` must persist `hours.coerceAtLeast(1L)` so invalid direct calls cannot store `0` or negative values.
+`setResourceAutoCheckIntervalHours(hours)` 必须持久化 `hours.coerceAtLeast(1L)`，避免直接调用时写入 `0` 或负数。
 
-- [ ] **Step 3: Update `readSettings()`**
+- [ ] **步骤 3：更新 `readSettings()`**
 
-Populate the three new fields from the getters.
+从 getter 中读取并填充三个新字段。
 
-- [ ] **Step 4: Verify**
+- [ ] **步骤 4：验证**
 
-Run:
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 2: Share Manifest Availability Logic
+## 任务 2：抽取共用的 manifest 更新可用性判断
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/domain/hub/HubModels.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/HubResourceRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
+**文件：**
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/domain/hub/HubModels.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/data/repository/HubResourceRepository.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
 
-**Interfaces:**
-- Produces:
+**接口：**
+- 产出：
   - `ResourceUpdateDetail`
   - `ResourceUpdateAvailability`
   - `HubResourceRepository.checkResourceUpdateAvailability(): ResourceUpdateAvailability`
 
-- [ ] **Step 1: Move shared update detail models into domain**
+- [ ] **步骤 1：把更新详情模型移动到 domain**
 
-Add to `HubModels.kt`:
+在 `HubModels.kt` 中增加：
 
 ```kotlin
 data class ResourceUpdateDetail(
@@ -163,9 +163,9 @@ sealed interface ResourceUpdateAvailability {
 }
 ```
 
-- [ ] **Step 2: Add repository availability check**
+- [ ] **步骤 2：增加 repository 更新可用性检查**
 
-Add to `HubResourceRepository`:
+在 `HubResourceRepository` 中增加：
 
 ```kotlin
 suspend fun checkResourceUpdateAvailability(): ResourceUpdateAvailability {
@@ -189,45 +189,47 @@ suspend fun checkResourceUpdateAvailability(): ResourceUpdateAvailability {
 }
 ```
 
-Add a private `HubResourceManifest.toResourceUpdateDetail()` in the repository file, copied from the current `SettingsViewModel` extension.
+在同一文件中增加私有扩展方法 `HubResourceManifest.toResourceUpdateDetail()`，内容从当前 `SettingsViewModel` 的同名扩展迁移过来。
 
-- [ ] **Step 3: Update `SettingsViewModel.checkResourceUpdates()`**
+- [ ] **步骤 3：更新 `SettingsViewModel.checkResourceUpdates()`**
 
-Replace inline manifest comparison with `hubResourceRepository.checkResourceUpdateAvailability()`.
+把当前手写的 manifest 版本比较替换为 `hubResourceRepository.checkResourceUpdateAvailability()`。
 
-When result is `Available`, set `pendingManifest = result.manifest` and `ResourceUpdateState.Available(result.detail)`.
+当结果是 `Available` 时，设置 `pendingManifest = result.manifest`，并设置 `ResourceUpdateState.Available(result.detail)`。
 
-When result is `NoUpdate`, set `pendingManifest = null` and `ResourceUpdateState.NoUpdate(result.message)`.
+当结果是 `NoUpdate` 时，设置 `pendingManifest = null`，并设置 `ResourceUpdateState.NoUpdate(result.message)`。
 
-- [ ] **Step 4: Remove duplicate models from `SettingsViewModel.kt`**
+- [ ] **步骤 4：删除 `SettingsViewModel.kt` 中的重复模型**
 
-Delete the local `ResourceUpdateDetail` data class and local `HubResourceManifest.toResourceUpdateDetail()` extension after imports point to `domain.hub.ResourceUpdateDetail`.
+删除本地 `ResourceUpdateDetail` data class 和本地 `HubResourceManifest.toResourceUpdateDetail()` 扩展方法。
 
-- [ ] **Step 5: Verify**
+`SettingsViewModel` 和 `SettingsScreen` 改为导入 `domain.hub.ResourceUpdateDetail`。
 
-Run:
+- [ ] **步骤 5：验证**
+
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 3: Add Resource Update Notification Helper
+## 任务 3：新增资源更新通知 helper
 
-**Files:**
-- Create: `app/src/main/java/vip/mystery0/pixel/text/notification/ResourceUpdateNotificationHelper.kt`
+**文件：**
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/notification/ResourceUpdateNotificationHelper.kt`
 
-**Interfaces:**
-- Produces:
+**接口：**
+- 产出：
   - `ResourceUpdateNotificationHelper.CHANNEL_ID_RESOURCE_UPDATES`
   - `ResourceUpdateNotificationHelper.createNotificationChannel(context: Context)`
   - `ResourceUpdateNotificationHelper.showUpdateAvailable(context: Context, detail: ResourceUpdateDetail)`
   - `ResourceUpdateNotificationHelper.cancel(context: Context)`
 
-- [ ] **Step 1: Create notification helper**
+- [ ] **步骤 1：创建通知 helper**
 
-Create an object with:
+创建 object：
 
 ```kotlin
 object ResourceUpdateNotificationHelper {
@@ -238,85 +240,85 @@ object ResourceUpdateNotificationHelper {
 }
 ```
 
-- [ ] **Step 2: Create low-priority channel**
+- [ ] **步骤 2：创建低优先级通知渠道**
 
-Use `NotificationManager.IMPORTANCE_LOW` and `setShowBadge(false)`.
+使用 `NotificationManager.IMPORTANCE_LOW`，并设置 `setShowBadge(false)`。
 
-- [ ] **Step 3: Build fixed notification**
+- [ ] **步骤 3：构造固定 ID 通知**
 
-`showUpdateAvailable()` must:
+`showUpdateAvailable()` 必须满足：
 
-- return immediately when Android 13+ notification permission is missing.
-- call `createNotificationChannel(context)`.
-- call `cancel(context)` before `notify(...)`.
-- use `NotificationCompat.PRIORITY_LOW`.
-- use `setAutoCancel(true)`.
-- use `setOnlyAlertOnce(true)`.
-- use `R.drawable.ic_notification_sms`.
-- title: `发现资源更新`
-- text: `有新的规则或模型资源可用，点按查看`
+- Android 13+ 缺少通知权限时直接返回。
+- 调用 `createNotificationChannel(context)`。
+- 调用 `cancel(context)` 后再 `notify(...)`。
+- 使用 `NotificationCompat.PRIORITY_LOW`。
+- 使用 `setAutoCancel(true)`。
+- 使用 `setOnlyAlertOnce(true)`。
+- 使用 `R.drawable.ic_notification_sms`。
+- 标题：`发现资源更新`。
+- 正文：`有新的规则或模型资源可用，点按查看`。
 
-The PendingIntent target is `MainActivity` with:
+PendingIntent 打开 `MainActivity`，并带上：
 
 ```kotlin
 putExtra(MainActivity.EXTRA_OPEN_SETTINGS, true)
 putExtra(MainActivity.EXTRA_TRIGGER_RESOURCE_UPDATE_CHECK, true)
 ```
 
-- [ ] **Step 4: Add cancel helper**
+- [ ] **步骤 4：增加取消通知方法**
 
-`cancel(context)` calls:
+`cancel(context)` 调用：
 
 ```kotlin
 NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID_RESOURCE_UPDATE)
 ```
 
-- [ ] **Step 5: Verify**
+- [ ] **步骤 5：验证**
 
-Run:
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 4: Add Worker and Scheduler
+## 任务 4：新增 Worker 和 Scheduler
 
-**Files:**
-- Create: `app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateCheckWorker.kt`
-- Create: `app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateScheduler.kt`
+**文件：**
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateCheckWorker.kt`
+- 新建：`app/src/main/java/vip/mystery0/pixel/text/worker/ResourceUpdateScheduler.kt`
 
-**Interfaces:**
-- Produces:
+**接口：**
+- 产出：
   - `ResourceUpdateCheckWorker`
   - `ResourceUpdateScheduler.syncAfterSettingsChange()`
   - `ResourceUpdateScheduler.syncOnAppStart()`
   - `ResourceUpdateScheduler.enqueueImmediateCheck()`
 
-- [ ] **Step 1: Create `ResourceUpdateCheckWorker`**
+- [ ] **步骤 1：创建 `ResourceUpdateCheckWorker`**
 
-Worker dependencies via `KoinComponent`:
+Worker 通过 `KoinComponent` 注入：
 
 ```kotlin
 private val settingsRepository: AppSettingsRepository by inject()
 private val hubResourceRepository: HubResourceRepository by inject()
 ```
 
-`doWork()` behavior:
+`doWork()` 行为：
 
-1. If `settingsRepository.isResourceAutoCheckEnabled()` is false, cancel the update notification and return `Result.success()`.
-2. Call `hubResourceRepository.checkResourceUpdateAvailability()`.
-3. On success, call `settingsRepository.setResourceAutoCheckLastCheckedAt(System.currentTimeMillis())`.
-4. If `Available`, call `ResourceUpdateNotificationHelper.showUpdateAvailable(applicationContext, result.detail)`.
-5. If `NoUpdate`, call `ResourceUpdateNotificationHelper.cancel(applicationContext)`.
-6. On exception, log `resource update check failed error=<SimpleName>` and return `Result.retry()`.
+1. 如果 `settingsRepository.isResourceAutoCheckEnabled()` 为 false，取消资源更新通知，并返回 `Result.success()`。
+2. 调用 `hubResourceRepository.checkResourceUpdateAvailability()`。
+3. 成功后调用 `settingsRepository.setResourceAutoCheckLastCheckedAt(System.currentTimeMillis())`。
+4. 如果结果是 `Available`，调用 `ResourceUpdateNotificationHelper.showUpdateAvailable(applicationContext, result.detail)`。
+5. 如果结果是 `NoUpdate`，调用 `ResourceUpdateNotificationHelper.cancel(applicationContext)`。
+6. 捕获异常时记录日志 `resource update check failed error=<SimpleName>`，并返回 `Result.retry()`。
 
-Do not call `hubResourceRepository.updateAll(...)`.
+禁止调用 `hubResourceRepository.updateAll(...)`。
 
-- [ ] **Step 2: Create `ResourceUpdateScheduler`**
+- [ ] **步骤 2：创建 `ResourceUpdateScheduler`**
 
-Constructor:
+构造函数：
 
 ```kotlin
 class ResourceUpdateScheduler(
@@ -325,34 +327,34 @@ class ResourceUpdateScheduler(
 )
 ```
 
-Constants:
+常量：
 
 ```kotlin
 private const val UNIQUE_PERIODIC_WORK_NAME = "resource_update_auto_check"
 private const val UNIQUE_IMMEDIATE_WORK_NAME = "resource_update_immediate_check"
 ```
 
-- [ ] **Step 3: Implement periodic sync**
+- [ ] **步骤 3：实现周期调度同步**
 
-`syncAfterSettingsChange()` behavior:
+`syncAfterSettingsChange()` 行为：
 
-- If disabled:
+- 如果自动检查关闭：
   - cancel `UNIQUE_PERIODIC_WORK_NAME`
   - cancel `UNIQUE_IMMEDIATE_WORK_NAME`
-  - cancel update notification
-- If enabled:
-  - enqueue unique periodic work with `ExistingPeriodicWorkPolicy.UPDATE`
-  - interval: `settingsRepository.getResourceAutoCheckIntervalHours()`
-  - initial delay: same interval in hours
-  - constraint: `NetworkType.CONNECTED`
+  - 取消资源更新通知
+- 如果自动检查开启：
+  - 使用 `ExistingPeriodicWorkPolicy.UPDATE` enqueue unique periodic work
+  - interval 使用 `settingsRepository.getResourceAutoCheckIntervalHours()`
+  - initial delay 使用同样的小时数
+  - 约束条件为 `NetworkType.CONNECTED`
 
-- [ ] **Step 4: Implement app-start sync**
+- [ ] **步骤 4：实现 App 启动同步**
 
-`syncOnAppStart()` behavior:
+`syncOnAppStart()` 行为：
 
-- If disabled, call `syncAfterSettingsChange()` and return.
-- Ensure periodic work exists by calling the enabled branch of `syncAfterSettingsChange()`.
-- Compute:
+- 如果自动检查关闭，调用 `syncAfterSettingsChange()` 后返回。
+- 如果自动检查开启，先调用开启分支确保 periodic work 存在。
+- 计算：
 
 ```kotlin
 val intervalMillis = TimeUnit.HOURS.toMillis(
@@ -362,86 +364,90 @@ val lastCheckedAt = settingsRepository.getResourceAutoCheckLastCheckedAt()
 val now = System.currentTimeMillis()
 ```
 
-- If `lastCheckedAt <= 0L || now - lastCheckedAt >= intervalMillis`, call `enqueueImmediateCheck()`.
+- 如果 `lastCheckedAt <= 0L || now - lastCheckedAt >= intervalMillis`，调用 `enqueueImmediateCheck()`。
 
-- [ ] **Step 5: Implement immediate check**
+- [ ] **步骤 5：实现立即检查**
 
-`enqueueImmediateCheck()` enqueues unique one-time work with `ExistingWorkPolicy.KEEP` and `NetworkType.CONNECTED`.
+`enqueueImmediateCheck()` 使用 `ExistingWorkPolicy.KEEP` 和 `NetworkType.CONNECTED` enqueue unique one-time work。
 
-- [ ] **Step 6: Verify**
+- [ ] **步骤 6：验证**
 
-Run:
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 5: Wire Scheduler and App Startup
+## 任务 5：接入 Scheduler 和 App 启动逻辑
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/PixelTextApp.kt`
+**文件：**
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/PixelTextApp.kt`
 
-**Interfaces:**
-- Consumes:
+**接口：**
+- 消费：
   - `ResourceUpdateScheduler`
   - `ResourceUpdateNotificationHelper`
 
-- [ ] **Step 1: Register scheduler in Koin**
+- [ ] **步骤 1：在 Koin 中注册 scheduler**
 
-Add:
+增加：
 
 ```kotlin
 single { ResourceUpdateScheduler(androidContext(), get()) }
 ```
 
-- [ ] **Step 2: Create notification channel on app startup**
+- [ ] **步骤 2：App 启动时创建通知渠道**
 
-In `PixelTextApp.onCreate()`, call:
+在 `PixelTextApp.onCreate()` 中调用：
 
 ```kotlin
 ResourceUpdateNotificationHelper.createNotificationChannel(this)
 ```
 
-- [ ] **Step 3: Synchronize scheduler after Koin startup**
+- [ ] **步骤 3：Koin 启动后同步调度状态**
 
-After `startKoin { ... }`, call:
+在 `startKoin { ... }` 之后调用：
 
 ```kotlin
 getKoin().get<ResourceUpdateScheduler>().syncOnAppStart()
 ```
 
-Import `org.koin.android.ext.android.getKoin`.
+导入：
 
-- [ ] **Step 4: Verify**
+```kotlin
+import org.koin.android.ext.android.getKoin
+```
 
-Run:
+- [ ] **步骤 4：验证**
+
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 6: Add Notification Deep Link to Settings
+## 任务 6：新增通知进入设置页的 deep link
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/MainActivity.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
+**文件：**
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/MainActivity.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
 
-**Interfaces:**
-- Produces:
+**接口：**
+- 产出：
   - `MainActivity.EXTRA_OPEN_SETTINGS`
   - `MainActivity.EXTRA_TRIGGER_RESOURCE_UPDATE_CHECK`
   - `SettingsDeepLink`
   - `SettingsScreen(resourceUpdateCheckRequestId: Long?)`
 
-- [ ] **Step 1: Add settings deep link model**
+- [ ] **步骤 1：增加设置页 deep link 模型**
 
-Add:
+增加：
 
 ```kotlin
 data class SettingsDeepLink(
@@ -450,39 +456,42 @@ data class SettingsDeepLink(
 )
 ```
 
-Use `requestId` to make repeated notification clicks observable by Compose.
+`requestId` 用来让连续点击通知也能被 Compose 观察到。
 
-- [ ] **Step 2: Parse notification extras in `MainActivity`**
+- [ ] **步骤 2：在 `MainActivity` 解析通知 extras**
 
-Add companion constants:
+增加 companion constants：
 
 ```kotlin
 const val EXTRA_OPEN_SETTINGS = "extra_open_settings"
 const val EXTRA_TRIGGER_RESOURCE_UPDATE_CHECK = "extra_trigger_resource_update_check"
 ```
 
-Add a mutable state:
+增加状态：
 
 ```kotlin
 private var pendingSettingsDeepLink by mutableStateOf<SettingsDeepLink?>(null)
 ```
 
-In `onCreate()` and `onNewIntent()`, parse settings deep link from the intent.
+在 `onCreate()` 和 `onNewIntent()` 中从 intent 解析 settings deep link。
 
-- [ ] **Step 3: Pass settings deep link to navigation**
+- [ ] **步骤 3：把 settings deep link 传给 navigation**
 
-Extend `AppNavigation` parameters:
+扩展 `AppNavigation` 参数：
 
 ```kotlin
 pendingSettingsDeepLink: SettingsDeepLink? = null,
 onSettingsDeepLinkConsumed: () -> Unit = {},
 ```
 
-Add `LaunchedEffect(pendingSettingsDeepLink)` that navigates to `"settings"` with `launchSingleTop = true`, then calls `onSettingsDeepLinkConsumed()`.
+增加 `LaunchedEffect(pendingSettingsDeepLink)`：
 
-- [ ] **Step 4: Forward check request into `SettingsScreen`**
+- 如果 deep link 非空，`navController.navigate("settings") { launchSingleTop = true }`
+- 然后调用 `onSettingsDeepLinkConsumed()`
 
-When rendering `SettingsScreen`, pass:
+- [ ] **步骤 4：把检查请求传入 `SettingsScreen`**
+
+渲染 `SettingsScreen` 时传入：
 
 ```kotlin
 resourceUpdateCheckRequestId =
@@ -491,7 +500,7 @@ resourceUpdateCheckRequestId =
         ?.requestId
 ```
 
-In `SettingsScreen`, add:
+在 `SettingsScreen` 中增加：
 
 ```kotlin
 LaunchedEffect(resourceUpdateCheckRequestId) {
@@ -501,40 +510,40 @@ LaunchedEffect(resourceUpdateCheckRequestId) {
 }
 ```
 
-- [ ] **Step 5: Verify**
+- [ ] **步骤 5：验证**
 
-Run:
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-## Task 7: Add Settings UI Controls
+## 任务 7：增加设置页 UI 控件
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
+**文件：**
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
+- 修改：`app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
 
-**Interfaces:**
-- Consumes:
+**接口：**
+- 消费：
   - `ResourceUpdateScheduler`
-  - new `AppSettings` fields
+  - 新增的 `AppSettings` 字段
 
-- [ ] **Step 1: Inject scheduler into `SettingsViewModel`**
+- [ ] **步骤 1：向 `SettingsViewModel` 注入 scheduler**
 
-Constructor adds:
+构造函数增加：
 
 ```kotlin
 private val resourceUpdateScheduler: ResourceUpdateScheduler,
 ```
 
-Update Koin ViewModel registration if needed.
+如有需要，同步更新 Koin ViewModel 注册。
 
-- [ ] **Step 2: Add ViewModel setters**
+- [ ] **步骤 2：增加 ViewModel setter**
 
-Add:
+增加：
 
 ```kotlin
 fun setResourceAutoCheckEnabled(enabled: Boolean) {
@@ -556,9 +565,9 @@ fun setResourceAutoCheckIntervalHours(hours: Long): Boolean {
 }
 ```
 
-- [ ] **Step 3: Add switch preference**
+- [ ] **步骤 3：增加开关设置项**
 
-In the “模型与规则” section after “检查资源更新”, add:
+在“模型与规则”区域的“检查资源更新”之后增加：
 
 ```kotlin
 SwitchPreference(
@@ -570,9 +579,9 @@ SwitchPreference(
 )
 ```
 
-- [ ] **Step 4: Add interval preference**
+- [ ] **步骤 4：增加间隔设置项**
 
-Add a `Preference`:
+增加一个 `Preference`：
 
 ```kotlin
 Preference(
@@ -584,78 +593,78 @@ Preference(
 )
 ```
 
-- [ ] **Step 5: Add interval input dialog**
+- [ ] **步骤 5：增加间隔输入弹窗**
 
-Dialog behavior:
+弹窗行为：
 
-- Initial text is `settings.resourceAutoCheckIntervalHours.toString()`.
-- Use numeric keyboard.
-- Confirm button parses `input.trim().toLongOrNull()`.
-- If parsed value is `null` or `<= 0L`, show error text `请输入大于 0 的整数`.
-- On valid input, call `viewModel.setResourceAutoCheckIntervalHours(value)` and dismiss.
+- 初始文本为 `settings.resourceAutoCheckIntervalHours.toString()`。
+- 使用数字键盘。
+- 确认按钮解析 `input.trim().toLongOrNull()`。
+- 如果解析结果为 `null` 或 `<= 0L`，显示错误文案 `请输入大于 0 的整数`。
+- 输入合法时调用 `viewModel.setResourceAutoCheckIntervalHours(value)` 并关闭弹窗。
 
-- [ ] **Step 6: Verify**
+- [ ] **步骤 6：验证**
 
-Run:
-
-```bash
-./gradlew :app:compileDebugKotlin
-```
-
-Expected: `BUILD SUCCESSFUL`.
-
-## Task 8: Privacy Docs and Manual Verification
-
-**Files:**
-- Modify: `PRIVACY.md`
-
-**Interfaces:**
-- Consumes:
-  - automatic manifest checking behavior from previous tasks.
-
-- [ ] **Step 1: Update privacy policy**
-
-In the `INTERNET` permission explanation and data upload sections, document:
-
-- automatic resource checking is optional and controlled by the “自动检查资源更新” setting.
-- automatic checks only request the resource manifest.
-- automatic checks do not upload SMS/MMS content, contacts, local parsing results, or spam classification results.
-- resource download still happens only after user confirmation in the settings update dialog.
-
-- [ ] **Step 2: Run compile validation**
-
-Run:
+运行：
 
 ```bash
 ./gradlew :app:compileDebugKotlin
 ```
 
-Expected: `BUILD SUCCESSFUL`.
+预期：`BUILD SUCCESSFUL`。
 
-- [ ] **Step 3: Optional lint validation**
+## 任务 8：更新隐私文档与手动验证
 
-Run when implementation touches notification, manifest, or Compose imports heavily:
+**文件：**
+- 修改：`PRIVACY.md`
+
+**接口：**
+- 消费：
+  - 前面任务实现的自动 manifest 检查行为。
+
+- [ ] **步骤 1：更新隐私政策**
+
+在 `INTERNET` 权限说明和数据上传相关段落中说明：
+
+- 自动资源检查是可选功能，由“自动检查资源更新”设置控制。
+- 自动检查只请求资源 manifest。
+- 自动检查不会上传短信/彩信内容、联系人、本地解析结果或骚扰分类结果。
+- 资源下载仍然只会在用户于设置页更新对话框中确认后发生。
+
+- [ ] **步骤 2：运行编译验证**
+
+运行：
+
+```bash
+./gradlew :app:compileDebugKotlin
+```
+
+预期：`BUILD SUCCESSFUL`。
+
+- [ ] **步骤 3：可选运行 lint 验证**
+
+当实现大量修改通知、manifest 或 Compose imports 时运行：
 
 ```bash
 ./gradlew :app:lintDebug
 ```
 
-Expected: `BUILD SUCCESSFUL` or only pre-existing warnings.
+预期：`BUILD SUCCESSFUL` 或仅存在实现前已有的 warning。
 
-- [ ] **Step 4: Manual validation checklist**
+- [ ] **步骤 4：手动验证清单**
 
-Verify on device or emulator:
+在真机或模拟器上验证：
 
-- Default state: automatic check switch is off.
-- Enabling automatic check stores `lastCheckedAt` close to enable time and schedules periodic work.
-- Changing interval while enabled restarts interval calculation from the change time.
-- Entering `0`, negative values, blank input, or non-numeric text shows an error and does not save.
-- App startup with overdue `lastCheckedAt` enqueues one immediate check job.
-- Worker only fetches manifest and never downloads rules/model files.
-- Manifest with same versions cancels any existing update notification.
-- Manifest with newer rules/model shows one low-priority notification.
-- Repeated update checks replace the same notification instead of accumulating multiple notifications.
-- Tapping the notification opens settings, triggers one resource update check, and shows the existing update dialog.
-- Tapping the notification does not install resources until the user taps “更新”.
-- Disabling automatic checks cancels scheduled work and the existing update notification.
+- 默认状态下，“自动检查资源更新”开关关闭。
+- 开启自动检查后，`lastCheckedAt` 接近开启时间，并且周期任务被调度。
+- 自动检查开启时修改间隔，会从修改时间重新计算下一次间隔。
+- 输入 `0`、负数、空白或非数字文本时显示错误，不保存。
+- App 启动时，如果 `lastCheckedAt` 已超过间隔，会 enqueue 一次立即检查。
+- Worker 只拉取 manifest，不下载规则或模型文件。
+- manifest 版本相同时，取消已有资源更新通知。
+- manifest 有新规则或模型版本时，显示一条低优先级通知。
+- 重复检查时替换同一条通知，不累积多条通知。
+- 点击通知进入设置页，并触发一次资源更新检查，显示现有更新对话框。
+- 点击通知不会安装资源，只有用户点击“更新”后才会安装。
+- 关闭自动检查后，已调度任务和已有资源更新通知都会被取消。
 
