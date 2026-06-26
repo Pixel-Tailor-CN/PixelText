@@ -1,14 +1,16 @@
 package vip.mystery0.pixel.text.ui
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -203,56 +205,103 @@ private fun conversationDetailRoute(threadId: Long, address: String): String {
     return "conversation_detail/$threadId/${Uri.encode(address)}"
 }
 
-private fun AnimatedContentTransitionScope<*>.activityLikeEnterTransition(): EnterTransition {
-    return slideIntoContainer(
-        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+private fun activityLikeEnterTransition(): EnterTransition {
+    return slideInHorizontally(
+        initialOffsetX = { fullWidth -> fullWidth },
         animationSpec = tween(
-            durationMillis = NAV_TRANSITION_DURATION_MS,
+            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
             easing = FastOutSlowInEasing
         )
-    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS))
+    ) +
+            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
+            scaleIn(
+                initialScale = ACTIVITY_FOREGROUND_INITIAL_SCALE,
+                animationSpec = tween(
+                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
 }
 
-private fun AnimatedContentTransitionScope<*>.activityLikeExitTransition(): ExitTransition {
-    return slideOutOfContainer(
-        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+private fun activityLikeExitTransition(): ExitTransition {
+    return slideOutHorizontally(
+        targetOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
         animationSpec = tween(
-            durationMillis = NAV_TRANSITION_DURATION_MS,
+            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
             easing = FastOutSlowInEasing
         )
-    ) + delayedExitFadeOut()
+    ) +
+            activityBackgroundFadeOut() +
+            scaleOut(
+                targetScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
+                animationSpec = tween(
+                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
 }
 
-private fun AnimatedContentTransitionScope<*>.activityLikePopEnterTransition(): EnterTransition {
-    return slideIntoContainer(
-        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+private fun activityLikePopEnterTransition(): EnterTransition {
+    return slideInHorizontally(
+        initialOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
         animationSpec = tween(
-            durationMillis = NAV_TRANSITION_DURATION_MS,
+            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
             easing = FastOutSlowInEasing
         )
-    ) + fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS))
+    ) +
+            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
+            scaleIn(
+                initialScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
+                animationSpec = tween(
+                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
 }
 
-private fun AnimatedContentTransitionScope<*>.activityLikePopExitTransition(): ExitTransition {
-    return slideOutOfContainer(
-        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+private fun activityLikePopExitTransition(): ExitTransition {
+    return slideOutHorizontally(
+        targetOffsetX = { fullWidth -> fullWidth },
         animationSpec = tween(
-            durationMillis = NAV_TRANSITION_DURATION_MS,
+            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
             easing = FastOutSlowInEasing
         )
-    ) + delayedExitFadeOut()
+    ) +
+            activityForegroundFadeOut() +
+            scaleOut(
+                targetScale = ACTIVITY_FOREGROUND_POP_EXIT_SCALE,
+                animationSpec = tween(
+                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
 }
 
-private const val NAV_TRANSITION_DURATION_MS = 300
+private const val ACTIVITY_FOREGROUND_DURATION_MS = 300
+private const val ACTIVITY_BACKGROUND_DURATION_MS = 260
+private const val ACTIVITY_BACKGROUND_OFFSET_DIVISOR = 4
+private const val ACTIVITY_FOREGROUND_INITIAL_SCALE = 0.96f
+private const val ACTIVITY_FOREGROUND_POP_EXIT_SCALE = 0.90f
+private const val ACTIVITY_BACKGROUND_TARGET_SCALE = 0.92f
 private const val NAV_ENTER_FADE_DURATION_MS = 90
-private const val NAV_EXIT_FADE_HOLD_MS = 225
+private const val NAV_EXIT_FADE_DURATION_MS = 90
+private const val NAV_EXIT_FADE_DELAY_MS = 120
+private const val NAV_FOREGROUND_EXIT_FADE_DELAY_MS = 210
 
-private fun delayedExitFadeOut(): ExitTransition {
+private fun activityBackgroundFadeOut(): ExitTransition {
     return fadeOut(
-        animationSpec = keyframes {
-            durationMillis = NAV_TRANSITION_DURATION_MS
-            1f at NAV_EXIT_FADE_HOLD_MS
-            0f at NAV_TRANSITION_DURATION_MS
-        }
+        animationSpec = tween(
+            durationMillis = NAV_EXIT_FADE_DURATION_MS,
+            delayMillis = NAV_EXIT_FADE_DELAY_MS
+        )
+    )
+}
+
+private fun activityForegroundFadeOut(): ExitTransition {
+    return fadeOut(
+        animationSpec = tween(
+            durationMillis = NAV_EXIT_FADE_DURATION_MS,
+            delayMillis = NAV_FOREGROUND_EXIT_FADE_DELAY_MS
+        )
     )
 }
