@@ -26,6 +26,12 @@ data class AppSettings(
     val spamModelResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
     val vocabResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
     val resourceUpdatedAt: Long = AppSettingsKeys.DEFAULT_RESOURCE_UPDATED_AT,
+    val resourceAutoCheckEnabled: Boolean =
+        AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_ENABLED,
+    val resourceAutoCheckIntervalHours: Long =
+        AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS,
+    val resourceAutoCheckLastCheckedAt: Long =
+        AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT,
 )
 
 enum class SpamAutoAction(val storageValue: String) {
@@ -82,6 +88,9 @@ interface AppSettingsRepository {
     fun setSpamModelResourceVersion(version: String)
     fun setVocabResourceVersion(version: String)
     fun setResourceUpdatedAt(timestamp: Long)
+    fun setResourceAutoCheckEnabled(enabled: Boolean)
+    fun setResourceAutoCheckIntervalHours(hours: Long)
+    fun setResourceAutoCheckLastCheckedAt(timestamp: Long)
 
     fun isSpamDetectionEnabled(): Boolean
     fun isMuteSpamNotificationsEnabled(): Boolean
@@ -98,6 +107,9 @@ interface AppSettingsRepository {
     fun getSpamModelResourceVersion(): String
     fun getVocabResourceVersion(): String
     fun getResourceUpdatedAt(): Long
+    fun isResourceAutoCheckEnabled(): Boolean
+    fun getResourceAutoCheckIntervalHours(): Long
+    fun getResourceAutoCheckLastCheckedAt(): Long
 }
 
 object AppSettingsKeys {
@@ -120,6 +132,11 @@ object AppSettingsKeys {
     const val KEY_SPAM_MODEL_RESOURCE_VERSION = "spam_model_resource_version"
     const val KEY_VOCAB_RESOURCE_VERSION = "vocab_resource_version"
     const val KEY_RESOURCE_UPDATED_AT = "resource_updated_at"
+    const val KEY_RESOURCE_AUTO_CHECK_ENABLED = "resource_auto_check_enabled"
+    const val KEY_RESOURCE_AUTO_CHECK_INTERVAL_HOURS =
+        "resource_auto_check_interval_hours"
+    const val KEY_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT =
+        "resource_auto_check_last_checked_at"
 
     const val DEFAULT_SPAM_DETECTION_ENABLED = true
     const val DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED = false
@@ -134,4 +151,7 @@ object AppSettingsKeys {
     const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
     const val DEFAULT_RESOURCE_VERSION = "builtin"
     const val DEFAULT_RESOURCE_UPDATED_AT = 0L
+    const val DEFAULT_RESOURCE_AUTO_CHECK_ENABLED = false
+    const val DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS = 24L
+    const val DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT = 0L
 }

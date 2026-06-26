@@ -9,6 +9,8 @@ import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
+import vip.mystery0.pixel.text.domain.hub.ResourceUpdateAvailability
+import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
@@ -20,6 +22,26 @@ class HubResourceRepository(
     private val messageParser: MessageParser,
 ) {
     suspend fun checkManifest(): HubResourceManifest = client.fetchManifest()
+
+    suspend fun checkResourceUpdateAvailability(): ResourceUpdateAvailability {
+        val manifest = checkManifest()
+        val remoteRuleVersion = manifest.rules?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        val remoteModelVersion =
+            manifest.spamModel?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        val currentRuleVersion = settings.getRuleResourceVersion()
+        val currentModelVersion = settings.getSpamModelResourceVersion()
+        return if (
+            remoteRuleVersion == currentRuleVersion &&
+            remoteModelVersion == currentModelVersion
+        ) {
+            ResourceUpdateAvailability.NoUpdate("当前规则和模型已经是最新版本")
+        } else {
+            ResourceUpdateAvailability.Available(
+                manifest = manifest,
+                detail = manifest.toResourceUpdateDetail()
+            )
+        }
+    }
 
     suspend fun updateAll(manifest: HubResourceManifest): HubOperationResult {
         return runCatching {
@@ -86,6 +108,25 @@ class HubResourceRepository(
 
     private fun verifyRulesJson(json: String) {
         rulesFileAdapter.fromJson(json) ?: throw IllegalStateException("rules file empty")
+    }
+
+    private fun HubResourceManifest.toResourceUpdateDetail(): ResourceUpdateDetail {
+        val notes = listOfNotNull(
+            spamModel?.releaseNotes
+                ?.takeIf { it.isNotBlank() }
+                ?.let { "模型：$it" },
+            rules?.releaseNotes
+                ?.takeIf { it.isNotBlank() }
+                ?.let { "规则：$it" }
+        ).joinToString(separator = "\n")
+
+        return ResourceUpdateDetail(
+            modelVersion = spamModel?.version ?: "未提供",
+            modelSizeBytes = spamModel?.model?.sizeBytes,
+            ruleVersion = rules?.version ?: "未提供",
+            ruleSizeBytes = rules?.sizeBytes,
+            releaseNotes = notes.ifBlank { "暂无版本说明" }
+        )
     }
 
     private companion object {

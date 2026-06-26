@@ -96,6 +96,23 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         updatePrefs { putLong(AppSettingsKeys.KEY_RESOURCE_UPDATED_AT, timestamp) }
     }
 
+    override fun setResourceAutoCheckEnabled(enabled: Boolean) {
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_ENABLED, enabled) }
+    }
+
+    override fun setResourceAutoCheckIntervalHours(hours: Long) {
+        updatePrefs {
+            putLong(
+                AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_INTERVAL_HOURS,
+                hours.coerceAtLeast(1L)
+            )
+        }
+    }
+
+    override fun setResourceAutoCheckLastCheckedAt(timestamp: Long) {
+        updatePrefs { putLong(AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT, timestamp) }
+    }
+
     override fun isSpamDetectionEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
@@ -194,6 +211,24 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_RESOURCE_UPDATED_AT
         )
 
+    override fun isResourceAutoCheckEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_ENABLED,
+            AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_ENABLED
+        )
+
+    override fun getResourceAutoCheckIntervalHours(): Long =
+        prefs.getLong(
+            AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_INTERVAL_HOURS,
+            AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS
+        ).coerceAtLeast(1L)
+
+    override fun getResourceAutoCheckLastCheckedAt(): Long =
+        prefs.getLong(
+            AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT,
+            AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT
+        )
+
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
@@ -212,7 +247,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),
             vocabResourceVersion = getVocabResourceVersion(),
-            resourceUpdatedAt = getResourceUpdatedAt()
+            resourceUpdatedAt = getResourceUpdatedAt(),
+            resourceAutoCheckEnabled = isResourceAutoCheckEnabled(),
+            resourceAutoCheckIntervalHours = getResourceAutoCheckIntervalHours(),
+            resourceAutoCheckLastCheckedAt = getResourceAutoCheckLastCheckedAt()
         )
     }
 

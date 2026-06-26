@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,18 +42,38 @@ data class ConversationDeepLink(
     val address: String,
 )
 
+data class SettingsDeepLink(
+    val triggerResourceUpdateCheck: Boolean,
+    val requestId: Long,
+)
+
 @Composable
 fun AppNavigation(
     pendingDeepLink: ConversationDeepLink? = null,
     onDeepLinkConsumed: () -> Unit = {},
+    pendingSettingsDeepLink: SettingsDeepLink? = null,
+    onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    var resourceUpdateCheckRequestId by remember { mutableStateOf<Long?>(null) }
 
     // 收到外部 deep link 时，直接跳转到对应会话详情
     LaunchedEffect(pendingDeepLink) {
         val link = pendingDeepLink ?: return@LaunchedEffect
         navController.navigate(conversationDetailRoute(link.threadId, link.address))
         onDeepLinkConsumed()
+    }
+
+    // 资源更新通知只进入设置页，并把一次性检查请求交给设置页处理。
+    LaunchedEffect(pendingSettingsDeepLink) {
+        val link = pendingSettingsDeepLink ?: return@LaunchedEffect
+        resourceUpdateCheckRequestId = link
+            .takeIf { it.triggerResourceUpdateCheck }
+            ?.requestId
+        navController.navigate("settings") {
+            launchSingleTop = true
+        }
+        onSettingsDeepLinkConsumed()
     }
 
     Box(
@@ -113,7 +136,11 @@ fun AppNavigation(
                     },
                     onNavigateToSwipeActions = {
                         navController.navigate("swipe_actions")
-                    }
+                    },
+                    resourceUpdateCheckRequestId = resourceUpdateCheckRequestId,
+                    onResourceUpdateCheckRequestConsumed = {
+                        resourceUpdateCheckRequestId = null
+                    },
                 )
             }
             composable("swipe_actions") {

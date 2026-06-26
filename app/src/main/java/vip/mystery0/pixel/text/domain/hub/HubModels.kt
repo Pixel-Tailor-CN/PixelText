@@ -26,6 +26,25 @@ data class HubResourceManifest(
     val spamModel: HubSpamModelArtifact?,
 )
 
+data class ResourceUpdateDetail(
+    val modelVersion: String,
+    val modelSizeBytes: Long?,
+    val ruleVersion: String,
+    val ruleSizeBytes: Long?,
+    val releaseNotes: String,
+)
+
+sealed interface ResourceUpdateAvailability {
+    data class Available(
+        val manifest: HubResourceManifest,
+        val detail: ResourceUpdateDetail,
+    ) : ResourceUpdateAvailability
+
+    data class NoUpdate(
+        val message: String,
+    ) : ResourceUpdateAvailability
+}
+
 data class SampleSubmissionRequest(
     val deviceId: String,
     val content: String,

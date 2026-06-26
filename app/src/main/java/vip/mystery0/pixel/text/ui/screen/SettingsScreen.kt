@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Rule
@@ -55,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -73,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,13 +90,13 @@ import me.zhanghai.compose.preference.preferenceCategory
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
-import vip.mystery0.pixel.text.viewmodel.ResourceUpdateDetail
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import java.util.Locale
@@ -105,6 +108,8 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
+    resourceUpdateCheckRequestId: Long? = null,
+    onResourceUpdateCheckRequestConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
@@ -114,6 +119,9 @@ fun SettingsScreen(
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
+    var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
+    var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
+    var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = {
@@ -151,6 +159,13 @@ fun SettingsScreen(
         resourceUpdateState !is ResourceUpdateState.Busy
     val spamAutoActionEnabled =
         settings.spamDetectionEnabled && settings.muteSpamNotificationsEnabled
+
+    LaunchedEffect(resourceUpdateCheckRequestId) {
+        if (resourceUpdateCheckRequestId != null) {
+            viewModel.checkResourceUpdates()
+            onResourceUpdateCheckRequestConsumed()
+        }
+    }
 
     fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
         if (permissions.isEmpty()) return
@@ -244,6 +259,43 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Sync, contentDescription = null)
                                 },
                                 onClick = viewModel::checkResourceUpdates
+                            )
+                        }
+                        item(
+                            key = "resource_auto_check",
+                            contentType = "SwitchPreference"
+                        ) {
+                            SwitchPreference(
+                                value = settings.resourceAutoCheckEnabled,
+                                onValueChange = viewModel::setResourceAutoCheckEnabled,
+                                title = { Text("自动检查资源更新") },
+                                summary = {
+                                    Text("定期获取资源清单，有更新时通知你，不会自动下载")
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Sync, contentDescription = null)
+                                }
+                            )
+                        }
+                        item(
+                            key = "resource_auto_check_interval",
+                            contentType = "Preference"
+                        ) {
+                            Preference(
+                                title = { Text("检查间隔时间") },
+                                summary = {
+                                    Text("每 ${settings.resourceAutoCheckIntervalHours} 小时检查一次")
+                                },
+                                enabled = settings.resourceAutoCheckEnabled,
+                                icon = {
+                                    Icon(Icons.Rounded.Schedule, contentDescription = null)
+                                },
+                                onClick = {
+                                    resourceAutoCheckIntervalInput =
+                                        settings.resourceAutoCheckIntervalHours.toString()
+                                    resourceAutoCheckIntervalError = null
+                                    showResourceAutoCheckIntervalDialog = true
+                                }
                             )
                         }
                         if (showDebugResourceActions) {
@@ -614,6 +666,50 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showSpamAutoActionDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showResourceAutoCheckIntervalDialog) {
+        AlertDialog(
+            onDismissRequest = { showResourceAutoCheckIntervalDialog = false },
+            title = { Text("检查间隔时间") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = resourceAutoCheckIntervalInput,
+                        onValueChange = {
+                            resourceAutoCheckIntervalInput = it
+                            resourceAutoCheckIntervalError = null
+                        },
+                        label = { Text("小时") },
+                        singleLine = true,
+                        isError = resourceAutoCheckIntervalError != null,
+                        supportingText = resourceAutoCheckIntervalError?.let { error ->
+                            { Text(error) }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val value = resourceAutoCheckIntervalInput.trim().toLongOrNull()
+                        if (value == null || !viewModel.setResourceAutoCheckIntervalHours(value)) {
+                            resourceAutoCheckIntervalError = "请输入大于 0 的整数"
+                            return@TextButton
+                        }
+                        showResourceAutoCheckIntervalDialog = false
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResourceAutoCheckIntervalDialog = false }) {
                     Text("取消")
                 }
             }
