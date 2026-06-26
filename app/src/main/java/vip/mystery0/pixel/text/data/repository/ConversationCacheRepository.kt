@@ -49,18 +49,19 @@ class ConversationCacheRepository(
     }
 
     suspend fun isCacheReady(): Boolean = withContext(Dispatchers.IO) {
-        dao.getMetadataValue(KEY_CACHE_INITIALIZED) == 1
+        dao.getMetadataValue(KEY_CACHE_VERSION) == CURRENT_CACHE_VERSION
     }
 
     suspend fun fullSync(archivedThreadIds: Set<Long>) = withContext(Dispatchers.IO) {
-        Log.d(TAG, "starting full sync")
+        Log.d(TAG, "starting full sync cache_version=$CURRENT_CACHE_VERSION")
         val allThreadIds = telephonyDataSource.queryConversationThreadIds()
             .distinct()
             .filter { it !in archivedThreadIds }
 
         if (allThreadIds.isEmpty()) {
             dao.deleteAll()
-            markCacheInitialized()
+            markCacheReady()
+            Log.d(TAG, "full sync done cache_version=$CURRENT_CACHE_VERSION upserted=0 deleted=all")
             return@withContext
         }
 
@@ -70,8 +71,11 @@ class ConversationCacheRepository(
 
         dao.upsert(conversations.map { it.toCachedConversationEntity() })
         if (deletedIds.isNotEmpty()) dao.delete(deletedIds)
-        markCacheInitialized()
-        Log.d(TAG, "full sync done: upserted=${conversations.size} deleted=${deletedIds.size}")
+        markCacheReady()
+        Log.d(
+            TAG,
+            "full sync done cache_version=$CURRENT_CACHE_VERSION upserted=${conversations.size} deleted=${deletedIds.size}"
+        )
     }
 
     private suspend fun syncChangedThreads(uri: Uri?) {
@@ -111,8 +115,9 @@ class ConversationCacheRepository(
         }
     }
 
-    private suspend fun markCacheInitialized() {
+    private suspend fun markCacheReady() {
         dao.upsertMetadata(CacheMetadataEntity(KEY_CACHE_INITIALIZED, 1))
+        dao.upsertMetadata(CacheMetadataEntity(KEY_CACHE_VERSION, CURRENT_CACHE_VERSION))
     }
 
     private fun fetchAndBuildConversations(threadIds: List<Long>): List<ConversationModel> {
@@ -179,5 +184,7 @@ class ConversationCacheRepository(
 
     private companion object {
         const val KEY_CACHE_INITIALIZED = "cache_initialized"
+        const val KEY_CACHE_VERSION = "cache_version"
+        const val CURRENT_CACHE_VERSION = 1
     }
 }
