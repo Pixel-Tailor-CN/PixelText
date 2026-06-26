@@ -10,16 +10,19 @@ import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
-import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
+import vip.mystery0.pixel.text.domain.hub.ResourceUpdateAvailability
+import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
+import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
     private val hubResourceRepository: HubResourceRepository,
+    private val resourceUpdateScheduler: ResourceUpdateScheduler,
     bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
     val settings = settingsRepository.settings
@@ -70,6 +73,24 @@ class SettingsViewModel(
         settingsRepository.setLeftSwipeAction(action)
     }
 
+    fun setResourceAutoCheckEnabled(enabled: Boolean) {
+        settingsRepository.setResourceAutoCheckEnabled(enabled)
+        if (enabled) {
+            settingsRepository.setResourceAutoCheckLastCheckedAt(System.currentTimeMillis())
+        }
+        resourceUpdateScheduler.syncAfterSettingsChange()
+    }
+
+    fun setResourceAutoCheckIntervalHours(hours: Long): Boolean {
+        if (hours <= 0L) return false
+        settingsRepository.setResourceAutoCheckIntervalHours(hours)
+        if (settingsRepository.isResourceAutoCheckEnabled()) {
+            settingsRepository.setResourceAutoCheckLastCheckedAt(System.currentTimeMillis())
+        }
+        resourceUpdateScheduler.syncAfterSettingsChange()
+        return true
+    }
+
     fun displayRuleResourceVersion(version: String): String {
         return formatResourceVersionForDisplay(version, bundledResourceVersions.rulesVersion)
     }
@@ -82,25 +103,20 @@ class SettingsViewModel(
         if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
         _resourceUpdateState.value = ResourceUpdateState.Checking
         viewModelScope.launch {
-            runCatching { hubResourceRepository.checkManifest() }
-                .onSuccess { manifest ->
-                    val remoteRuleVersion =
-                        manifest.rules?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
-                    val remoteModelVersion =
-                        manifest.spamModel?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
-                    val currentRuleVersion = settingsRepository.getRuleResourceVersion()
-                    val currentModelVersion = settingsRepository.getSpamModelResourceVersion()
-                    if (
-                        remoteRuleVersion == currentRuleVersion &&
-                        remoteModelVersion == currentModelVersion
-                    ) {
-                        pendingManifest = null
-                        _resourceUpdateState.value =
-                            ResourceUpdateState.NoUpdate("当前规则和模型已经是最新版本")
-                    } else {
-                        pendingManifest = manifest
-                        _resourceUpdateState.value =
-                            ResourceUpdateState.Available(manifest.toResourceUpdateDetail())
+            runCatching { hubResourceRepository.checkResourceUpdateAvailability() }
+                .onSuccess { result ->
+                    when (result) {
+                        is ResourceUpdateAvailability.Available -> {
+                            pendingManifest = result.manifest
+                            _resourceUpdateState.value =
+                                ResourceUpdateState.Available(result.detail)
+                        }
+
+                        is ResourceUpdateAvailability.NoUpdate -> {
+                            pendingManifest = null
+                            _resourceUpdateState.value =
+                                ResourceUpdateState.NoUpdate(result.message)
+                        }
                     }
                 }
                 .onFailure { error ->
@@ -176,14 +192,6 @@ class SettingsViewModel(
     }
 }
 
-data class ResourceUpdateDetail(
-    val modelVersion: String,
-    val modelSizeBytes: Long?,
-    val ruleVersion: String,
-    val ruleSizeBytes: Long?,
-    val releaseNotes: String,
-)
-
 sealed interface ResourceUpdateState {
     sealed interface Busy : ResourceUpdateState
 
@@ -195,23 +203,4 @@ sealed interface ResourceUpdateState {
     data class Working(val message: String) : ResourceUpdateState, Busy
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState
-}
-
-private fun HubResourceManifest.toResourceUpdateDetail(): ResourceUpdateDetail {
-    val notes = listOfNotNull(
-        spamModel?.releaseNotes
-            ?.takeIf { it.isNotBlank() }
-            ?.let { "模型：$it" },
-        rules?.releaseNotes
-            ?.takeIf { it.isNotBlank() }
-            ?.let { "规则：$it" }
-    ).joinToString(separator = "\n")
-
-    return ResourceUpdateDetail(
-        modelVersion = spamModel?.version ?: "未提供",
-        modelSizeBytes = spamModel?.model?.sizeBytes,
-        ruleVersion = rules?.version ?: "未提供",
-        ruleSizeBytes = rules?.sizeBytes,
-        releaseNotes = notes.ifBlank { "暂无版本说明" }
-    )
 }
