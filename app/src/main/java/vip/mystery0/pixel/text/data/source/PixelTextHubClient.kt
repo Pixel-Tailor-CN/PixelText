@@ -117,7 +117,6 @@ internal data class HubArtifactResponse(
     val sha256: String,
     val sizeBytes: Long,
     val downloadUrl: String,
-    val minAppVersionCode: Int,
     val releaseNotes: String = "",
 ) {
     fun toDomain(): HubArtifact = HubArtifact(
@@ -125,7 +124,6 @@ internal data class HubArtifactResponse(
         sha256 = sha256,
         sizeBytes = sizeBytes,
         downloadUrl = downloadUrl,
-        minAppVersionCode = minAppVersionCode,
         releaseNotes = releaseNotes
     )
 }
@@ -148,14 +146,12 @@ internal data class HubSpamModelArtifactResponse(
     val version: String,
     val model: HubFileArtifactResponse,
     val vocab: HubFileArtifactResponse,
-    val minAppVersionCode: Int,
     val releaseNotes: String = "",
 ) {
     fun toDomain(): HubSpamModelArtifact = HubSpamModelArtifact(
         version = version,
         model = model.toDomain(),
         vocab = vocab.toDomain(),
-        minAppVersionCode = minAppVersionCode,
         releaseNotes = releaseNotes
     )
 }
