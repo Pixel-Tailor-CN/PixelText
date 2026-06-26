@@ -270,6 +270,12 @@ Release 构建，需要签名配置：
 ./gradlew :app:lintDebug
 ```
 
+测试约束：
+
+- 本项目不做单元测试。除非用户在当前任务中明确要求，否则不要新增 `app/src/test/`、`app/src/androidTest/`
+  测试代码，不要新增测试依赖，也不要运行 `testDebugUnitTest`、`test` 等单元测试任务。
+- 代码修改后的验证优先使用编译、Lint、Mock 界面、手动检查或真机验证。
+
 版本管理：
 
 - `versionCode` 基于 `git rev-list HEAD --count`。

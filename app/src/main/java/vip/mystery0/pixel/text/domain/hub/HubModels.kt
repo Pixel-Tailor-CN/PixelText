@@ -5,7 +5,6 @@ data class HubArtifact(
     val sha256: String,
     val sizeBytes: Long,
     val downloadUrl: String,
-    val minAppVersionCode: Int,
     val releaseNotes: String,
 )
 
@@ -19,7 +18,6 @@ data class HubSpamModelArtifact(
     val version: String,
     val model: HubFileArtifact,
     val vocab: HubFileArtifact,
-    val minAppVersionCode: Int,
     val releaseNotes: String,
 )
 
