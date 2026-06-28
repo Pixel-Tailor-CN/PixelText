@@ -48,6 +48,13 @@ class MessageRepositoryImpl(
 
     override suspend fun isCacheReady(): Boolean = conversationCacheRepository.isCacheReady()
 
+    override suspend fun forceSyncConversations() {
+        withContext(Dispatchers.IO) {
+            val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
+            conversationCacheRepository.fullSync(archivedThreadIds)
+        }
+    }
+
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
         val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
         val hiddenThreadIds = getHiddenFullySpamThreadIds(archivedThreadIds)

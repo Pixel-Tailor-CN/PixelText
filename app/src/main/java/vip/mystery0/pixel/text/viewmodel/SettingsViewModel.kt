@@ -12,6 +12,7 @@ import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateAvailability
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
+import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
@@ -22,6 +23,7 @@ import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
     private val hubResourceRepository: HubResourceRepository,
+    private val messageRepository: MessageRepository,
     private val resourceUpdateScheduler: ResourceUpdateScheduler,
     bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
@@ -31,6 +33,8 @@ class SettingsViewModel(
         MutableStateFlow<ResourceUpdateState>(ResourceUpdateState.Idle)
     val resourceUpdateState: StateFlow<ResourceUpdateState> =
         _resourceUpdateState.asStateFlow()
+    private val _smsSyncState = MutableStateFlow<SmsSyncState>(SmsSyncState.Idle)
+    val smsSyncState: StateFlow<SmsSyncState> = _smsSyncState.asStateFlow()
     private var pendingManifest: HubResourceManifest? = null
 
     fun setSpamDetectionEnabled(enabled: Boolean) {
@@ -97,6 +101,27 @@ class SettingsViewModel(
 
     fun displaySpamModelResourceVersion(version: String): String {
         return formatResourceVersionForDisplay(version, bundledResourceVersions.spamModelVersion)
+    }
+
+    fun forceSyncSmsData() {
+        if (_smsSyncState.value is SmsSyncState.Syncing) return
+        _smsSyncState.value = SmsSyncState.Syncing
+        viewModelScope.launch {
+            runCatching { messageRepository.forceSyncConversations() }
+                .onSuccess {
+                    _smsSyncState.value = SmsSyncState.Idle
+                }
+                .onFailure { error ->
+                    _smsSyncState.value =
+                        SmsSyncState.Error(error.message ?: "同步短信数据失败")
+                }
+        }
+    }
+
+    fun dismissSmsSyncError() {
+        if (_smsSyncState.value is SmsSyncState.Error) {
+            _smsSyncState.value = SmsSyncState.Idle
+        }
     }
 
     fun checkResourceUpdates() {
@@ -222,4 +247,10 @@ sealed interface ResourceUpdateState {
     data class Working(val message: String) : ResourceUpdateState, Busy
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState
+}
+
+sealed interface SmsSyncState {
+    data object Idle : SmsSyncState
+    data object Syncing : SmsSyncState
+    data class Error(val message: String) : SmsSyncState
 }
