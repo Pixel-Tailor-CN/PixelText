@@ -28,7 +28,7 @@
         ]
       },
       "conditions": {
-        "content_regex": "借记卡(?<account>\\d+)于(?<date>\\d{4})发生(?<type>.*?交易)[，。]金额(?<amount>[0-9,.]+)人民币[，。](?<details>已冻结.*)"
+        "content_regex": "借记卡(?<account>\\d+)于(?<date>\\d{4})发生(?<type>.*?交易)[，。]金额(?<amount>[0-9,.]+)人民币[，。](?<details>已冻结[^【]+)"
       }
     },
     {
@@ -42,7 +42,7 @@
         ]
       },
       "conditions": {
-        "content_regex": "(?<passenger>[\\u4e00-\\u9fa5]+)购票成功，(?<date>\\d{1,2}月\\d{1,2}日)(?<trainNo>[A-Z0-9]+)次，(?<departureStation>[^0-9a-zA-Z]+)(?<departureTime>\\d{2}:\\d{2})开"
+        "content_regex": "(?<passenger>[\\u4e00-\\u9fa5]+)购票成功，(?<date>\\d{1,2}月\\d{1,2}日)(?<trainNo>[A-Z]\\d+)次，(?<departureStation>[^\\d，。]+)(?<departureTime>\\d{2}:\\d{2})开"
       }
     },
     {
@@ -53,7 +53,7 @@
         "signature_equals": "招商银行"
       },
       "conditions": {
-        "content_regex": "账户(?<account>\\d{4})于(?<date>\\d{2}月\\d{2}日\\d{2}:\\d{2})(?<type>[^，。人]+?)[，]?人民币(?<amount>[0-9,.]+)(?:元)?[。，（\\(]?(?<details>[^）\\)]*)"
+        "content_regex": "账户(?<account>\\d{4})于(?<date>\\d{2}月\\d{2}日\\d{2}:\\d{2})(?<type>[^，。人]+?)[，]?人民币(?<amount>[0-9,.]+)(?:元)?(?:[。，（\\(]?(?<details>.*))?"
       }
     },
     {
@@ -67,50 +67,172 @@
         ]
       },
       "conditions": {
-        "content_regex": "购票成功，(?<date>\\d{4}-\\d{2}-\\d{2})\\s*(?<departureTime>\\d{2}:\\d{2}:\\d{2})出发，(?<departureStation>[^—]+)—(?<arrivalStation>[^，]+)，(?<trainNo>[A-Z0-9]+)，(?:检票口：(?<gate>[^，]+)，)?(?<passenger>[\\u4e00-\\u9fa5]+).*?(?<seatClass>\\w+座)?\\s*(?<seat>\\d+车厢\\w+号)"
+        "content_regex": "购票成功，(?<date>\\d{4}-\\d{2}-\\d{2})\\s*(?<departureTime>\\d{2}:\\d{2}:\\d{2})出发，(?<departureStation>[^—]+)—(?<arrivalStation>[^，]+)，(?<trainNo>[A-Z0-9]+)，(?:检票口：(?<gate>[^，]+)，)?(?<passenger>[\\u4e00-\\u9fa5]+)\\s+(?<seatClass>[^\\s，。]+座)\\s+(?<seat>\\d+车厢[0-9A-Z]+号)"
+      }
+    },
+    {
+      "id": "express_cainiao_arrival",
+      "target_card": "ExpressDelivery",
+      "priority": 95,
+      "fast_fail": {
+        "signature_equals": "菜鸟驿站",
+        "keywords": [
+          "包裹已到"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?:您有包裹|您的?(?<company>[^包，。]+?)包裹)已到(?<location>[^，。]+)[，。](?:请(?<time>[^前，。]+)前)?.*?(?:凭|取件码)[：:]?(?<code>[0-9A-Za-z-]+)"
+      }
+    },
+    {
+      "id": "express_yunda_arrival",
+      "target_card": "ExpressDelivery",
+      "priority": 95,
+      "fast_fail": {
+        "signature_equals": "韵达超市",
+        "keywords": [
+          "包裹已到"
+        ]
+      },
+      "conditions": {
+        "content_regex": "您的(?<company>[^包，。]+?)包裹已到(?<location>[^，。]+)[，。](?:请(?<time>[^前，。]+)前)?.*?(?:凭|取件码)[：:]?(?<code>[0-9A-Za-z-]+)"
       }
     },
     {
       "id": "express_delivery_arrival",
       "target_card": "ExpressDelivery",
-      "priority": 90,
+      "priority": 45,
       "fast_fail": {
         "keywords": [
           "包裹已到"
         ]
       },
       "conditions": {
-        "content_regex": "(?:您的?(?<company>[^包]+?)包裹|您有包裹)已到(?<location>[^，。]+)[，。](?:请(?<time>[^前]+)前)?.*?(?:凭|取件码)[：:]?(?<code>[0-9a-zA-Z-]+)"
+        "content_regex": "(?:您有包裹|您的?(?<company>[^包，。]+?)包裹)已到(?<location>[^，。]+)[，。](?:请(?<time>[^前，。]+)前)?.*?(?:凭|取件码)[：:]?(?<code>[0-9A-Za-z-]+)"
       }
     },
     {
-      "id": "verification_oppo_open_platform",
+      "id": "verification_code_after_keyword_general",
       "target_card": "VerificationCode",
-      "priority": 90,
+      "priority": 120,
       "fast_fail": {
-        "signature_equals": "OPPO",
         "keywords": [
           "验证码"
         ]
       },
       "conditions": {
-        "content_regex": "(?<code>[0-9a-zA-Z]{4,8})（OPPO开放平台验证码）"
+        "content_regex": "(?:短信登录|登录)?验证码(?:为|是)?[：:\\s]*(?<code>[0-9A-Za-z]{4,8})"
       }
     },
     {
-      "id": "verification_code_general",
+      "id": "verification_code_before_keyword_general",
       "target_card": "VerificationCode",
-      "priority": 10,
+      "priority": 119,
       "fast_fail": {
         "keywords": [
-          "验证码",
-          "动态码",
-          "校验码",
+          "验证码"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?<code>[0-9A-Za-z]{4,8})\\s*(?:[（(])?.{0,20}?(?:短信登录|登录)?验证码"
+      }
+    },
+    {
+      "id": "verification_random_code_prefix",
+      "target_card": "VerificationCode",
+      "priority": 65,
+      "fast_fail": {
+        "keywords": [
+          "随机码"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?<code>[0-9A-Za-z]{4,8})\\s*[（(][^）)]*随机码"
+      }
+    },
+    {
+      "id": "verification_wechat_mobile_link",
+      "target_card": "VerificationCode",
+      "priority": 88,
+      "fast_fail": {
+        "signature_equals": "WeChat",
+        "keywords": [
           "code"
         ]
       },
       "conditions": {
-        "content_regex": "(?i)(?:验证码|动态码|校验码|code).*?(?<code>[0-9a-zA-Z]{4,8})"
+        "content_regex": "(?i)(?:mobile number|use the code)\\s*\\((?<code>[0-9A-Za-z]{4,8})\\).*?(?:code|wechat)"
+      }
+    },
+    {
+      "id": "flight_china_eastern_purchase",
+      "target_card": "Flight",
+      "priority": 100,
+      "fast_fail": {
+        "signature_equals": "东方航空",
+        "keywords": [
+          "已购买",
+          "航班"
+        ]
+      },
+      "conditions": {
+        "content_regex": "您已购买(?<date>\\d{4}年\\d{2}月\\d{2}日)(?<departureTime>\\d{2}:\\d{2})\\s+(?<departureCity>[^机场至]+)机场(?:[（(](?<terminal>T\\d+)[）)])?至(?<arrivalCity>[^机场，）)]+)机场(?:[（(]T\\d+[）)])?，(?<flightNo>[A-Z]{2}\\d+)航班"
+      }
+    },
+    {
+      "id": "flight_china_southern_delay",
+      "target_card": "Flight",
+      "priority": 98,
+      "fast_fail": {
+        "signature_equals": "南航",
+        "keywords": [
+          "航班",
+          "推迟"
+        ]
+      },
+      "conditions": {
+        "content_regex": "您原订的(?<date>\\d{4}-\\d{2}-\\d{2})\\s+(?<departureTime>\\d{2}:\\d{2})\\s+(?<departureCity>[^-]+)-(?<arrivalCity>[^\\s]+)\\s+(?<flightNo>[A-Z]{2}\\d+)航班"
+      }
+    },
+    {
+      "id": "verification_code_english_suffix",
+      "target_card": "VerificationCode",
+      "priority": 45,
+      "fast_fail": {
+        "keywords": [
+          "verification code"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?i)(?<code>[0-9A-Za-z]{4,8})\\s+is your verification code"
+      }
+    },
+    {
+      "id": "verification_teambition_code_prefix",
+      "target_card": "VerificationCode",
+      "priority": 85,
+      "fast_fail": {
+        "signature_equals": "汇翼科技",
+        "keywords": [
+          "verification code"
+        ]
+      },
+      "conditions": {
+        "content_regex": "(?i)verification code[：:\\s]*(?<code>[0-9A-Za-z]{4,8})"
+      }
+    },
+    {
+      "id": "verification_alipay_check_code",
+      "target_card": "VerificationCode",
+      "priority": 90,
+      "fast_fail": {
+        "signature_equals": "支付宝",
+        "keywords": [
+          "校验码"
+        ]
+      },
+      "conditions": {
+        "content_regex": "校验码(?<code>[0-9A-Za-z]{4,8})"
       }
     }
   ]

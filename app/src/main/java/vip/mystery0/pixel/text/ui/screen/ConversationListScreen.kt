@@ -40,10 +40,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Chat
+import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -409,10 +412,10 @@ fun ConversationListScreen(
                 if (hasPermission && !selectionMode) {
                     Column {
                         ExtendedFloatingActionButton(
-                            text = { Text("Start chat") },
+                            text = { Text("开始聊天") },
                             icon = {
                                 Icon(
-                                    Icons.Rounded.ChatBubbleOutline,
+                                    Icons.AutoMirrored.Rounded.Chat,
                                     contentDescription = null
                                 )
                             },
