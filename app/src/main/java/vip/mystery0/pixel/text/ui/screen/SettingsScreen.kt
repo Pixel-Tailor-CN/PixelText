@@ -8,8 +8,12 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -30,6 +34,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Rule
@@ -51,11 +56,14 @@ import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -150,7 +158,7 @@ fun SettingsScreen(
         is ResourceUpdateState.Available ->
             "发现可安装资源：模型 ${state.detail.modelVersion}，规则 ${state.detail.ruleVersion}"
         is ResourceUpdateState.NoUpdate -> "手动检查规则和模型资源更新"
-        ResourceUpdateState.Updating -> "正在更新资源..."
+        is ResourceUpdateState.Updating -> state.message
         is ResourceUpdateState.Working -> state.message
         is ResourceUpdateState.Success -> state.message
         is ResourceUpdateState.Error -> state.message
@@ -716,58 +724,208 @@ fun SettingsScreen(
         )
     }
 
-    if (resourceUpdateState is ResourceUpdateState.Checking) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("正在检查资源更新") },
-            text = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LoadingIndicator(modifier = Modifier.size(32.dp))
-                    Text(
-                        text = "正在连接服务端获取最新规则和模型信息",
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
-            },
-            confirmButton = {}
-        )
-    }
-
-    (resourceUpdateState as? ResourceUpdateState.Available)?.let { state ->
-        AlertDialog(
-            onDismissRequest = viewModel::dismissResourceUpdateDialog,
-            title = { Text("发现资源更新") },
-            text = {
-                ResourceUpdateDetailContent(detail = state.detail)
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::installResourceUpdates) {
-                    Text("更新")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissResourceUpdateDialog) {
-                    Text("稍后")
+    if (resourceUpdateState.shouldShowResourceUpdateSheet()) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                if (resourceUpdateState !is ResourceUpdateState.Busy) {
+                    viewModel.dismissResourceUpdateDialog()
                 }
             }
-        )
+        ) {
+            AnimatedContent(
+                targetState = resourceUpdateState.sheetMode(),
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "ResourceUpdateContent"
+            ) { _ ->
+                ResourceUpdateSheetContent(
+                    state = resourceUpdateState,
+                    onInstall = viewModel::installResourceUpdates,
+                    onDismiss = viewModel::dismissResourceUpdateDialog
+                )
+            }
+        }
     }
+}
 
-    (resourceUpdateState as? ResourceUpdateState.NoUpdate)?.let { state ->
-        AlertDialog(
-            onDismissRequest = viewModel::dismissResourceUpdateDialog,
-            title = { Text("暂无可用更新") },
-            text = { Text(state.message) },
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissResourceUpdateDialog) {
+@Composable
+private fun ResourceUpdateSheetContent(
+    state: ResourceUpdateState,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        when (state) {
+            ResourceUpdateState.Idle -> Unit
+
+            ResourceUpdateState.Checking -> {
+                Text(
+                    text = "正在检查资源更新",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                ResourceUpdateBusyRow(message = "正在连接服务端获取最新规则和模型信息")
+            }
+
+            is ResourceUpdateState.Available -> {
+                Text(
+                    text = "发现资源更新",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                ResourceUpdateDetailContent(detail = state.detail)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("稍后")
+                    }
+                    Button(
+                        onClick = onInstall,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("更新")
+                    }
+                }
+            }
+
+            is ResourceUpdateState.NoUpdate -> {
+                Text(
+                    text = "暂无可用更新",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("知道了")
                 }
             }
+
+            is ResourceUpdateState.Updating -> {
+                val progress = state.progress.coerceIn(0f, 1f)
+                Text(
+                    text = "正在更新资源",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                LinearWavyProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            is ResourceUpdateState.Working -> {
+                Text(
+                    text = "正在处理资源",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                ResourceUpdateBusyRow(message = state.message)
+            }
+
+            is ResourceUpdateState.Success -> {
+                Text(
+                    text = "操作完成",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("知道了")
+                }
+            }
+
+            is ResourceUpdateState.Error -> {
+                Text(
+                    text = "操作失败",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("关闭")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResourceUpdateBusyRow(message: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LoadingIndicator(modifier = Modifier.size(32.dp))
+        Text(
+            text = message,
+            modifier = Modifier.padding(start = 16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+private fun ResourceUpdateState.shouldShowResourceUpdateSheet(): Boolean {
+    return this !is ResourceUpdateState.Idle
+}
+
+private fun ResourceUpdateState.sheetMode(): ResourceUpdateSheetMode {
+    return when (this) {
+        ResourceUpdateState.Idle -> ResourceUpdateSheetMode.Idle
+        ResourceUpdateState.Checking -> ResourceUpdateSheetMode.Checking
+        is ResourceUpdateState.Available -> ResourceUpdateSheetMode.Available
+        is ResourceUpdateState.NoUpdate -> ResourceUpdateSheetMode.NoUpdate
+        is ResourceUpdateState.Updating -> ResourceUpdateSheetMode.Updating
+        is ResourceUpdateState.Working -> ResourceUpdateSheetMode.Working
+        is ResourceUpdateState.Success -> ResourceUpdateSheetMode.Success
+        is ResourceUpdateState.Error -> ResourceUpdateSheetMode.Error
+    }
+}
+
+private enum class ResourceUpdateSheetMode {
+    Idle,
+    Checking,
+    Available,
+    NoUpdate,
+    Updating,
+    Working,
+    Success,
+    Error,
 }
 
 @Composable

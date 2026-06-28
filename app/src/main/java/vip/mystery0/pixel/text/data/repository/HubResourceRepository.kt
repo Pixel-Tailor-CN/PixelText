@@ -14,6 +14,7 @@ import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import java.io.File
 
 class HubResourceRepository(
     private val client: PixelTextHubClient,
@@ -43,13 +44,45 @@ class HubResourceRepository(
         }
     }
 
-    suspend fun updateAll(manifest: HubResourceManifest): HubOperationResult {
+    suspend fun updateAll(
+        manifest: HubResourceManifest,
+        onProgress: (message: String, progress: Float) -> Unit = { _, _ -> },
+    ): HubOperationResult {
         return runCatching {
+            val totalBytes = manifest.totalDownloadBytes().coerceAtLeast(1L)
+            var completedBytes = 0L
+
+            fun reportProgress(message: String) {
+                onProgress(
+                    message,
+                    (completedBytes.toDouble() / totalBytes.toDouble())
+                        .toFloat()
+                        .coerceIn(0f, 1f)
+                )
+            }
+
+            suspend fun downloadTracked(
+                message: String,
+                url: String,
+                target: File,
+            ) {
+                var reportedBytes = 0L
+                reportProgress(message)
+                client.downloadTo(url, target) { currentBytes ->
+                    val delta = (currentBytes - reportedBytes).coerceAtLeast(0L)
+                    reportedBytes = currentBytes
+                    completedBytes += delta
+                    reportProgress(message)
+                }
+            }
+
+            onProgress("正在准备下载资源", 0f)
             manifest.rules?.let { rules ->
                 val temp = store.tempFile("rules-${safeVersion(rules.version)}.json")
-                client.downloadTo(rules.downloadUrl, temp)
+                downloadTracked("正在下载智能卡片规则", rules.downloadUrl, temp)
                 store.verifySize(temp, rules.sizeBytes)
                 store.verifySha256(temp, rules.sha256)
+                onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
                 verifyRulesJson(temp.readText(Charsets.UTF_8))
                 store.activateRules(temp)
                 settings.setRuleResourceVersion(rules.version)
@@ -60,18 +93,20 @@ class HubResourceRepository(
                 val safeVersion = safeVersion(spamModel.version)
                 val modelTemp = store.tempFile("spam-model-$safeVersion.tflite")
                 val vocabTemp = store.tempFile("vocab-$safeVersion.txt")
-                client.downloadTo(spamModel.model.downloadUrl, modelTemp)
-                client.downloadTo(spamModel.vocab.downloadUrl, vocabTemp)
+                downloadTracked("正在下载离线模型", spamModel.model.downloadUrl, modelTemp)
+                downloadTracked("正在下载模型词表", spamModel.vocab.downloadUrl, vocabTemp)
                 store.verifySize(modelTemp, spamModel.model.sizeBytes)
                 store.verifySize(vocabTemp, spamModel.vocab.sizeBytes)
                 store.verifySha256(modelTemp, spamModel.model.sha256)
                 store.verifySha256(vocabTemp, spamModel.vocab.sha256)
+                onProgress("正在校验并启用离线模型", completedBytes.toProgress(totalBytes))
                 store.activateModelAndVocab(modelTemp, vocabTemp)
                 settings.setSpamModelResourceVersion(spamModel.version)
                 settings.setVocabResourceVersion(spamModel.version)
             }
 
             settings.setResourceUpdatedAt(System.currentTimeMillis())
+            onProgress("资源更新完成", 1f)
             HubOperationResult.Success
         }.getOrElse { error ->
             HubOperationResult.Failure(error.message ?: "update failed")
@@ -127,6 +162,20 @@ class HubResourceRepository(
             ruleSizeBytes = rules?.sizeBytes,
             releaseNotes = notes.ifBlank { "暂无版本说明" }
         )
+    }
+
+    private fun HubResourceManifest.totalDownloadBytes(): Long {
+        return listOfNotNull(
+            rules?.sizeBytes,
+            spamModel?.model?.sizeBytes,
+            spamModel?.vocab?.sizeBytes
+        ).sum()
+    }
+
+    private fun Long.toProgress(totalBytes: Long): Float {
+        return (toDouble() / totalBytes.coerceAtLeast(1L).toDouble())
+            .toFloat()
+            .coerceIn(0f, 1f)
     }
 
     private companion object {
