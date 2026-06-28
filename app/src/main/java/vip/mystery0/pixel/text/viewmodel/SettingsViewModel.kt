@@ -129,15 +129,29 @@ class SettingsViewModel(
     fun installResourceUpdates() {
         val manifest = pendingManifest ?: return
         if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
-        _resourceUpdateState.value = ResourceUpdateState.Updating
+        _resourceUpdateState.value = ResourceUpdateState.Updating(
+            message = "正在准备下载资源",
+            progress = 0f
+        )
         viewModelScope.launch {
-            when (val result = hubResourceRepository.updateAll(manifest)) {
+            val result = hubResourceRepository.updateAll(manifest) { message, progress ->
+                _resourceUpdateState.value = ResourceUpdateState.Updating(
+                    message = message,
+                    progress = progress
+                )
+            }
+            when (result) {
                 HubOperationResult.Success -> {
                     pendingManifest = null
+                    _resourceUpdateState.value = ResourceUpdateState.Updating(
+                        message = "资源更新完成",
+                        progress = 1f
+                    )
                     _resourceUpdateState.value = ResourceUpdateState.Success("资源已更新")
                 }
 
                 is HubOperationResult.Failure -> {
+                    pendingManifest = null
                     _resourceUpdateState.value = ResourceUpdateState.Error(result.message)
                 }
             }
@@ -161,12 +175,14 @@ class SettingsViewModel(
     }
 
     fun dismissResourceUpdateDialog() {
-        if (
-            _resourceUpdateState.value is ResourceUpdateState.Available ||
-            _resourceUpdateState.value is ResourceUpdateState.NoUpdate
-        ) {
-            pendingManifest = null
-            _resourceUpdateState.value = ResourceUpdateState.Idle
+        when (_resourceUpdateState.value) {
+            ResourceUpdateState.Idle,
+            is ResourceUpdateState.Busy -> Unit
+
+            else -> {
+                pendingManifest = null
+                _resourceUpdateState.value = ResourceUpdateState.Idle
+            }
         }
     }
 
@@ -199,7 +215,10 @@ sealed interface ResourceUpdateState {
     data object Checking : ResourceUpdateState, Busy
     data class Available(val detail: ResourceUpdateDetail) : ResourceUpdateState
     data class NoUpdate(val message: String) : ResourceUpdateState
-    data object Updating : ResourceUpdateState, Busy
+    data class Updating(
+        val message: String,
+        val progress: Float,
+    ) : ResourceUpdateState, Busy
     data class Working(val message: String) : ResourceUpdateState, Busy
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState

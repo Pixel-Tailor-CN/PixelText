@@ -42,7 +42,11 @@ class PixelTextHubClient(
         ensureSuccessful(service.submitSample(request.toBody()), "request failed")
     }
 
-    suspend fun downloadTo(url: String, target: File): Long = withContext(Dispatchers.IO) {
+    suspend fun downloadTo(
+        url: String,
+        target: File,
+        onProgress: (Long) -> Unit = {},
+    ): Long = withContext(Dispatchers.IO) {
         val response = service.download(url)
         if (!response.isSuccessful) {
             throw IllegalStateException("download failed status=${response.code()}")
@@ -52,7 +56,15 @@ class PixelTextHubClient(
         body.use {
             it.byteStream().use { input ->
                 target.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var totalBytes = 0L
+                    while (true) {
+                        val readBytes = input.read(buffer)
+                        if (readBytes < 0) break
+                        output.write(buffer, 0, readBytes)
+                        totalBytes += readBytes
+                        onProgress(totalBytes)
+                    }
                 }
             }
         }
