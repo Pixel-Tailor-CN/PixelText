@@ -13,6 +13,7 @@ data class MessageSearchFilter(
 interface MessageRepository {
     fun startCacheObserving()
     suspend fun isCacheReady(): Boolean
+    suspend fun forceSyncConversations()
     fun getAllConversations(): Flow<List<ConversationModel>>
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>

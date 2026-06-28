@@ -107,6 +107,7 @@ import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
+import vip.mystery0.pixel.text.viewmodel.SmsSyncState
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -122,6 +123,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
     val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
+    val smsSyncState by viewModel.smsSyncState.collectAsState()
     var permissionRefreshKey by remember { mutableIntStateOf(0) }
     var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
@@ -165,6 +167,7 @@ fun SettingsScreen(
     }
     val resourceUpdateEnabled =
         resourceUpdateState !is ResourceUpdateState.Busy
+    val smsSyncEnabled = smsSyncState !is SmsSyncState.Syncing
     val spamAutoActionEnabled =
         settings.spamDetectionEnabled && settings.muteSpamNotificationsEnabled
 
@@ -305,36 +308,6 @@ fun SettingsScreen(
                                     showResourceAutoCheckIntervalDialog = true
                                 }
                             )
-                        }
-                        if (showDebugResourceActions) {
-                            item(
-                                key = "debug_delete_downloaded_model",
-                                contentType = "Preference"
-                            ) {
-                                Preference(
-                                    title = { Text("删除下载的模型文件") },
-                                    summary = { Text("删除已下载的离线模型和词表，回退到内置模型") },
-                                    enabled = resourceUpdateEnabled,
-                                    icon = {
-                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
-                                    },
-                                    onClick = viewModel::deleteDownloadedModelResource
-                                )
-                            }
-                            item(
-                                key = "debug_delete_downloaded_rules",
-                                contentType = "Preference"
-                            ) {
-                                Preference(
-                                    title = { Text("删除下载的智能卡片规则文件") },
-                                    summary = { Text("删除已下载的规则文件，回退到内置规则版本") },
-                                    enabled = resourceUpdateEnabled,
-                                    icon = {
-                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
-                                    },
-                                    onClick = viewModel::deleteDownloadedRulesResource
-                                )
-                            }
                         }
                         item(key = "sample_submission", contentType = "Preference") {
                             Preference(
@@ -513,6 +486,60 @@ fun SettingsScreen(
                                     onRequest = {
                                         pendingPermissionDialogItem = permissionItem
                                     }
+                                )
+                            }
+                        }
+
+                        preferenceCategory(
+                            key = "category_advanced_features",
+                            title = { Text("高级功能") }
+                        )
+                        item(key = "force_sms_sync", contentType = "Preference") {
+                            Preference(
+                                title = { Text("强制同步短信数据") },
+                                summary = {
+                                    Text(
+                                        if (smsSyncState is SmsSyncState.Syncing) {
+                                            "正在同步短信数据，请稍候…"
+                                        } else {
+                                            "重新读取系统短信和彩信并刷新本地会话缓存"
+                                        }
+                                    )
+                                },
+                                enabled = smsSyncEnabled,
+                                icon = {
+                                    Icon(Icons.Rounded.Sync, contentDescription = null)
+                                },
+                                onClick = viewModel::forceSyncSmsData
+                            )
+                        }
+                        if (showDebugResourceActions) {
+                            item(
+                                key = "debug_delete_downloaded_model",
+                                contentType = "Preference"
+                            ) {
+                                Preference(
+                                    title = { Text("删除下载的模型文件") },
+                                    summary = { Text("删除已下载的离线模型和词表，回退到内置模型") },
+                                    enabled = resourceUpdateEnabled,
+                                    icon = {
+                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                                    },
+                                    onClick = viewModel::deleteDownloadedModelResource
+                                )
+                            }
+                            item(
+                                key = "debug_delete_downloaded_rules",
+                                contentType = "Preference"
+                            ) {
+                                Preference(
+                                    title = { Text("删除下载的智能卡片规则文件") },
+                                    summary = { Text("删除已下载的规则文件，回退到内置规则版本") },
+                                    enabled = resourceUpdateEnabled,
+                                    icon = {
+                                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                                    },
+                                    onClick = viewModel::deleteDownloadedRulesResource
                                 )
                             }
                         }
@@ -719,6 +746,28 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showResourceAutoCheckIntervalDialog = false }) {
                     Text("取消")
+                }
+            }
+        )
+    }
+
+    if (smsSyncState is SmsSyncState.Syncing) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("正在同步数据") },
+            text = { Text("首次启动需要同步短信数据，请稍候…") },
+            confirmButton = {}
+        )
+    }
+
+    (smsSyncState as? SmsSyncState.Error)?.let { state ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSmsSyncError,
+            title = { Text("同步失败") },
+            text = { Text(state.message) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissSmsSyncError) {
+                    Text("知道了")
                 }
             }
         )

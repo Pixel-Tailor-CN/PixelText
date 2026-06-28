@@ -69,6 +69,6 @@ val appModule = module {
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
 }
