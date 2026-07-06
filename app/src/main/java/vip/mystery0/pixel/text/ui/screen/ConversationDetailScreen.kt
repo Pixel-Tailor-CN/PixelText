@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -181,6 +183,7 @@ fun ConversationDetailScreen(
     val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
     val spamMarkMenuText =
         if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
+    val canReportSelectedSample = selectedMessage?.content?.isNotBlank() == true
 
     // 双卡场景：加载当前激活的 SIM 列表，单卡 / 无权限时为空列表
     val simList = remember { SimInfoProvider.getActiveSimList(context) }
@@ -240,6 +243,25 @@ fun ConversationDetailScreen(
         }
     }
 
+    LaunchedEffect(selectedMessage?.id) {
+        val message = selectedMessage ?: return@LaunchedEffect
+        if (!canReportSelectedSample) return@LaunchedEffect
+        if (appSettings.sampleSubmissionShortcutHintShown) return@LaunchedEffect
+        settingsRepository.setSampleSubmissionShortcutHintShown(true)
+        val result = snackbarHostState.showSnackbar(
+            message = "可点右上角上报图标，自动带入当前短信",
+            actionLabel = "上报",
+            withDismissAction = true
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            onNavigateToSampleSubmission(
+                message.content,
+                message.sender.ifBlank { address }
+            )
+            selectedMessageIds.clear()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
         topBar = {
@@ -276,6 +298,22 @@ fun ConversationDetailScreen(
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete")
                         }
                         if (selectedMessageIds.size == 1) {
+                            if (canReportSelectedSample) {
+                                IconButton(onClick = {
+                                    selectedMessage?.let { message ->
+                                        onNavigateToSampleSubmission(
+                                            message.content,
+                                            message.sender.ifBlank { address }
+                                        )
+                                    }
+                                    selectedMessageIds.clear()
+                                }) {
+                                    Icon(
+                                        Icons.Rounded.UploadFile,
+                                        contentDescription = "Report sample"
+                                    )
+                                }
+                            }
                             var showMoreMenu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {

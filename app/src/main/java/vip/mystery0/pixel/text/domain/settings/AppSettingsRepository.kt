@@ -32,6 +32,8 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS,
     val resourceAutoCheckLastCheckedAt: Long =
         AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT,
+    val sampleSubmissionShortcutHintShown: Boolean =
+        AppSettingsKeys.DEFAULT_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN,
 )
 
 enum class SpamAutoAction(val storageValue: String) {
@@ -91,6 +93,7 @@ interface AppSettingsRepository {
     fun setResourceAutoCheckEnabled(enabled: Boolean)
     fun setResourceAutoCheckIntervalHours(hours: Long)
     fun setResourceAutoCheckLastCheckedAt(timestamp: Long)
+    fun setSampleSubmissionShortcutHintShown(shown: Boolean)
 
     fun isSpamDetectionEnabled(): Boolean
     fun isMuteSpamNotificationsEnabled(): Boolean
@@ -110,6 +113,7 @@ interface AppSettingsRepository {
     fun isResourceAutoCheckEnabled(): Boolean
     fun getResourceAutoCheckIntervalHours(): Long
     fun getResourceAutoCheckLastCheckedAt(): Long
+    fun isSampleSubmissionShortcutHintShown(): Boolean
 }
 
 object AppSettingsKeys {
@@ -137,6 +141,8 @@ object AppSettingsKeys {
         "resource_auto_check_interval_hours"
     const val KEY_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT =
         "resource_auto_check_last_checked_at"
+    const val KEY_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN =
+        "sample_submission_shortcut_hint_shown"
 
     const val DEFAULT_SPAM_DETECTION_ENABLED = true
     const val DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED = false
@@ -154,4 +160,5 @@ object AppSettingsKeys {
     const val DEFAULT_RESOURCE_AUTO_CHECK_ENABLED = false
     const val DEFAULT_RESOURCE_AUTO_CHECK_INTERVAL_HOURS = 24L
     const val DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT = 0L
+    const val DEFAULT_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN = false
 }
