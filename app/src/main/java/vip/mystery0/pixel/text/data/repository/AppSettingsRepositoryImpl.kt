@@ -113,6 +113,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         updatePrefs { putLong(AppSettingsKeys.KEY_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT, timestamp) }
     }
 
+    override fun setSampleSubmissionShortcutHintShown(shown: Boolean) {
+        updatePrefs {
+            putBoolean(AppSettingsKeys.KEY_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN, shown)
+        }
+    }
+
     override fun isSpamDetectionEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
@@ -229,6 +235,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_RESOURCE_AUTO_CHECK_LAST_CHECKED_AT
         )
 
+    override fun isSampleSubmissionShortcutHintShown(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN,
+            AppSettingsKeys.DEFAULT_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN
+        )
+
     private fun readSettings(): AppSettings {
         return AppSettings(
             spamDetectionEnabled = isSpamDetectionEnabled(),
@@ -250,7 +262,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             resourceUpdatedAt = getResourceUpdatedAt(),
             resourceAutoCheckEnabled = isResourceAutoCheckEnabled(),
             resourceAutoCheckIntervalHours = getResourceAutoCheckIntervalHours(),
-            resourceAutoCheckLastCheckedAt = getResourceAutoCheckLastCheckedAt()
+            resourceAutoCheckLastCheckedAt = getResourceAutoCheckLastCheckedAt(),
+            sampleSubmissionShortcutHintShown = isSampleSubmissionShortcutHintShown()
         )
     }
 

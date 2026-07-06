@@ -312,7 +312,9 @@ fun SettingsScreen(
                         item(key = "sample_submission", contentType = "Preference") {
                             Preference(
                                 title = { Text("上报脱敏短信样本") },
-                                summary = { Text("手动提交已脱敏的短信样本，帮助改进本地规则和模型") },
+                                summary = {
+                                    Text("手动提交已脱敏的短信样本，也可在短信详情页长按单条短信后快速带入")
+                                },
                                 icon = {
                                     Icon(Icons.Rounded.UploadFile, contentDescription = null)
                                 },
