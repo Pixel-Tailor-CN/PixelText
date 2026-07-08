@@ -10,6 +10,7 @@ import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
 import vip.mystery0.pixel.text.domain.sample.SampleDesensitizationAssistant
+import vip.mystery0.pixel.text.domain.sample.SampleReplacementError
 import vip.mystery0.pixel.text.domain.sample.SensitiveType
 
 class SampleSubmissionViewModel(
@@ -27,6 +28,8 @@ class SampleSubmissionViewModel(
     var submitting by mutableStateOf(false)
         private set
     var resultMessage by mutableStateOf<String?>(null)
+        private set
+    var desensitizationHintMessage by mutableStateOf<String?>(null)
         private set
     var desensitizationState by mutableStateOf(DesensitizationAssistantState())
         private set
@@ -82,7 +85,14 @@ class SampleSubmissionViewModel(
     }
 
     fun replaceSelectedSensitiveText() {
-        desensitizationState = desensitizationAssistant.replaceSelected(desensitizationState)
+        val result = desensitizationAssistant.replaceSelected(desensitizationState)
+        desensitizationState = result.state
+        desensitizationHintMessage = when (result.error) {
+            SampleReplacementError.INVALID_TEMPORAL_FORMAT ->
+                "选择的内容似乎不是有效的时间格式，请手动修改"
+
+            null -> null
+        }
     }
 
     fun applyDesensitizedDraft() {
@@ -110,6 +120,10 @@ class SampleSubmissionViewModel(
 
     fun clearResult() {
         resultMessage = null
+    }
+
+    fun clearDesensitizationHintMessage() {
+        desensitizationHintMessage = null
     }
 
     fun submit() {

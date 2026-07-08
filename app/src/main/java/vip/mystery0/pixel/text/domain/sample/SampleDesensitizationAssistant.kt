@@ -22,6 +22,11 @@ data class DesensitizationAssistantState(
     }
 }
 
+data class ReplaceSelectedResult(
+    val state: DesensitizationAssistantState,
+    val error: SampleReplacementError? = null,
+)
+
 class SampleDesensitizationAssistant(
     private val tokenizer: SampleTextTokenizer = SampleTextTokenizer(),
     private val desensitizer: SampleDesensitizer = SampleDesensitizer(),
@@ -82,18 +87,31 @@ class SampleDesensitizationAssistant(
         return state.copy(selectedType = type)
     }
 
-    fun replaceSelected(state: DesensitizationAssistantState): DesensitizationAssistantState {
-        val start = state.selectedStart ?: return state
-        val end = state.selectedEnd ?: return state
-        val type = state.selectedType ?: return state
-        if (start >= end) return state
-        val nextDraft = desensitizer.replace(state.draft, start, end, type)
-        return state.copy(
-            draft = nextDraft,
-            tokens = tokenizer.selectionUnits(nextDraft),
-            selectedStart = null,
-            selectedEnd = null,
-            dirty = nextDraft != state.draft || state.dirty,
-        )
+    fun replaceSelected(state: DesensitizationAssistantState): ReplaceSelectedResult {
+        val start = state.selectedStart ?: return ReplaceSelectedResult(state)
+        val end = state.selectedEnd ?: return ReplaceSelectedResult(state)
+        val type = state.selectedType ?: return ReplaceSelectedResult(state)
+        if (start >= end) return ReplaceSelectedResult(state)
+        return when (val result = desensitizer.replace(state.draft, start, end, type)) {
+            is SampleReplacementResult.Success -> {
+                val nextDraft = result.content
+                ReplaceSelectedResult(
+                    state = state.copy(
+                        draft = nextDraft,
+                        tokens = tokenizer.selectionUnits(nextDraft),
+                        selectedStart = null,
+                        selectedEnd = null,
+                        dirty = nextDraft != state.draft || state.dirty,
+                    )
+                )
+            }
+
+            is SampleReplacementResult.Failure -> {
+                ReplaceSelectedResult(
+                    state = state,
+                    error = result.error,
+                )
+            }
+        }
     }
 }

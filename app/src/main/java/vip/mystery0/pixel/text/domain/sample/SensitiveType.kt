@@ -9,5 +9,8 @@ enum class SensitiveType(val label: String) {
     ORDER_ID("订单号"),
     VERIFICATION_CODE("验证码"),
     AMOUNT("金额"),
+    DATE("日期"),
+    TIME("时间"),
+    DATE_TIME("日期时间"),
     OTHER("其他"),
 }
