@@ -55,7 +55,7 @@ val appModule = module {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
-    single { SmartspacerSmsRepository(get(), get()) }
+    single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
@@ -69,6 +69,6 @@ val appModule = module {
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(androidContext(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
 }

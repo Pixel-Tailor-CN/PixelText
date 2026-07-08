@@ -32,6 +32,7 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -250,6 +251,7 @@ class ConversationDetailViewModel(
             runCatching {
                 val score = if (markedAsSpam) MANUAL_SPAM_SCORE else MANUAL_NON_SPAM_SCORE
                 spamRepository.save(message.id, message.threadId, score)
+                SmartspacerIntegration.notifyChanged(context)
                 updateMessageSpamScore(message.id, score)
                 _manualSpamChecks.value += (message.id to ManualSpamCheckState.Result(score))
                 markedAsSpam
@@ -289,6 +291,7 @@ class ConversationDetailViewModel(
                 val score = result.getOrThrow()
                 if (score >= 0f) {
                     spamRepository.save(message.id, message.threadId, score)
+                    SmartspacerIntegration.notifyChanged(context)
                     updateMessageSpamScore(message.id, score)
                     ManualSpamCheckState.Result(score)
                 } else {

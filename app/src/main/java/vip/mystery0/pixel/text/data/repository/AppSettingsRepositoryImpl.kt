@@ -12,6 +12,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.SmartspacerUnreadCountSettings
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
@@ -34,6 +35,23 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
         updatePrefs {
             putBoolean(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED, enabled)
+        }
+    }
+
+    override fun setSmartspacerUnreadCountSettings(settings: SmartspacerUnreadCountSettings) {
+        updatePrefs {
+            putBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_NORMAL_MESSAGES,
+                settings.includeNormalMessages
+            )
+            putBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_SPAM_MESSAGES,
+                settings.includeSpamMessages
+            )
+            putBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_ARCHIVED_MESSAGES,
+                settings.includeArchivedMessages
+            )
         }
     }
 
@@ -145,6 +163,22 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED
         )
 
+    override fun getSmartspacerUnreadCountSettings(): SmartspacerUnreadCountSettings =
+        SmartspacerUnreadCountSettings(
+            includeNormalMessages = prefs.getBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_NORMAL_MESSAGES,
+                AppSettingsKeys.DEFAULT_SMARTSPACER_UNREAD_COUNT_SETTINGS.includeNormalMessages
+            ),
+            includeSpamMessages = prefs.getBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_SPAM_MESSAGES,
+                AppSettingsKeys.DEFAULT_SMARTSPACER_UNREAD_COUNT_SETTINGS.includeSpamMessages
+            ),
+            includeArchivedMessages = prefs.getBoolean(
+                AppSettingsKeys.KEY_SMARTSPACER_UNREAD_INCLUDE_ARCHIVED_MESSAGES,
+                AppSettingsKeys.DEFAULT_SMARTSPACER_UNREAD_COUNT_SETTINGS.includeArchivedMessages
+            )
+        )
+
     override fun isSmartCardEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SMART_CARD_ENABLED,
@@ -247,6 +281,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),
             hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
+            smartspacerUnreadCountSettings = getSmartspacerUnreadCountSettings(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
                 isVerificationCodeNotificationActionEnabled(),

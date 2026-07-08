@@ -72,6 +72,11 @@ data class SmartspacerSmsRow(
     val read: Boolean
 )
 
+data class SmartspacerUnreadSmsRow(
+    val id: Long,
+    val threadId: Long
+)
+
 private data class IncomingMessageRef(
     val id: Long,
     val timestamp: Long,
@@ -658,19 +663,25 @@ class TelephonyDataSource(
         return rows
     }
 
-    fun getUnreadSmsCountForSmartspacer(): Int {
+    fun getUnreadSmsMessagesForSmartspacer(): List<SmartspacerUnreadSmsRow> {
+        val rows = mutableListOf<SmartspacerUnreadSmsRow>()
         contentResolver.query(
             Telephony.Sms.CONTENT_URI,
-            arrayOf("COUNT(*)"),
+            arrayOf(Telephony.Sms._ID, Telephony.Sms.THREAD_ID),
             "${Telephony.Sms.READ} = 0 AND ${Telephony.Sms.TYPE} = ?",
             arrayOf(Telephony.Sms.MESSAGE_TYPE_INBOX.toString()),
             null
         )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                return cursor.getInt(0)
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            while (cursor.moveToNext()) {
+                rows += SmartspacerUnreadSmsRow(
+                    id = cursor.getLong(idIndex),
+                    threadId = cursor.getLong(threadIdIndex)
+                )
             }
         }
-        return 0
+        return rows
     }
 
     fun insertOutboxPlaceholder(
