@@ -12,5 +12,4 @@ enum class SensitiveType(val label: String) {
     DATE("日期"),
     TIME("时间"),
     DATE_TIME("日期时间"),
-    OTHER("其他"),
 }

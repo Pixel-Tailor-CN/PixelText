@@ -88,6 +88,9 @@ class SampleSubmissionViewModel(
         val result = desensitizationAssistant.replaceSelected(desensitizationState)
         desensitizationState = result.state
         desensitizationHintMessage = when (result.error) {
+            SampleReplacementError.INVALID_AMOUNT_FORMAT ->
+                "选择的内容似乎不是有效的金额格式，请手动修改"
+
             SampleReplacementError.INVALID_TEMPORAL_FORMAT ->
                 "选择的内容似乎不是有效的时间格式，请手动修改"
 
