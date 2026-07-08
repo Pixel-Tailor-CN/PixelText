@@ -139,6 +139,11 @@
             </intent-filter>
         </provider>
 
+        <activity
+            android:name=".smartspacer.UnreadSmsComplicationConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PixelText" />
+
         <receiver
             android:name=".smartspacer.VerificationCodeSmartspacerActionReceiver"
             android:exported="false" />

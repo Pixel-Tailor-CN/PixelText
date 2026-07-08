@@ -7,7 +7,6 @@ import vip.mystery0.pixel.text.data.source.SmartspacerSmsRow
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
-import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
 data class SmartspacerVerificationCode(
@@ -22,14 +21,14 @@ data class SmartspacerVerificationCode(
 class SmartspacerSmsRepository(
     private val telephonyDataSource: TelephonyDataSource,
     private val messageParser: MessageParser,
-    private val settingsRepository: AppSettingsRepository,
+    private val settingsRepository: UnreadSmsComplicationSettingsRepository,
     private val spamRepository: SpamRepository,
     archiveDatabase: ConversationArchiveDatabase,
 ) {
     private val archiveDao = archiveDatabase.archivedConversationDao()
 
-    fun getUnreadSmsCount(): Int {
-        val settings = settingsRepository.getSmartspacerUnreadCountSettings()
+    fun getUnreadSmsCount(smartspacerId: String): Int {
+        val settings = settingsRepository.getSettings(smartspacerId)
         if (!settings.hasEnabledCategory()) return 0
 
         val unreadMessages = telephonyDataSource.getUnreadSmsMessagesForSmartspacer()
