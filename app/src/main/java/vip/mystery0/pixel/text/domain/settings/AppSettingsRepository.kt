@@ -9,8 +9,6 @@ data class AppSettings(
     val spamAutoAction: SpamAutoAction = AppSettingsKeys.DEFAULT_SPAM_AUTO_ACTION,
     val hideFullySpamConversationsEnabled: Boolean =
         AppSettingsKeys.DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED,
-    val smartspacerUnreadCountSettings: SmartspacerUnreadCountSettings =
-        AppSettingsKeys.DEFAULT_SMARTSPACER_UNREAD_COUNT_SETTINGS,
     val smartCardEnabled: Boolean = AppSettingsKeys.DEFAULT_SMART_CARD_ENABLED,
     val verificationCodeNotificationActionEnabled: Boolean =
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
@@ -37,16 +35,6 @@ data class AppSettings(
     val sampleSubmissionShortcutHintShown: Boolean =
         AppSettingsKeys.DEFAULT_SAMPLE_SUBMISSION_SHORTCUT_HINT_SHOWN,
 )
-
-data class SmartspacerUnreadCountSettings(
-    val includeNormalMessages: Boolean = true,
-    val includeSpamMessages: Boolean = true,
-    val includeArchivedMessages: Boolean = true
-) {
-    fun hasEnabledCategory(): Boolean {
-        return includeNormalMessages || includeSpamMessages || includeArchivedMessages
-    }
-}
 
 enum class SpamAutoAction(val storageValue: String) {
     NONE("none"),
@@ -91,7 +79,6 @@ interface AppSettingsRepository {
     fun setMuteSpamNotificationsEnabled(enabled: Boolean)
     fun setSpamAutoAction(action: SpamAutoAction)
     fun setHideFullySpamConversationsEnabled(enabled: Boolean)
-    fun setSmartspacerUnreadCountSettings(settings: SmartspacerUnreadCountSettings)
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean)
@@ -112,7 +99,6 @@ interface AppSettingsRepository {
     fun isMuteSpamNotificationsEnabled(): Boolean
     fun getSpamAutoAction(): SpamAutoAction
     fun isHideFullySpamConversationsEnabled(): Boolean
-    fun getSmartspacerUnreadCountSettings(): SmartspacerUnreadCountSettings
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
     fun isHideVerificationCodeOnLockScreenEnabled(): Boolean
@@ -137,12 +123,6 @@ object AppSettingsKeys {
     const val KEY_SPAM_AUTO_ACTION = "spam_auto_action"
     const val KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED =
         "hide_fully_spam_conversations_enabled"
-    const val KEY_SMARTSPACER_UNREAD_INCLUDE_NORMAL_MESSAGES =
-        "smartspacer_unread_include_normal_messages"
-    const val KEY_SMARTSPACER_UNREAD_INCLUDE_SPAM_MESSAGES =
-        "smartspacer_unread_include_spam_messages"
-    const val KEY_SMARTSPACER_UNREAD_INCLUDE_ARCHIVED_MESSAGES =
-        "smartspacer_unread_include_archived_messages"
     const val KEY_SMART_CARD_ENABLED = "smart_card_enabled"
     const val KEY_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED =
         "verification_code_notification_action_enabled"
@@ -168,7 +148,6 @@ object AppSettingsKeys {
     const val DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED = false
     val DEFAULT_SPAM_AUTO_ACTION = SpamAutoAction.NONE
     const val DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED = false
-    val DEFAULT_SMARTSPACER_UNREAD_COUNT_SETTINGS = SmartspacerUnreadCountSettings()
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
     const val DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED = true

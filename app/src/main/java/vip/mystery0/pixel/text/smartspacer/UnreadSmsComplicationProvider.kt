@@ -15,9 +15,10 @@ import android.graphics.drawable.Icon as AndroidIcon
 
 class UnreadSmsComplicationProvider : SmartspacerComplicationProvider(), KoinComponent {
     private val repository: SmartspacerSmsRepository by inject()
+    private val settingsRepository: UnreadSmsComplicationSettingsRepository by inject()
 
     override fun getSmartspaceActions(smartspacerId: String): List<SmartspaceAction> {
-        val count = repository.getUnreadSmsCount()
+        val count = repository.getUnreadSmsCount(smartspacerId)
         val label = formatUnreadCount(count) ?: return emptyList()
         return listOf(
             ComplicationTemplate.Basic(
@@ -39,8 +40,16 @@ class UnreadSmsComplicationProvider : SmartspacerComplicationProvider(), KoinCom
         return Config(
             label = "未读短信数量",
             description = "显示 PixelText 中的未读短信数量",
-            icon = AndroidIcon.createWithResource(provideContext(), R.drawable.ic_notification_sms)
+            icon = AndroidIcon.createWithResource(provideContext(), R.drawable.ic_notification_sms),
+            configActivity = Intent(
+                provideContext(),
+                UnreadSmsComplicationConfigActivity::class.java
+            )
         )
+    }
+
+    override fun onProviderRemoved(smartspacerId: String) {
+        settingsRepository.removeSettings(smartspacerId)
     }
 
     private fun openAppIntent(): Intent {

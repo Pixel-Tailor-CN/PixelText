@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,13 +17,10 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
-import vip.mystery0.pixel.text.domain.settings.SmartspacerUnreadCountSettings
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
-import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 
 class SettingsViewModel(
-    private val context: Context,
     private val settingsRepository: AppSettingsRepository,
     private val hubResourceRepository: HubResourceRepository,
     private val messageRepository: MessageRepository,
@@ -55,11 +51,6 @@ class SettingsViewModel(
 
     fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
         settingsRepository.setHideFullySpamConversationsEnabled(enabled)
-    }
-
-    fun setSmartspacerUnreadCountSettings(settings: SmartspacerUnreadCountSettings) {
-        settingsRepository.setSmartspacerUnreadCountSettings(settings)
-        SmartspacerIntegration.notifyChanged(context)
     }
 
     fun setSmartCardEnabled(enabled: Boolean) {
