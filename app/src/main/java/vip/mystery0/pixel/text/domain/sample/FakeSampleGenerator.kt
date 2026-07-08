@@ -14,11 +14,10 @@ class FakeSampleGenerator(
             SensitiveType.BANK_CARD -> generateBankCard(source)
             SensitiveType.ORDER_ID -> generateByShape(source, letterMode = LetterMode.PRESERVE_CASE)
             SensitiveType.VERIFICATION_CODE -> generateByShape(source, letterMode = LetterMode.UPPERCASE)
-            SensitiveType.AMOUNT -> generateAmount(source)
+            SensitiveType.AMOUNT,
             SensitiveType.DATE,
             SensitiveType.TIME,
-            SensitiveType.DATE_TIME,
-            SensitiveType.OTHER -> generateOther(source)
+            SensitiveType.DATE_TIME -> source
         }
     }
 
@@ -78,8 +77,8 @@ class FakeSampleGenerator(
         }
     }
 
-    private fun generateAmount(source: String): String {
-        val match = amountRegex.find(source) ?: return generateOther(source)
+    fun generateAmountOrNull(source: String): String? {
+        val match = amountRegex.find(source) ?: return null
         val prefix = match.groupValues[1]
         val integer = match.groupValues[2]
         val decimal = match.groupValues[3]
@@ -91,22 +90,6 @@ class FakeSampleGenerator(
             "." + randomNumber(decimal.length, firstNonZero = false)
         }
         return "$prefix$fakeInteger$fakeDecimal$suffix"
-    }
-
-    private fun generateOther(source: String): String {
-        return buildString {
-            source.forEach { char ->
-                append(
-                    when {
-                        char.isChinese() -> '某'
-                        char.isAsciiDigit() -> randomDigit()
-                        char in 'A'..'Z' -> randomUppercaseLetter()
-                        char in 'a'..'z' -> randomLowercaseLetter()
-                        else -> char
-                    }
-                )
-            }
-        }
     }
 
     private fun generateByShape(

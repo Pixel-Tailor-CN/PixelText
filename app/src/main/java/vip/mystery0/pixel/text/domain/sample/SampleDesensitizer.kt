@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.domain.sample
 
 enum class SampleReplacementError {
+    INVALID_AMOUNT_FORMAT,
     INVALID_TEMPORAL_FORMAT,
 }
 
@@ -26,6 +27,13 @@ class SampleDesensitizer(
         }
         val source = content.substring(start, end)
         val replacement = when (type) {
+            SensitiveType.AMOUNT -> {
+                generator.generateAmountOrNull(source)
+                    ?: return SampleReplacementResult.Failure(
+                        SampleReplacementError.INVALID_AMOUNT_FORMAT
+                    )
+            }
+
             SensitiveType.DATE,
             SensitiveType.TIME,
             SensitiveType.DATE_TIME -> {
