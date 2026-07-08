@@ -15,6 +15,9 @@ class FakeSampleGenerator(
             SensitiveType.ORDER_ID -> generateByShape(source, letterMode = LetterMode.PRESERVE_CASE)
             SensitiveType.VERIFICATION_CODE -> generateByShape(source, letterMode = LetterMode.UPPERCASE)
             SensitiveType.AMOUNT -> generateAmount(source)
+            SensitiveType.DATE,
+            SensitiveType.TIME,
+            SensitiveType.DATE_TIME,
             SensitiveType.OTHER -> generateOther(source)
         }
     }

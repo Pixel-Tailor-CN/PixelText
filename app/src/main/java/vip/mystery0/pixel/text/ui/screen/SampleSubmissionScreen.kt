@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
@@ -70,12 +72,20 @@ fun SampleSubmissionScreen(
     initialContent: String = "",
     initialSender: String = "",
 ) {
+    val context = LocalContext.current
     var categoryMenuExpanded by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     val canSubmit = viewModel.agreed && viewModel.content.isNotBlank() && !viewModel.submitting
 
     LaunchedEffect(initialContent, initialSender) {
         viewModel.applyDraft(initialContent, initialSender)
+    }
+
+    viewModel.desensitizationHintMessage?.let { message ->
+        LaunchedEffect(message) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearDesensitizationHintMessage()
+        }
     }
 
     Scaffold(
