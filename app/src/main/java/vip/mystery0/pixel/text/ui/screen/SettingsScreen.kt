@@ -67,6 +67,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -101,6 +102,7 @@ import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.SmartspacerUnreadCountSettings
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
@@ -129,7 +131,11 @@ fun SettingsScreen(
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
+    var showSmartspacerUnreadCountDialog by remember { mutableStateOf(false) }
     var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
+    var pendingSmartspacerUnreadCountSettings by remember {
+        mutableStateOf(SmartspacerUnreadCountSettings())
+    }
     var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
     var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -392,6 +398,25 @@ fun SettingsScreen(
                                 },
                                 icon = {
                                     Icon(Icons.Rounded.VisibilityOff, contentDescription = null)
+                                }
+                            )
+                        }
+                        item(
+                            key = "smartspacer_unread_count_settings",
+                            contentType = "Preference"
+                        ) {
+                            Preference(
+                                title = { Text("Smartspacer 未读统计范围") },
+                                summary = {
+                                    Text(settings.smartspacerUnreadCountSettings.preferenceSummary())
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Forum, contentDescription = null)
+                                },
+                                onClick = {
+                                    pendingSmartspacerUnreadCountSettings =
+                                        settings.smartspacerUnreadCountSettings
+                                    showSmartspacerUnreadCountDialog = true
                                 }
                             )
                         }
@@ -703,6 +728,72 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showSpamAutoActionDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showSmartspacerUnreadCountDialog) {
+        AlertDialog(
+            onDismissRequest = { showSmartspacerUnreadCountDialog = false },
+            title = { Text("Smartspacer 未读统计范围") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "控制 Smartspacer 未读数量统计哪些未读短信，同一条短信命中多个分类时只计数一次。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    SmartspacerUnreadCategoryOption(
+                        title = "正常短信",
+                        summary = "未归档且未标记为骚扰的未读短信",
+                        checked = pendingSmartspacerUnreadCountSettings.includeNormalMessages,
+                        onCheckedChange = { enabled ->
+                            pendingSmartspacerUnreadCountSettings =
+                                pendingSmartspacerUnreadCountSettings.copy(
+                                    includeNormalMessages = enabled
+                                )
+                        }
+                    )
+                    SmartspacerUnreadCategoryOption(
+                        title = "骚扰短信",
+                        summary = "命中骚扰识别阈值的未读短信",
+                        checked = pendingSmartspacerUnreadCountSettings.includeSpamMessages,
+                        onCheckedChange = { enabled ->
+                            pendingSmartspacerUnreadCountSettings =
+                                pendingSmartspacerUnreadCountSettings.copy(
+                                    includeSpamMessages = enabled
+                                )
+                        }
+                    )
+                    SmartspacerUnreadCategoryOption(
+                        title = "归档短信",
+                        summary = "位于归档会话中的未读短信",
+                        checked = pendingSmartspacerUnreadCountSettings.includeArchivedMessages,
+                        onCheckedChange = { enabled ->
+                            pendingSmartspacerUnreadCountSettings =
+                                pendingSmartspacerUnreadCountSettings.copy(
+                                    includeArchivedMessages = enabled
+                                )
+                        }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setSmartspacerUnreadCountSettings(
+                            pendingSmartspacerUnreadCountSettings
+                        )
+                        showSmartspacerUnreadCountDialog = false
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSmartspacerUnreadCountDialog = false }) {
                     Text("取消")
                 }
             }
@@ -1088,6 +1179,57 @@ private fun SpamAutoAction.dialogSummary(): String {
         SpamAutoAction.MARK_READ -> "识别为骚扰后自动标记这条短信为已读"
         SpamAutoAction.DELETE -> "模型判断不一定完全准确，正常短信也可能被当作骚扰并被移除"
     }
+}
+
+@Composable
+private fun SmartspacerUnreadCategoryOption(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(end = 16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+    }
+}
+
+private fun SmartspacerUnreadCountSettings.preferenceSummary(): String {
+    val enabledCategories = buildList {
+        if (includeNormalMessages) add("正常短信")
+        if (includeSpamMessages) add("骚扰短信")
+        if (includeArchivedMessages) add("归档短信")
+    }
+    if (enabledCategories.isEmpty()) {
+        return "不显示未读数量"
+    }
+    if (enabledCategories.size == 3) {
+        return "统计全部未读短信"
+    }
+    return "统计${enabledCategories.joinToString("、")}的未读短信"
 }
 
 @Composable

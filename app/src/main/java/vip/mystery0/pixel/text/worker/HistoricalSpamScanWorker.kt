@@ -14,6 +14,7 @@ import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import java.util.UUID
 
 class HistoricalSpamScanWorker(
@@ -77,6 +78,9 @@ class HistoricalSpamScanWorker(
             }
 
             publishProgress(processed, pendingMessages.size, spamCount, forceNotification = true)
+            if (pendingMessages.isNotEmpty()) {
+                SmartspacerIntegration.notifyChanged(applicationContext)
+            }
             SpamScanNotificationHelper.showCompleted(applicationContext, processed, spamCount)
             Result.success(
                 workDataOf(

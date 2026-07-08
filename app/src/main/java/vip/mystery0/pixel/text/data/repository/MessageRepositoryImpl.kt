@@ -109,6 +109,7 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             val archivedAt = System.currentTimeMillis()
             archiveDao.archive(conversations.map { it.toArchivedConversationEntity(archivedAt) })
+            SmartspacerIntegration.notifyChanged(context)
         }
     }
 
@@ -116,6 +117,7 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
             archiveDao.unarchive(threadIds)
+            SmartspacerIntegration.notifyChanged(context)
         }
     }
 
