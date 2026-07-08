@@ -177,9 +177,9 @@ fun ConversationDetailScreen(
     val selectedSpamCheckState = selectedMessage?.let { manualSpamChecks[it.id] }
     val canCheckSelectedSpam =
         selectedMessage != null &&
-            selectedMessage.content.isNotBlank() &&
-            selectedMessage.spamScore < 0f &&
-            selectedSpamCheckState !is ManualSpamCheckState.Checking
+                selectedMessage.content.isNotBlank() &&
+                selectedMessage.spamScore < 0f &&
+                selectedSpamCheckState !is ManualSpamCheckState.Checking
     val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
     val spamMarkMenuText =
         if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
@@ -300,12 +300,10 @@ fun ConversationDetailScreen(
                         if (selectedMessageIds.size == 1) {
                             if (canReportSelectedSample) {
                                 IconButton(onClick = {
-                                    selectedMessage?.let { message ->
-                                        onNavigateToSampleSubmission(
-                                            message.content,
-                                            message.sender.ifBlank { address }
-                                        )
-                                    }
+                                    onNavigateToSampleSubmission(
+                                        selectedMessage.content,
+                                        selectedMessage.sender.ifBlank { address }
+                                    )
                                     selectedMessageIds.clear()
                                 }) {
                                     Icon(
