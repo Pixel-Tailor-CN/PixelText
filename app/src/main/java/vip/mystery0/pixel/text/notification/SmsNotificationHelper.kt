@@ -20,6 +20,14 @@ import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
+import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
+import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
+import vip.mystery0.pixel.text.domain.settings.defaultLabelTemplate
+import vip.mystery0.pixel.text.domain.settings.defaultOrder
+import vip.mystery0.pixel.text.domain.settings.normalizeNotificationQuickActionConfigs
+import vip.mystery0.pixel.text.domain.settings.preferenceLabelKey
+import vip.mystery0.pixel.text.domain.settings.preferenceOrderKey
+import vip.mystery0.pixel.text.domain.settings.renderLabel
 import vip.mystery0.pixel.text.receiver.NotificationActionReceiver
 
 object SmsNotificationHelper {
@@ -32,7 +40,7 @@ object SmsNotificationHelper {
     private var messageParser: MessageParser? = null
 
     /**
-     * 在 Application.onCreate() 中调用，注册通知渠道（Android 8.0+ 必须）。
+     * 在 Application.onCreate() 中调用，注册通知渠道。
      */
     fun createNotificationChannel(context: Context) {
         val channel = NotificationChannel(
@@ -50,14 +58,10 @@ object SmsNotificationHelper {
     }
 
     /**
-     * 发送新短信通知，带"已阅"、"回复"操作按钮。
-     * 如果本地解析结果是验证码，会额外显示"复制 xxxxxx"操作。
+     * 发送新短信通知。
      *
-     * @param context       上下文
-     * @param sender        发件人（号码或联系人名称）
-     * @param body          短信内容
-     * @param threadId      会话 ID，用于跳转、分组和标记已读
-     * @param messageUri    插入数据库后返回的 URI，用于复制验证码后精确标记单条短信已读
+     * 普通短信显示“已阅”和“回复”，验证码短信会额外显示“复制验证码”操作。
+     * 三个操作的顺序和文案都由设置决定。
      */
     fun showSmsNotification(
         context: Context,
@@ -66,9 +70,9 @@ object SmsNotificationHelper {
         threadId: Long = 0L,
         messageUri: String? = null,
     ) {
-        // Android 13+ 需要运行时授权 POST_NOTIFICATIONS
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
+            if (
+                ContextCompat.checkSelfPermission(
                     context,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
@@ -77,11 +81,11 @@ object SmsNotificationHelper {
             }
         }
 
-        // 通知 ID：以 threadId 为 ID 保证同一会话只保留最新一条（覆盖更新）
         val notificationId =
             if (threadId != 0L) threadId.toInt() else System.currentTimeMillis().toInt()
+        val actionConfigs = readNotificationQuickActionConfigs(context)
+        val actionConfigByType = actionConfigs.associateBy { it.type }
 
-        // ── 主体点击：打开 MainActivity 并传入 threadId 和发件人地址 ────────
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(MainActivity.EXTRA_THREAD_ID, threadId)
@@ -89,13 +93,11 @@ object SmsNotificationHelper {
         }
         val contentPendingIntent = PendingIntent.getActivity(
             context,
-            // requestCode 区分不同会话的 PendingIntent，避免复用旧 Intent
             notificationId,
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // ── Action 1："已阅" ─────────────────────────────────────────────────
         val markReadIntent = Intent(context, NotificationActionReceiver::class.java).apply {
             action = NotificationActionReceiver.ACTION_MARK_READ
             putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
@@ -103,18 +105,21 @@ object SmsNotificationHelper {
         }
         val markReadPendingIntent = PendingIntent.getBroadcast(
             context,
-            // requestCode = notificationId * 10 + 1，与其他 action 区分
             notificationId * 10 + 1,
             markReadIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val markReadAction = NotificationCompat.Action.Builder(
+            0,
+            actionConfigByType[NotificationQuickActionType.MARK_READ]?.labelTemplate
+                ?: NotificationQuickActionType.MARK_READ.defaultLabelTemplate(),
+            markReadPendingIntent
+        ).build()
 
-        // ── Action 2："回复" ─────────────────────────────────────────────────
         val replyLabel = context.getString(R.string.notification_reply_hint)
         val remoteInput = RemoteInput.Builder(NotificationActionReceiver.EXTRA_REPLY_TEXT)
             .setLabel(replyLabel)
             .build()
-
         val replyIntent = Intent(context, NotificationActionReceiver::class.java).apply {
             action = NotificationActionReceiver.ACTION_REPLY_SMS
             putExtra(NotificationActionReceiver.EXTRA_NOTIFICATION_ID, notificationId)
@@ -125,12 +130,12 @@ object SmsNotificationHelper {
             context,
             notificationId * 10 + 2,
             replyIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE // Required for RemoteInput
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
-
         val replyAction = NotificationCompat.Action.Builder(
             0,
-            context.getString(R.string.notification_action_reply),
+            actionConfigByType[NotificationQuickActionType.REPLY]?.labelTemplate
+                ?: NotificationQuickActionType.REPLY.defaultLabelTemplate(),
             replyPendingIntent
         ).addRemoteInput(remoteInput).build()
 
@@ -149,15 +154,24 @@ object SmsNotificationHelper {
                 copyIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-
             NotificationCompat.Action.Builder(
                 0,
-                "复制 $code",
+                actionConfigByType[NotificationQuickActionType.COPY_CODE]
+                    ?.renderLabel(code)
+                    ?: code,
                 copyPendingIntent
             ).build()
         }
 
-        // ── 构建通知 ─────────────────────────────────────────────────────────
+        val actionMap = buildMap<NotificationQuickActionType, NotificationCompat.Action> {
+            put(NotificationQuickActionType.MARK_READ, markReadAction)
+            put(NotificationQuickActionType.REPLY, replyAction)
+            copyCodeAction?.let {
+                put(NotificationQuickActionType.COPY_CODE, it)
+            }
+        }
+        val orderedActions = orderNotificationActions(actionConfigs, actionMap)
+
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
             .setSmallIcon(R.drawable.ic_notification_sms)
             .setContentTitle(sender)
@@ -168,14 +182,6 @@ object SmsNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setGroup("sms_group_$threadId")
-            // Action 1：已阅
-            .addAction(
-                0,
-                context.getString(R.string.notification_action_mark_read),
-                markReadPendingIntent
-            )
-
-        copyCodeAction?.let { notificationBuilder.addAction(it) }
 
         verificationCode
             ?.takeIf { shouldHideVerificationCodeOnLockScreen(context) }
@@ -190,15 +196,20 @@ object SmsNotificationHelper {
                             threadId = threadId,
                             verificationCode = code,
                             contentPendingIntent = contentPendingIntent,
-                            markReadPendingIntent = markReadPendingIntent,
-                            replyAction = replyAction
+                            actions = orderNotificationActions(
+                                actionConfigs,
+                                actionMap.filterKeys {
+                                    it != NotificationQuickActionType.COPY_CODE
+                                }
+                            )
                         )
                     )
             }
 
         val notification = notificationBuilder
-            // Action 2：回复
-            .addAction(replyAction)
+            .apply {
+                orderedActions.forEach(::addAction)
+            }
             .build()
 
         NotificationManagerCompat.from(context).notify(notificationId, notification)
@@ -241,8 +252,7 @@ object SmsNotificationHelper {
         threadId: Long,
         verificationCode: String,
         contentPendingIntent: PendingIntent,
-        markReadPendingIntent: PendingIntent,
-        replyAction: NotificationCompat.Action,
+        actions: List<NotificationCompat.Action>,
     ): Notification {
         val maskedBody = maskVerificationCode(body, verificationCode)
         return NotificationCompat.Builder(context, CHANNEL_ID_SMS)
@@ -256,12 +266,9 @@ object SmsNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setGroup("sms_group_$threadId")
-            .addAction(
-                0,
-                context.getString(R.string.notification_action_mark_read),
-                markReadPendingIntent
-            )
-            .addAction(replyAction)
+            .apply {
+                actions.forEach(::addAction)
+            }
             .build()
     }
 
@@ -276,6 +283,27 @@ object SmsNotificationHelper {
         return messageParser ?: MessageParser(appContext, HubResourceStore(appContext)).also {
             messageParser = it
         }
+    }
+
+    private fun readNotificationQuickActionConfigs(context: Context): List<NotificationQuickActionConfig> {
+        val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+        return NotificationQuickActionType.entries.map { type ->
+            NotificationQuickActionConfig(
+                type = type,
+                labelTemplate = prefs.getString(
+                    type.preferenceLabelKey(),
+                    type.defaultLabelTemplate()
+                ) ?: type.defaultLabelTemplate(),
+                order = prefs.getInt(type.preferenceOrderKey(), type.defaultOrder())
+            )
+        }.normalizeNotificationQuickActionConfigs()
+    }
+
+    private fun orderNotificationActions(
+        actionConfigs: List<NotificationQuickActionConfig>,
+        actions: Map<NotificationQuickActionType, NotificationCompat.Action>,
+    ): List<NotificationCompat.Action> {
+        return actionConfigs.mapNotNull { config -> actions[config.type] }
     }
 
     fun cancelThreadNotification(context: Context, threadId: Long) {
