@@ -147,16 +147,10 @@ fun SpamConversationListScreen(
                         var isRefreshing by remember { mutableStateOf(false) }
 
                         if (state.conversations.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "暂无已识别骚扰会话",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            ConversationEmptyState(
+                                imageRes = vip.mystery0.pixel.text.R.drawable.illustration_spam_conversation_empty,
+                                text = "暂无已识别骚扰会话"
+                            )
                             return@Box
                         }
 
