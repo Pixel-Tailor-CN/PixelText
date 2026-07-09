@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -63,6 +64,7 @@ sealed interface ManualSpamCheckState {
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
     private val telephonyDataSource: TelephonyDataSource,
+    private val contactDataSource: ContactDataSource,
     private val context: Context,
     private val spamClassifierFactory: SpamClassifierFactory,
     private val spamRepository: SpamRepository
@@ -72,6 +74,8 @@ class ConversationDetailViewModel(
 
     private val _address = MutableStateFlow<String>("")
     val address: StateFlow<String> = _address.asStateFlow()
+    private val _conversationTitle = MutableStateFlow("")
+    val conversationTitle: StateFlow<String> = _conversationTitle.asStateFlow()
 
     private val _sending = MutableStateFlow(false)
     val sending: StateFlow<Boolean> = _sending.asStateFlow()
@@ -123,6 +127,7 @@ class ConversationDetailViewModel(
 
     fun loadThread(threadId: Long, address: String) {
         _address.value = address
+        _conversationTitle.value = resolveConversationTitle(address)
         if (currentThreadId == threadId && _messages.isNotEmpty()) return
 
         currentThreadId = threadId
@@ -142,6 +147,10 @@ class ConversationDetailViewModel(
                 repository.markThreadAsRead(threadId)
             }
         }
+    }
+
+    private fun resolveConversationTitle(address: String): String {
+        return contactDataSource.getDisplayName(address)?.takeIf { it.isNotBlank() } ?: address
     }
 
     fun loadMore() {
