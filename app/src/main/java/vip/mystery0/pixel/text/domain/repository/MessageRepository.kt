@@ -7,7 +7,9 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 data class MessageSearchFilter(
     val unreadOnly: Boolean = false,
     val simSubId: Int? = null,
-    val mmsOnly: Boolean = false
+    val mmsOnly: Boolean = false,
+    val contactAddress: String? = null,
+    val contactDisplayName: String? = null,
 )
 
 interface MessageRepository {
