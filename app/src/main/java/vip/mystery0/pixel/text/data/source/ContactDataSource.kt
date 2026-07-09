@@ -31,6 +31,13 @@ class ContactDataSource(
         return null
     }
 
+    fun matchesAddress(selectedAddress: String, candidateAddress: String): Boolean {
+        if (selectedAddress.isBlank() || candidateAddress.isBlank()) return false
+        val selectedKeys = contactLookupKeys(selectedAddress)
+        val candidateKeys = contactLookupKeys(candidateAddress)
+        return selectedKeys.any(candidateKeys::contains)
+    }
+
     private fun ensureContactNameCacheLoaded() {
         if (contactNameCacheLoaded) return
 

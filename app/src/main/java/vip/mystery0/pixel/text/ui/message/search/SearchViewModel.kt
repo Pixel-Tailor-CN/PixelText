@@ -66,11 +66,25 @@ class SearchViewModel(private val repository: MessageRepository) : ViewModel() {
         }
     }
 
+    fun setContactFilter(address: String, displayName: String?) {
+        _searchFilter.value = _searchFilter.value.copy(
+            contactAddress = address.takeIf { it.isNotBlank() },
+            contactDisplayName = displayName?.takeIf { it.isNotBlank() }
+        )
+    }
+
+    fun clearContactFilter() {
+        _searchFilter.value = _searchFilter.value.copy(
+            contactAddress = null,
+            contactDisplayName = null
+        )
+    }
+
     private suspend fun performSearch(query: String, filter: MessageSearchFilter) {
         _uiState.value = SearchUiState.Loading
         repository.searchMessages(query, filter)
             .catch { e ->
-                _uiState.value = SearchUiState.Error(e.message ?: "Search failed")
+                _uiState.value = SearchUiState.Error(e.message ?: "搜索失败")
             }
             .collect { results ->
                 _uiState.value = SearchUiState.Success(results)
@@ -78,7 +92,7 @@ class SearchViewModel(private val repository: MessageRepository) : ViewModel() {
     }
 
     private fun MessageSearchFilter.isActive(): Boolean {
-        return unreadOnly || simSubId != null || mmsOnly
+        return unreadOnly || simSubId != null || mmsOnly || !contactAddress.isNullOrBlank()
     }
 }
 

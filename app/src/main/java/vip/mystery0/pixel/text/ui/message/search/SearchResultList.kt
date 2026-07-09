@@ -1,8 +1,13 @@
 package vip.mystery0.pixel.text.ui.message.search
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.LoadingIndicator
@@ -11,7 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 
 @Composable
@@ -22,13 +29,10 @@ fun SearchResultList(
 ) {
     when (uiState) {
         is SearchUiState.Idle -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "输入关键词搜索短信内容",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SearchPlaceholder(
+                imageRes = R.drawable.illustration_search_idle,
+                text = "输入关键词，或直接按联系人筛选短信"
+            )
         }
 
         is SearchUiState.Loading -> {
@@ -40,7 +44,7 @@ fun SearchResultList(
         is SearchUiState.Error -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    "搜索出错: ${uiState.message}",
+                    text = "搜索失败：${uiState.message}",
                     color = MaterialTheme.colorScheme.error
                 )
             }
@@ -48,9 +52,10 @@ fun SearchResultList(
 
         is SearchUiState.Success -> {
             if (uiState.results.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("未找到相关短信", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                SearchPlaceholder(
+                    imageRes = R.drawable.illustration_search_empty,
+                    text = "没有找到匹配的短信"
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -65,6 +70,35 @@ fun SearchResultList(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchPlaceholder(
+    @DrawableRes imageRes: Int,
+    text: String
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(imageRes),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(220.dp)
+                    .padding(bottom = 20.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

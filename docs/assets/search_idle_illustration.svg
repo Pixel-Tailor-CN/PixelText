@@ -1,0 +1,20 @@
+<svg width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="44" y="38" width="124" height="92" rx="22" fill="#F3F7F7"/>
+  <rect x="56" y="54" width="100" height="12" rx="6" fill="#CFE6E2"/>
+  <rect x="56" y="76" width="82" height="10" rx="5" fill="#DCECEA"/>
+  <rect x="56" y="94" width="66" height="10" rx="5" fill="#DCECEA"/>
+  <circle cx="176" cy="88" r="26" fill="#E4F3EF"/>
+  <circle cx="176" cy="88" r="18" stroke="#4E8E84" stroke-width="8"/>
+  <path d="M190 102L207 119" stroke="#4E8E84" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="66" cy="30" r="10" fill="#9FC9C1"/>
+  <circle cx="84" cy="26" r="4" fill="#EFF7F5"/>
+  <circle cx="192" cy="38" r="8" fill="#B6D8D2"/>
+  <circle cx="205" cy="135" r="7" fill="#B6D8D2"/>
+  <circle cx="40" cy="122" r="7" fill="#B6D8D2"/>
+  <path d="M31 121C31 116.029 35.0294 112 40 112C44.9706 112 49 116.029 49 121V121.5H31V121Z" fill="#4E8E84"/>
+  <path d="M56 144C56 137.925 60.9249 133 67 133H145C151.075 133 156 137.925 156 144V146H56V144Z" fill="#D7EAE6"/>
+  <circle cx="78" cy="145" r="7" fill="#7DB3A8"/>
+  <circle cx="98" cy="145" r="7" fill="#7DB3A8"/>
+  <circle cx="118" cy="145" r="7" fill="#7DB3A8"/>
+  <path d="M173 47C173 42.0294 177.029 38 182 38C186.971 38 191 42.0294 191 47V47.5H173V47Z" fill="#4E8E84"/>
+</svg>

@@ -165,7 +165,21 @@ class MessageRepositoryImpl(
         )
             .map { it.toMessageModel(parsedResult = ParsedResult.None) }
 
-        emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
+        val filteredMessages = (smsMessages + mmsMessages)
+            .filter { message ->
+                val selectedContactAddress = filter.contactAddress
+                if (selectedContactAddress.isNullOrBlank()) {
+                    true
+                } else {
+                    contactDataSource.matchesAddress(
+                        selectedAddress = selectedContactAddress,
+                        candidateAddress = message.sender
+                    )
+                }
+            }
+            .sortedByDescending { it.timestamp }
+
+        emit(filteredMessages)
     }.flowOn(Dispatchers.IO)
 
     override fun getMessagesByThread(
