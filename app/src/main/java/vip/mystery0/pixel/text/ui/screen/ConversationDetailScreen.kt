@@ -120,6 +120,7 @@ fun ConversationDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    val conversationTitle by viewModel.conversationTitle.collectAsState()
     val sending by viewModel.sending.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val appSettings by settingsRepository.settings.collectAsState()
@@ -128,6 +129,9 @@ fun ConversationDetailScreen(
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var messageText by remember(threadId, address, initialMessageText) {
         mutableStateOf(initialMessageText)
+    }
+    var showAddressInTitle by remember(threadId, address) {
+        mutableStateOf(false)
     }
     var textScale by remember {
         mutableFloatStateOf(settingsRepository.getConversationDetailTextScale())
@@ -180,6 +184,13 @@ fun ConversationDetailScreen(
                 selectedMessage.content.isNotBlank() &&
                 selectedMessage.spamScore < 0f &&
                 selectedSpamCheckState !is ManualSpamCheckState.Checking
+    val canToggleConversationTitle =
+        conversationTitle.isNotBlank() && conversationTitle != address
+    val topBarTitle = when {
+        showAddressInTitle && address.isNotBlank() -> address
+        conversationTitle.isNotBlank() -> conversationTitle
+        else -> address
+    }
     val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
     val spamMarkMenuText =
         if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
@@ -411,7 +422,17 @@ fun ConversationDetailScreen(
                 )
             } else {
                 TopAppBar(
-                    title = { Text(address) },
+                    title = {
+                        Text(
+                            text = topBarTitle,
+                            modifier = Modifier.clickable(
+                                enabled = canToggleConversationTitle,
+                                onClick = {
+                                    showAddressInTitle = !showAddressInTitle
+                                }
+                            )
+                        )
+                    },
                     navigationIcon = {
                         if (!isTablet) {
                             IconButton(onClick = onNavigateBack) {
