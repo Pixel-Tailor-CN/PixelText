@@ -29,6 +29,7 @@ import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
@@ -139,6 +140,9 @@ fun AppNavigation(
                     onNavigateToSwipeActions = {
                         navController.navigate("swipe_actions")
                     },
+                    onNavigateToNotificationActions = {
+                        navController.navigate("notification_actions")
+                    },
                     resourceUpdateCheckRequestId = resourceUpdateCheckRequestId,
                     onResourceUpdateCheckRequestConsumed = {
                         resourceUpdateCheckRequestId = null
@@ -147,6 +151,11 @@ fun AppNavigation(
             }
             composable("swipe_actions") {
                 SwipeActionSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("notification_actions") {
+                NotificationActionSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

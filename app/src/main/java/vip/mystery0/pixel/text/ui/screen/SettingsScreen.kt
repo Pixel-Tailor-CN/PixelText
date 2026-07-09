@@ -117,6 +117,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
+    onNavigateToNotificationActions: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
     onResourceUpdateCheckRequestConsumed: () -> Unit = {},
 ) {
@@ -436,6 +437,21 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
                                 },
                                 onClick = onNavigateToSwipeActions
+                            )
+                        }
+                        item(
+                            key = "notification_quick_actions",
+                            contentType = "Preference"
+                        ) {
+                            Preference(
+                                title = { Text("通知快捷操作") },
+                                summary = {
+                                    Text(settings.notificationQuickActionConfigs.settingsSummary())
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Forum, contentDescription = null)
+                                },
+                                onClick = onNavigateToNotificationActions
                             )
                         }
                         item(

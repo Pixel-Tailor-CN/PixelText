@@ -11,7 +11,14 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
+import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
+import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.defaultLabelTemplate
+import vip.mystery0.pixel.text.domain.settings.defaultOrder
+import vip.mystery0.pixel.text.domain.settings.normalizeNotificationQuickActionConfigs
+import vip.mystery0.pixel.text.domain.settings.preferenceLabelKey
+import vip.mystery0.pixel.text.domain.settings.preferenceOrderKey
 
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
@@ -71,6 +78,16 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     override fun setLeftSwipeAction(action: ConversationSwipeAction) {
         updatePrefs {
             putString(AppSettingsKeys.KEY_LEFT_SWIPE_ACTION, action.storageValue)
+        }
+    }
+
+    override fun setNotificationQuickActionConfigs(configs: List<NotificationQuickActionConfig>) {
+        val normalizedConfigs = configs.normalizeNotificationQuickActionConfigs()
+        updatePrefs {
+            normalizedConfigs.forEach { config ->
+                putString(config.type.preferenceLabelKey(), config.labelTemplate.trim())
+                putInt(config.type.preferenceOrderKey(), config.order)
+            }
         }
     }
 
@@ -187,6 +204,20 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             )
         )
 
+    override fun getNotificationQuickActionConfigs(): List<NotificationQuickActionConfig> {
+        return NotificationQuickActionType.entries.map { type ->
+            NotificationQuickActionConfig(
+                type = type,
+                labelTemplate = prefs.getString(
+                    type.preferenceLabelKey(),
+                    type.defaultLabelTemplate()
+                )
+                    ?: type.defaultLabelTemplate(),
+                order = prefs.getInt(type.preferenceOrderKey(), type.defaultOrder())
+            )
+        }.normalizeNotificationQuickActionConfigs()
+    }
+
     override fun getConversationDetailTextScale(): Float =
         prefs.getFloat(
             AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -255,6 +286,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),
+            notificationQuickActionConfigs = getNotificationQuickActionConfigs(),
             conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),

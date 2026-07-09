@@ -20,6 +20,8 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_RIGHT_SWIPE_ACTION,
     val leftSwipeAction: ConversationSwipeAction =
         AppSettingsKeys.DEFAULT_LEFT_SWIPE_ACTION,
+    val notificationQuickActionConfigs: List<NotificationQuickActionConfig> =
+        defaultNotificationQuickActionConfigs(),
     val conversationDetailTextScale: Float =
         AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
     val ruleResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
@@ -85,6 +87,7 @@ interface AppSettingsRepository {
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat)
     fun setRightSwipeAction(action: ConversationSwipeAction)
     fun setLeftSwipeAction(action: ConversationSwipeAction)
+    fun setNotificationQuickActionConfigs(configs: List<NotificationQuickActionConfig>)
     fun setConversationDetailTextScale(scale: Float)
     fun setRuleResourceVersion(version: String)
     fun setSpamModelResourceVersion(version: String)
@@ -105,6 +108,7 @@ interface AppSettingsRepository {
     fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat
     fun getRightSwipeAction(): ConversationSwipeAction
     fun getLeftSwipeAction(): ConversationSwipeAction
+    fun getNotificationQuickActionConfigs(): List<NotificationQuickActionConfig>
     fun getConversationDetailTextScale(): Float
     fun getRuleResourceVersion(): String
     fun getSpamModelResourceVersion(): String
@@ -131,6 +135,12 @@ object AppSettingsKeys {
     const val KEY_MESSAGE_TIME_DISPLAY_FORMAT = "message_time_display_format"
     const val KEY_RIGHT_SWIPE_ACTION = "right_swipe_action"
     const val KEY_LEFT_SWIPE_ACTION = "left_swipe_action"
+    const val KEY_NOTIFICATION_ACTION_MARK_READ_LABEL = "notification_action_mark_read_label"
+    const val KEY_NOTIFICATION_ACTION_MARK_READ_ORDER = "notification_action_mark_read_order"
+    const val KEY_NOTIFICATION_ACTION_COPY_CODE_LABEL = "notification_action_copy_code_label"
+    const val KEY_NOTIFICATION_ACTION_COPY_CODE_ORDER = "notification_action_copy_code_order"
+    const val KEY_NOTIFICATION_ACTION_REPLY_LABEL = "notification_action_reply_label"
+    const val KEY_NOTIFICATION_ACTION_REPLY_ORDER = "notification_action_reply_order"
     const val KEY_CONVERSATION_DETAIL_TEXT_SCALE = "conversation_detail_text_scale"
     const val KEY_RULE_RESOURCE_VERSION = "rule_resource_version"
     const val KEY_SPAM_MODEL_RESOURCE_VERSION = "spam_model_resource_version"
