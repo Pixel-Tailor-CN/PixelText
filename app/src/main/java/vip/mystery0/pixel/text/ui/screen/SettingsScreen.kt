@@ -101,6 +101,7 @@ import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
@@ -529,6 +530,25 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Sync, contentDescription = null)
                                 },
                                 onClick = viewModel::forceSyncSmsData
+                            )
+                        }
+                        item(key = "refresh_smartspacer", contentType = "Preference") {
+                            Preference(
+                                title = { Text("刷新 Smartspacer 数据") },
+                                summary = {
+                                    Text("手动触发 Smartspacer 重新计算未读数量和快捷卡片")
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.DashboardCustomize, contentDescription = null)
+                                },
+                                onClick = {
+                                    SmartspacerIntegration.notifyChanged(context)
+                                    Toast.makeText(
+                                        context,
+                                        "已触发 Smartspacer 刷新",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             )
                         }
                         if (showDebugResourceActions) {
