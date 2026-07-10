@@ -12,13 +12,13 @@ import android.provider.Telephony
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,9 +46,6 @@ import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
-import androidx.compose.material.icons.rounded.Chat
-import androidx.compose.material.icons.rounded.ChatBubble
-import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
@@ -63,6 +60,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -1045,47 +1043,77 @@ fun MenuSheetContent(
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         ListItem(
-            headlineContent = { Text("设置默认短信应用") },
-            leadingContent = {
-                Icon(
-                    Icons.AutoMirrored.Rounded.Message,
-                    contentDescription = null
-                )
-            },
             modifier = Modifier
-                .alpha(if (isDefaultSmsApp) 0.38f else 1f)
-                .clickable(enabled = !isDefaultSmsApp) { onSetDefaultSmsAppClicked() }
+                        .alpha(if (isDefaultSmsApp) 0.38f else 1f)
+                        .clickable(enabled = !isDefaultSmsApp) { onSetDefaultSmsAppClicked() },
+            leadingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Message,
+                            contentDescription = null
+                        )
+                    },
+            trailingContent = null,
+            overlineContent = null,
+            supportingContent = null,
+            colors = ListItemDefaults.colors(),
+            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            content = { Text("设置默认短信应用") },
         )
         ListItem(
-            headlineContent = { Text("归档短信") },
+            modifier = Modifier.clickable { onArchiveClicked() },
             leadingContent = { Icon(Icons.Rounded.Archive, contentDescription = null) },
-            modifier = Modifier.clickable { onArchiveClicked() }
+            trailingContent = null,
+            overlineContent = null,
+            supportingContent = null,
+            colors = ListItemDefaults.colors(),
+            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            content = { Text("归档短信") },
         )
         ListItem(
-            headlineContent = { Text("标记所有会话为已读") },
+            modifier = Modifier.clickable { onMarkAllReadClicked() },
             leadingContent = { Icon(Icons.Rounded.DoneAll, contentDescription = null) },
-            modifier = Modifier.clickable { onMarkAllReadClicked() }
+            trailingContent = null,
+            overlineContent = null,
+            supportingContent = null,
+            colors = ListItemDefaults.colors(),
+            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            content = { Text("标记所有会话为已读") },
         )
         ListItem(
-            headlineContent = { Text("骚扰与拦截") },
+            modifier = Modifier.clickable { onSpamClicked() },
             leadingContent = { Icon(Icons.Rounded.Security, contentDescription = null) },
-            modifier = Modifier.clickable { onSpamClicked() }
+            trailingContent = null,
+            overlineContent = null,
+            supportingContent = null,
+            colors = ListItemDefaults.colors(),
+            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            content = { Text("骚扰与拦截") },
         )
         ListItem(
-            headlineContent = { Text("设置") },
+            modifier = Modifier.clickable { onSettingsClicked() },
             leadingContent = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-            modifier = Modifier.clickable { onSettingsClicked() }
+            trailingContent = null,
+            overlineContent = null,
+            supportingContent = null,
+            colors = ListItemDefaults.colors(),
+            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            content = { Text("设置") },
         )
         if (showDebugMenu) {
             ListItem(
-                headlineContent = { Text("开发测试（MOCK）") },
+                modifier = Modifier.clickable { onMockClicked() },
                 leadingContent = {
-                    Icon(
-                        Icons.Rounded.Build,
-                        contentDescription = null
-                    )
-                },
-                modifier = Modifier.clickable { onMockClicked() }
+                                Icon(
+                                    Icons.Rounded.Build,
+                                    contentDescription = null
+                                )
+                            },
+                trailingContent = null,
+                overlineContent = null,
+                supportingContent = null,
+                colors = ListItemDefaults.colors(),
+                elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+                content = { Text("开发测试（MOCK）") },
             )
         }
         Spacer(
