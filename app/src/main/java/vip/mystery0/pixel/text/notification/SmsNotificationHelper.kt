@@ -22,6 +22,7 @@ import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
+import vip.mystery0.pixel.text.domain.settings.SmsNotificationIcon
 import vip.mystery0.pixel.text.domain.settings.defaultLabelTemplate
 import vip.mystery0.pixel.text.domain.settings.defaultOrder
 import vip.mystery0.pixel.text.domain.settings.normalizeNotificationQuickActionConfigs
@@ -173,7 +174,7 @@ object SmsNotificationHelper {
         val orderedActions = orderNotificationActions(actionConfigs, actionMap)
 
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
-            .setSmallIcon(R.drawable.ic_notification_sms)
+            .setSmallIcon(resolveSmallIcon(context))
             .setContentTitle(sender)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -256,7 +257,7 @@ object SmsNotificationHelper {
     ): Notification {
         val maskedBody = maskVerificationCode(body, verificationCode)
         return NotificationCompat.Builder(context, CHANNEL_ID_SMS)
-            .setSmallIcon(R.drawable.ic_notification_sms)
+            .setSmallIcon(resolveSmallIcon(context))
             .setContentTitle(sender)
             .setContentText(maskedBody)
             .setStyle(NotificationCompat.BigTextStyle().bigText(maskedBody))
@@ -297,6 +298,17 @@ object SmsNotificationHelper {
                 order = prefs.getInt(type.preferenceOrderKey(), type.defaultOrder())
             )
         }.normalizeNotificationQuickActionConfigs()
+    }
+
+    /** 读取当前短信通知小图标；无效或旧版本设置会回退到默认图标。 */
+    fun resolveSmallIcon(context: Context): Int {
+        val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+        return SmsNotificationIcon.fromId(
+            prefs.getString(
+                AppSettingsKeys.KEY_SMS_NOTIFICATION_ICON_ID,
+                AppSettingsKeys.DEFAULT_SMS_NOTIFICATION_ICON_ID
+            )
+        ).drawableRes
     }
 
     private fun orderNotificationActions(

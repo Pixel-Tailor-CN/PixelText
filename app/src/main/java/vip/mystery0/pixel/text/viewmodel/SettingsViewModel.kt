@@ -82,6 +82,10 @@ class SettingsViewModel(
         settingsRepository.setNotificationQuickActionConfigs(configs)
     }
 
+    fun setSmsNotificationIconId(iconId: String) {
+        settingsRepository.setSmsNotificationIconId(iconId)
+    }
+
     fun setResourceAutoCheckEnabled(enabled: Boolean) {
         settingsRepository.setResourceAutoCheckEnabled(enabled)
         if (enabled) {

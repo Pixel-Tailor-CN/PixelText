@@ -34,6 +34,7 @@ import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
+import vip.mystery0.pixel.text.ui.screen.SmsNotificationIconSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.SwipeActionSettingsScreen
 
@@ -143,6 +144,9 @@ fun AppNavigation(
                     onNavigateToNotificationActions = {
                         navController.navigate("notification_actions")
                     },
+                    onNavigateToSmsNotificationIcons = {
+                        navController.navigate("sms_notification_icons")
+                    },
                     resourceUpdateCheckRequestId = resourceUpdateCheckRequestId,
                     onResourceUpdateCheckRequestConsumed = {
                         resourceUpdateCheckRequestId = null
@@ -156,6 +160,11 @@ fun AppNavigation(
             }
             composable("notification_actions") {
                 NotificationActionSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("sms_notification_icons") {
+                SmsNotificationIconSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

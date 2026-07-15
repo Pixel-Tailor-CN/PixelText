@@ -14,6 +14,7 @@ import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.SmsNotificationIcon
 import vip.mystery0.pixel.text.domain.settings.defaultLabelTemplate
 import vip.mystery0.pixel.text.domain.settings.defaultOrder
 import vip.mystery0.pixel.text.domain.settings.normalizeNotificationQuickActionConfigs
@@ -88,6 +89,13 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 putString(config.type.preferenceLabelKey(), config.labelTemplate.trim())
                 putInt(config.type.preferenceOrderKey(), config.order)
             }
+        }
+    }
+
+    override fun setSmsNotificationIconId(iconId: String) {
+        val normalizedId = SmsNotificationIcon.fromId(iconId).storageId
+        updatePrefs {
+            putString(AppSettingsKeys.KEY_SMS_NOTIFICATION_ICON_ID, normalizedId)
         }
     }
 
@@ -218,6 +226,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }.normalizeNotificationQuickActionConfigs()
     }
 
+    override fun getSmsNotificationIconId(): String =
+        SmsNotificationIcon.fromId(
+            prefs.getString(
+                AppSettingsKeys.KEY_SMS_NOTIFICATION_ICON_ID,
+                AppSettingsKeys.DEFAULT_SMS_NOTIFICATION_ICON_ID
+            )
+        ).storageId
+
     override fun getConversationDetailTextScale(): Float =
         prefs.getFloat(
             AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -287,6 +303,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),
             notificationQuickActionConfigs = getNotificationQuickActionConfigs(),
+            smsNotificationIconId = getSmsNotificationIconId(),
             conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),

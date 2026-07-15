@@ -22,6 +22,7 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_LEFT_SWIPE_ACTION,
     val notificationQuickActionConfigs: List<NotificationQuickActionConfig> =
         defaultNotificationQuickActionConfigs(),
+    val smsNotificationIconId: String = AppSettingsKeys.DEFAULT_SMS_NOTIFICATION_ICON_ID,
     val conversationDetailTextScale: Float =
         AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
     val ruleResourceVersion: String = AppSettingsKeys.DEFAULT_RESOURCE_VERSION,
@@ -88,6 +89,7 @@ interface AppSettingsRepository {
     fun setRightSwipeAction(action: ConversationSwipeAction)
     fun setLeftSwipeAction(action: ConversationSwipeAction)
     fun setNotificationQuickActionConfigs(configs: List<NotificationQuickActionConfig>)
+    fun setSmsNotificationIconId(iconId: String)
     fun setConversationDetailTextScale(scale: Float)
     fun setRuleResourceVersion(version: String)
     fun setSpamModelResourceVersion(version: String)
@@ -109,6 +111,7 @@ interface AppSettingsRepository {
     fun getRightSwipeAction(): ConversationSwipeAction
     fun getLeftSwipeAction(): ConversationSwipeAction
     fun getNotificationQuickActionConfigs(): List<NotificationQuickActionConfig>
+    fun getSmsNotificationIconId(): String
     fun getConversationDetailTextScale(): Float
     fun getRuleResourceVersion(): String
     fun getSpamModelResourceVersion(): String
@@ -141,6 +144,7 @@ object AppSettingsKeys {
     const val KEY_NOTIFICATION_ACTION_COPY_CODE_ORDER = "notification_action_copy_code_order"
     const val KEY_NOTIFICATION_ACTION_REPLY_LABEL = "notification_action_reply_label"
     const val KEY_NOTIFICATION_ACTION_REPLY_ORDER = "notification_action_reply_order"
+    const val KEY_SMS_NOTIFICATION_ICON_ID = "sms_notification_icon_id"
     const val KEY_CONVERSATION_DETAIL_TEXT_SCALE = "conversation_detail_text_scale"
     const val KEY_RULE_RESOURCE_VERSION = "rule_resource_version"
     const val KEY_SPAM_MODEL_RESOURCE_VERSION = "spam_model_resource_version"
@@ -164,6 +168,7 @@ object AppSettingsKeys {
     val DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT = MessageTimeDisplayFormat.HUMANIZED
     val DEFAULT_RIGHT_SWIPE_ACTION = ConversationSwipeAction.TOGGLE_READ
     val DEFAULT_LEFT_SWIPE_ACTION = ConversationSwipeAction.ARCHIVE
+    val DEFAULT_SMS_NOTIFICATION_ICON_ID = SmsNotificationIcon.default.storageId
     const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
     const val DEFAULT_RESOURCE_VERSION = "builtin"
     const val DEFAULT_RESOURCE_UPDATED_AT = 0L

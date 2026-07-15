@@ -549,7 +549,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
 
         val updatedNotification =
             NotificationCompat.Builder(context, SmsNotificationHelper.CHANNEL_ID_SMS)
-                .setSmallIcon(R.drawable.ic_notification_sms)
+                .setSmallIcon(SmsNotificationHelper.resolveSmallIcon(context))
                 .setContentText(statusText)
                 // 最低优先级：仅作状态提示，不振动、不发声
                 .setPriority(NotificationCompat.PRIORITY_MIN)

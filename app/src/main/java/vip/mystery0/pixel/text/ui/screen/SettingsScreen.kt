@@ -101,6 +101,7 @@ import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.settings.SmsNotificationIcon
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
@@ -119,6 +120,7 @@ fun SettingsScreen(
     onNavigateToSampleSubmission: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
     onNavigateToNotificationActions: () -> Unit = {},
+    onNavigateToSmsNotificationIcons: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
     onResourceUpdateCheckRequestConsumed: () -> Unit = {},
 ) {
@@ -453,6 +455,32 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Forum, contentDescription = null)
                                 },
                                 onClick = onNavigateToNotificationActions
+                            )
+                        }
+                        item(
+                            key = "sms_notification_icon",
+                            contentType = "Preference"
+                        ) {
+                            Preference(
+                                title = { Text("短信通知图标") },
+                                summary = {
+                                    Text(
+                                        SmsNotificationIcon.fromId(
+                                            settings.smsNotificationIconId
+                                        ).displayName
+                                    )
+                                },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(
+                                            SmsNotificationIcon.fromId(
+                                                settings.smsNotificationIconId
+                                            ).drawableRes
+                                        ),
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = onNavigateToSmsNotificationIcons
                             )
                         }
                         item(
