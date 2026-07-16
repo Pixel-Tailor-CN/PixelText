@@ -216,9 +216,16 @@ class VerificationCodeViewModel(
                     bodies.value = bodyCache.toMap()
                     return@onSuccess
                 }
-                repository.deleteMessageIds(listOf(messageId))
                 updateExpanded(expandedIds.value - messageId)
-                eventsMutable.emit(VerificationCodeEvent.ShowMessage("原短信已不存在"))
+                runCatching { repository.deleteMessageIds(listOf(messageId)) }
+                    .onSuccess {
+                        eventsMutable.emit(VerificationCodeEvent.ShowMessage("原短信已不存在"))
+                    }
+                    .onFailure {
+                        eventsMutable.emit(
+                            VerificationCodeEvent.ShowMessage("原短信已不存在，但清理索引失败，请重试")
+                        )
+                    }
             }
         }
     }

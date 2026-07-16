@@ -126,8 +126,10 @@ fun VerificationCodeScreen(
         },
     ) { padding ->
         PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
+            isRefreshing = state.isRefreshing || state.isRebuilding,
+            onRefresh = {
+                if (!state.isRefreshing && !state.isRebuilding) viewModel.refresh()
+            },
             modifier = Modifier.padding(padding),
         ) {
             when {
