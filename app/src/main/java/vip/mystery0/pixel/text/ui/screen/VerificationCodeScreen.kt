@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -136,6 +138,7 @@ fun VerificationCodeScreen(
             val message = when (event) {
                 is MarkAllReadResultEvent.Success ->
                     "已标记 ${event.conversationCount} 个会话为已读"
+
                 MarkAllReadResultEvent.NoUnread -> "没有未读会话"
                 is MarkAllReadResultEvent.Failure -> event.reason
             }
@@ -159,6 +162,7 @@ fun VerificationCodeScreen(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -176,7 +180,10 @@ fun VerificationCodeScreen(
             onRefresh = {
                 if (!state.isRefreshing && !state.isRebuilding) viewModel.refresh()
             },
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding),
         ) {
             when {
                 !hasReadSms -> CenterMessage(
@@ -185,12 +192,14 @@ fun VerificationCodeScreen(
                     actionLabel = "授予权限",
                     onAction = { permissionLauncher.launch(Manifest.permission.READ_SMS) },
                 )
+
                 !isDefaultSms -> CenterMessage(
                     message = "请将 Pixel Text 设为默认短信应用后重试",
                     loading = false,
                     actionLabel = "设为默认",
                     onAction = { requestDefaultSmsRole(context, roleLauncher::launch) },
                 )
+
                 state.isInitializing -> CenterMessage("正在识别验证码…", true)
                 state.errorMessage != null && state.pages.isEmpty() -> CenterMessage(
                     message = state.errorMessage!!,
@@ -198,11 +207,12 @@ fun VerificationCodeScreen(
                     actionLabel = "检查设置",
                     onAction = onNavigateToSettings,
                 )
+
                 state.pages.isEmpty() -> CenterMessage("暂无验证码", false)
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     state.pages.forEach { page ->
@@ -211,7 +221,9 @@ fun VerificationCodeScreen(
                                 Text(
                                     text = formatMonth(page.month.monthKey),
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 12.dp),
                                 )
                             }
                         }
@@ -222,14 +234,21 @@ fun VerificationCodeScreen(
                                 body = state.messageBodies[message.messageId],
                                 loadingBody = message.messageId in state.loadingBodies,
                                 onToggle = { viewModel.toggleMessageMode(message.messageId) },
-                                onNavigate = { onNavigateToConversation(message.threadId, message.address) },
+                                onNavigate = {
+                                    onNavigateToConversation(
+                                        message.threadId,
+                                        message.address
+                                    )
+                                },
                             )
                         }
                     }
                 }
             }
             if (state.isRebuilding && state.pages.isNotEmpty()) {
-                CircularProgressIndicator(Modifier.align(Alignment.TopCenter).padding(top = 12.dp))
+                CircularProgressIndicator(Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp))
             }
         }
     }
@@ -309,7 +328,9 @@ private fun VerificationIndexCard(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -336,7 +357,10 @@ private fun CenterMessage(
     onAction: (() -> Unit)? = null,
 ) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             if (loading) CircularProgressIndicator()
             Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (actionLabel != null && onAction != null) {
