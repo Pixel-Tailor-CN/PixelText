@@ -37,6 +37,7 @@ import vip.mystery0.pixel.text.viewmodel.MessageViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
+import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 
@@ -82,4 +83,5 @@ val appModule = module {
     viewModel { SearchViewModel(get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
+    viewModel { VerificationCodeViewModel(get(), get()) }
 }
