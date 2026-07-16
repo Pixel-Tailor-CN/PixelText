@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDatabase
 import vip.mystery0.pixel.text.data.repository.AppSettingsRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
+import vip.mystery0.pixel.text.data.repository.KeywordSpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
@@ -27,6 +28,7 @@ import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
+import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.smartspacer.SmartspacerSmsRepository
 import vip.mystery0.pixel.text.smartspacer.UnreadSmsComplicationSettingsRepository
@@ -35,12 +37,14 @@ import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MessageViewModel
+import vip.mystery0.pixel.text.viewmodel.KeywordSpamViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
 import vip.mystery0.pixel.text.viewmodel.UnreadBadgeViewModel
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
+import vip.mystery0.pixel.text.worker.KeywordSpamRebuildScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
@@ -53,6 +57,7 @@ val appModule = module {
     single { MessageParser(androidContext(), get()) }
     single { HubResourceRepository(get(), get(), get(), get(), get()) }
     single { ResourceUpdateScheduler(androidContext(), get()) }
+    single { KeywordSpamRebuildScheduler(androidContext()) }
     single { VerificationCodeIndexScheduler(androidContext()) }
     single { VerificationCodeCleanupScheduler(androidContext(), get()) }
     single { SampleSubmissionRepository(androidContext(), get(), get()) }
@@ -67,6 +72,7 @@ val appModule = module {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
+    single<KeywordSpamRepository> { KeywordSpamRepositoryImpl(get()) }
     single { UnreadSmsCounter(get(), get(), get()) }
     single<VerificationCodeRepository> {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
@@ -81,6 +87,7 @@ val appModule = module {
         MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
+    viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }

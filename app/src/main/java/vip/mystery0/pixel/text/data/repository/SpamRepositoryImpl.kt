@@ -14,6 +14,7 @@ class SpamRepositoryImpl(
     private val settingsRepository: AppSettingsRepository
 ) : SpamRepository {
     private val dao = db.spamResultDao()
+    private val keywordDao = db.blockedKeywordDao()
 
     override suspend fun getScore(messageId: Long): Float? =
         withContext(Dispatchers.IO) { dao.getScore(messageId) }
@@ -58,7 +59,10 @@ class SpamRepositoryImpl(
     override suspend fun delete(messageIds: Set<Long>) {
         if (messageIds.isEmpty()) return
         withContext(Dispatchers.IO) {
-            messageIds.chunked(MAX_QUERY_ARGS).forEach { dao.deleteByMessageIds(it) }
+            messageIds.chunked(MAX_QUERY_ARGS).forEach {
+                dao.deleteByMessageIds(it)
+                keywordDao.deleteMatches(it)
+            }
         }
     }
 

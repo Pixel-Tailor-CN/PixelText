@@ -16,6 +16,7 @@ import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
+import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -67,6 +68,7 @@ class SpamDetectionWorker(
 
     private val spamRepository: SpamRepository by inject()
     private val spamClassifier: SpamClassifier by inject()
+    private val keywordSpamRepository: KeywordSpamRepository by inject()
     private val settingsRepository: AppSettingsRepository by inject()
     private val telephonyDataSource: TelephonyDataSource by inject()
 
@@ -79,55 +81,56 @@ class SpamDetectionWorker(
         val messageUri = inputData.getString(KEY_MESSAGE_URI).orEmpty().takeIf { it.isNotBlank() }
         if (messageId < 0 || threadId < 0) return Result.failure()
 
-        if (!spamRepository.isEnabled()) {
-            if (deferNotification) {
-                showOriginalNotification(sender, threadId, content, messageUri)
-            }
-            return Result.success()
+        val keywordMatched = runCatching {
+            keywordSpamRepository.updateMessageMatch(messageId, threadId, content)
+        }.getOrElse { error ->
+            Log.e(TAG, "keyword spam match failed message_id=$messageId", error)
+            false
         }
 
-        val score = runCatching {
-            try {
-                classificationSemaphore.withPermit {
-                    spamClassifier.classify(content)
+        val score = if (spamRepository.isEnabled()) {
+            runCatching {
+                try {
+                    classificationSemaphore.withPermit {
+                        spamClassifier.classify(content)
+                    }
+                } finally {
+                    spamClassifier.close()
                 }
-            } finally {
-                spamClassifier.close()
+            }.getOrElse { error ->
+                Log.e(TAG, "failed to classify spam message_id=$messageId", error)
+                null
             }
-        }.getOrElse { e ->
-            Log.e(TAG, "failed to classify spam message_id=$messageId", e)
-            if (deferNotification) {
-                showOriginalNotification(sender, threadId, content, messageUri)
-                return Result.success()
-            }
-            return Result.failure()
+        } else {
+            null
         }
 
-        if (score < 0f) {
-            if (deferNotification) {
-                showOriginalNotification(sender, threadId, content, messageUri)
-            }
-            return Result.success()
-        }
-
-        if (score >= 0f) {
+        if (score != null && score >= 0f) {
             spamRepository.save(messageId, threadId, score)
             Log.d(TAG, "spam score message_id=$messageId score=$score")
-            applySpamAutoAction(
+        }
+
+        val isSpam = keywordMatched || (score != null && score >= SPAM_THRESHOLD)
+        applySpamAutoAction(
+            messageId = messageId,
+            threadId = threadId,
+            isSpam = isSpam,
+            deferNotification = deferNotification,
+        )
+        updateNotification(
+            sender = sender,
+            threadId = threadId,
+            content = content,
+            isSpam = isSpam,
+            deferNotification = deferNotification,
+            messageUri = messageUri,
+        )
+        if (keywordMatched || (score != null && score >= 0f)) {
+            notifySpamResult(
                 messageId = messageId,
                 threadId = threadId,
-                score = score,
-                deferNotification = deferNotification
+                score = if (keywordMatched) 1f else score ?: -1f,
             )
-            updateNotification(
-                sender = sender,
-                threadId = threadId,
-                content = content,
-                score = score,
-                deferNotification = deferNotification,
-                messageUri = messageUri
-            )
-            notifySpamResult(messageId, threadId, score)
             SmartspacerIntegration.notifyChanged(applicationContext)
         }
         return Result.success()
@@ -136,10 +139,10 @@ class SpamDetectionWorker(
     private suspend fun applySpamAutoAction(
         messageId: Long,
         threadId: Long,
-        score: Float,
-        deferNotification: Boolean
+        isSpam: Boolean,
+        deferNotification: Boolean,
     ) {
-        if (score < SPAM_THRESHOLD) return
+        if (!isSpam) return
         val action = effectiveSpamAutoAction(deferNotification)
         when (action) {
             SpamAutoAction.NONE -> Unit
@@ -170,7 +173,6 @@ class SpamDetectionWorker(
 
     private fun effectiveSpamAutoAction(deferNotification: Boolean): SpamAutoAction {
         if (!deferNotification) return SpamAutoAction.NONE
-        if (!settingsRepository.isSpamDetectionEnabled()) return SpamAutoAction.NONE
         if (!settingsRepository.isMuteSpamNotificationsEnabled()) return SpamAutoAction.NONE
         return settingsRepository.getSpamAutoAction()
     }
@@ -179,13 +181,13 @@ class SpamDetectionWorker(
         sender: String,
         threadId: Long,
         content: String,
-        score: Float,
+        isSpam: Boolean,
         deferNotification: Boolean,
         messageUri: String?
     ) {
         if (sender.isBlank()) return
-        if (deferNotification && score >= SPAM_THRESHOLD) return
-        val notificationBody = if (score >= SPAM_THRESHOLD) {
+        if (deferNotification && isSpam) return
+        val notificationBody = if (isSpam) {
             "已识别为骚扰短信，内容已自动隐藏"
         } else {
             content
@@ -194,22 +196,6 @@ class SpamDetectionWorker(
             context = applicationContext,
             sender = sender,
             body = notificationBody,
-            threadId = threadId,
-            messageUri = messageUri
-        )
-    }
-
-    private fun showOriginalNotification(
-        sender: String,
-        threadId: Long,
-        content: String,
-        messageUri: String?
-    ) {
-        if (sender.isBlank()) return
-        SmsNotificationHelper.showSmsNotification(
-            context = applicationContext,
-            sender = sender,
-            body = content,
             threadId = threadId,
             messageUri = messageUri
         )

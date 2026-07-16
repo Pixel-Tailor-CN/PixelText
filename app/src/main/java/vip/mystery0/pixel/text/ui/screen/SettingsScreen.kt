@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
@@ -110,6 +111,7 @@ import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.util.enableDebugMode
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
+import vip.mystery0.pixel.text.viewmodel.KeywordSpamViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SmsSyncState
 import java.util.Locale
@@ -118,16 +120,19 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel(),
+    keywordSpamViewModel: KeywordSpamViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
+    onNavigateToKeywordSpam: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
     onResourceUpdateCheckRequestConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
+    val blockedKeywords by keywordSpamViewModel.keywords.collectAsState()
     val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
     val smsSyncState by viewModel.smsSyncState.collectAsState()
     val isVerificationCodeIndexRunning by
@@ -179,8 +184,7 @@ fun SettingsScreen(
     val resourceUpdateEnabled =
         resourceUpdateState !is ResourceUpdateState.Busy
     val smsSyncEnabled = smsSyncState !is SmsSyncState.Syncing
-    val spamAutoActionEnabled =
-        settings.spamDetectionEnabled && settings.muteSpamNotificationsEnabled
+    val spamAutoActionEnabled = settings.muteSpamNotificationsEnabled
 
     LaunchedEffect(resourceUpdateCheckRequestId) {
         if (resourceUpdateCheckRequestId != null) {
@@ -342,11 +346,29 @@ fun SettingsScreen(
                                 onValueChange = viewModel::setSpamDetectionEnabled,
                                 title = { Text("骚扰短信识别") },
                                 summary = {
-                                    Text("接收新短信和扫描历史短信时调用本地模型识别骚扰内容")
+                                    Text("控制本地模型识别；自定义关键词规则不受此开关影响")
                                 },
                                 icon = {
                                     Icon(Icons.Rounded.Shield, contentDescription = null)
                                 }
+                            )
+                        }
+                        item(key = "keyword_spam", contentType = "Preference") {
+                            Preference(
+                                title = { Text("关键词拦截") },
+                                summary = {
+                                    Text(
+                                        if (blockedKeywords.isEmpty()) {
+                                            "添加只保存在设备本地的短信正文关键词"
+                                        } else {
+                                            "已添加 ${blockedKeywords.size} 个关键词"
+                                        }
+                                    )
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.FilterAlt, contentDescription = null)
+                                },
+                                onClick = onNavigateToKeywordSpam,
                             )
                         }
                         item(
@@ -358,9 +380,8 @@ fun SettingsScreen(
                                 onValueChange = viewModel::setMuteSpamNotificationsEnabled,
                                 title = { Text("骚扰短信不提醒") },
                                 summary = {
-                                    Text("开启骚扰短信识别后，收到骚扰短信时不显示通知且不做提醒")
+                                    Text("模型或关键词识别为骚扰时，不显示通知且不做提醒")
                                 },
-                                enabled = settings.spamDetectionEnabled,
                                 icon = {
                                     Icon(Icons.Rounded.NotificationsOff, contentDescription = null)
                                 }
@@ -374,7 +395,7 @@ fun SettingsScreen(
                                         if (spamAutoActionEnabled) {
                                             settings.spamAutoAction.preferenceSummary()
                                         } else {
-                                            "需要先开启骚扰短信识别和骚扰短信不提醒"
+                                            "需要先开启骚扰短信不提醒"
                                         }
                                     )
                                 },

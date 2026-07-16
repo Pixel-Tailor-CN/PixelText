@@ -130,14 +130,10 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
 
     private fun shouldDeferNotificationForSpamCheck(context: Context): Boolean {
         val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
-        val spamDetectionEnabled = prefs.getBoolean(
-            AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED,
-            AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED
-        )
         val muteSpamNotificationsEnabled = prefs.getBoolean(
             AppSettingsKeys.KEY_MUTE_SPAM_NOTIFICATIONS_ENABLED,
             AppSettingsKeys.DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED
         )
-        return spamDetectionEnabled && muteSpamNotificationsEnabled
+        return muteSpamNotificationsEnabled
     }
 }
