@@ -14,6 +14,10 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
     val hideVerificationCodeOnLockScreenEnabled: Boolean =
         AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+    val verificationCodeAutoDeleteEnabled: Boolean =
+        AppSettingsKeys.DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
+    val verificationCodeRetentionDays: Int =
+        AppSettingsKeys.DEFAULT_VERIFICATION_CODE_RETENTION_DAYS,
     val messageTimeDisplayFormat: MessageTimeDisplayFormat =
         AppSettingsKeys.DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT,
     val rightSwipeAction: ConversationSwipeAction =
@@ -85,6 +89,8 @@ interface AppSettingsRepository {
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean)
+    fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean)
+    fun setVerificationCodeRetentionDays(days: Int)
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat)
     fun setRightSwipeAction(action: ConversationSwipeAction)
     fun setLeftSwipeAction(action: ConversationSwipeAction)
@@ -107,6 +113,8 @@ interface AppSettingsRepository {
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
     fun isHideVerificationCodeOnLockScreenEnabled(): Boolean
+    fun isVerificationCodeAutoDeleteEnabled(): Boolean
+    fun getVerificationCodeRetentionDays(): Int
     fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat
     fun getRightSwipeAction(): ConversationSwipeAction
     fun getLeftSwipeAction(): ConversationSwipeAction
@@ -135,6 +143,9 @@ object AppSettingsKeys {
         "verification_code_notification_action_enabled"
     const val KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED =
         "hide_verification_code_on_lock_screen_enabled"
+    const val KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED =
+        "verification_code_auto_delete_enabled"
+    const val KEY_VERIFICATION_CODE_RETENTION_DAYS = "verification_code_retention_days"
     const val KEY_MESSAGE_TIME_DISPLAY_FORMAT = "message_time_display_format"
     const val KEY_RIGHT_SWIPE_ACTION = "right_swipe_action"
     const val KEY_LEFT_SWIPE_ACTION = "left_swipe_action"
@@ -165,6 +176,10 @@ object AppSettingsKeys {
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
     const val DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED = true
+    const val DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED = false
+    const val DEFAULT_VERIFICATION_CODE_RETENTION_DAYS = 7
+    const val MIN_VERIFICATION_CODE_RETENTION_DAYS = 1
+    const val MAX_VERIFICATION_CODE_RETENTION_DAYS = 365
     val DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT = MessageTimeDisplayFormat.HUMANIZED
     val DEFAULT_RIGHT_SWIPE_ACTION = ConversationSwipeAction.TOGGLE_READ
     val DEFAULT_LEFT_SWIPE_ACTION = ConversationSwipeAction.ARCHIVE

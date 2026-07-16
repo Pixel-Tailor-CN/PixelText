@@ -64,6 +64,24 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean) {
+        updatePrefs {
+            putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED, enabled)
+        }
+    }
+
+    override fun setVerificationCodeRetentionDays(days: Int) {
+        updatePrefs {
+            putInt(
+                AppSettingsKeys.KEY_VERIFICATION_CODE_RETENTION_DAYS,
+                days.coerceIn(
+                    AppSettingsKeys.MIN_VERIFICATION_CODE_RETENTION_DAYS,
+                    AppSettingsKeys.MAX_VERIFICATION_CODE_RETENTION_DAYS,
+                ),
+            )
+        }
+    }
+
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
         updatePrefs {
             putString(AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT, format.storageValue)
@@ -188,6 +206,21 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED
         )
 
+    override fun isVerificationCodeAutoDeleteEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
+            AppSettingsKeys.DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
+        )
+
+    override fun getVerificationCodeRetentionDays(): Int =
+        prefs.getInt(
+            AppSettingsKeys.KEY_VERIFICATION_CODE_RETENTION_DAYS,
+            AppSettingsKeys.DEFAULT_VERIFICATION_CODE_RETENTION_DAYS,
+        ).coerceIn(
+            AppSettingsKeys.MIN_VERIFICATION_CODE_RETENTION_DAYS,
+            AppSettingsKeys.MAX_VERIFICATION_CODE_RETENTION_DAYS,
+        )
+
     override fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat =
         MessageTimeDisplayFormat.fromStorageValue(
             prefs.getString(
@@ -299,6 +332,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 isVerificationCodeNotificationActionEnabled(),
             hideVerificationCodeOnLockScreenEnabled =
                 isHideVerificationCodeOnLockScreenEnabled(),
+            verificationCodeAutoDeleteEnabled = isVerificationCodeAutoDeleteEnabled(),
+            verificationCodeRetentionDays = getVerificationCodeRetentionDays(),
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),

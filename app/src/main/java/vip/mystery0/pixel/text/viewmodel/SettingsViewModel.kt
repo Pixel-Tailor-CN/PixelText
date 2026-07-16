@@ -16,6 +16,7 @@ import vip.mystery0.pixel.text.domain.hub.ResourceUpdateAvailability
 import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
@@ -23,6 +24,7 @@ import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
+import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
@@ -30,6 +32,7 @@ class SettingsViewModel(
     private val messageRepository: MessageRepository,
     private val resourceUpdateScheduler: ResourceUpdateScheduler,
     private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
+    private val verificationCodeCleanupScheduler: VerificationCodeCleanupScheduler,
     bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
     val settings = settingsRepository.settings
@@ -74,6 +77,22 @@ class SettingsViewModel(
 
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean) {
         settingsRepository.setHideVerificationCodeOnLockScreenEnabled(enabled)
+    }
+
+    fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean) {
+        settingsRepository.setVerificationCodeAutoDeleteEnabled(enabled)
+        verificationCodeCleanupScheduler.sync()
+    }
+
+    fun setVerificationCodeRetentionDays(days: Int): Boolean {
+        if (days !in AppSettingsKeys.MIN_VERIFICATION_CODE_RETENTION_DAYS..AppSettingsKeys.MAX_VERIFICATION_CODE_RETENTION_DAYS) {
+            return false
+        }
+        settingsRepository.setVerificationCodeRetentionDays(days)
+        if (settingsRepository.isVerificationCodeAutoDeleteEnabled()) {
+            verificationCodeCleanupScheduler.sync()
+        }
+        return true
     }
 
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {

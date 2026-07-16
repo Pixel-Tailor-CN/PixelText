@@ -75,6 +75,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -138,6 +139,9 @@ fun SettingsScreen(
     var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
     var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
     var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
+    var showVerificationCodeRetentionDaysDialog by remember { mutableStateOf(false) }
+    var verificationCodeRetentionDaysInput by remember { mutableStateOf("") }
+    var verificationCodeRetentionDaysError by remember { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = {
@@ -520,6 +524,42 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        item(
+                            key = "verification_code_auto_delete",
+                            contentType = "SwitchPreference",
+                        ) {
+                            SwitchPreference(
+                                value = settings.verificationCodeAutoDeleteEnabled,
+                                onValueChange = viewModel::setVerificationCodeAutoDeleteEnabled,
+                                title = { Text("自动删除验证码") },
+                                summary = { Text("定期删除超过保留期限的验证码短信") },
+                                icon = {
+                                    Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                                },
+                            )
+                        }
+                        if (settings.verificationCodeAutoDeleteEnabled) {
+                            item(
+                                key = "verification_code_retention_days",
+                                contentType = "Preference",
+                            ) {
+                                Preference(
+                                    title = { Text("验证码保留时间") },
+                                    summary = {
+                                        Text("${settings.verificationCodeRetentionDays} 天")
+                                    },
+                                    icon = {
+                                        Icon(Icons.Rounded.Schedule, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        verificationCodeRetentionDaysInput =
+                                            settings.verificationCodeRetentionDays.toString()
+                                        verificationCodeRetentionDaysError = null
+                                        showVerificationCodeRetentionDaysDialog = true
+                                    },
+                                )
+                            }
+                        }
 
                         preferenceCategory(
                             key = "category_permissions",
@@ -845,6 +885,49 @@ fun SettingsScreen(
         )
     }
 
+    if (showVerificationCodeRetentionDaysDialog) {
+        AlertDialog(
+            onDismissRequest = { showVerificationCodeRetentionDaysDialog = false },
+            title = { Text("验证码保留时间") },
+            text = {
+                OutlinedTextField(
+                    value = verificationCodeRetentionDaysInput,
+                    onValueChange = { input ->
+                        if (input.any { !it.isDigit() }) return@OutlinedTextField
+                        verificationCodeRetentionDaysInput = input
+                        verificationCodeRetentionDaysError = null
+                    },
+                    label = { Text("天数") },
+                    supportingText = verificationCodeRetentionDaysError?.let { error ->
+                        { Text(error) }
+                    },
+                    isError = verificationCodeRetentionDaysError != null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val days = verificationCodeRetentionDaysInput.toIntOrNull()
+                        if (days == null || !viewModel.setVerificationCodeRetentionDays(days)) {
+                            verificationCodeRetentionDaysError = "请输入 1–365 之间的整数"
+                            return@TextButton
+                        }
+                        showVerificationCodeRetentionDaysDialog = false
+                    },
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVerificationCodeRetentionDaysDialog = false }) {
+                    Text("取消")
+                }
+            },
+        )
+    }
+
     if (smsSyncState is SmsSyncState.Syncing) {
         AlertDialog(
             onDismissRequest = {},
@@ -879,12 +962,14 @@ fun SettingsScreen(
                 targetState = resourceUpdateState.sheetMode(),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "ResourceUpdateContent"
-            ) { _ ->
-                ResourceUpdateSheetContent(
-                    state = resourceUpdateState,
-                    onInstall = viewModel::installResourceUpdates,
-                    onDismiss = viewModel::dismissResourceUpdateDialog
-                )
+            ) { sheetMode ->
+                key(sheetMode) {
+                    ResourceUpdateSheetContent(
+                        state = resourceUpdateState,
+                        onInstall = viewModel::installResourceUpdates,
+                        onDismiss = viewModel::dismissResourceUpdateDialog
+                    )
+                }
             }
         }
     }

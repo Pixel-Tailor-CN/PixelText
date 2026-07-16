@@ -23,6 +23,8 @@ interface VerificationCodeRepository {
 
     suspend fun reconcile()
 
+    suspend fun getExpiredMessageIds(cutoffTimestamp: Long): List<Long>
+
     suspend fun deleteMessageIds(messageIds: Collection<Long>)
 
     suspend fun deleteThreadIds(threadIds: Collection<Long>)

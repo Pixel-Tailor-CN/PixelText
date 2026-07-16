@@ -40,6 +40,7 @@ import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
+import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
@@ -51,6 +52,7 @@ val appModule = module {
     single { HubResourceRepository(get(), get(), get(), get(), get()) }
     single { ResourceUpdateScheduler(androidContext(), get()) }
     single { VerificationCodeIndexScheduler(androidContext()) }
+    single { VerificationCodeCleanupScheduler(androidContext(), get()) }
     single { SampleSubmissionRepository(androidContext(), get(), get()) }
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
@@ -81,7 +83,7 @@ val appModule = module {
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get()) }
 }

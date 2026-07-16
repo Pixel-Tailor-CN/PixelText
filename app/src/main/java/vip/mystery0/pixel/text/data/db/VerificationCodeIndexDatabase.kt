@@ -111,6 +111,18 @@ interface VerificationCodeIndexDao {
     )
     suspend fun getActiveEntries(): List<VerificationCodeIndexEntity>
 
+    @Query(
+        """
+        SELECT message_id FROM verification_code_index
+        WHERE generation = COALESCE(
+            (SELECT active_generation FROM verification_code_metadata WHERE id = 1),
+            0
+        ) AND timestamp < :cutoffTimestamp
+        ORDER BY timestamp ASC, message_id ASC
+        """
+    )
+    suspend fun getExpiredMessageIds(cutoffTimestamp: Long): List<Long>
+
     @Query("SELECT * FROM sms_scan_state WHERE generation = :generation AND message_id IN (:messageIds)")
     suspend fun getScanStates(generation: Long, messageIds: List<Long>): List<SmsScanStateEntity>
 

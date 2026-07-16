@@ -114,6 +114,11 @@ class VerificationCodeRepositoryImpl(
         writeMutex.withLock { reconcileLocked() }
     }
 
+    override suspend fun getExpiredMessageIds(cutoffTimestamp: Long): List<Long> =
+        withContext(Dispatchers.IO) {
+            dao.getExpiredMessageIds(cutoffTimestamp)
+        }
+
     private suspend fun reconcileLocked() {
         val metadata = ensureMetadata()
         val ruleVersion = currentRuleVersion()

@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
+import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 class PixelTextApp : Application() {
     override fun onCreate() {
@@ -25,5 +26,6 @@ class PixelTextApp : Application() {
         }
         getKoin().get<ResourceUpdateScheduler>().syncOnAppStart()
         getKoin().get<VerificationCodeIndexScheduler>().scheduleReconcile()
+        getKoin().get<VerificationCodeCleanupScheduler>().sync()
     }
 }
