@@ -127,6 +127,10 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                 val address = intent.getStringExtra(EXTRA_REPLY_ADDRESS)
 
                 if (!replyText.isNullOrBlank() && !address.isNullOrBlank()) {
+                    if (threadId > 0L) {
+                        markThreadAsRead(context, threadId)
+                    }
+                    syncReadStateAsync(context, threadId.takeIf { it > 0L })
                     val sent = sendSmsReply(context, notificationId, address, replyText)
                     // 发送后必须更新通知，否则系统会一直显示转圈进度条
                     if (sent) {
