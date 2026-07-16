@@ -28,7 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
-import vip.mystery0.pixel.text.ui.screen.ConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.HomeScreen
 import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
@@ -87,15 +87,15 @@ fun AppNavigation(
     ) {
         NavHost(
             navController = navController,
-            startDestination = "conversations",
+            startDestination = "home",
             modifier = Modifier.fillMaxSize(),
             enterTransition = { activityLikeEnterTransition() },
             exitTransition = { activityLikeExitTransition() },
             popEnterTransition = { activityLikePopEnterTransition() },
             popExitTransition = { activityLikePopExitTransition() }
         ) {
-            composable("conversations") {
-                ConversationListScreen(
+            composable("home") {
+                HomeScreen(
                     onNavigateToDetail = { threadId, address ->
                         navController.navigate(conversationDetailRoute(threadId, address))
                     },

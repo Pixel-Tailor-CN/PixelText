@@ -41,7 +41,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.automirrored.rounded.Message
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
@@ -55,7 +54,6 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,6 +92,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -116,6 +115,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
@@ -144,6 +144,7 @@ private enum class ConversationSwipeGestureDirection {
 private const val CONVERSATION_VERTICAL_LOCK_RATIO = 1.05f
 private const val CONVERSATION_HORIZONTAL_LOCK_RATIO = 1.25f
 private const val CONVERSATION_SWIPE_THRESHOLD_FRACTION = 0.5f
+private const val SCROLL_DIRECTION_THRESHOLD = 4
 
 @Composable
 fun ConversationListScreen(
@@ -153,7 +154,9 @@ fun ConversationListScreen(
     onNavigateToMock: () -> Unit,
     onNavigateToArchive: () -> Unit,
     onNavigateToSpam: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onScrollDirectionChanged: (isScrollingDown: Boolean) -> Unit = {},
+    onFloatingActionButtonVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val showDebugMenu = isDebugModeEnabled()
@@ -302,8 +305,26 @@ fun ConversationListScreen(
     val coroutineScope = rememberCoroutineScope()
     var transientSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var showMenuSheet by remember { mutableStateOf(false) }
-    var showNewChatSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    LaunchedEffect(hasPermission, selectionMode) {
+        onFloatingActionButtonVisibilityChanged(hasPermission && !selectionMode)
+    }
+    LaunchedEffect(listState) {
+        var previousIndex = listState.firstVisibleItemIndex
+        var previousOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged()
+            .collect { (index, offset) ->
+                val indexChanged = index != previousIndex
+                val delta = if (indexChanged) index - previousIndex else offset - previousOffset
+                if (indexChanged || abs(delta) >= SCROLL_DIRECTION_THRESHOLD) {
+                    onScrollDirectionChanged(delta > 0)
+                }
+                previousIndex = index
+                previousOffset = offset
+            }
+    }
 
     fun showTransientSnackbar(message: String) {
         transientSnackbarJob?.cancel()
@@ -407,25 +428,6 @@ fun ConversationListScreen(
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
-            },
-            floatingActionButton = {
-                if (hasPermission && !selectionMode) {
-                    Column {
-                        ExtendedFloatingActionButton(
-                            text = { Text("开始聊天") },
-                            icon = {
-                                Icon(
-                                    Icons.AutoMirrored.Rounded.Chat,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = { showNewChatSheet = true },
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-                    }
-                }
             },
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0.dp),
@@ -711,17 +713,6 @@ fun ConversationListScreen(
         }
     }
 
-    if (showNewChatSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showNewChatSheet = false },
-            sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-        ) {
-            NewChatBottomSheet(
-                onDismiss = { showNewChatSheet = false },
-                onNavigateToDetail = onNavigateToDetail
-            )
-        }
-    }
 }
 
 @Composable
