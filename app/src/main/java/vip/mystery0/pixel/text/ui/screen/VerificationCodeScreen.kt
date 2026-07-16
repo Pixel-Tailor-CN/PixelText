@@ -41,12 +41,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
@@ -78,11 +80,18 @@ fun VerificationCodeScreen(
         }
     }
     ObserveListScrollDirection(listState, onScrollDirectionChanged = onScrollDirectionChanged)
-    LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index, state.canLoadMore) {
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-        if (state.canLoadMore && lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD) {
-            viewModel.loadNextMonth()
-        }
+    LaunchedEffect(listState, state.canLoadMore) {
+        if (!state.canLoadMore) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .distinctUntilChanged()
+            .collect { lastVisible ->
+                if (
+                    lastVisible != null &&
+                    lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+                ) {
+                    viewModel.loadNextMonth()
+                }
+            }
     }
 
     Scaffold(
