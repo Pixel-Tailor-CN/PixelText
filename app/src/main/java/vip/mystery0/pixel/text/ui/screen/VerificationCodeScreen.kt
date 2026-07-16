@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeEvent
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
 import java.time.Instant
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -116,6 +118,7 @@ fun VerificationCodeScreen(
                                 showMenu = false
                                 viewModel.rebuildAll()
                             },
+                            enabled = !state.isRefreshing && !state.isRebuilding,
                         )
                     }
                 },
@@ -224,13 +227,17 @@ private fun CenterMessage(message: String, loading: Boolean) {
 }
 
 private fun formatMonth(monthKey: String): String = runCatching {
-    val (year, month) = monthKey.split('-').map(String::toInt)
-    "${year}年${month}月"
+    val locale = Locale.getDefault()
+    val pattern = DateFormat.getBestDateTimePattern(locale, "yMMMM")
+    DateTimeFormatter.ofPattern(pattern, locale).format(YearMonth.parse(monthKey))
 }.getOrDefault(monthKey)
 
-private fun formatMessageTime(timestamp: Long): String = DateTimeFormatter
-    .ofPattern("M月d日 HH:mm", Locale.getDefault())
-    .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
+private fun formatMessageTime(timestamp: Long): String {
+    val locale = Locale.getDefault()
+    val pattern = DateFormat.getBestDateTimePattern(locale, "MMMdHm")
+    return DateTimeFormatter.ofPattern(pattern, locale)
+        .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
+}
 
 private const val SCROLL_THRESHOLD = 4
 private const val LOAD_MORE_THRESHOLD = 4

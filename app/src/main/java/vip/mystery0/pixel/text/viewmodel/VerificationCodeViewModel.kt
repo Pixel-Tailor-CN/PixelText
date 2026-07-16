@@ -37,6 +37,21 @@ data class VerificationCodeUiState(
     val errorMessage: String? = null,
 )
 
+private data class VerificationCodeTransientState(
+    val isRefreshing: Boolean,
+    val isRebuilding: Boolean,
+    val loadingBodies: Set<Long>,
+    val expandedMessageIds: Set<Long>,
+    val messageBodies: Map<Long, String>,
+    val errorMessage: String?,
+)
+
+private data class VerificationCodeBodyState(
+    val expandedMessageIds: Set<Long>,
+    val messageBodies: Map<Long, String>,
+    val errorMessage: String?,
+)
+
 sealed interface VerificationCodeEvent {
     data class ShowMessage(val message: String) : VerificationCodeEvent
 }
@@ -78,29 +93,43 @@ class VerificationCodeViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    @Suppress("UNCHECKED_CAST")
-    val uiState: StateFlow<VerificationCodeUiState> = combine(
-        pages,
-        months,
+    private val operationState = combine(
         refreshing,
         rebuilding,
         loadingBodies,
-        expandedIds,
-        bodies,
-        error,
-    ) { values ->
-        val currentPages = values[0] as List<VerificationCodeMonthPage>
-        val allMonths = values[1] as List<VerificationCodeMonthModel>
+    ) { isRefreshing, isRebuilding, loading -> Triple(isRefreshing, isRebuilding, loading) }
+
+    private val bodyState = combine(expandedIds, bodies, error) { expanded, cachedBodies, message ->
+        VerificationCodeBodyState(expanded, cachedBodies, message)
+    }
+
+    private val transientState = combine(operationState, bodyState) { operation, body ->
+        VerificationCodeTransientState(
+            isRefreshing = operation.first,
+            isRebuilding = operation.second,
+            loadingBodies = operation.third,
+            expandedMessageIds = body.expandedMessageIds,
+            messageBodies = body.messageBodies,
+            errorMessage = body.errorMessage,
+        )
+    }
+
+    val uiState: StateFlow<VerificationCodeUiState> = combine(
+        pages,
+        months,
+        transientState,
+    ) { currentPages, allMonths, transient ->
         VerificationCodeUiState(
             pages = currentPages,
-            isInitializing = currentPages.isEmpty() && (values[2] as Boolean || values[3] as Boolean),
-            isRefreshing = values[2] as Boolean,
-            isRebuilding = values[3] as Boolean,
-            loadingBodies = values[4] as Set<Long>,
-            expandedMessageIds = values[5] as Set<Long>,
-            messageBodies = values[6] as Map<Long, String>,
+            isInitializing = currentPages.isEmpty() &&
+                (transient.isRefreshing || transient.isRebuilding),
+            isRefreshing = transient.isRefreshing,
+            isRebuilding = transient.isRebuilding,
+            loadingBodies = transient.loadingBodies,
+            expandedMessageIds = transient.expandedMessageIds,
+            messageBodies = transient.messageBodies,
             canLoadMore = currentPages.size < allMonths.size,
-            errorMessage = values[7] as String?,
+            errorMessage = transient.errorMessage,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VerificationCodeUiState())
 
@@ -112,6 +141,17 @@ class VerificationCodeViewModel(
 
     init {
         refresh()
+        viewModelScope.launch {
+            pages.collect { loadedPages ->
+                val loadedIds = loadedPages.flatMap { it.messages }
+                    .mapTo(mutableSetOf()) { it.messageId }
+                expandedIds.value.intersect(loadedIds).forEach { messageId ->
+                    if (messageId !in bodies.value && messageId !in loadingBodies.value) {
+                        loadMessageBody(messageId)
+                    }
+                }
+            }
+        }
     }
 
     fun loadNextMonth() {
@@ -158,17 +198,27 @@ class VerificationCodeViewModel(
             return
         }
         if (messageId in loadingBodies.value) return
+        loadMessageBody(messageId)
+    }
+
+    private fun loadMessageBody(messageId: Long) {
+        if (messageId in loadingBodies.value) return
+        loadingBodies.value += messageId
         viewModelScope.launch {
-            loadingBodies.value += messageId
-            val body = runCatching { repository.getMessageBody(messageId) }.getOrNull()
+            val result = runCatching { repository.getMessageBody(messageId) }
             loadingBodies.value -= messageId
-            if (body == null) {
+            result.onFailure {
+                updateExpanded(expandedIds.value - messageId)
+                eventsMutable.emit(VerificationCodeEvent.ShowMessage("读取原文失败，请重试"))
+            }.onSuccess { body ->
+                if (body != null) {
+                    bodyCache[messageId] = body
+                    bodies.value = bodyCache.toMap()
+                    return@onSuccess
+                }
                 repository.deleteMessageIds(listOf(messageId))
                 updateExpanded(expandedIds.value - messageId)
                 eventsMutable.emit(VerificationCodeEvent.ShowMessage("原短信已不存在"))
-            } else {
-                bodyCache[messageId] = body
-                bodies.value = bodyCache.toMap()
             }
         }
     }
