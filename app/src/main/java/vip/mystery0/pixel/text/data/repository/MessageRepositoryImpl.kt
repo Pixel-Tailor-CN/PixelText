@@ -127,7 +127,8 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
             telephonyDataSource.deleteThreads(threadIds)
-            verificationCodeRepository.deleteThreadIds(threadIds)
+            val existingSmsThreadIds = telephonyDataSource.existingSmsThreadIds(threadIds)
+            verificationCodeRepository.deleteThreadIds(threadIds - existingSmsThreadIds)
             archiveDao.unarchive(threadIds)
             conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)

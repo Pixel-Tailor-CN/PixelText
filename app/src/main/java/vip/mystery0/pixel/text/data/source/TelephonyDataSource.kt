@@ -156,13 +156,14 @@ class TelephonyDataSource(
         val result = mutableSetOf<Long>()
         values.chunked(MAX_QUERY_ARGS).forEach { chunk ->
             val (selection, selectionArgs) = buildThreadSelection(column, chunk)
-            contentResolver.query(
+            val cursor = contentResolver.query(
                 Telephony.Sms.CONTENT_URI,
                 arrayOf(column),
                 selection,
                 selectionArgs,
                 null,
-            )?.use { cursor ->
+            ) ?: throw IllegalStateException("sms existence query returned null column=$column")
+            cursor.use {
                 val valueIndex = cursor.getColumnIndexOrThrow(column)
                 while (cursor.moveToNext()) result += cursor.getLong(valueIndex)
             }
