@@ -22,9 +22,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
@@ -98,6 +100,11 @@ fun AppNavigation(
                 HomeScreen(
                     onNavigateToDetail = { threadId, address ->
                         navController.navigate(conversationDetailRoute(threadId, address))
+                    },
+                    onNavigateToMessage = { threadId, address, messageId ->
+                        navController.navigate(
+                            conversationDetailRoute(threadId, address, messageId)
+                        )
                     },
                     onNavigateToSearch = {
                         navController.navigate("search")
@@ -195,13 +202,24 @@ fun AppNavigation(
                     }
                 )
             }
-            composable("conversation_detail/{threadId}/{address}") { backStackEntry ->
+            composable(
+                route = "conversation_detail/{threadId}/{address}?messageId={messageId}",
+                arguments = listOf(
+                    navArgument("messageId") {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    }
+                ),
+            ) { backStackEntry ->
                 val threadId =
                     backStackEntry.arguments?.getString("threadId")?.toLongOrNull() ?: -1L
                 val address = backStackEntry.arguments?.getString("address") ?: ""
+                val targetMessageId = backStackEntry.arguments?.getLong("messageId")
+                    ?.takeIf { it > 0L }
                 ConversationDetailScreen(
                     threadId = threadId,
                     address = address,
+                    targetMessageId = targetMessageId,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = { content, sender ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
@@ -219,8 +237,13 @@ fun AppNavigation(
     }
 }
 
-private fun conversationDetailRoute(threadId: Long, address: String): String {
-    return "conversation_detail/$threadId/${Uri.encode(address)}"
+private fun conversationDetailRoute(
+    threadId: Long,
+    address: String,
+    messageId: Long? = null,
+): String {
+    val baseRoute = "conversation_detail/$threadId/${Uri.encode(address)}"
+    return messageId?.takeIf { it > 0L }?.let { "$baseRoute?messageId=$it" } ?: baseRoute
 }
 
 private fun activityLikeEnterTransition(): EnterTransition {

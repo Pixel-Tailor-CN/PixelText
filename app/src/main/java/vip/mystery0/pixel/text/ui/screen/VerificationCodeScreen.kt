@@ -80,7 +80,7 @@ import java.util.Locale
 
 @Composable
 fun VerificationCodeScreen(
-    onNavigateToConversation: (Long, String) -> Unit,
+    onNavigateToConversation: (Long, String, Long) -> Unit,
     onNavigateToMock: () -> Unit,
     onNavigateToArchive: () -> Unit,
     onNavigateToSpam: () -> Unit,
@@ -238,7 +238,8 @@ fun VerificationCodeScreen(
                                     onNavigate = {
                                         onNavigateToConversation(
                                             message.threadId,
-                                            message.address
+                                            message.address,
+                                            message.messageId,
                                         )
                                     },
                                 )

@@ -59,6 +59,7 @@ private const val NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS = 250
 @Composable
 fun HomeScreen(
     onNavigateToDetail: (Long, String) -> Unit,
+    onNavigateToMessage: (Long, String, Long) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToMock: () -> Unit,
     onNavigateToArchive: () -> Unit,
@@ -202,7 +203,7 @@ fun HomeScreen(
             }
             composable(VERIFICATION_CODES_ROUTE) {
                 VerificationCodeScreen(
-                    onNavigateToConversation = onNavigateToDetail,
+                    onNavigateToConversation = onNavigateToMessage,
                     onNavigateToMock = onNavigateToMock,
                     onNavigateToArchive = onNavigateToArchive,
                     onNavigateToSpam = onNavigateToSpam,

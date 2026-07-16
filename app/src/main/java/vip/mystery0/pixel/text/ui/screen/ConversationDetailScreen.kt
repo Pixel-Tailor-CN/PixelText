@@ -88,6 +88,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -108,6 +109,7 @@ import vip.mystery0.pixel.text.viewmodel.SendResultEvent
 fun ConversationDetailScreen(
     threadId: Long,
     address: String,
+    targetMessageId: Long? = null,
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: (content: String, sender: String) -> Unit = { _, _ -> },
     isTablet: Boolean = false,
@@ -126,6 +128,12 @@ fun ConversationDetailScreen(
     val appSettings by settingsRepository.settings.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
+    var highlightedMessageId by remember(threadId, targetMessageId) {
+        mutableStateOf<Long?>(null)
+    }
+    var locatedTargetMessageId by remember(threadId, targetMessageId) {
+        mutableStateOf<Long?>(null)
+    }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var messageText by remember(threadId, address, initialMessageText) {
         mutableStateOf(initialMessageText)
@@ -564,6 +572,22 @@ fun ConversationDetailScreen(
             is MessageUiState.Success -> {
                 val listState = rememberLazyListState()
 
+                LaunchedEffect(targetMessageId) {
+                    val targetId = targetMessageId ?: return@LaunchedEffect
+                    if (locatedTargetMessageId == targetId) return@LaunchedEffect
+                    val targetIndex = viewModel.loadUntilMessage(targetId)
+                    if (targetIndex == null) {
+                        snackbarHostState.showSnackbar("原短信已不存在")
+                        return@LaunchedEffect
+                    }
+
+                    listState.animateScrollToItem(targetIndex)
+                    locatedTargetMessageId = targetId
+                    highlightedMessageId = targetId
+                    delay(TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS)
+                    highlightedMessageId = null
+                }
+
                 LaunchedEffect(listState) {
                     snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                         .collect { lastIndex ->
@@ -595,9 +619,11 @@ fun ConversationDetailScreen(
                             key = { it.stableKey }
                         ) { message ->
                             val isSelected = selectedMessageIds.contains(message.id)
+                            val isTargetHighlighted = highlightedMessageId == message.id
                             MessageItem(
                                 message = message,
                                 isSelected = isSelected,
+                                isHighlighted = isTargetHighlighted,
                                 textScale = textScale,
                                 manualSpamCheckState = manualSpamChecks[message.id],
                                 onCheckSpam = { viewModel.checkSpamOnce(message) },
@@ -761,6 +787,7 @@ private fun SimSelectorButton(
 }
 
 private const val SPAM_THRESHOLD = 0.7f
+private const val TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS = 1_100L
 private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
 private const val MIN_CONVERSATION_DETAIL_TEXT_SCALE = 0.85f
 private const val MAX_CONVERSATION_DETAIL_TEXT_SCALE = 1.8f

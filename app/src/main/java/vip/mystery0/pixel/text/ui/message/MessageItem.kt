@@ -1,7 +1,10 @@
 package vip.mystery0.pixel.text.ui.message
 
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +49,7 @@ fun MessageItem(
     message: MessageModel,
     isSelected: Boolean,
     textScale: Float,
+    isHighlighted: Boolean = false,
     manualSpamCheckState: ManualSpamCheckState? = null,
     onCheckSpam: () -> Unit = {},
     onClick: () -> Unit,
@@ -52,6 +57,24 @@ fun MessageItem(
     interactionEnabled: Boolean = true,
     timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
 ) {
+    val highlightAlpha = remember(message.stableKey) { Animatable(0f) }
+    val highlightColor = MaterialTheme.colorScheme.primary
+    LaunchedEffect(isHighlighted) {
+        if (!isHighlighted) {
+            highlightAlpha.snapTo(0f)
+            return@LaunchedEffect
+        }
+        repeat(TARGET_HIGHLIGHT_PULSE_COUNT) {
+            highlightAlpha.animateTo(
+                targetValue = TARGET_HIGHLIGHT_MAX_ALPHA,
+                animationSpec = tween(TARGET_HIGHLIGHT_FADE_IN_MILLIS),
+            )
+            highlightAlpha.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(TARGET_HIGHLIGHT_FADE_OUT_MILLIS),
+            )
+        }
+    }
     var showOriginal by remember { mutableStateOf(false) }
     var currentTimeDisplayFormat by remember(message.stableKey, timeDisplayFormat) {
         mutableStateOf(timeDisplayFormat)
@@ -65,6 +88,10 @@ fun MessageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(
+                color = highlightColor.copy(alpha = highlightAlpha.value),
+                shape = RoundedCornerShape(16.dp),
+            )
             .combinedClickable(
                 enabled = interactionEnabled,
                 onClick = onClick,
@@ -232,6 +259,11 @@ fun formatTimeAgo(timestamp: Long): String {
         else -> formatDetailedTime(timestamp)
     }
 }
+
+private const val TARGET_HIGHLIGHT_PULSE_COUNT = 3
+private const val TARGET_HIGHLIGHT_MAX_ALPHA = 0.12f
+private const val TARGET_HIGHLIGHT_FADE_IN_MILLIS = 120
+private const val TARGET_HIGHLIGHT_FADE_OUT_MILLIS = 240
 
 fun formatDetailedTime(timestamp: Long): String {
     val formatter = SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault())

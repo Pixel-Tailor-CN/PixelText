@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -155,6 +156,20 @@ class ConversationDetailViewModel(
 
     fun loadMore() {
         fetchMessages()
+    }
+
+    suspend fun loadUntilMessage(messageId: Long): Int? {
+        while (true) {
+            val targetIndex = _messages.indexOfFirst { it.id == messageId }
+            if (targetIndex >= 0) return targetIndex
+            if (!hasMore) return null
+
+            val previousSize = _messages.size
+            if (!isLoadingMore) fetchMessages()
+            while (isLoadingMore) delay(MESSAGE_LOAD_POLL_INTERVAL_MILLIS)
+
+            if (_messages.size == previousSize) return null
+        }
     }
 
     private fun fetchMessages() {
@@ -440,6 +455,7 @@ class ConversationDetailViewModel(
         private val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f
+        private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L
         private val sendRequestCounter = AtomicInteger(0)
     }
 }
