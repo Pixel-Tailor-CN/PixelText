@@ -11,7 +11,6 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.net.toUri
 import java.nio.charset.Charset
-import java.security.MessageDigest
 
 private const val TELEPHONY_TAG = "TelephonyDataSource"
 
@@ -83,7 +82,8 @@ data class SmsIndexSummaryRow(
     val threadId: Long,
     val address: String,
     val date: Long,
-    val bodyFingerprint: String,
+    val dateSent: Long,
+    val type: Int,
 )
 
 private data class IncomingMessageRef(
@@ -112,7 +112,8 @@ class TelephonyDataSource(
                 Telephony.Sms.THREAD_ID,
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.DATE,
-                Telephony.Sms.BODY,
+                Telephony.Sms.DATE_SENT,
+                Telephony.Sms.TYPE,
             ),
             selection,
             selectionArgs,
@@ -123,23 +124,22 @@ class TelephonyDataSource(
             val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
             val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
             val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
-            val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
+            val dateSentIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE_SENT)
+            val typeIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.TYPE)
             while (cursor.moveToNext()) {
                 rows += SmsIndexSummaryRow(
                     id = cursor.getLong(idIndex),
                     threadId = cursor.getLong(threadIdIndex),
                     address = cursor.getString(addressIndex).orEmpty(),
                     date = cursor.getLong(dateIndex),
-                    bodyFingerprint = cursor.getString(bodyIndex).orEmpty().sha256(),
+                    dateSent = cursor.getLong(dateSentIndex),
+                    type = cursor.getInt(typeIndex),
                 )
             }
         }
         return rows
     }
 
-    private fun String.sha256(): String = MessageDigest.getInstance("SHA-256")
-        .digest(toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
 
     fun getSmsBody(messageId: Long): String? = contentResolver.query(
         Telephony.Sms.CONTENT_URI,

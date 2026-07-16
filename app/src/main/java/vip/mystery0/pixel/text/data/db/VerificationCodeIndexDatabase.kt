@@ -63,7 +63,7 @@ data class SmsScanStateEntity(
     @ColumnInfo(name = "thread_id") val threadId: Long,
     val address: String,
     val timestamp: Long,
-    @ColumnInfo(name = "body_fingerprint") val bodyFingerprint: String,
+    @ColumnInfo(name = "metadata_fingerprint") val metadataFingerprint: String,
 )
 
 @Dao
@@ -157,7 +157,7 @@ interface VerificationCodeIndexDao {
         VerificationCodeMetadataEntity::class,
         SmsScanStateEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class VerificationCodeIndexDatabase : RoomDatabase() {
@@ -187,12 +187,22 @@ abstract class VerificationCodeIndexDatabase : RoomDatabase() {
                 context,
                 VerificationCodeIndexDatabase::class.java,
                 "verification_code_index.db",
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `sms_scan_state` (`generation` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `body_fingerprint` TEXT NOT NULL, PRIMARY KEY(`generation`, `message_id`))")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_scan_state_generation_message_id` ON `sms_scan_state` (`generation`, `message_id`)")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `sms_scan_state` RENAME TO `sms_scan_state_v2`")
+                db.execSQL("DROP INDEX IF EXISTS `index_sms_scan_state_generation_message_id`")
+                db.execSQL("CREATE TABLE `sms_scan_state` (`generation` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `metadata_fingerprint` TEXT NOT NULL, PRIMARY KEY(`generation`, `message_id`))")
+                db.execSQL("CREATE INDEX `index_sms_scan_state_generation_message_id` ON `sms_scan_state` (`generation`, `message_id`)")
+                db.execSQL("DROP TABLE `sms_scan_state_v2`")
             }
         }
     }

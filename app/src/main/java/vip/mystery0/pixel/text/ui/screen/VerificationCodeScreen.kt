@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.ui.screen
 
 import android.text.format.DateFormat
 import android.Manifest
+import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -84,10 +85,16 @@ fun VerificationCodeScreen(
     var accessRefreshKey by remember { mutableStateOf(0) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { accessRefreshKey++ }
+    ) { granted ->
+        accessRefreshKey++
+        if (granted) viewModel.refresh()
+    }
     val roleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) { accessRefreshKey++ }
+    ) { result ->
+        accessRefreshKey++
+        if (result.resultCode == Activity.RESULT_OK) viewModel.refresh()
+    }
     val hasReadSms = remember(accessRefreshKey) {
         context.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
     }

@@ -56,7 +56,14 @@ class VerificationCodeRepositoryImpl(
         writeMutex.withLock {
             val metadata = ensureMetadata()
             indexIntoGeneration(
-                summary = SmsIndexSummaryRow(messageId, threadId, address, timestamp, body.sha256()),
+                summary = SmsIndexSummaryRow(
+                    messageId,
+                    threadId,
+                    address,
+                    timestamp,
+                    timestamp,
+                    android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX,
+                ),
                 body = body,
                 generation = metadata.activeGeneration,
                 ruleVersion = currentRuleVersion(),
@@ -67,7 +74,14 @@ class VerificationCodeRepositoryImpl(
                 threadId = threadId,
                 address = address,
                 timestamp = timestamp,
-                bodyFingerprint = body.sha256(),
+                metadataFingerprint = SmsIndexSummaryRow(
+                    messageId,
+                    threadId,
+                    address,
+                    timestamp,
+                    timestamp,
+                    android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX,
+                ).metadataFingerprint(),
             )))
         }
     }
@@ -214,7 +228,7 @@ class VerificationCodeRepositoryImpl(
             val old = oldStates[summary.id]
             val unchanged = old != null && old.threadId == summary.threadId &&
                 old.address == summary.address && old.timestamp == summary.date &&
-                old.bodyFingerprint == summary.bodyFingerprint
+                old.metadataFingerprint == summary.metadataFingerprint()
             if (unchanged) {
                 oldEntries[summary.id]?.let { copiedEntries += it.copy(generation = generation) }
             } else {
@@ -228,15 +242,23 @@ class VerificationCodeRepositoryImpl(
                 threadId = summary.threadId,
                 address = summary.address,
                 timestamp = summary.date,
-                bodyFingerprint = summary.bodyFingerprint,
+                metadataFingerprint = summary.metadataFingerprint(),
             )
         }
         if (copiedEntries.isNotEmpty()) dao.upsertEntries(copiedEntries)
         dao.upsertScanStates(scanStates)
     }
 
-    private fun String.sha256(): String = java.security.MessageDigest.getInstance("SHA-256")
-        .digest(toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    /**
+     * SMS 在写入后按正文不可变处理。增量扫描只使用 Provider 元数据定位候选，
+     * 同 ID 正文若被外部篡改，需要通过完整重建重新识别。
+     */
+    private fun SmsIndexSummaryRow.metadataFingerprint(): String {
+        val metadata = "$id\u0000$threadId\u0000$address\u0000$date\u0000$dateSent\u0000$type"
+        return java.security.MessageDigest.getInstance("SHA-256")
+            .digest(metadata.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
 
     private fun currentRuleVersion(): String = settings.getRuleResourceVersion()
 

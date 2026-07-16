@@ -28,6 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -52,6 +55,7 @@ fun HomeScreen(
     var isFloatingActionButtonExpanded by remember { mutableStateOf(true) }
     var isConversationFloatingActionButtonVisible by remember { mutableStateOf(true) }
     var showNewChatSheet by remember { mutableStateOf(false) }
+    val startChat = { showNewChatSheet = true }
 
     LaunchedEffect(currentRoute) {
         isFloatingActionButtonExpanded = true
@@ -98,6 +102,11 @@ fun HomeScreen(
                 ExtendedFloatingActionButton(
                     modifier = Modifier.clearAndSetSemantics {
                         contentDescription = "开始聊天"
+                        role = Role.Button
+                        onClick(label = "开始聊天") {
+                            startChat()
+                            true
+                        }
                     },
                     expanded = isFloatingActionButtonExpanded,
                     text = { Text("开始聊天") },
@@ -107,7 +116,7 @@ fun HomeScreen(
                             contentDescription = null,
                         )
                     },
-                    onClick = { showNewChatSheet = true },
+                    onClick = startChat,
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 )

@@ -37,7 +37,7 @@
 
 - [ ] 建立索引实体、元数据实体和 DAO；索引包含 message/thread/address/timestamp/month/code/signature/ruleVersion/generation，不包含正文。
 - [ ] DAO 只读取活动代际，月份和月内消息均倒序；完整重建在成功后事务切换代际。
-- [ ] TelephonyDataSource 增加只读 SMS 摘要、按单个 ID 读取正文和按 ID/会话检查存在性的接口。
+- [ ] TelephonyDataSource 增加不含正文的 SMS 元数据摘要、按单个 ID 读取正文和按 ID/会话检查存在性的接口；增量扫描按“短信写入后正文不可变”假设使用元数据指纹，同 ID 正文外部篡改由完整重建发现。
 - [ ] 仓库使用现有 MessageParser 识别 `ParsedResult.VerificationCode`，实现增量校验、完整重建、即时写入和失效清理。
 - [ ] 在 Koin 中注册数据库与仓库。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期通过。
