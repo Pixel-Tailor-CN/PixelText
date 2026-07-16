@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shield
@@ -535,6 +536,20 @@ fun SettingsScreen(
                                 summary = { Text("定期删除超过保留期限的验证码短信") },
                                 icon = {
                                     Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                                },
+                            )
+                        }
+                        item(
+                            key = "unread_badge",
+                            contentType = "SwitchPreference",
+                        ) {
+                            SwitchPreference(
+                                value = settings.unreadBadgeEnabled,
+                                onValueChange = viewModel::setUnreadBadgeEnabled,
+                                title = { Text("未读红点提醒") },
+                                summary = { Text("在底部会话按钮显示未读短信数量") },
+                                icon = {
+                                    Icon(Icons.Rounded.Notifications, contentDescription = null)
                                 },
                             )
                         }

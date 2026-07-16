@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "spam_result")
 data class SpamResultEntity(
@@ -50,6 +51,9 @@ interface SpamResultDao {
         """
     )
     suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
+
+    @Query("SELECT COUNT(*) FROM spam_result")
+    fun observeCount(): Flow<Int>
 
     @Query("DELETE FROM spam_result WHERE message_id IN (:messageIds)")
     suspend fun deleteByMessageIds(messageIds: List<Long>)

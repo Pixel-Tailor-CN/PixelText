@@ -82,6 +82,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setUnreadBadgeEnabled(enabled: Boolean) {
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_UNREAD_BADGE_ENABLED, enabled) }
+    }
+
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
         updatePrefs {
             putString(AppSettingsKeys.KEY_MESSAGE_TIME_DISPLAY_FORMAT, format.storageValue)
@@ -221,6 +225,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.MAX_VERIFICATION_CODE_RETENTION_DAYS,
         )
 
+    override fun isUnreadBadgeEnabled(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_UNREAD_BADGE_ENABLED,
+            AppSettingsKeys.DEFAULT_UNREAD_BADGE_ENABLED,
+        )
+
     override fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat =
         MessageTimeDisplayFormat.fromStorageValue(
             prefs.getString(
@@ -334,6 +344,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 isHideVerificationCodeOnLockScreenEnabled(),
             verificationCodeAutoDeleteEnabled = isVerificationCodeAutoDeleteEnabled(),
             verificationCodeRetentionDays = getVerificationCodeRetentionDays(),
+            unreadBadgeEnabled = isUnreadBadgeEnabled(),
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),

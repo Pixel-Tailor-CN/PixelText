@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.domain.spam
 
+import kotlinx.coroutines.flow.Flow
+
 interface SpamRepository {
     suspend fun getScore(messageId: Long): Float?
     suspend fun save(messageId: Long, threadId: Long, score: Float)
@@ -7,5 +9,6 @@ interface SpamRepository {
     suspend fun getSpamMessageIds(messageIds: List<Long>, threshold: Float): Set<Long>
     suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
     suspend fun delete(messageIds: Set<Long>)
+    fun observeChanges(): Flow<Unit>
     fun isEnabled(): Boolean
 }

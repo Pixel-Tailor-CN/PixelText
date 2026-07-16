@@ -95,6 +95,10 @@ class SettingsViewModel(
         return true
     }
 
+    fun setUnreadBadgeEnabled(enabled: Boolean) {
+        settingsRepository.setUnreadBadgeEnabled(enabled)
+    }
+
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
         settingsRepository.setMessageTimeDisplayFormat(format)
     }

@@ -15,6 +15,7 @@ import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.VerificationCodeRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.UnreadSmsCounter
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.ContactDataSource
@@ -38,6 +39,7 @@ import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
+import vip.mystery0.pixel.text.viewmodel.UnreadBadgeViewModel
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
@@ -65,11 +67,12 @@ val appModule = module {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
+    single { UnreadSmsCounter(get(), get(), get()) }
     single<VerificationCodeRepository> {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
-    single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
+    single { SmartspacerSmsRepository(get(), get(), get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
@@ -86,4 +89,5 @@ val appModule = module {
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get()) }
+    viewModel { UnreadBadgeViewModel(androidContext(), get(), get()) }
 }

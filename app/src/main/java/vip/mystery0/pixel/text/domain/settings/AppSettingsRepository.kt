@@ -18,6 +18,7 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
     val verificationCodeRetentionDays: Int =
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_RETENTION_DAYS,
+    val unreadBadgeEnabled: Boolean = AppSettingsKeys.DEFAULT_UNREAD_BADGE_ENABLED,
     val messageTimeDisplayFormat: MessageTimeDisplayFormat =
         AppSettingsKeys.DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT,
     val rightSwipeAction: ConversationSwipeAction =
@@ -91,6 +92,7 @@ interface AppSettingsRepository {
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean)
     fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean)
     fun setVerificationCodeRetentionDays(days: Int)
+    fun setUnreadBadgeEnabled(enabled: Boolean)
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat)
     fun setRightSwipeAction(action: ConversationSwipeAction)
     fun setLeftSwipeAction(action: ConversationSwipeAction)
@@ -115,6 +117,7 @@ interface AppSettingsRepository {
     fun isHideVerificationCodeOnLockScreenEnabled(): Boolean
     fun isVerificationCodeAutoDeleteEnabled(): Boolean
     fun getVerificationCodeRetentionDays(): Int
+    fun isUnreadBadgeEnabled(): Boolean
     fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat
     fun getRightSwipeAction(): ConversationSwipeAction
     fun getLeftSwipeAction(): ConversationSwipeAction
@@ -146,6 +149,7 @@ object AppSettingsKeys {
     const val KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED =
         "verification_code_auto_delete_enabled"
     const val KEY_VERIFICATION_CODE_RETENTION_DAYS = "verification_code_retention_days"
+    const val KEY_UNREAD_BADGE_ENABLED = "unread_badge_enabled"
     const val KEY_MESSAGE_TIME_DISPLAY_FORMAT = "message_time_display_format"
     const val KEY_RIGHT_SWIPE_ACTION = "right_swipe_action"
     const val KEY_LEFT_SWIPE_ACTION = "left_swipe_action"
@@ -180,6 +184,7 @@ object AppSettingsKeys {
     const val DEFAULT_VERIFICATION_CODE_RETENTION_DAYS = 7
     const val MIN_VERIFICATION_CODE_RETENTION_DAYS = 1
     const val MAX_VERIFICATION_CODE_RETENTION_DAYS = 365
+    const val DEFAULT_UNREAD_BADGE_ENABLED = true
     val DEFAULT_MESSAGE_TIME_DISPLAY_FORMAT = MessageTimeDisplayFormat.HUMANIZED
     val DEFAULT_RIGHT_SWIPE_ACTION = ConversationSwipeAction.TOGGLE_READ
     val DEFAULT_LEFT_SWIPE_ACTION = ConversationSwipeAction.ARCHIVE

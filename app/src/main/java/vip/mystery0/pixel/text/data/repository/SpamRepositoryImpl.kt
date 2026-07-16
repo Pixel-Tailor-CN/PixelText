@@ -2,6 +2,8 @@ package vip.mystery0.pixel.text.data.repository
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.SpamResultEntity
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
@@ -59,6 +61,8 @@ class SpamRepositoryImpl(
             messageIds.chunked(MAX_QUERY_ARGS).forEach { dao.deleteByMessageIds(it) }
         }
     }
+
+    override fun observeChanges(): Flow<Unit> = dao.observeCount().map { }
 
     override fun isEnabled(): Boolean = settingsRepository.isSpamDetectionEnabled()
 

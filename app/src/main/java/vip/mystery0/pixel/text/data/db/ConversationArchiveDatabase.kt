@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 
 @Entity(tableName = "archived_conversation")
@@ -32,6 +33,9 @@ data class ArchivedConversationEntity(
 interface ArchivedConversationDao {
     @Query("SELECT thread_id FROM archived_conversation")
     suspend fun getArchivedThreadIds(): List<Long>
+
+    @Query("SELECT thread_id FROM archived_conversation")
+    fun observeArchivedThreadIds(): Flow<List<Long>>
 
     @Query("SELECT * FROM archived_conversation ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
     suspend fun getArchivedConversations(limit: Int, offset: Int): List<ArchivedConversationEntity>
