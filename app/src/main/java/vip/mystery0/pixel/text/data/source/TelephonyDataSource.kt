@@ -96,8 +96,13 @@ class TelephonyDataSource(
 ) {
     private val simNameCache = mutableMapOf<Int, String>()
 
-    fun getSmsIndexSummaries(): List<SmsIndexSummaryRow> {
+    fun getSmsIndexSummaries(
+        beforeMessageId: Long? = null,
+        limit: Int = DEFAULT_INDEX_BATCH_SIZE,
+    ): List<SmsIndexSummaryRow> {
         val rows = mutableListOf<SmsIndexSummaryRow>()
+        val selection = beforeMessageId?.let { "${Telephony.Sms._ID} < ?" }
+        val selectionArgs = beforeMessageId?.let { arrayOf(it.toString()) }
         contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
@@ -106,9 +111,9 @@ class TelephonyDataSource(
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.DATE,
             ),
-            null,
-            null,
-            "${Telephony.Sms.DATE} DESC",
+            selection,
+            selectionArgs,
+            "${Telephony.Sms._ID} DESC LIMIT $limit",
         )?.use { cursor ->
             val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
             val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
@@ -1207,6 +1212,7 @@ class TelephonyDataSource(
 
     private companion object {
         const val MAX_QUERY_ARGS = 900
+        const val DEFAULT_INDEX_BATCH_SIZE = 500
 
         val smsMessageProjection = arrayOf(
             Telephony.Sms._ID,

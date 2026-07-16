@@ -1,7 +1,10 @@
 package vip.mystery0.pixel.text.data.repository
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDatabase
 import vip.mystery0.pixel.text.data.db.VerificationCodeIndexEntity
@@ -25,6 +28,7 @@ class VerificationCodeRepositoryImpl(
     private val settings: AppSettingsRepository,
 ) : VerificationCodeRepository {
     private val dao = database.verificationCodeIndexDao()
+    private val writeMutex = Mutex()
 
     override fun observeMonths(): Flow<List<VerificationCodeMonthModel>> = dao.observeMonths()
 
@@ -42,80 +46,114 @@ class VerificationCodeRepositoryImpl(
         body: String,
         timestamp: Long,
     ) = withContext(Dispatchers.IO) {
-        val metadata = ensureMetadata()
-        indexIntoGeneration(
-            summary = SmsIndexSummaryRow(messageId, threadId, address, timestamp),
-            body = body,
-            generation = metadata.activeGeneration,
-            ruleVersion = currentRuleVersion(),
-        )
+        writeMutex.withLock {
+            val metadata = ensureMetadata()
+            indexIntoGeneration(
+                summary = SmsIndexSummaryRow(messageId, threadId, address, timestamp),
+                body = body,
+                generation = metadata.activeGeneration,
+                ruleVersion = currentRuleVersion(),
+            )
+        }
     }
 
     override suspend fun rebuildAll() = withContext(Dispatchers.IO) {
+        writeMutex.withLock { rebuildAllLocked() }
+    }
+
+    private suspend fun rebuildAllLocked() {
         val metadata = ensureMetadata()
-        val generation = maxOf(System.currentTimeMillis(), metadata.activeGeneration + 1)
+        val generation = metadata.activeGeneration + 1
         val ruleVersion = currentRuleVersion()
         try {
-            telephonyDataSource.getSmsIndexSummaries().forEach { summary ->
-                val body = telephonyDataSource.getSmsBody(summary.id) ?: return@forEach
-                indexIntoGeneration(summary, body, generation, ruleVersion)
+            forEachSmsSummaryPage { summaries ->
+                summaries.forEach { summary ->
+                    val body = telephonyDataSource.getSmsBody(summary.id) ?: return@forEach
+                    indexIntoGeneration(summary, body, generation, ruleVersion)
+                }
             }
             database.activateGeneration(generation, ruleVersion, System.currentTimeMillis())
         } catch (error: Throwable) {
-            dao.deleteGeneration(generation)
+            withContext(NonCancellable) {
+                dao.deleteGeneration(generation)
+            }
             throw error
         }
     }
 
     override suspend fun reconcile() = withContext(Dispatchers.IO) {
+        writeMutex.withLock { reconcileLocked() }
+    }
+
+    private suspend fun reconcileLocked() {
         val metadata = ensureMetadata()
         val ruleVersion = currentRuleVersion()
         if (metadata.lastFullScanRuleVersion != ruleVersion) {
-            rebuildAll()
-            return@withContext
+            rebuildAllLocked()
+            return
         }
 
-        val summaries = telephonyDataSource.getSmsIndexSummaries()
-        val summariesById = summaries.associateBy(SmsIndexSummaryRow::id)
-        val indexedById = dao.getActiveEntries().associateBy(VerificationCodeIndexEntity::messageId)
+        val remainingIndexedById = dao.getActiveEntries()
+            .associateByTo(mutableMapOf(), VerificationCodeIndexEntity::messageId)
 
-        summaries.forEach { summary ->
-            val indexed = indexedById[summary.id]
-            val unchanged = indexed != null &&
-                indexed.threadId == summary.threadId &&
-                indexed.address == summary.address &&
-                indexed.timestamp == summary.date &&
-                indexed.ruleVersion == ruleVersion
-            if (!unchanged) {
-                val body = telephonyDataSource.getSmsBody(summary.id)
-                if (body == null) {
-                    dao.deleteMessage(metadata.activeGeneration, summary.id)
-                } else {
-                    indexIntoGeneration(summary, body, metadata.activeGeneration, ruleVersion)
+        forEachSmsSummaryPage { summaries ->
+            summaries.forEach { summary ->
+                val indexed = remainingIndexedById.remove(summary.id)
+                val unchanged = indexed != null &&
+                    indexed.threadId == summary.threadId &&
+                    indexed.address == summary.address &&
+                    indexed.timestamp == summary.date &&
+                    indexed.ruleVersion == ruleVersion
+                if (!unchanged) {
+                    val body = telephonyDataSource.getSmsBody(summary.id)
+                    if (body == null) {
+                        dao.deleteMessage(metadata.activeGeneration, summary.id)
+                    } else {
+                        indexIntoGeneration(summary, body, metadata.activeGeneration, ruleVersion)
+                    }
                 }
             }
         }
 
-        val missingIndexedIds = indexedById.keys - summariesById.keys
-        missingIndexedIds.chunked(MAX_DATABASE_ARGS).forEach { chunk ->
+        remainingIndexedById.keys.chunked(MAX_DATABASE_ARGS).forEach { chunk ->
             dao.deleteMessageIds(chunk)
         }
-        dao.upsertMetadata(metadata.copy(lastReconciledAt = System.currentTimeMillis()))
+        dao.updateLastReconciledAt(System.currentTimeMillis())
     }
 
     override suspend fun deleteMessageIds(messageIds: Collection<Long>) =
         withContext(Dispatchers.IO) {
-            messageIds.distinct().chunked(MAX_DATABASE_ARGS).forEach { chunk ->
-                dao.deleteMessageIds(chunk)
+            writeMutex.withLock {
+                messageIds.distinct().chunked(MAX_DATABASE_ARGS).forEach { chunk ->
+                    dao.deleteMessageIds(chunk)
+                }
             }
         }
 
     override suspend fun deleteThreadIds(threadIds: Collection<Long>) =
         withContext(Dispatchers.IO) {
-            threadIds.distinct().chunked(MAX_DATABASE_ARGS).forEach { chunk ->
-                dao.deleteThreadIds(chunk)
+            writeMutex.withLock {
+                threadIds.distinct().chunked(MAX_DATABASE_ARGS).forEach { chunk ->
+                    dao.deleteThreadIds(chunk)
+                }
             }
         }
+
+    private suspend fun forEachSmsSummaryPage(
+        block: suspend (List<SmsIndexSummaryRow>) -> Unit,
+    ) {
+        var beforeMessageId: Long? = null
+        while (true) {
+            val summaries = telephonyDataSource.getSmsIndexSummaries(
+                beforeMessageId = beforeMessageId,
+                limit = SMS_SCAN_BATCH_SIZE,
+            )
+            if (summaries.isEmpty()) return
+            block(summaries)
+            if (summaries.size < SMS_SCAN_BATCH_SIZE) return
+            beforeMessageId = summaries.last().id
+        }
+    }
 
     private suspend fun ensureMetadata(): VerificationCodeMetadataEntity {
         dao.getMetadata()?.let { return it }
@@ -160,6 +198,7 @@ class VerificationCodeRepositoryImpl(
 
     private companion object {
         const val MAX_DATABASE_ARGS = 900
+        const val SMS_SCAN_BATCH_SIZE = 500
         val monthFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM")
     }
 }

@@ -5,13 +5,13 @@ import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.Transaction
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
@@ -20,6 +20,10 @@ import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 @Entity(
     tableName = "verification_code_index",
     primaryKeys = ["generation", "message_id"],
+    indices = [
+        Index(value = ["generation", "month_key", "timestamp"]),
+        Index(value = ["thread_id"]),
+    ],
 )
 data class VerificationCodeIndexEntity(
     @ColumnInfo(name = "message_id") val messageId: Long,
@@ -94,6 +98,9 @@ interface VerificationCodeIndexDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMetadata(metadata: VerificationCodeMetadataEntity)
+
+    @Query("UPDATE verification_code_metadata SET last_reconciled_at = :timestamp WHERE id = 1")
+    suspend fun updateLastReconciledAt(timestamp: Long)
 
     @Query("DELETE FROM verification_code_index WHERE generation = :generation AND message_id = :messageId")
     suspend fun deleteMessage(generation: Long, messageId: Long)
