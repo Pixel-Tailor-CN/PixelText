@@ -64,7 +64,7 @@ val appModule = module {
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
     single<VerificationCodeRepository> {
-        VerificationCodeRepositoryImpl(get(), get(), get(), get())
+        VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
@@ -83,5 +83,5 @@ val appModule = module {
     viewModel { SearchViewModel(get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
-    viewModel { VerificationCodeViewModel(get(), get()) }
+    viewModel { VerificationCodeViewModel(get(), get(), get()) }
 }

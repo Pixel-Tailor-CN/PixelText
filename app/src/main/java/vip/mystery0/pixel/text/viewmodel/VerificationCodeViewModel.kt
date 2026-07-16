@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
+import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.util.LinkedHashMap
 
 data class VerificationCodeMonthPage(
@@ -60,6 +62,7 @@ sealed interface VerificationCodeEvent {
 class VerificationCodeViewModel(
     private val repository: VerificationCodeRepository,
     private val savedStateHandle: SavedStateHandle,
+    private val scheduler: VerificationCodeIndexScheduler,
 ) : ViewModel() {
     private val loadedMonthCount = MutableStateFlow(1)
     private val refreshing = MutableStateFlow(false)
@@ -140,6 +143,23 @@ class VerificationCodeViewModel(
     }
 
     init {
+        viewModelScope.launch {
+            scheduler.observeIsRunning().collect { running ->
+                if (!running) {
+                    refreshing.value = false
+                    rebuilding.value = false
+                }
+            }
+        }
+        viewModelScope.launch {
+            scheduler.observeLatestState().collect { state ->
+                error.value = if (state == WorkInfo.State.FAILED) {
+                    "无法访问短信数据，请检查短信权限和默认短信应用设置"
+                } else {
+                    null
+                }
+            }
+        }
         refresh()
         viewModelScope.launch {
             pages.collect { loadedPages ->
@@ -159,32 +179,14 @@ class VerificationCodeViewModel(
     }
 
     fun refresh() {
-        if (refreshJob?.isActive == true) return
-        refreshJob = viewModelScope.launch {
-            refreshing.value = true
-            error.value = null
-            runCatching { repository.reconcile() }
-                .onFailure {
-                    error.value = "刷新验证码失败"
-                    eventsMutable.emit(VerificationCodeEvent.ShowMessage("刷新验证码失败"))
-                }
-            refreshing.value = false
-        }
+        refreshing.value = true
+        scheduler.scheduleReconcile()
     }
 
     fun rebuildAll() {
-        if (refreshJob?.isActive == true) return
-        refreshJob = viewModelScope.launch {
-            rebuilding.value = true
-            error.value = null
-            runCatching { repository.rebuildAll() }
-                .onSuccess { eventsMutable.emit(VerificationCodeEvent.ShowMessage("已重新识别全部短信")) }
-                .onFailure {
-                    error.value = "重新识别失败"
-                    eventsMutable.emit(VerificationCodeEvent.ShowMessage("重新识别失败"))
-                }
-            rebuilding.value = false
-        }
+        rebuilding.value = true
+        scheduler.scheduleFullRebuild()
+        eventsMutable.tryEmit(VerificationCodeEvent.ShowMessage("已安排重新识别全部短信"))
     }
 
     fun toggleMessageMode(messageId: Long) {

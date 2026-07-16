@@ -12,7 +12,10 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.withTransaction
+import androidx.room.RoomWarnings
 import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
@@ -49,6 +52,20 @@ data class VerificationCodeMetadataEntity(
     }
 }
 
+@Entity(
+    tableName = "sms_scan_state",
+    primaryKeys = ["generation", "message_id"],
+    indices = [Index(value = ["generation", "message_id"])],
+)
+data class SmsScanStateEntity(
+    val generation: Long,
+    @ColumnInfo(name = "message_id") val messageId: Long,
+    @ColumnInfo(name = "thread_id") val threadId: Long,
+    val address: String,
+    val timestamp: Long,
+    @ColumnInfo(name = "body_fingerprint") val bodyFingerprint: String,
+)
+
 @Dao
 interface VerificationCodeIndexDao {
     @Query(
@@ -77,6 +94,7 @@ interface VerificationCodeIndexDao {
         ORDER BY timestamp DESC, message_id DESC
         """
     )
+    @Suppress(RoomWarnings.QUERY_MISMATCH)
     fun observeMonth(monthKey: String): Flow<List<VerificationCodeIndexModel>>
 
     @Query("SELECT * FROM verification_code_metadata WHERE id = 1")
@@ -93,8 +111,17 @@ interface VerificationCodeIndexDao {
     )
     suspend fun getActiveEntries(): List<VerificationCodeIndexEntity>
 
+    @Query("SELECT * FROM sms_scan_state WHERE generation = :generation AND message_id IN (:messageIds)")
+    suspend fun getScanStates(generation: Long, messageIds: List<Long>): List<SmsScanStateEntity>
+
+    @Query("SELECT * FROM verification_code_index WHERE generation = :generation AND message_id IN (:messageIds)")
+    suspend fun getEntries(generation: Long, messageIds: List<Long>): List<VerificationCodeIndexEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEntries(entries: List<VerificationCodeIndexEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertScanStates(entries: List<SmsScanStateEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMetadata(metadata: VerificationCodeMetadataEntity)
@@ -116,14 +143,21 @@ interface VerificationCodeIndexDao {
 
     @Query("DELETE FROM verification_code_index WHERE generation != :generation")
     suspend fun deleteOtherGenerations(generation: Long)
+
+    @Query("DELETE FROM sms_scan_state WHERE generation = :generation")
+    suspend fun deleteScanGeneration(generation: Long)
+
+    @Query("DELETE FROM sms_scan_state WHERE generation != :generation")
+    suspend fun deleteOtherScanGenerations(generation: Long)
 }
 
 @Database(
     entities = [
         VerificationCodeIndexEntity::class,
         VerificationCodeMetadataEntity::class,
+        SmsScanStateEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class VerificationCodeIndexDatabase : RoomDatabase() {
@@ -143,6 +177,7 @@ abstract class VerificationCodeIndexDatabase : RoomDatabase() {
                 )
             )
             verificationCodeIndexDao().deleteOtherGenerations(generation)
+            verificationCodeIndexDao().deleteOtherScanGenerations(generation)
         }
     }
 
@@ -152,6 +187,13 @@ abstract class VerificationCodeIndexDatabase : RoomDatabase() {
                 context,
                 VerificationCodeIndexDatabase::class.java,
                 "verification_code_index.db",
-            ).build()
+            ).addMigrations(MIGRATION_1_2).build()
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `sms_scan_state` (`generation` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `body_fingerprint` TEXT NOT NULL, PRIMARY KEY(`generation`, `message_id`))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_scan_state_generation_message_id` ON `sms_scan_state` (`generation`, `message_id`)")
+            }
+        }
     }
 }

@@ -30,13 +30,16 @@ class VerificationCodeIndexWorker(
             Result.success()
         } catch (error: CancellationException) {
             throw error
+        } catch (error: SecurityException) {
+            Log.w(TAG, "verification index unavailable mode=$mode error=${error::class.java.simpleName}")
+            Result.failure()
         } catch (error: Exception) {
             Log.e(
                 TAG,
                 "verification index failed mode=$mode attempt=$runAttemptCount error=${error::class.java.simpleName}",
                 error,
             )
-            Result.retry()
+            if (error is IllegalStateException) Result.failure() else Result.retry()
         }
     }
 

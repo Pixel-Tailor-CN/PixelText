@@ -3,14 +3,18 @@ package vip.mystery0.pixel.text.data.repository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDatabase
 import vip.mystery0.pixel.text.data.db.VerificationCodeIndexEntity
 import vip.mystery0.pixel.text.data.db.VerificationCodeMetadataEntity
+import vip.mystery0.pixel.text.data.db.SmsScanStateEntity
 import vip.mystery0.pixel.text.data.source.SmsIndexSummaryRow
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
@@ -26,6 +30,7 @@ class VerificationCodeRepositoryImpl(
     private val telephonyDataSource: TelephonyDataSource,
     private val parser: MessageParser,
     private val settings: AppSettingsRepository,
+    private val contactDataSource: ContactDataSource,
 ) : VerificationCodeRepository {
     private val dao = database.verificationCodeIndexDao()
     private val writeMutex = Mutex()
@@ -33,7 +38,9 @@ class VerificationCodeRepositoryImpl(
     override fun observeMonths(): Flow<List<VerificationCodeMonthModel>> = dao.observeMonths()
 
     override fun observeMonth(monthKey: String): Flow<List<VerificationCodeIndexModel>> =
-        dao.observeMonth(monthKey)
+        dao.observeMonth(monthKey).map { messages ->
+            messages.map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
+        }.flowOn(Dispatchers.IO)
 
     override suspend fun getMessageBody(messageId: Long): String? = withContext(Dispatchers.IO) {
         telephonyDataSource.getSmsBody(messageId)
@@ -49,11 +56,19 @@ class VerificationCodeRepositoryImpl(
         writeMutex.withLock {
             val metadata = ensureMetadata()
             indexIntoGeneration(
-                summary = SmsIndexSummaryRow(messageId, threadId, address, timestamp),
+                summary = SmsIndexSummaryRow(messageId, threadId, address, timestamp, body.sha256()),
                 body = body,
                 generation = metadata.activeGeneration,
                 ruleVersion = currentRuleVersion(),
             )
+            dao.upsertScanStates(listOf(SmsScanStateEntity(
+                generation = metadata.activeGeneration,
+                messageId = messageId,
+                threadId = threadId,
+                address = address,
+                timestamp = timestamp,
+                bodyFingerprint = body.sha256(),
+            )))
         }
     }
 
@@ -67,16 +82,15 @@ class VerificationCodeRepositoryImpl(
         val ruleVersion = currentRuleVersion()
         try {
             dao.deleteGeneration(generation)
+            dao.deleteScanGeneration(generation)
             forEachSmsSummaryPage { summaries ->
-                summaries.forEach { summary ->
-                    val body = telephonyDataSource.getSmsBody(summary.id) ?: return@forEach
-                    indexIntoGeneration(summary, body, generation, ruleVersion)
-                }
+                processPage(summaries, generation, ruleVersion, null)
             }
             database.activateGeneration(generation, ruleVersion, System.currentTimeMillis())
         } catch (error: Throwable) {
             withContext(NonCancellable) {
                 dao.deleteGeneration(generation)
+                dao.deleteScanGeneration(generation)
             }
             throw error
         }
@@ -94,32 +108,21 @@ class VerificationCodeRepositoryImpl(
             return
         }
 
-        val remainingIndexedById = dao.getActiveEntries()
-            .associateByTo(mutableMapOf(), VerificationCodeIndexEntity::messageId)
-
-        forEachSmsSummaryPage { summaries ->
-            summaries.forEach { summary ->
-                val indexed = remainingIndexedById.remove(summary.id)
-                val unchanged = indexed != null &&
-                    indexed.threadId == summary.threadId &&
-                    indexed.address == summary.address &&
-                    indexed.timestamp == summary.date &&
-                    indexed.ruleVersion == ruleVersion
-                if (!unchanged) {
-                    val body = telephonyDataSource.getSmsBody(summary.id)
-                    if (body == null) {
-                        dao.deleteMessage(metadata.activeGeneration, summary.id)
-                    } else {
-                        indexIntoGeneration(summary, body, metadata.activeGeneration, ruleVersion)
-                    }
-                }
+        val generation = metadata.activeGeneration + 1
+        try {
+            dao.deleteGeneration(generation)
+            dao.deleteScanGeneration(generation)
+            forEachSmsSummaryPage { summaries ->
+                processPage(summaries, generation, ruleVersion, metadata.activeGeneration)
             }
+            database.activateGeneration(generation, ruleVersion, System.currentTimeMillis())
+        } catch (error: Throwable) {
+            withContext(NonCancellable) {
+                dao.deleteGeneration(generation)
+                dao.deleteScanGeneration(generation)
+            }
+            throw error
         }
-
-        remainingIndexedById.keys.chunked(MAX_DATABASE_ARGS).forEach { chunk ->
-            dao.deleteMessageIds(chunk)
-        }
-        dao.updateLastReconciledAt(System.currentTimeMillis())
     }
 
     override suspend fun deleteMessageIds(messageIds: Collection<Long>) =
@@ -194,6 +197,46 @@ class VerificationCodeRepositoryImpl(
             )
         )
     }
+
+    private suspend fun processPage(
+        summaries: List<SmsIndexSummaryRow>,
+        generation: Long,
+        ruleVersion: String,
+        sourceGeneration: Long?,
+    ) {
+        val ids = summaries.map { it.id }
+        val oldStates = sourceGeneration?.let { dao.getScanStates(it, ids) }
+            .orEmpty().associateBy { it.messageId }
+        val oldEntries = sourceGeneration?.let { dao.getEntries(it, ids) }
+            .orEmpty().associateBy { it.messageId }
+        val copiedEntries = mutableListOf<VerificationCodeIndexEntity>()
+        val scanStates = summaries.map { summary ->
+            val old = oldStates[summary.id]
+            val unchanged = old != null && old.threadId == summary.threadId &&
+                old.address == summary.address && old.timestamp == summary.date &&
+                old.bodyFingerprint == summary.bodyFingerprint
+            if (unchanged) {
+                oldEntries[summary.id]?.let { copiedEntries += it.copy(generation = generation) }
+            } else {
+                telephonyDataSource.getSmsBody(summary.id)?.let { body ->
+                    indexIntoGeneration(summary, body, generation, ruleVersion)
+                }
+            }
+            SmsScanStateEntity(
+                generation = generation,
+                messageId = summary.id,
+                threadId = summary.threadId,
+                address = summary.address,
+                timestamp = summary.date,
+                bodyFingerprint = summary.bodyFingerprint,
+            )
+        }
+        if (copiedEntries.isNotEmpty()) dao.upsertEntries(copiedEntries)
+        dao.upsertScanStates(scanStates)
+    }
+
+    private fun String.sha256(): String = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
 
     private fun currentRuleVersion(): String = settings.getRuleResourceVersion()
 

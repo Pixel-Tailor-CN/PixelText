@@ -9,6 +9,7 @@ data class VerificationCodeIndexModel(
     val code: String,
     val signature: String?,
     val ruleVersion: String,
+    val displayName: String? = null,
 )
 
 data class VerificationCodeMonthModel(
