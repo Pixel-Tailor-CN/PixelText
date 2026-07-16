@@ -7,12 +7,14 @@ import org.koin.dsl.module
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.ConversationCacheDatabase
 import vip.mystery0.pixel.text.data.db.SpamDatabase
+import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDatabase
 import vip.mystery0.pixel.text.data.repository.AppSettingsRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.VerificationCodeRepositoryImpl
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.ContactDataSource
@@ -20,6 +22,7 @@ import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
@@ -49,6 +52,7 @@ val appModule = module {
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
     single { ConversationCacheDatabase.create(androidContext()) }
+    single { VerificationCodeIndexDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
     single { TelephonyDataSource(androidContext(), get()) }
     factory { SpamClassifier(androidContext(), get()) }
@@ -56,6 +60,9 @@ val appModule = module {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
+    single<VerificationCodeRepository> {
+        VerificationCodeRepositoryImpl(get(), get(), get(), get())
+    }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {

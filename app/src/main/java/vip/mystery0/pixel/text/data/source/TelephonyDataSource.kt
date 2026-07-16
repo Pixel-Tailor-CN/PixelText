@@ -77,6 +77,13 @@ data class SmartspacerUnreadSmsRow(
     val threadId: Long
 )
 
+data class SmsIndexSummaryRow(
+    val id: Long,
+    val threadId: Long,
+    val address: String,
+    val date: Long,
+)
+
 private data class IncomingMessageRef(
     val id: Long,
     val timestamp: Long,
@@ -88,6 +95,75 @@ class TelephonyDataSource(
     private val contentResolver: ContentResolver
 ) {
     private val simNameCache = mutableMapOf<Int, String>()
+
+    fun getSmsIndexSummaries(): List<SmsIndexSummaryRow> {
+        val rows = mutableListOf<SmsIndexSummaryRow>()
+        contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.THREAD_ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.DATE,
+            ),
+            null,
+            null,
+            "${Telephony.Sms.DATE} DESC",
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+            val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
+            while (cursor.moveToNext()) {
+                rows += SmsIndexSummaryRow(
+                    id = cursor.getLong(idIndex),
+                    threadId = cursor.getLong(threadIdIndex),
+                    address = cursor.getString(addressIndex).orEmpty(),
+                    date = cursor.getLong(dateIndex),
+                )
+            }
+        }
+        return rows
+    }
+
+    fun getSmsBody(messageId: Long): String? = contentResolver.query(
+        Telephony.Sms.CONTENT_URI,
+        arrayOf(Telephony.Sms.BODY),
+        "${Telephony.Sms._ID} = ?",
+        arrayOf(messageId.toString()),
+        null,
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)).orEmpty()
+        } else {
+            null
+        }
+    }
+
+    fun existingSmsMessageIds(messageIds: Collection<Long>): Set<Long> =
+        queryExistingSmsIds(Telephony.Sms._ID, messageIds)
+
+    fun existingSmsThreadIds(threadIds: Collection<Long>): Set<Long> =
+        queryExistingSmsIds(Telephony.Sms.THREAD_ID, threadIds)
+
+    private fun queryExistingSmsIds(column: String, values: Collection<Long>): Set<Long> {
+        if (values.isEmpty()) return emptySet()
+        val result = mutableSetOf<Long>()
+        values.chunked(MAX_QUERY_ARGS).forEach { chunk ->
+            val (selection, selectionArgs) = buildThreadSelection(column, chunk)
+            contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(column),
+                selection,
+                selectionArgs,
+                null,
+            )?.use { cursor ->
+                val valueIndex = cursor.getColumnIndexOrThrow(column)
+                while (cursor.moveToNext()) result += cursor.getLong(valueIndex)
+            }
+        }
+        return result
+    }
 
     fun searchConversationThreadIds(query: String, maxResults: Int = 50): List<Long> {
         val threadIds = linkedSetOf<Long>()
