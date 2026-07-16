@@ -66,6 +66,7 @@ class VerificationCodeRepositoryImpl(
         val generation = metadata.activeGeneration + 1
         val ruleVersion = currentRuleVersion()
         try {
+            dao.deleteGeneration(generation)
             forEachSmsSummaryPage { summaries ->
                 summaries.forEach { summary ->
                     val body = telephonyDataSource.getSmsBody(summary.id) ?: return@forEach
