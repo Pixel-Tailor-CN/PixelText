@@ -21,6 +21,7 @@ import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
+import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -37,6 +38,7 @@ class MessageRepositoryImpl(
     private val settingsRepository: AppSettingsRepository,
     private val archiveDatabase: ConversationArchiveDatabase,
     val conversationCacheRepository: ConversationCacheRepository,
+    private val verificationCodeRepository: VerificationCodeRepository,
     private val context: Context
 ) : MessageRepository {
 
@@ -125,6 +127,7 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
             telephonyDataSource.deleteThreads(threadIds)
+            verificationCodeRepository.deleteThreadIds(threadIds)
             archiveDao.unarchive(threadIds)
             conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
@@ -137,6 +140,7 @@ class MessageRepositoryImpl(
         return withContext(Dispatchers.IO) {
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val deletedCount = telephonyDataSource.deleteMessages(messageIds)
+            verificationCodeRepository.deleteMessageIds(messageIds)
             spamRepository.delete(messageIds)
             conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)

@@ -14,6 +14,7 @@ import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.io.File
 
 class HubResourceRepository(
@@ -21,6 +22,7 @@ class HubResourceRepository(
     private val store: HubResourceStore,
     private val settings: AppSettingsRepository,
     private val messageParser: MessageParser,
+    private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
 ) {
     suspend fun checkManifest(): HubResourceManifest = client.fetchManifest()
 
@@ -87,6 +89,7 @@ class HubResourceRepository(
                 store.activateRules(temp)
                 settings.setRuleResourceVersion(rules.version)
                 messageParser.reloadRules()
+                verificationCodeIndexScheduler.scheduleFullRebuild()
             }
 
             manifest.spamModel?.let { spamModel ->
@@ -119,6 +122,7 @@ class HubResourceRepository(
             settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
             settings.setResourceUpdatedAt(System.currentTimeMillis())
             messageParser.reloadRules()
+            verificationCodeIndexScheduler.scheduleFullRebuild()
             HubOperationResult.Success
         }.getOrElse { error ->
             HubOperationResult.Failure(error.message ?: "delete rules failed")

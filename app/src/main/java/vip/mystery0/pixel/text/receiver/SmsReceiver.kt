@@ -7,12 +7,20 @@ import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 
-class SmsReceiver : BroadcastReceiver() {
+class SmsReceiver : BroadcastReceiver(), KoinComponent {
+    private val verificationCodeRepository: VerificationCodeRepository by inject()
+
     companion object {
         private const val TAG = "SmsReceiver"
     }
@@ -70,6 +78,28 @@ class SmsReceiver : BroadcastReceiver() {
 
             // 触发骚扰检测
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
+            if (messageId != null && threadId > 0) {
+                val pendingResult = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        verificationCodeRepository.indexMessage(
+                            messageId = messageId,
+                            threadId = threadId,
+                            address = sender,
+                            body = body,
+                            timestamp = timestamp,
+                        )
+                    } catch (error: Exception) {
+                        Log.e(
+                            TAG,
+                            "verification index failed message_id=$messageId error=${error::class.java.simpleName}",
+                            error,
+                        )
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
+            }
             val deferNotification = shouldDeferNotificationForSpamCheck(context)
             val canScheduleSpamCheck = messageId != null && threadId > 0
             if (canScheduleSpamCheck) {

@@ -38,6 +38,7 @@ import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
+import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
@@ -46,8 +47,9 @@ val appModule = module {
     single { HubResourceStore(androidContext()) }
     single { PixelTextHubClient("https://pixeltext.api.mystery0.vip") }
     single { MessageParser(androidContext(), get()) }
-    single { HubResourceRepository(get(), get(), get(), get()) }
+    single { HubResourceRepository(get(), get(), get(), get(), get()) }
     single { ResourceUpdateScheduler(androidContext(), get()) }
+    single { VerificationCodeIndexScheduler(androidContext()) }
     single { SampleSubmissionRepository(androidContext(), get(), get()) }
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
@@ -70,7 +72,7 @@ val appModule = module {
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
     viewModel { ConversationListViewModel(get(), get()) }
