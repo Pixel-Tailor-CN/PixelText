@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
@@ -27,6 +28,8 @@ class VerificationCodeIndexWorker(
             }
             Log.i(TAG, "verification index completed mode=$mode")
             Result.success()
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             Log.e(
                 TAG,

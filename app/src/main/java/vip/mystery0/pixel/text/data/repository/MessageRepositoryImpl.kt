@@ -140,7 +140,9 @@ class MessageRepositoryImpl(
         return withContext(Dispatchers.IO) {
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val deletedCount = telephonyDataSource.deleteMessages(messageIds)
-            verificationCodeRepository.deleteMessageIds(messageIds)
+            val requestedSmsIds = messageIds.filterTo(mutableSetOf()) { it > 0 }
+            val existingSmsIds = telephonyDataSource.existingSmsMessageIds(requestedSmsIds)
+            verificationCodeRepository.deleteMessageIds(requestedSmsIds - existingSmsIds)
             spamRepository.delete(messageIds)
             conversationCacheRepository.syncThreads(threadIds.toList())
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
