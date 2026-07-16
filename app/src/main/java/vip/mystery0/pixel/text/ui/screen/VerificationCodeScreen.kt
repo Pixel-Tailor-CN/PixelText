@@ -11,15 +11,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -212,7 +213,6 @@ fun VerificationCodeScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     state.pages.forEach { page ->
@@ -223,25 +223,32 @@ fun VerificationCodeScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
                                 )
                             }
                         }
                         items(page.messages, key = { it.messageId }) { message ->
-                            VerificationIndexCard(
-                                message = message,
-                                expanded = message.messageId in state.expandedMessageIds,
-                                body = state.messageBodies[message.messageId],
-                                loadingBody = message.messageId in state.loadingBodies,
-                                onToggle = { viewModel.toggleMessageMode(message.messageId) },
-                                onNavigate = {
-                                    onNavigateToConversation(
-                                        message.threadId,
-                                        message.address
-                                    )
-                                },
-                            )
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                VerificationIndexCard(
+                                    message = message,
+                                    expanded = message.messageId in state.expandedMessageIds,
+                                    body = state.messageBodies[message.messageId],
+                                    loadingBody = message.messageId in state.loadingBodies,
+                                    onToggle = { viewModel.toggleMessageMode(message.messageId) },
+                                    onNavigate = {
+                                        onNavigateToConversation(
+                                            message.threadId,
+                                            message.address
+                                        )
+                                    },
+                                )
+                            }
                         }
+                    }
+                    item(key = "navigation_bar_spacer") {
+                        Spacer(
+                            Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        )
                     }
                 }
             }

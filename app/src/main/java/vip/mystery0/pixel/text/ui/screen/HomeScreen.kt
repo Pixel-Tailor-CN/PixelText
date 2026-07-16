@@ -1,6 +1,16 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -43,6 +54,7 @@ import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 
 private const val CONVERSATIONS_ROUTE = "conversations"
 private const val VERIFICATION_CODES_ROUTE = "verification_codes"
+private const val NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS = 250
 
 @Composable
 fun HomeScreen(
@@ -57,13 +69,13 @@ fun HomeScreen(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: CONVERSATIONS_ROUTE
-    var isFloatingActionButtonExpanded by remember { mutableStateOf(true) }
+    var areNavigationControlsVisible by remember { mutableStateOf(true) }
     var isConversationFloatingActionButtonVisible by remember { mutableStateOf(true) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     val startChat = { showNewChatSheet = true }
 
     LaunchedEffect(currentRoute) {
-        isFloatingActionButtonExpanded = true
+        areNavigationControlsVisible = true
     }
 
     BackHandler(enabled = currentRoute == VERIFICATION_CODES_ROUTE) {
@@ -74,42 +86,72 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            NavigationBar {
-                HomeDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            isFloatingActionButtonExpanded = true
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            AnimatedVisibility(
+                visible = areNavigationControlsVisible,
+                enter = slideInVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    initialOffsetY = { it },
+                ) + expandVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    expandFrom = Alignment.Bottom,
+                ) + fadeIn(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)),
+                exit = slideOutVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    targetOffsetY = { it },
+                ) + shrinkVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    shrinkTowards = Alignment.Bottom,
+                ) + fadeOut(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)),
+            ) {
+                NavigationBar {
+                    HomeDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            selected = currentRoute == destination.route,
+                            onClick = {
+                                areNavigationControlsVisible = true
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {
-                            if (destination == HomeDestination.Conversations) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_notification_sms),
-                                    contentDescription = destination.label,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = destination.icon,
-                                    contentDescription = destination.label,
-                                )
-                            }
-                        },
-                        label = { Text(destination.label) },
-                    )
+                            },
+                            icon = {
+                                if (destination == HomeDestination.Conversations) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_notification_sms),
+                                        contentDescription = destination.label,
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = destination.icon,
+                                        contentDescription = destination.label,
+                                    )
+                                }
+                            },
+                            label = { Text(destination.label) },
+                        )
+                    }
                 }
             }
         },
         floatingActionButton = {
-            if (
-                currentRoute == VERIFICATION_CODES_ROUTE ||
-                isConversationFloatingActionButtonVisible
+            AnimatedVisibility(
+                visible = areNavigationControlsVisible && (
+                    currentRoute == VERIFICATION_CODES_ROUTE ||
+                        isConversationFloatingActionButtonVisible
+                    ),
+                enter = slideInVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    initialOffsetY = { it / 2 },
+                ) + fadeIn(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)) +
+                    scaleIn(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)),
+                exit = slideOutVertically(
+                    animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
+                    targetOffsetY = { it / 2 },
+                ) + fadeOut(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)) +
+                    scaleOut(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)),
             ) {
                 ExtendedFloatingActionButton(
                     modifier = Modifier.clearAndSetSemantics {
@@ -120,7 +162,7 @@ fun HomeScreen(
                             true
                         }
                     },
-                    expanded = isFloatingActionButtonExpanded,
+                    expanded = true,
                     text = { Text("开始聊天") },
                     icon = {
                         Icon(
@@ -151,7 +193,7 @@ fun HomeScreen(
                     onNavigateToSpam = onNavigateToSpam,
                     onNavigateToSettings = onNavigateToSettings,
                     onScrollDirectionChanged = { isScrollingDown ->
-                        isFloatingActionButtonExpanded = !isScrollingDown
+                        areNavigationControlsVisible = !isScrollingDown
                     },
                     onFloatingActionButtonVisibilityChanged = { visible ->
                         isConversationFloatingActionButtonVisible = visible
@@ -167,7 +209,7 @@ fun HomeScreen(
                     onNavigateToSettings = onNavigateToSettings,
                     conversationListViewModel = conversationListViewModel,
                     onScrollDirectionChanged = { isScrollingDown ->
-                        isFloatingActionButtonExpanded = !isScrollingDown
+                        areNavigationControlsVisible = !isScrollingDown
                     },
                 )
             }
