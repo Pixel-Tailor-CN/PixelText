@@ -3,8 +3,10 @@ package vip.mystery0.pixel.text.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
@@ -20,12 +22,14 @@ import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
+import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 
 class SettingsViewModel(
     private val settingsRepository: AppSettingsRepository,
     private val hubResourceRepository: HubResourceRepository,
     private val messageRepository: MessageRepository,
     private val resourceUpdateScheduler: ResourceUpdateScheduler,
+    private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
     bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
     val settings = settingsRepository.settings
@@ -36,6 +40,12 @@ class SettingsViewModel(
         _resourceUpdateState.asStateFlow()
     private val _smsSyncState = MutableStateFlow<SmsSyncState>(SmsSyncState.Idle)
     val smsSyncState: StateFlow<SmsSyncState> = _smsSyncState.asStateFlow()
+    val isVerificationCodeIndexRunning: StateFlow<Boolean> =
+        verificationCodeIndexScheduler.observeIsRunning().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            false,
+        )
     private var pendingManifest: HubResourceManifest? = null
 
     fun setSpamDetectionEnabled(enabled: Boolean) {
@@ -131,6 +141,11 @@ class SettingsViewModel(
         if (_smsSyncState.value is SmsSyncState.Error) {
             _smsSyncState.value = SmsSyncState.Idle
         }
+    }
+
+    fun rebuildVerificationCodeIndex() {
+        if (isVerificationCodeIndexRunning.value) return
+        verificationCodeIndexScheduler.scheduleFullRebuild()
     }
 
     fun checkResourceUpdates() {

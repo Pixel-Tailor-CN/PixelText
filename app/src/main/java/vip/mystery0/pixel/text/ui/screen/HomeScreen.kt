@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
@@ -36,6 +37,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 
 private const val CONVERSATIONS_ROUTE = "conversations"
 private const val VERIFICATION_CODES_ROUTE = "verification_codes"
@@ -49,6 +53,7 @@ fun HomeScreen(
     onNavigateToSpam: () -> Unit,
     onNavigateToSettings: () -> Unit,
 ) {
+    val conversationListViewModel: ConversationListViewModel = koinViewModel()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: CONVERSATIONS_ROUTE
@@ -84,10 +89,17 @@ fun HomeScreen(
                             }
                         },
                         icon = {
-                            Icon(
-                                imageVector = destination.icon,
-                                contentDescription = destination.label,
-                            )
+                            if (destination == HomeDestination.Conversations) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_notification_sms),
+                                    contentDescription = destination.label,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = destination.icon,
+                                    contentDescription = destination.label,
+                                )
+                            }
                         },
                         label = { Text(destination.label) },
                     )
@@ -131,6 +143,7 @@ fun HomeScreen(
         ) {
             composable(CONVERSATIONS_ROUTE) {
                 ConversationListScreen(
+                    viewModel = conversationListViewModel,
                     onNavigateToDetail = onNavigateToDetail,
                     onNavigateToSearch = onNavigateToSearch,
                     onNavigateToMock = onNavigateToMock,
@@ -148,7 +161,11 @@ fun HomeScreen(
             composable(VERIFICATION_CODES_ROUTE) {
                 VerificationCodeScreen(
                     onNavigateToConversation = onNavigateToDetail,
+                    onNavigateToMock = onNavigateToMock,
+                    onNavigateToArchive = onNavigateToArchive,
+                    onNavigateToSpam = onNavigateToSpam,
                     onNavigateToSettings = onNavigateToSettings,
+                    conversationListViewModel = conversationListViewModel,
                     onScrollDirectionChanged = { isScrollingDown ->
                         isFloatingActionButtonExpanded = !isScrollingDown
                     },

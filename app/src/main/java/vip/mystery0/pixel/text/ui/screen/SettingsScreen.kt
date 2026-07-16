@@ -128,6 +128,8 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
     val smsSyncState by viewModel.smsSyncState.collectAsState()
+    val isVerificationCodeIndexRunning by
+        viewModel.isVerificationCodeIndexRunning.collectAsState()
     var permissionRefreshKey by remember { mutableIntStateOf(0) }
     var pendingPermissionRequest by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingPermissionDialogItem by remember { mutableStateOf<PermissionItem?>(null) }
@@ -558,6 +560,32 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.Sync, contentDescription = null)
                                 },
                                 onClick = viewModel::forceSyncSmsData
+                            )
+                        }
+                        item(key = "rebuild_verification_code_index", contentType = "Preference") {
+                            Preference(
+                                title = { Text("重新识别全部短信") },
+                                summary = {
+                                    Text(
+                                        if (isVerificationCodeIndexRunning) {
+                                            "正在重新识别短信，请稍候…"
+                                        } else {
+                                            "按照当前识别规则重新扫描短信并刷新验证码索引"
+                                        }
+                                    )
+                                },
+                                enabled = !isVerificationCodeIndexRunning,
+                                icon = {
+                                    Icon(Icons.AutoMirrored.Rounded.Rule, contentDescription = null)
+                                },
+                                onClick = {
+                                    viewModel.rebuildVerificationCodeIndex()
+                                    Toast.makeText(
+                                        context,
+                                        "已安排重新识别全部短信",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             )
                         }
                         item(key = "refresh_smartspacer", contentType = "Preference") {
