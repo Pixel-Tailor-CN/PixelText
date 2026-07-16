@@ -92,7 +92,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -115,7 +114,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
@@ -123,6 +121,7 @@ import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
+import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
 import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
@@ -144,7 +143,6 @@ private enum class ConversationSwipeGestureDirection {
 private const val CONVERSATION_VERTICAL_LOCK_RATIO = 1.05f
 private const val CONVERSATION_HORIZONTAL_LOCK_RATIO = 1.25f
 private const val CONVERSATION_SWIPE_THRESHOLD_FRACTION = 0.5f
-private const val SCROLL_DIRECTION_THRESHOLD = 4
 
 @Composable
 fun ConversationListScreen(
@@ -310,21 +308,7 @@ fun ConversationListScreen(
     LaunchedEffect(hasPermission, selectionMode) {
         onFloatingActionButtonVisibilityChanged(hasPermission && !selectionMode)
     }
-    LaunchedEffect(listState) {
-        var previousIndex = listState.firstVisibleItemIndex
-        var previousOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .distinctUntilChanged()
-            .collect { (index, offset) ->
-                val indexChanged = index != previousIndex
-                val delta = if (indexChanged) index - previousIndex else offset - previousOffset
-                if (indexChanged || abs(delta) >= SCROLL_DIRECTION_THRESHOLD) {
-                    onScrollDirectionChanged(delta > 0)
-                }
-                previousIndex = index
-                previousOffset = offset
-            }
-    }
+    ObserveListScrollDirection(listState, onScrollDirectionChanged = onScrollDirectionChanged)
 
     fun showTransientSnackbar(message: String) {
         transientSnackbarJob?.cancel()

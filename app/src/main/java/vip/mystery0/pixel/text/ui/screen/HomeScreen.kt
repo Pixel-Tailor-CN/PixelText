@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -94,6 +96,9 @@ fun HomeScreen(
                 isConversationFloatingActionButtonVisible
             ) {
                 ExtendedFloatingActionButton(
+                    modifier = Modifier.semantics {
+                        contentDescription = "开始聊天"
+                    },
                     expanded = isFloatingActionButtonExpanded,
                     text = { Text("开始聊天") },
                     icon = {

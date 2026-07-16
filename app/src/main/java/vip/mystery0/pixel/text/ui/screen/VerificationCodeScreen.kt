@@ -41,16 +41,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
+import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeEvent
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
 import java.time.Instant
@@ -78,21 +77,7 @@ fun VerificationCodeScreen(
             }
         }
     }
-    LaunchedEffect(listState) {
-        var previousIndex = listState.firstVisibleItemIndex
-        var previousOffset = listState.firstVisibleItemScrollOffset
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .distinctUntilChanged()
-            .collect { (index, offset) ->
-                val indexChanged = index != previousIndex
-                val delta = if (indexChanged) index - previousIndex else offset - previousOffset
-                if (indexChanged || kotlin.math.abs(delta) >= SCROLL_THRESHOLD) {
-                    onScrollDirectionChanged(delta > 0)
-                }
-                previousIndex = index
-                previousOffset = offset
-            }
-    }
+    ObserveListScrollDirection(listState, onScrollDirectionChanged = onScrollDirectionChanged)
     LaunchedEffect(listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index, state.canLoadMore) {
         val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
         if (state.canLoadMore && lastVisible >= listState.layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD) {
@@ -241,5 +226,4 @@ private fun formatMessageTime(timestamp: Long): String {
         .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
 }
 
-private const val SCROLL_THRESHOLD = 4
 private const val LOAD_MORE_THRESHOLD = 4
