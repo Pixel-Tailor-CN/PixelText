@@ -8,7 +8,7 @@
 
 使用 Android 标准 `TileService` 实现 `AppLauncherTileService`：
 
-- 磁贴处于可点击的无状态展示模式，不根据应用数据改变名称、图标或状态。
+- 磁贴固定使用激活样式表示入口可用，不根据应用数据改变名称、图标或状态。
 - 点击磁贴时创建指向 `MainActivity` 的 Intent，使用系统提供的 `startActivityAndCollapse` 启动应用。
 - Intent 使用 `FLAG_ACTIVITY_NEW_TASK` 与 `FLAG_ACTIVITY_CLEAR_TOP`，复用已有应用任务并回到主界面。
 - 在 `AndroidManifest.xml` 中以 `android.permission.BIND_QUICK_SETTINGS_TILE` 保护服务，并声明 `android.service.quicksettings.action.QS_TILE`。

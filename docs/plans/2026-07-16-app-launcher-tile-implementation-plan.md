@@ -26,7 +26,7 @@
 **接口：**
 
 - 继承 `android.service.quicksettings.TileService`。
-- `onStartListening()` 将磁贴设为 `Tile.STATE_INACTIVE` 并刷新，保持无状态显示。
+- `onStartListening()` 将磁贴固定设为 `Tile.STATE_ACTIVE` 并刷新，避免呈现为已关闭的开关。
 - `onClick()` 创建指向 `MainActivity` 的启动 Intent。
 - Android 14 及以上使用 `PendingIntent` 重载；Android 12 至 13 使用 `Intent` 重载。
 
@@ -53,7 +53,7 @@
 
 **步骤：**
 
-- [ ] 在 application 下注册非导出的磁贴服务。
+- [ ] 在 application 下注册仅允许持有系统磁贴绑定权限调用的导出服务。
 - [ ] 声明磁贴 action 和无状态元数据。
 - [ ] 运行 `./gradlew :app:lintDebug`，预期检查成功。
 
