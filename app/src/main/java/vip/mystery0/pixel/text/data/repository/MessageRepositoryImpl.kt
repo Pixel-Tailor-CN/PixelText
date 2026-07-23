@@ -3,8 +3,10 @@ package vip.mystery0.pixel.text.data.repository
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
@@ -58,19 +60,26 @@ class MessageRepositoryImpl(
     }
 
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
-        val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-        val hiddenThreadIds = getHiddenFullySpamThreadIds(archivedThreadIds)
-
         if (!conversationCacheRepository.isCacheReady()) {
+            val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
             conversationCacheRepository.fullSync(archivedThreadIds)
         }
 
-        val conversations = conversationCacheRepository.getAllConversations(
-            archivedThreadIds = archivedThreadIds,
-            hiddenThreadIds = hiddenThreadIds
-        ).map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
-
-        emit(conversations)
+        emitAll(
+            conversationCacheRepository.observeAllConversations()
+                .map { conversations ->
+                    val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
+                    val hiddenThreadIds = getHiddenFullySpamThreadIds(archivedThreadIds)
+                    conversations
+                        .filter {
+                            it.threadId !in archivedThreadIds &&
+                                    it.threadId !in hiddenThreadIds
+                        }
+                        .map {
+                            it.copy(displayName = contactDataSource.getDisplayName(it.address))
+                        }
+                }
+        )
     }.flowOn(Dispatchers.IO)
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =

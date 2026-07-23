@@ -1,17 +1,23 @@
 package vip.mystery0.pixel.text.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+
+private const val TAG = "ConversationListVM"
 
 class ConversationListViewModel(
     private val repository: MessageRepository,
@@ -39,23 +45,31 @@ class ConversationListViewModel(
     private val allConversations = mutableListOf<ConversationModel>()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private val pendingArchivedThreadIds = mutableSetOf<Long>()
+    private var conversationSubscriptionJob: Job? = null
     private var isLoading = false
     private var isRefreshingLoaded = false
 
     fun loadConversations(force: Boolean = false) {
         if (isLoading) return
         repository.startCacheObserving()
-        if (force) {
-            allConversations.clear()
-            _uiState.value = ConversationListUiState.Loading
-        } else if (allConversations.isNotEmpty()) {
+        if (conversationSubscriptionJob?.isActive == true) {
+            if (force && !isRefreshingLoaded) {
+                refreshLoaded(forceSync = false, showRefreshIndicator = false)
+            }
             return
+        }
+        if (force && allConversations.isEmpty()) {
+            _uiState.value = ConversationListUiState.Loading
         }
 
         loadAllConversations()
     }
 
     fun refreshOrLoadConversations() {
+        if (conversationSubscriptionJob?.isActive != true) {
+            loadConversations()
+            return
+        }
         if (allConversations.isEmpty()) {
             loadConversations(force = true)
         } else {
@@ -65,52 +79,78 @@ class ConversationListViewModel(
 
     fun refreshConversations() {
         if (isLoading || isRefreshingLoaded) return
-        if (allConversations.isEmpty()) {
-            loadConversations(force = true)
-        } else {
-            refreshLoaded(showRefreshIndicator = true)
-        }
+        refreshLoaded(forceSync = true, showRefreshIndicator = true)
     }
 
     private fun loadAllConversations() {
         isLoading = true
-        viewModelScope.launch {
-            if (!repository.isCacheReady()) {
-                _isSyncing.value = true
-            }
-            repository.getAllConversations()
-                .catch { e ->
-                    _isSyncing.value = false
-                    if (allConversations.isEmpty()) {
-                        _uiState.value = ConversationListUiState.Error(e.message ?: "Unknown error")
+        conversationSubscriptionJob = viewModelScope.launch {
+            var retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
+            while (true) {
+                try {
+                    isLoading = allConversations.isEmpty()
+                    if (!repository.isCacheReady()) {
+                        _isSyncing.value = true
                     }
-                    isLoading = false
-                }
-                .collect { conversations ->
+                    repository.getAllConversations()
+                        .collect { conversations ->
+                            retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
+                            _isSyncing.value = false
+                            replaceConversations(conversations)
+                            isLoading = false
+                        }
+                    throw IllegalStateException("conversation flow completed")
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(
+                        TAG,
+                        "conversation subscription failed error=${error::class.java.simpleName}",
+                        error,
+                    )
+                    if (allConversations.isEmpty()) {
+                        _uiState.value =
+                            ConversationListUiState.Error(error.message ?: "Unknown error")
+                    }
+                } finally {
                     _isSyncing.value = false
-                    replaceConversations(conversations)
                     isLoading = false
                 }
+
+                delay(retryDelayMillis)
+                retryDelayMillis =
+                    (retryDelayMillis * 2).coerceAtMost(MAX_SUBSCRIPTION_RETRY_DELAY_MILLIS)
+            }
         }
     }
 
     fun refreshSilent() {
         if (isLoading || isRefreshingLoaded || allConversations.isEmpty()) return
-        refreshLoaded(showRefreshIndicator = false)
+        refreshLoaded(forceSync = false, showRefreshIndicator = false)
     }
 
-    private fun refreshLoaded(showRefreshIndicator: Boolean) {
+    private fun refreshLoaded(forceSync: Boolean, showRefreshIndicator: Boolean) {
         isRefreshingLoaded = true
         if (showRefreshIndicator) {
             _isRefreshing.value = true
         }
         viewModelScope.launch {
             try {
-                repository.getAllConversations()
-                    .catch { }
-                    .collect { newList ->
-                        replaceConversations(newList)
-                    }
+                if (forceSync) {
+                    repository.forceSyncConversations()
+                }
+                val newList = repository.getAllConversations().first()
+                replaceConversations(newList)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (showRefreshIndicator) {
+                    Log.e(
+                        TAG,
+                        "conversation refresh failed error=${error::class.java.simpleName}",
+                        error,
+                    )
+                }
             } finally {
                 if (showRefreshIndicator) {
                     _isRefreshing.value = false
@@ -269,6 +309,11 @@ class ConversationListViewModel(
             }
         }
         _uiState.value = ConversationListUiState.Success(allConversations.toList())
+    }
+
+    private companion object {
+        const val INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS = 1_000L
+        const val MAX_SUBSCRIPTION_RETRY_DELAY_MILLIS = 30_000L
     }
 }
 

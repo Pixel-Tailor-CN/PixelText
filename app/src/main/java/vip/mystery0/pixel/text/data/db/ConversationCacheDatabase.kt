@@ -13,6 +13,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 
 @Entity(tableName = "cached_conversation")
@@ -42,6 +43,9 @@ interface CachedConversationDao {
 
     @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC")
     suspend fun getAllConversations(): List<CachedConversationEntity>
+
+    @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC")
+    fun observeAllConversations(): Flow<List<CachedConversationEntity>>
 
     @Query("SELECT thread_id FROM cached_conversation")
     suspend fun getAllThreadIds(): List<Long>

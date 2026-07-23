@@ -7,11 +7,14 @@ import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -19,6 +22,7 @@ import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 
 class SmsReceiver : BroadcastReceiver(), KoinComponent {
+    private val conversationCacheRepository: ConversationCacheRepository by inject()
     private val verificationCodeRepository: VerificationCodeRepository by inject()
 
     companion object {
@@ -78,23 +82,47 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
 
             // 触发骚扰检测
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
-            if (messageId != null && threadId > 0) {
+            if (threadId > 0) {
                 val pendingResult = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        verificationCodeRepository.indexMessage(
-                            messageId = messageId,
-                            threadId = threadId,
-                            address = sender,
-                            body = body,
-                            timestamp = timestamp,
-                        )
-                    } catch (error: Exception) {
-                        Log.e(
-                            TAG,
-                            "verification index failed message_id=$messageId error=${error::class.java.simpleName}",
-                            error,
-                        )
+                        supervisorScope {
+                            launch {
+                                try {
+                                    conversationCacheRepository.syncThreads(listOf(threadId))
+                                } catch (error: CancellationException) {
+                                    throw error
+                                } catch (error: Exception) {
+                                    Log.e(
+                                        TAG,
+                                        "conversation cache sync failed thread_id=$threadId",
+                                        error,
+                                    )
+                                }
+                            }
+
+                            if (messageId != null) {
+                                launch {
+                                    try {
+                                        verificationCodeRepository.indexMessage(
+                                            messageId = messageId,
+                                            threadId = threadId,
+                                            address = sender,
+                                            body = body,
+                                            timestamp = timestamp,
+                                        )
+                                    } catch (error: CancellationException) {
+                                        throw error
+                                    } catch (error: Exception) {
+                                        Log.e(
+                                            TAG,
+                                            "verification index failed message_id=$messageId error=${error::class.java.simpleName}",
+                                            error,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     } finally {
                         pendingResult.finish()
                     }

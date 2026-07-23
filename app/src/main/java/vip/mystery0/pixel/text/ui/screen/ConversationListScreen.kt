@@ -3,10 +3,7 @@ package vip.mystery0.pixel.text.ui.screen
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.database.ContentObserver
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
 import android.widget.Toast
@@ -89,8 +86,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -262,31 +261,6 @@ fun ConversationListScreen(
         }
     }
 
-    DisposableEffect(context, hasPermission) {
-        if (!hasPermission) return@DisposableEffect onDispose {}
-
-        val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                viewModel.refreshSilent()
-            }
-        }
-
-        context.contentResolver.registerContentObserver(
-            Telephony.Sms.CONTENT_URI,
-            true,
-            contentObserver
-        )
-        context.contentResolver.registerContentObserver(
-            Telephony.Mms.CONTENT_URI,
-            true,
-            contentObserver
-        )
-
-        onDispose {
-            context.contentResolver.unregisterContentObserver(contentObserver)
-        }
-    }
-
     val uiState by viewModel.uiState.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
@@ -295,7 +269,35 @@ fun ConversationListScreen(
     val listState = rememberSaveable(saver = LazyListState.Saver) {
         LazyListState()
     }
+    var previousSuccessfulFirstThreadId by remember { mutableStateOf<Long?>(null) }
+    val successfulConversations = (uiState as? ConversationListUiState.Success)?.conversations
+    val latestSuccessfulConversations by rememberUpdatedState(successfulConversations)
+    val currentSuccessfulFirstThreadId = successfulConversations?.firstOrNull()?.threadId
     val conversationSwipeGesturesEnabled = !selectionMode && !listState.isScrollInProgress
+
+    LaunchedEffect(currentSuccessfulFirstThreadId) {
+        if (successfulConversations == null) return@LaunchedEffect
+        val previousFirstThreadId = previousSuccessfulFirstThreadId
+
+        if (
+            previousFirstThreadId != null &&
+            previousFirstThreadId != currentSuccessfulFirstThreadId
+        ) {
+            withFrameNanos { }
+            val previousFirstThreadIndex = latestSuccessfulConversations
+                ?.indexOfFirst {
+                    it.threadId == previousFirstThreadId
+                }
+                ?: -1
+            if (
+                previousFirstThreadIndex > 0 &&
+                listState.firstVisibleItemIndex == previousFirstThreadIndex
+            ) {
+                listState.scrollToItem(0)
+            }
+        }
+        previousSuccessfulFirstThreadId = currentSuccessfulFirstThreadId
+    }
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val snackbarHostState = remember { SnackbarHostState() }

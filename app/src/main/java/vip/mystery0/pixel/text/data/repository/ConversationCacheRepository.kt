@@ -10,8 +10,13 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import vip.mystery0.pixel.text.data.db.CacheMetadataEntity
 import vip.mystery0.pixel.text.data.db.CachedConversationDao
 import vip.mystery0.pixel.text.data.db.toCachedConversationEntity
@@ -28,6 +33,8 @@ class ConversationCacheRepository(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
+    private val isObserving = AtomicBoolean(false)
+    private val syncMutex = Mutex()
 
     private val observer = object : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
@@ -35,17 +42,38 @@ class ConversationCacheRepository(
         }
     }
 
+    @Synchronized
     fun startObserving() {
-        context.contentResolver.registerContentObserver(
-            Telephony.Sms.CONTENT_URI, true, observer
-        )
-        context.contentResolver.registerContentObserver(
-            Telephony.Mms.CONTENT_URI, true, observer
-        )
+        if (!isObserving.compareAndSet(false, true)) return
+        var smsObserverRegistered = false
+        try {
+            context.contentResolver.registerContentObserver(
+                Telephony.Sms.CONTENT_URI, true, observer
+            )
+            smsObserverRegistered = true
+            context.contentResolver.registerContentObserver(
+                Telephony.Mms.CONTENT_URI, true, observer
+            )
+        } catch (error: Throwable) {
+            if (smsObserverRegistered) {
+                runCatching {
+                    context.contentResolver.unregisterContentObserver(observer)
+                }
+            }
+            isObserving.set(false)
+            throw error
+        }
     }
 
+    @Synchronized
     fun stopObserving() {
-        context.contentResolver.unregisterContentObserver(observer)
+        if (!isObserving.compareAndSet(true, false)) return
+        try {
+            context.contentResolver.unregisterContentObserver(observer)
+        } catch (error: Throwable) {
+            isObserving.set(true)
+            throw error
+        }
     }
 
     suspend fun isCacheReady(): Boolean = withContext(Dispatchers.IO) {
@@ -53,6 +81,12 @@ class ConversationCacheRepository(
     }
 
     suspend fun fullSync(archivedThreadIds: Set<Long>) = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            fullSyncLocked(archivedThreadIds)
+        }
+    }
+
+    private suspend fun fullSyncLocked(archivedThreadIds: Set<Long>) {
         Log.d(TAG, "starting full sync cache_version=$CURRENT_CACHE_VERSION")
         val allThreadIds = telephonyDataSource.queryConversationThreadIds()
             .distinct()
@@ -62,7 +96,7 @@ class ConversationCacheRepository(
             dao.deleteAll()
             markCacheReady()
             Log.d(TAG, "full sync done cache_version=$CURRENT_CACHE_VERSION upserted=0 deleted=all")
-            return@withContext
+            return
         }
 
         val conversations = fetchAndBuildConversations(allThreadIds)
@@ -79,16 +113,24 @@ class ConversationCacheRepository(
     }
 
     private suspend fun syncChangedThreads(uri: Uri?) {
-        // 系统通知的 URI 通常是单条消息 URI，末尾 ID 是 messageId，不是 threadId。
-        val threadId = telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
-        if (threadId != null) {
-            syncThreads(listOf(threadId))
-        } else {
-            syncAllKnownThreads()
+        syncMutex.withLock {
+            // 系统通知的 URI 通常是单条消息 URI，末尾 ID 是 messageId，不是 threadId。
+            val threadId = telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
+            if (threadId != null) {
+                syncThreadsLocked(listOf(threadId))
+            } else {
+                syncAllKnownThreadsLocked()
+            }
         }
     }
 
-    suspend fun syncThreads(threadIds: List<Long>) {
+    suspend fun syncThreads(threadIds: List<Long>) = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            syncThreadsLocked(threadIds)
+        }
+    }
+
+    private suspend fun syncThreadsLocked(threadIds: List<Long>) {
         val conversations = fetchAndBuildConversations(threadIds)
         if (conversations.isEmpty()) {
             dao.delete(threadIds.toSet())
@@ -100,7 +142,7 @@ class ConversationCacheRepository(
         }
     }
 
-    private suspend fun syncAllKnownThreads() {
+    private suspend fun syncAllKnownThreadsLocked() {
         val currentThreadIds = telephonyDataSource.queryConversationThreadIds()
             .distinct()
         val cachedThreadIds = dao.getAllThreadIds()
@@ -111,7 +153,7 @@ class ConversationCacheRepository(
         }
 
         if (currentThreadIds.isNotEmpty()) {
-            syncThreads(currentThreadIds)
+            syncThreadsLocked(currentThreadIds)
         }
     }
 
@@ -181,6 +223,12 @@ class ConversationCacheRepository(
             .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
             .map { it.toConversationModel() }
     }
+
+    fun observeAllConversations(): Flow<List<ConversationModel>> =
+        dao.observeAllConversations()
+            .map { conversations ->
+                conversations.map { it.toConversationModel() }
+            }
 
     private companion object {
         const val KEY_CACHE_INITIALIZED = "cache_initialized"
