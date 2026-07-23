@@ -4,18 +4,23 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,7 +37,8 @@ import vip.mystery0.pixel.text.domain.model.ParsedResult
 fun VerificationCodeCard(
     content: String,
     result: ParsedResult.VerificationCode,
-    isSelected: Boolean = false
+    isSelected: Boolean = false,
+    compactCopyButton: Boolean = false,
 ) {
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
@@ -81,7 +87,7 @@ fun VerificationCodeCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(if (compactCopyButton) 12.dp else 20.dp))
 
             Button(
                 onClick = {
@@ -92,14 +98,30 @@ fun VerificationCodeCard(
                     containerColor = onContainerColor.copy(alpha = 0.1f),
                     contentColor = onContainerColor
                 ),
-                modifier = Modifier
-                    .height(56.dp)
-                    .widthIn(min = 104.dp)
+                contentPadding = if (compactCopyButton) {
+                    PaddingValues(0.dp)
+                } else {
+                    ButtonDefaults.ContentPadding
+                },
+                modifier = if (compactCopyButton) {
+                    Modifier.size(48.dp)
+                } else {
+                    Modifier
+                        .height(56.dp)
+                        .widthIn(min = 104.dp)
+                }
             ) {
-                Text(
-                    text = "复制",
-                    style = MaterialTheme.typography.titleMediumEmphasized
-                )
+                if (compactCopyButton) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentCopy,
+                        contentDescription = "复制验证码",
+                    )
+                } else {
+                    Text(
+                        text = "复制",
+                        style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                }
             }
         }
     }
