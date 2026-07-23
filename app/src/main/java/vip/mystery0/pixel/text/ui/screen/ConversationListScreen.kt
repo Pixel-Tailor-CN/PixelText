@@ -1010,6 +1010,10 @@ fun MenuSheetContent(
     onSettingsClicked: () -> Unit,
     onSetDefaultSmsAppClicked: () -> Unit
 ) {
+    val menuItemColors = ListItemDefaults.colors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1028,8 +1032,7 @@ fun MenuSheetContent(
             trailingContent = null,
             overlineContent = null,
             supportingContent = null,
-            colors = ListItemDefaults.colors(),
-            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            colors = menuItemColors,
             content = { Text("设置默认短信应用") },
         )
         ListItem(
@@ -1038,8 +1041,7 @@ fun MenuSheetContent(
             trailingContent = null,
             overlineContent = null,
             supportingContent = null,
-            colors = ListItemDefaults.colors(),
-            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            colors = menuItemColors,
             content = { Text("归档短信") },
         )
         ListItem(
@@ -1048,8 +1050,7 @@ fun MenuSheetContent(
             trailingContent = null,
             overlineContent = null,
             supportingContent = null,
-            colors = ListItemDefaults.colors(),
-            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            colors = menuItemColors,
             content = { Text("标记所有会话为已读") },
         )
         ListItem(
@@ -1058,8 +1059,7 @@ fun MenuSheetContent(
             trailingContent = null,
             overlineContent = null,
             supportingContent = null,
-            colors = ListItemDefaults.colors(),
-            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            colors = menuItemColors,
             content = { Text("骚扰与拦截") },
         )
         ListItem(
@@ -1068,8 +1068,7 @@ fun MenuSheetContent(
             trailingContent = null,
             overlineContent = null,
             supportingContent = null,
-            colors = ListItemDefaults.colors(),
-            elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+            colors = menuItemColors,
             content = { Text("设置") },
         )
         if (showDebugMenu) {
@@ -1084,8 +1083,7 @@ fun MenuSheetContent(
                 trailingContent = null,
                 overlineContent = null,
                 supportingContent = null,
-                colors = ListItemDefaults.colors(),
-                elevation = ListItemDefaults.elevation(ListItemDefaults.Elevation),
+                colors = menuItemColors,
                 content = { Text("开发测试（MOCK）") },
             )
         }
