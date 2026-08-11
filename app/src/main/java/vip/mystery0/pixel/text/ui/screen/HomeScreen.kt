@@ -161,10 +161,9 @@ fun HomeScreen(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = areNavigationControlsVisible && (
-                    currentRoute == VERIFICATION_CODES_ROUTE ||
-                        isConversationFloatingActionButtonVisible
-                    ),
+                visible = areNavigationControlsVisible &&
+                    currentRoute == CONVERSATIONS_ROUTE &&
+                    isConversationFloatingActionButtonVisible,
                 enter = slideInVertically(
                     animationSpec = tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS),
                     initialOffsetY = { it / 2 },

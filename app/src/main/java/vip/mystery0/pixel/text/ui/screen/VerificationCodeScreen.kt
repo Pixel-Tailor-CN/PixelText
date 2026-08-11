@@ -213,20 +213,15 @@ fun VerificationCodeScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
+                    reverseLayout = true,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    item(key = "navigation_bar_spacer") {
+                        Spacer(
+                            Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        )
+                    }
                     state.pages.forEach { page ->
-                        stickyHeader(key = "header_${page.month.monthKey}") {
-                            Surface(color = MaterialTheme.colorScheme.surface) {
-                                Text(
-                                    text = formatMonth(page.month.monthKey),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                )
-                            }
-                        }
                         items(page.messages, key = { it.messageId }) { message ->
                             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                                 VerificationIndexCard(
@@ -245,11 +240,17 @@ fun VerificationCodeScreen(
                                 )
                             }
                         }
-                    }
-                    item(key = "navigation_bar_spacer") {
-                        Spacer(
-                            Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
-                        )
+                        stickyHeader(key = "header_${page.month.monthKey}") {
+                            Surface(color = MaterialTheme.colorScheme.surface) {
+                                Text(
+                                    text = formatMonth(page.month.monthKey),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
