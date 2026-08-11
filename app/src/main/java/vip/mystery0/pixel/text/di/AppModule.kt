@@ -33,6 +33,7 @@ import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.smartspacer.SmartspacerSmsRepository
 import vip.mystery0.pixel.text.smartspacer.UnreadSmsComplicationSettingsRepository
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
+import vip.mystery0.pixel.text.ui.screen.mock.MockMessageFactory
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
@@ -78,6 +79,7 @@ val appModule = module {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
+    factory { MockMessageFactory(get()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
