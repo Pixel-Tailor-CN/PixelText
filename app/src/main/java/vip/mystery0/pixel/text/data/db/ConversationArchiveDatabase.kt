@@ -37,8 +37,8 @@ interface ArchivedConversationDao {
     @Query("SELECT thread_id FROM archived_conversation")
     fun observeArchivedThreadIds(): Flow<List<Long>>
 
-    @Query("SELECT * FROM archived_conversation ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
-    suspend fun getArchivedConversations(limit: Int, offset: Int): List<ArchivedConversationEntity>
+    @Query("SELECT thread_id FROM archived_conversation ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getArchivedThreadIds(limit: Int, offset: Int): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun archive(conversations: List<ArchivedConversationEntity>)

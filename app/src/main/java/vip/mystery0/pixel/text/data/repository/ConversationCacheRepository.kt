@@ -233,6 +233,6 @@ class ConversationCacheRepository(
     private companion object {
         const val KEY_CACHE_INITIALIZED = "cache_initialized"
         const val KEY_CACHE_VERSION = "cache_version"
-        const val CURRENT_CACHE_VERSION = 1
+        const val CURRENT_CACHE_VERSION = 2
     }
 }

@@ -78,7 +78,7 @@ val appModule = module {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
-    single { SmartspacerSmsRepository(get(), get(), get(), get()) }
+    single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
         val db = get<ConversationCacheDatabase>()
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())

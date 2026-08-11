@@ -28,7 +28,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.R
-import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
+import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import java.util.concurrent.ConcurrentHashMap
@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 使用 BroadcastReceiver 而非 Activity，确保在后台也能静默处理，无需唤起 UI。
  */
 class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
-    private val conversationCacheRepository: ConversationCacheRepository by inject()
+    private val messageRepository: MessageRepository by inject()
 
     companion object {
         private const val TAG = "NotificationActionReceiver"
@@ -99,10 +99,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
 
         when (intent.action) {
             ACTION_MARK_READ -> {
-                if (threadId != -1L) {
-                    markThreadAsRead(context, threadId)
-                    syncReadStateAsync(context, threadId)
-                }
+                markThreadAsReadAsync(context, threadId)
                 cancelNotification(context, notificationId)
             }
 
@@ -111,8 +108,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                 val messageUri = intent.getStringExtra(EXTRA_MESSAGE_URI)
                 if (!code.isNullOrBlank()) {
                     copyVerificationCode(context, code)
-                    markMessageAsRead(context, messageUri, threadId)
-                    syncReadStateAsync(context, resolveThreadId(context, messageUri, threadId))
+                    markMessageAsReadAsync(context, messageUri, threadId)
                 } else {
                     Log.w(TAG, "copy verification skipped: code is blank")
                 }
@@ -127,10 +123,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                 val address = intent.getStringExtra(EXTRA_REPLY_ADDRESS)
 
                 if (!replyText.isNullOrBlank() && !address.isNullOrBlank()) {
-                    if (threadId > 0L) {
-                        markThreadAsRead(context, threadId)
-                    }
-                    syncReadStateAsync(context, threadId.takeIf { it > 0L })
+                    markThreadAsReadAsync(context, threadId)
                     val sent = sendSmsReply(context, notificationId, address, replyText)
                     // 发送后必须更新通知，否则系统会一直显示转圈进度条
                     if (sent) {
@@ -158,18 +151,38 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         }
     }
 
-    private fun syncReadStateAsync(context: Context, threadId: Long?) {
-        if (threadId == null || threadId <= 0L) {
+    private fun markThreadAsReadAsync(context: Context, threadId: Long) {
+        if (threadId <= 0L) {
             SmartspacerIntegration.notifyChanged(context)
             return
         }
+        launchReadMutation(context, "thread_id=$threadId") {
+            messageRepository.markThreadAsRead(threadId)
+        }
+    }
+
+    private fun markMessageAsReadAsync(context: Context, messageUri: String?, threadId: Long) {
+        val messageId = messageUri?.let(::messageIdFromUri)
+        if (messageId != null) {
+            launchReadMutation(context, "message_id=$messageId") {
+                messageRepository.markMessagesAsRead(setOf(messageId))
+            }
+        } else {
+            markThreadAsReadAsync(context, threadId)
+        }
+    }
+
+    private fun launchReadMutation(
+        context: Context,
+        target: String,
+        mutation: suspend () -> Unit,
+    ) {
         val pendingResult = goAsync()
-        val cacheRepository = conversationCacheRepository
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                cacheRepository.syncThreads(listOf(threadId))
+                mutation()
             } catch (e: Exception) {
-                Log.e(TAG, "failed to sync conversation cache thread_id=$threadId", e)
+                Log.e(TAG, "failed to mark read $target", e)
             } finally {
                 SmartspacerIntegration.notifyChanged(context)
                 pendingResult.finish()
@@ -177,81 +190,15 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         }
     }
 
-    private fun resolveThreadId(context: Context, messageUri: String?, fallbackThreadId: Long): Long? {
-        if (fallbackThreadId > 0L) return fallbackThreadId
-        if (messageUri.isNullOrBlank()) return null
-        return try {
-            context.contentResolver.query(
-                Uri.parse(messageUri),
-                arrayOf(Telephony.Sms.THREAD_ID),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getLong(0) else null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "failed to resolve thread id message_uri=$messageUri", e)
-            null
-        }
+    private fun messageIdFromUri(messageUri: String): Long? {
+        val uri = runCatching { Uri.parse(messageUri) }.getOrNull() ?: return null
+        val id = uri.lastPathSegment?.toLongOrNull() ?: return null
+        return if (uri.authority == "mms") -id else id
     }
 
     // -------------------------------------------------------------------------
     // 内部实现
     // -------------------------------------------------------------------------
-
-    /**
-     * 将指定会话中所有未读的收件箱短信 / 彩信标记为已读。
-     */
-    private fun markThreadAsRead(context: Context, threadId: Long) {
-        try {
-            val smsUpdated = context.contentResolver.update(
-                Telephony.Sms.CONTENT_URI,
-                readValues(),
-                "${Telephony.Sms.THREAD_ID} = ? AND (${Telephony.Sms.READ} = 0 OR ${Telephony.Sms.SEEN} = 0) AND ${Telephony.Sms.TYPE} = ?",
-                arrayOf(threadId.toString(), Telephony.Sms.MESSAGE_TYPE_INBOX.toString())
-            )
-            val mmsUpdated = context.contentResolver.update(
-                Telephony.Mms.CONTENT_URI,
-                readValues(),
-                "${Telephony.Mms.THREAD_ID} = ? AND (${Telephony.Mms.READ} = 0 OR ${Telephony.Mms.SEEN} = 0) AND ${Telephony.Mms.MESSAGE_BOX} = ?",
-                arrayOf(threadId.toString(), Telephony.Mms.MESSAGE_BOX_INBOX.toString())
-            )
-            Log.d(TAG, "mark thread read thread_id=$threadId sms=$smsUpdated mms=$mmsUpdated")
-        } catch (e: Exception) {
-            Log.e(TAG, "failed to mark thread $threadId as read", e)
-        }
-    }
-
-    /**
-     * 优先将通知对应的单条消息标记为已读；URI 不可用时回退到会话级已读。
-     */
-    private fun markMessageAsRead(context: Context, messageUri: String?, threadId: Long) {
-        if (!messageUri.isNullOrBlank()) {
-            try {
-                val updated = context.contentResolver.update(
-                    Uri.parse(messageUri),
-                    readValues(),
-                    null,
-                    null
-                )
-                if (updated > 0) return
-            } catch (e: Exception) {
-                Log.e(TAG, "failed to mark message as read", e)
-            }
-        }
-
-        if (threadId != -1L) {
-            markThreadAsRead(context, threadId)
-        }
-    }
-
-    private fun readValues(): ContentValues {
-        return ContentValues().apply {
-            put(Telephony.Sms.READ, 1)
-            put(Telephony.Sms.SEEN, 1)
-        }
-    }
 
     /**
      * 将验证码写入系统剪贴板。

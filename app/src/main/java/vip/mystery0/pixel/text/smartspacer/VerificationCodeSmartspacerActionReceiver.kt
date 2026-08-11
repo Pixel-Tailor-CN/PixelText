@@ -6,6 +6,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -23,8 +27,17 @@ class VerificationCodeSmartspacerActionReceiver : BroadcastReceiver(), KoinCompo
         }
 
         copyVerificationCode(context, code)
-        repository.markMessageRead(messageId)
-        SmartspacerIntegration.notifyChanged(context)
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                repository.markMessageRead(messageId)
+            } catch (error: Exception) {
+                Log.e(TAG, "failed to mark verification message read message_id=$messageId", error)
+            } finally {
+                SmartspacerIntegration.notifyChanged(context)
+                pendingResult.finish()
+            }
+        }
     }
 
     private fun copyVerificationCode(context: Context, code: String) {

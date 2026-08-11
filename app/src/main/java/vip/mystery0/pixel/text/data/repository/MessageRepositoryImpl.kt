@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
-import vip.mystery0.pixel.text.data.db.toConversationModel
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.MmsConversationRow
 import vip.mystery0.pixel.text.data.source.MmsMessageRow
@@ -84,11 +83,17 @@ class MessageRepositoryImpl(
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
         flow {
-            val conversations = archiveDao.getArchivedConversations(limit, offset)
-                .map { it.toConversationModel() }
-            if (conversations.isEmpty()) {
+            val threadIds = archiveDao.getArchivedThreadIds(limit, offset)
+            if (threadIds.isEmpty()) {
                 emit(emptyList())
                 return@flow
+            }
+
+            val conversations = fetchConversationDetails(threadIds)
+                .sortedByDescending { it.timestamp }
+            val missingThreadIds = threadIds.toSet() - conversations.map { it.threadId }.toSet()
+            if (missingThreadIds.isNotEmpty()) {
+                archiveDao.unarchive(missingThreadIds)
             }
             emit(conversations)
         }.flowOn(Dispatchers.IO)
@@ -158,6 +163,18 @@ class MessageRepositoryImpl(
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
             deletedCount
+        }
+    }
+
+    override suspend fun markMessagesAsRead(messageIds: Set<Long>): Int {
+        if (messageIds.isEmpty()) return 0
+        return withContext(Dispatchers.IO) {
+            val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
+            val updatedCount = telephonyDataSource.markMessagesAsRead(messageIds)
+            conversationCacheRepository.syncThreads(threadIds.toList())
+            SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
+            SmartspacerIntegration.notifyChanged(context)
+            updatedCount
         }
     }
 
