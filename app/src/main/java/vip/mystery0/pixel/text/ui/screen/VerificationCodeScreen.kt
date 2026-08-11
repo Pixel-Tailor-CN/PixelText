@@ -328,7 +328,6 @@ private fun VerificationIndexCard(
                             code = message.code,
                             signature = message.signature ?: message.displayName ?: message.address,
                         ),
-                        compactCopyButton = true,
                     )
                 }
             }

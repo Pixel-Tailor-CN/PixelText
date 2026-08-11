@@ -2,26 +2,25 @@ package vip.mystery0.pixel.text.ui.message.cards
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material.icons.rounded.Password
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,89 +37,110 @@ fun VerificationCodeCard(
     content: String,
     result: ParsedResult.VerificationCode,
     isSelected: Boolean = false,
-    compactCopyButton: Boolean = false,
 ) {
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
+    val baseThemeColor = MaterialTheme.colorScheme.primary
     val containerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.inverseSurface
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
         animationSpec = tween(durationMillis = 200),
-        label = "containerColor"
+        label = "containerColor",
     )
     val onContainerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onPrimaryContainer,
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.inverseOnSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
         animationSpec = tween(durationMillis = 200),
-        label = "onContainerColor"
+        label = "onContainerColor",
     )
-
-    ElevatedCard(
-        shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = containerColor
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) containerColor else baseThemeColor.copy(alpha = 0.15f),
         ),
-        modifier = Modifier.widthIn(min = 260.dp, max = 360.dp)
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = result.code,
-                    style = MaterialTheme.typography.displaySmallEmphasized.copy(
-                        letterSpacing = 1.sp
-                    ),
-                    color = onContainerColor,
-                    maxLines = 1
-                )
-                Text(
-                    text = result.signature ?: "验证码",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = onContainerColor.copy(alpha = 0.62f)
+        Column {
+            Column(modifier = Modifier.padding(16.dp)) {
+                CardHeader(
+                    icon = Icons.Rounded.Password,
+                    iconTint = if (isSelected) onContainerColor else baseThemeColor,
+                    iconBg = if (isSelected) {
+                        onContainerColor.copy(alpha = 0.1f)
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    },
+                    title = result.signature?.takeIf { it.isNotBlank() } ?: "验证码",
+                    dividerColor = onContainerColor.copy(alpha = 0.1f),
                 )
             }
 
-            Spacer(modifier = Modifier.width(if (compactCopyButton) 12.dp else 20.dp))
-
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(result.code))
-                },
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = onContainerColor.copy(alpha = 0.1f),
-                    contentColor = onContainerColor
-                ),
-                contentPadding = if (compactCopyButton) {
-                    PaddingValues(0.dp)
-                } else {
-                    ButtonDefaults.ContentPadding
-                },
-                modifier = if (compactCopyButton) {
-                    Modifier.size(48.dp)
-                } else {
-                    Modifier
-                        .height(56.dp)
-                        .widthIn(min = 104.dp)
-                }
+            Surface(
+                color = containerColor,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                if (compactCopyButton) {
-                    Icon(
-                        imageVector = Icons.Rounded.ContentCopy,
-                        contentDescription = "复制验证码",
-                    )
-                } else {
-                    Text(
-                        text = "复制",
-                        style = MaterialTheme.typography.titleMediumEmphasized
-                    )
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = result.code,
+                            style = MaterialTheme.typography.displaySmallEmphasized.copy(
+                                letterSpacing = 1.sp,
+                            ),
+                            color = onContainerColor,
+                            maxLines = 1,
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) {
+                                onContainerColor.copy(alpha = 0.1f)
+                            } else {
+                                baseThemeColor.copy(alpha = 0.12f)
+                            },
+                        ) {
+                            Text(
+                                text = "验证码",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) onContainerColor else baseThemeColor,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+                    FilledIconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(result.code))
+                        },
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = onContainerColor.copy(alpha = 0.1f),
+                            contentColor = onContainerColor,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = "复制验证码",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }

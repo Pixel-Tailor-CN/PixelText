@@ -24,7 +24,6 @@ object MessageCardFactory {
                 content = content,
                 result = parsedResult,
                 isSelected = isSelected,
-                compactCopyButton = true,
             )
             else -> NormalMessageCard(content, isSelected)
         }
