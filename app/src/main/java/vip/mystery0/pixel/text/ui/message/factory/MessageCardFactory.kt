@@ -20,7 +20,12 @@ object MessageCardFactory {
             is ParsedResult.BankTransaction -> BankTransactionCard(parsedResult, isSelected)
             is ParsedResult.PhoneRecharge -> PhoneRechargeCard(parsedResult, isSelected)
             is ParsedResult.ExpressDelivery -> ExpressDeliveryCard(parsedResult, isSelected)
-            is ParsedResult.VerificationCode -> VerificationCodeCard(content, parsedResult, isSelected)
+            is ParsedResult.VerificationCode -> VerificationCodeCard(
+                content = content,
+                result = parsedResult,
+                isSelected = isSelected,
+                compactCopyButton = true,
+            )
             else -> NormalMessageCard(content, isSelected)
         }
     }
