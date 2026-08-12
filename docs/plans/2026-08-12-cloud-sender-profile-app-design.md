@@ -264,7 +264,7 @@ max zip bytes: 10 MiB
 max extracted bytes: 30 MiB
 max entries: 6000
 max profiles: 5000
-max avatar bytes: 512 KiB
+max avatar bytes: 256 KiB
 max avatar dimensions: 1024x1024
 ```
 
