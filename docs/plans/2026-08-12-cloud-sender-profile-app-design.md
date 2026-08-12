@@ -9,7 +9,7 @@
 - 按规范化号码在本地精确匹配。
 - 合并联系人、云端资料和原始号码的展示优先级。
 - 在会话列表、详情和通知中显示名称与头像。
-- 后台自动更新、手动更新、本地回退和失败降级。
+- 后台自动更新、手动检查更新、损坏版本自动回退和失败降级。
 
 服务端资料录入、手动发布、COS 上传和公共接口实现位于：
 
@@ -30,7 +30,7 @@ GET /api/v1/sender-profiles/manifest
 ```json
 {
   "version": "2026.08.12.1",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sha256": "7f...",
   "sizeBytes": 182340,
   "downloadUrl": "https://dl.pixeltext.mystery0.vip/sender-profiles/releases/2026.08.12.1/sender-profiles-7f....zip?s=...",
@@ -41,6 +41,8 @@ GET /api/v1/sender-profiles/manifest
 ```
 
 无稳定版本时服务端返回 `204 No Content`。App 将其视为正常结果，不重试、不清除当前本地资料。
+
+Manifest 响应使用 `Cache-Control: no-store`，不提供 ETag/304。`downloadUrl` 是短期 CDN 签名地址，App 不持久化、不缓存、不跨检查任务复用该地址。每次确定需要下载资料包时，必须先请求最新 manifest，并立即使用本次响应中的 `downloadUrl`。
 
 资料包结构：
 
@@ -57,23 +59,23 @@ JSON Schema v1：
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "version": "2026.08.12.1",
   "generatedAt": "2026-08-12T08:00:00Z",
   "profiles": [
     {
-      "number": "10086",
       "displayName": "中国移动",
       "avatar": {
         "path": "avatars/1.webp",
         "sha256": "ab..."
-      }
+      },
+      "numbers": ["10086", "CMCC"]
     }
   ]
 }
 ```
 
-第一版客户端只接受 `schemaVersion=1`。每条资料只有一个号码，不再包含或解析：
+第一版多号码客户端只接受 `schemaVersion=2`。每条标签包含排序后的 `numbers` 数组，名称和头像只保存一次。App 加载时展开每个号码到本地索引。资料包不再包含或解析：
 
 - 业务 Profile ID。
 - category。
@@ -118,7 +120,7 @@ SenderPresentationResolver
 
 ```kotlin
 data class SenderProfile(
-    val number: String,
+    val numbers: List<String>,
     val displayName: String,
     val avatar: SenderProfileAvatar,
 )
@@ -191,7 +193,7 @@ App 不依赖服务端数据库 ID。头像路径只作为资料包内的相对�
 Map<String, SenderProfile>
 ```
 
-键为再次规范化和校验后的 `profile.number`。出现重复键时拒绝整个新版本，保留当前有效版本。
+App 为每个 `profile.numbers` 元素生成本地候选 Key并展开到 Map。出现重复键时拒绝整个新版本，保留当前有效版本。
 
 ## 7. 网络层
 
@@ -224,6 +226,8 @@ suspend fun fetchSenderProfileManifest(): Response<SenderProfileManifestResponse
 - CDN `Content-Length` 存在时必须与 manifest 一致。
 - 实际写入超过上限时立即终止并删除临时文件。
 - 只允许 HTTPS CDN URL。
+- 不持久化或复用 `downloadUrl`，不实现 manifest ETag 缓存。
+- CDN 返回 401 或 403 时，重新请求一次 manifest；仅当版本、大小和 SHA-256 仍与目标版本一致时，使用新地址重试一次下载。
 - 请求不得附带本地号码、联系人、短信正文或命中信息。
 
 ## 8. 本地存储与原子启用
@@ -290,6 +294,8 @@ data class SenderProfileSnapshot(
 
 新版本启用后一次性替换不可变 Snapshot，避免 UI 读取半更新索引。
 
+Repository 启动时可以异步加载本地资料，不要求 Receiver 或通知链路同步等待。Snapshot 尚未加载完成时，`resolve(address)` 按无云端资料处理，返回联系人结果或原始号码和默认头像。资料加载完成后发布新 Snapshot，Compose 页面通过 Flow 自动刷新。
+
 `SenderPresentationResolver` 提供：
 
 ```kotlin
@@ -326,7 +332,15 @@ fun observe(address: String): Flow<SenderPresentation>
 
 ### 10.3 通知
 
-通知标题使用最终展示名称，本地头像可作为 LargeIcon。回复地址、Intent Extra 和 threadId 始终使用原始地址，不能使用展示名称。
+通知标题使用解析时可获得的最终展示名称，本地头像可作为 LargeIcon。回复地址、Intent Extra 和 threadId 始终使用原始地址，不能使用展示名称。
+
+如果 App 进程因新短信冷启动，而本地发件方资料尚未加载完成，本次通知直接按无云端资料处理，可以暂时显示原始号码和默认头像。通知发送流程不等待资料加载，也不为该低频场景引入同步磁盘读取、`goAsync()` 等待或复杂的通知重建机制。
+
+资料加载完成后：
+
+- 当前 App 页面通过 Snapshot Flow 自动刷新名称和头像。
+- 后续新通知使用已经加载的资料。
+- 已经发出的旧通知不主动追溯更新；除非后续因同一 threadId 的正常通知事件被重新构建，否则允许其保持原始号码展示。
 
 ## 11. 更新策略
 
@@ -337,9 +351,10 @@ fun observe(address: String): Flow<SenderPresentation>
 - 只有远端版本不同才下载。
 - `204`、版本相同和 App 版本过低按成功结束。
 - 下载、SHA、ZIP、Schema、号码或头像校验失败时保留当前版本。
-- 保留 current 和 previous 两个有效版本。
+- 保留 current 和 previous 两个有效版本，previous 只用于 current 损坏时自动恢复。
+- App 不提供用户手动切换到 previous 的入口，避免自动更新再次安装服务端当前稳定版本。
 
-服务端资料保存不会自动发布，因此 App 只会看到管理员手动发布后的稳定版本。
+服务端资料保存不会自动发布，因此 App 只会看到管理员手动发布后的稳定版本。业务版本存在错误时，由服务端管理后台回滚公共稳定版本，所有客户端在后续检查中统一恢复。
 
 ## 12. 设置项
 
@@ -351,9 +366,8 @@ fun observe(address: String): Flow<SenderPresentation>
 - 自动更新开关。
 - 可选仅 Wi-Fi 更新。
 - 立即检查更新。
-- 恢复上一版本。
 
-App 的“恢复上一版本”只切换本地 pointer，不请求服务端回滚。服务端公共版本回滚由管理后台负责。
+App 不提供“恢复上一版本”设置。`previous-version` 仅作为 current 损坏、启动校验失败等异常场景下的自动恢复手段。业务数据错误由服务端管理后台回滚公共稳定版本。
 
 ## 13. 安全与隐私
 
@@ -383,7 +397,8 @@ sender profile fallback activated version=2026.08.01.1
 | manifest 网络失败 | 保留当前版本，Worker 退避重试 |
 | 服务端返回 204 | 保留当前状态，按成功记录检查时间 |
 | App 版本过低 | 不下载，设置页提示升级 |
-| CDN 下载失败 | 删除 `.part`，保留当前版本 |
+| CDN 返回 401/403 | 重新请求一次 manifest，元数据一致时使用新签名地址重试一次 |
+| 其他 CDN 下载失败 | 删除 `.part`，保留当前版本 |
 | 大小或 SHA 不匹配 | 拒绝新版本 |
 | ZIP 非法或越界 | 拒绝新版本并清理临时目录 |
 | Schema 不支持 | 拒绝新版本 |
@@ -392,6 +407,7 @@ sender profile fallback activated version=2026.08.01.1
 | 头像缺失或非法 | 拒绝整个版本 |
 | current 损坏 | 自动尝试 previous |
 | current/previous 均损坏 | 回退默认展示 |
+| 通知冷启动且资料尚未加载 | 本次通知使用联系人或原始号码和默认头像，不等待、不追溯更新 |
 | 运行时头像解码失败 | 仅该头像回退默认图标 |
 
 ## 15. 实施顺序
@@ -417,7 +433,8 @@ sender profile fallback activated version=2026.08.01.1
 - App 不处理 category、priority、enabled 或 matcher 数组。
 - 号码匹配完全在本地完成。
 - 联系人名称优先于云端名称。
-- 主列表、归档、骚扰列表、详情和通知展示一致。
+- 资料已加载时，主列表、归档、骚扰列表、详情和后续通知展示一致。
+- 通知冷启动且资料尚未加载时允许临时显示原始号码，不阻塞通知发送，也不要求追溯更新旧通知。
 - 更新失败、包损坏和无网络不影响短信基础功能。
 - 当前页面可响应资料版本变化并自动刷新。
-- App 私有目录至少保留当前和上一有效版本。
+- App 私有目录至少保留当前和上一有效版本，上一版本仅用于自动故障恢复，不向用户提供手动切换入口。
