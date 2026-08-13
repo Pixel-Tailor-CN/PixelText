@@ -19,6 +19,7 @@ import vip.mystery0.pixel.text.domain.hub.HubFileArtifact
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.hub.HubSpamModelArtifact
 import vip.mystery0.pixel.text.domain.hub.SampleSubmissionRequest
+import vip.mystery0.pixel.text.domain.model.SenderProfileManifest
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -40,6 +41,72 @@ class PixelTextHubClient(
 
     suspend fun submitSample(request: SampleSubmissionRequest) = withContext(Dispatchers.IO) {
         ensureSuccessful(service.submitSample(request.toBody()), "request failed")
+    }
+
+    suspend fun fetchSenderProfileManifest(): SenderProfileManifest? =
+        withContext(Dispatchers.IO) {
+            val response = service.fetchSenderProfileManifest()
+            response.errorBody()?.close()
+            when {
+                response.code() == 204 -> null
+                !response.isSuccessful ->
+                    throw IllegalStateException("sender profile manifest failed status=${response.code()}")
+                else -> response.body()?.toDomain()
+                    ?: throw IllegalStateException("sender profile manifest empty body")
+            }
+        }
+
+    suspend fun downloadSenderProfileTo(
+        url: String,
+        target: File,
+        expectedSizeBytes: Long,
+        maxSizeBytes: Long,
+        onProgress: (Long) -> Unit = {},
+    ): Long = withContext(Dispatchers.IO) {
+        if (!url.startsWith("https://")) {
+            throw IllegalStateException("sender profile download url must use https")
+        }
+        val response = service.download(url)
+        if (!response.isSuccessful) {
+            response.errorBody()?.close()
+            throw SenderProfileDownloadException(response.code())
+        }
+        val body = response.body() ?: throw IllegalStateException("sender profile download empty body")
+        val contentLength = body.contentLength()
+        if (contentLength >= 0 && contentLength != expectedSizeBytes) {
+            body.close()
+            throw IllegalStateException(
+                "sender profile content length mismatch expected=$expectedSizeBytes actual=$contentLength"
+            )
+        }
+        target.parentFile?.mkdirs()
+        runCatching {
+            body.use {
+                it.byteStream().use { input ->
+                    target.outputStream().use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var totalBytes = 0L
+                        while (true) {
+                            val readBytes = input.read(buffer)
+                            if (readBytes < 0) break
+                            totalBytes += readBytes
+                            if (totalBytes > maxSizeBytes || totalBytes > expectedSizeBytes) {
+                                throw IllegalStateException("sender profile download size exceeded")
+                            }
+                            output.write(buffer, 0, readBytes)
+                            onProgress(totalBytes)
+                        }
+                    }
+                }
+            }
+        }.onFailure { target.delete() }.getOrThrow()
+        if (target.length() != expectedSizeBytes) {
+            target.delete()
+            throw IllegalStateException(
+                "sender profile download size mismatch expected=$expectedSizeBytes actual=${target.length()}"
+            )
+        }
+        target.length()
     }
 
     suspend fun downloadTo(
@@ -104,6 +171,9 @@ private interface PixelTextHubService {
     @GET("api/v1/resources/manifest")
     suspend fun fetchManifest(): Response<HubResourceManifestResponse>
 
+    @GET("api/v1/sender-profiles/manifest")
+    suspend fun fetchSenderProfileManifest(): Response<SenderProfileManifestResponse>
+
     @POST("api/v1/samples")
     suspend fun submitSample(@Body body: SampleSubmissionBody): Response<ResponseBody>
 
@@ -167,6 +237,32 @@ internal data class HubSpamModelArtifactResponse(
         releaseNotes = releaseNotes
     )
 }
+
+@JsonClass(generateAdapter = true)
+internal data class SenderProfileManifestResponse(
+    val version: String,
+    val schemaVersion: Int,
+    val sha256: String,
+    val sizeBytes: Long,
+    val downloadUrl: String,
+    val releaseNotes: String = "",
+    val minAppVersionCode: Int,
+    val publishedAt: String? = null,
+) {
+    fun toDomain() = SenderProfileManifest(
+        version = version,
+        schemaVersion = schemaVersion,
+        sha256 = sha256,
+        sizeBytes = sizeBytes,
+        downloadUrl = downloadUrl,
+        releaseNotes = releaseNotes,
+        minAppVersionCode = minAppVersionCode,
+        publishedAt = publishedAt,
+    )
+}
+
+class SenderProfileDownloadException(val statusCode: Int) :
+    IllegalStateException("sender profile download failed status=$statusCode")
 
 @JsonClass(generateAdapter = true)
 internal data class SampleSubmissionBody(

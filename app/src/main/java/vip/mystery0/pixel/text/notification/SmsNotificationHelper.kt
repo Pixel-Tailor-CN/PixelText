@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -70,6 +71,8 @@ object SmsNotificationHelper {
         body: String,
         threadId: Long = 0L,
         messageUri: String? = null,
+        displaySender: String = sender,
+        avatarPath: String? = null,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (
@@ -175,7 +178,7 @@ object SmsNotificationHelper {
 
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
             .setSmallIcon(resolveSmallIcon(context))
-            .setContentTitle(sender)
+            .setContentTitle(displaySender)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -184,6 +187,11 @@ object SmsNotificationHelper {
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setGroup("sms_group_$threadId")
+            .apply {
+                avatarPath?.let { path ->
+                    BitmapFactory.decodeFile(path)?.let(::setLargeIcon)
+                }
+            }
 
         verificationCode
             ?.takeIf { shouldHideVerificationCodeOnLockScreen(context) }
@@ -193,7 +201,7 @@ object SmsNotificationHelper {
                     .setPublicVersion(
                         buildLockScreenSafeNotification(
                             context = context,
-                            sender = sender,
+                            sender = displaySender,
                             body = body,
                             threadId = threadId,
                             verificationCode = code,

@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
+import vip.mystery0.pixel.text.data.repository.SenderProfileInstallResult
+import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
+import vip.mystery0.pixel.text.data.repository.SenderProfileUpdateAvailability
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
@@ -33,6 +36,7 @@ class SettingsViewModel(
     private val resourceUpdateScheduler: ResourceUpdateScheduler,
     private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
     private val verificationCodeCleanupScheduler: VerificationCodeCleanupScheduler,
+    private val senderProfileRepository: SenderProfileRepository,
     bundledResourceVersionProvider: BundledResourceVersionProvider,
 ) : ViewModel() {
     val settings = settingsRepository.settings
@@ -41,6 +45,12 @@ class SettingsViewModel(
         MutableStateFlow<ResourceUpdateState>(ResourceUpdateState.Idle)
     val resourceUpdateState: StateFlow<ResourceUpdateState> =
         _resourceUpdateState.asStateFlow()
+    private val _senderProfileUpdateState =
+        MutableStateFlow<SenderProfileUpdateState>(SenderProfileUpdateState.Idle)
+    val senderProfileUpdateState: StateFlow<SenderProfileUpdateState> =
+        _senderProfileUpdateState.asStateFlow()
+    private val _senderProfileVersion = MutableStateFlow<String?>(null)
+    val senderProfileVersion: StateFlow<String?> = _senderProfileVersion.asStateFlow()
     private val _smsSyncState = MutableStateFlow<SmsSyncState>(SmsSyncState.Idle)
     val smsSyncState: StateFlow<SmsSyncState> = _smsSyncState.asStateFlow()
     val isVerificationCodeIndexRunning: StateFlow<Boolean> =
@@ -50,6 +60,14 @@ class SettingsViewModel(
             false,
         )
     private var pendingManifest: HubResourceManifest? = null
+    private var pendingSenderProfileManifest:
+        vip.mystery0.pixel.text.domain.model.SenderProfileManifest? = null
+
+    init {
+        viewModelScope.launch {
+            _senderProfileVersion.value = senderProfileRepository.currentVersion()
+        }
+    }
 
     fun setSpamDetectionEnabled(enabled: Boolean) {
         settingsRepository.setSpamDetectionEnabled(enabled)
@@ -230,6 +248,65 @@ class SettingsViewModel(
         }
     }
 
+    fun checkSenderProfileUpdates() {
+        if (_senderProfileUpdateState.value is SenderProfileUpdateState.Busy) return
+        _senderProfileUpdateState.value = SenderProfileUpdateState.Checking
+        viewModelScope.launch {
+            runCatching { senderProfileRepository.checkUpdate() }
+                .onSuccess { result -> when (result) {
+                    is SenderProfileUpdateAvailability.Available -> {
+                        pendingSenderProfileManifest = result.manifest
+                        _senderProfileUpdateState.value =
+                            SenderProfileUpdateState.Available(result.info)
+                    }
+
+                    is SenderProfileUpdateAvailability.NoUpdate -> {
+                        pendingSenderProfileManifest = null
+                        _senderProfileUpdateState.value =
+                            SenderProfileUpdateState.NoUpdate(result.message)
+                    }
+                } }
+                .onFailure { error ->
+                    pendingSenderProfileManifest = null
+                    _senderProfileUpdateState.value =
+                        SenderProfileUpdateState.Error(error.message ?: "检查发件方资料失败")
+                }
+        }
+    }
+
+    fun installSenderProfileUpdate() {
+        if (_senderProfileUpdateState.value is SenderProfileUpdateState.Busy) return
+        val manifest = pendingSenderProfileManifest ?: return
+        _senderProfileUpdateState.value =
+            SenderProfileUpdateState.Installing("正在准备安装", 0f)
+        viewModelScope.launch {
+            when (val result = senderProfileRepository.install(manifest) { message, progress ->
+                _senderProfileUpdateState.value =
+                    SenderProfileUpdateState.Installing(message, progress)
+            }) {
+                is SenderProfileInstallResult.Success -> {
+                    pendingSenderProfileManifest = null
+                    _senderProfileVersion.value = result.version
+                    _senderProfileUpdateState.value =
+                        SenderProfileUpdateState.Success("发件方资料已安装")
+                }
+
+                is SenderProfileInstallResult.Failure -> {
+                    pendingSenderProfileManifest = null
+                    _senderProfileUpdateState.value =
+                        SenderProfileUpdateState.Error(result.message)
+                }
+            }
+        }
+    }
+
+    fun dismissSenderProfileUpdateDialog() {
+        if (_senderProfileUpdateState.value !is SenderProfileUpdateState.Busy) {
+            pendingSenderProfileManifest = null
+            _senderProfileUpdateState.value = SenderProfileUpdateState.Idle
+        }
+    }
+
     fun deleteDownloadedModelResource() {
         runResourceMaintenance(
             busyState = ResourceUpdateState.Working("正在删除下载的模型文件"),
@@ -294,6 +371,20 @@ sealed interface ResourceUpdateState {
     data class Working(val message: String) : ResourceUpdateState, Busy
     data class Success(val message: String) : ResourceUpdateState
     data class Error(val message: String) : ResourceUpdateState
+}
+
+sealed interface SenderProfileUpdateState {
+    sealed interface Busy : SenderProfileUpdateState
+
+    data object Idle : SenderProfileUpdateState
+    data object Checking : SenderProfileUpdateState, Busy
+    data class Available(val info: vip.mystery0.pixel.text.domain.model.SenderProfileUpdateInfo) :
+        SenderProfileUpdateState
+    data class NoUpdate(val message: String) : SenderProfileUpdateState
+    data class Installing(val message: String, val progress: Float) :
+        SenderProfileUpdateState, Busy
+    data class Success(val message: String) : SenderProfileUpdateState
+    data class Error(val message: String) : SenderProfileUpdateState
 }
 
 sealed interface SmsSyncState {

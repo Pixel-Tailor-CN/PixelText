@@ -38,7 +38,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Message
-import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Close
@@ -117,10 +116,10 @@ import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
+import vip.mystery0.pixel.text.ui.component.SenderAvatar
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
-import vip.mystery0.pixel.text.ui.theme.getAvatarColor
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
@@ -918,24 +917,12 @@ fun ConversationItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(modifier = Modifier.size(48.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else getAvatarColor(conversation.address)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                // 使用联系人头像图标
-                Icon(
-                    imageVector = Icons.Rounded.AccountCircle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            SenderAvatar(
+                identifier = conversation.address,
+                avatarPath = conversation.avatarPath,
+                avatarSha256 = conversation.avatarSha256,
+                selected = selected,
+            )
 
             if (conversation.unreadCount > 0) {
                 Box(

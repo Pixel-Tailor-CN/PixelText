@@ -8,5 +8,7 @@ data class ConversationModel(
     val displayName: String? = null,
     val unreadCount: Int = 0,
     val isMms: Boolean = false,
-    val hasMms: Boolean = false
+    val hasMms: Boolean = false,
+    val avatarPath: String? = null,
+    val avatarSha256: String? = null,
 )

@@ -67,6 +67,7 @@ class ConversationDetailViewModel(
     private val telephonyDataSource: TelephonyDataSource,
     private val contactDataSource: ContactDataSource,
     private val context: Context,
+    private val senderProfileRepository: vip.mystery0.pixel.text.data.repository.SenderProfileRepository,
     private val spamClassifierFactory: SpamClassifierFactory,
     private val spamRepository: SpamRepository
 ) : ViewModel() {
@@ -128,7 +129,10 @@ class ConversationDetailViewModel(
 
     fun loadThread(threadId: Long, address: String) {
         _address.value = address
-        _conversationTitle.value = resolveConversationTitle(address)
+        _conversationTitle.value = address
+        viewModelScope.launch {
+            _conversationTitle.value = resolveConversationTitle(address)
+        }
         if (currentThreadId == threadId && _messages.isNotEmpty()) return
 
         currentThreadId = threadId
@@ -150,8 +154,10 @@ class ConversationDetailViewModel(
         }
     }
 
-    private fun resolveConversationTitle(address: String): String {
-        return contactDataSource.getDisplayName(address)?.takeIf { it.isNotBlank() } ?: address
+    private suspend fun resolveConversationTitle(address: String): String {
+        return contactDataSource.getDisplayName(address)?.takeIf { it.isNotBlank() }
+            ?: senderProfileRepository.findByNumber(address)?.displayName
+            ?: address
     }
 
     fun loadMore() {

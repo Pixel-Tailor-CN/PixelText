@@ -225,7 +225,7 @@ class ConversationCacheRepository(
     }
 
     fun observeAllConversations(): Flow<List<ConversationModel>> =
-        dao.observeAllConversations()
+        dao.observeAllConversationsWithSenderProfile()
             .map { conversations ->
                 conversations.map { it.toConversationModel() }
             }

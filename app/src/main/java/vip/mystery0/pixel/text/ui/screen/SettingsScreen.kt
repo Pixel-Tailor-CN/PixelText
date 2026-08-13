@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -113,6 +114,7 @@ import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ResourceUpdateState
 import vip.mystery0.pixel.text.viewmodel.KeywordSpamViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
+import vip.mystery0.pixel.text.viewmodel.SenderProfileUpdateState
 import vip.mystery0.pixel.text.viewmodel.SmsSyncState
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
@@ -134,6 +136,8 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val blockedKeywords by keywordSpamViewModel.keywords.collectAsState()
     val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
+    val senderProfileUpdateState by viewModel.senderProfileUpdateState.collectAsState()
+    val senderProfileVersion by viewModel.senderProfileVersion.collectAsState()
     val smsSyncState by viewModel.smsSyncState.collectAsState()
     val isVerificationCodeIndexRunning by
         viewModel.isVerificationCodeIndexRunning.collectAsState()
@@ -324,6 +328,28 @@ fun SettingsScreen(
                                 }
                             )
                         }
+                        preferenceCategory(
+                            key = "category_sender_profiles",
+                            title = { Text("发件方资料") }
+                        )
+                        item(key = "sender_profile_update", contentType = "Preference") {
+                            Preference(
+                                title = { Text("发件方名称与头像") },
+                                summary = {
+                                    Text(
+                                        senderProfileVersion?.let { "当前版本：$it，点按检查更新" }
+                                            ?: "未安装发件方资料，点按检查更新"
+                                    )
+                                },
+                                enabled = senderProfileUpdateState !is SenderProfileUpdateState.Busy,
+                                icon = { Icon(Icons.Rounded.Badge, contentDescription = null) },
+                                onClick = viewModel::checkSenderProfileUpdates,
+                            )
+                        }
+                        preferenceCategory(
+                            key = "category_contribution",
+                            title = { Text("数据贡献") }
+                        )
                         item(key = "sample_submission", contentType = "Preference") {
                             Preference(
                                 title = { Text("上报脱敏短信样本") },
@@ -986,6 +1012,18 @@ fun SettingsScreen(
         )
     }
 
+    if (senderProfileUpdateState !is SenderProfileUpdateState.Idle) {
+        ModalBottomSheet(
+            onDismissRequest = viewModel::dismissSenderProfileUpdateDialog
+        ) {
+            SenderProfileUpdateSheetContent(
+                state = senderProfileUpdateState,
+                onInstall = viewModel::installSenderProfileUpdate,
+                onDismiss = viewModel::dismissSenderProfileUpdateDialog,
+            )
+        }
+    }
+
     if (resourceUpdateState.shouldShowResourceUpdateSheet()) {
         ModalBottomSheet(
             onDismissRequest = {
@@ -1009,6 +1047,90 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SenderProfileUpdateSheetContent(
+    state: SenderProfileUpdateState,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        when (state) {
+            SenderProfileUpdateState.Idle -> Unit
+            SenderProfileUpdateState.Checking -> {
+                Text("正在检查发件方资料", style = MaterialTheme.typography.titleLarge)
+                ResourceUpdateBusyRow("正在连接服务端获取最新发件方资料")
+            }
+
+            is SenderProfileUpdateState.Available -> {
+                Text("发现发件方资料更新", style = MaterialTheme.typography.titleLarge)
+                Text("版本：${state.info.version}")
+                Text("大小：${formatBytes(state.info.sizeBytes)}")
+                Text(
+                    state.info.releaseNotes,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text("稍后")
+                    }
+                    Button(onClick = onInstall, modifier = Modifier.weight(1f)) {
+                        Text("安装")
+                    }
+                }
+            }
+
+            is SenderProfileUpdateState.NoUpdate -> {
+                Text("暂无可用更新", style = MaterialTheme.typography.titleLarge)
+                Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("知道了")
+                }
+            }
+
+            is SenderProfileUpdateState.Installing -> {
+                val progress = state.progress.coerceIn(0f, 1f)
+                Text("正在安装发件方资料", style = MaterialTheme.typography.titleLarge)
+                Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LinearWavyProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            is SenderProfileUpdateState.Success -> {
+                Text("安装完成", style = MaterialTheme.typography.titleLarge)
+                Text(state.message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("知道了")
+                }
+            }
+
+            is SenderProfileUpdateState.Error -> {
+                Text("安装失败", style = MaterialTheme.typography.titleLarge)
+                Text(state.message, color = MaterialTheme.colorScheme.error)
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("关闭")
+                }
+            }
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> String.format(Locale.getDefault(), "%.1f MiB", bytes / 1024f / 1024f)
+    bytes >= 1024L -> String.format(Locale.getDefault(), "%.1f KiB", bytes / 1024f)
+    else -> "$bytes B"
 }
 
 @Composable

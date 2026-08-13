@@ -13,6 +13,8 @@ import kotlinx.coroutines.sync.withPermit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
@@ -68,6 +70,8 @@ class SpamDetectionWorker(
 
     private val spamRepository: SpamRepository by inject()
     private val spamClassifier: SpamClassifier by inject()
+    private val senderProfileRepository: SenderProfileRepository by inject()
+    private val contactDataSource: ContactDataSource by inject()
     private val keywordSpamRepository: KeywordSpamRepository by inject()
     private val settingsRepository: AppSettingsRepository by inject()
     private val messageRepository: MessageRepository by inject()
@@ -168,7 +172,7 @@ class SpamDetectionWorker(
         return settingsRepository.getSpamAutoAction()
     }
 
-    private fun updateNotification(
+    private suspend fun updateNotification(
         sender: String,
         threadId: Long,
         content: String,
@@ -183,12 +187,17 @@ class SpamDetectionWorker(
         } else {
             content
         }
+        val profile = senderProfileRepository.findByNumber(sender)
         SmsNotificationHelper.showSmsNotification(
             context = applicationContext,
             sender = sender,
             body = notificationBody,
             threadId = threadId,
-            messageUri = messageUri
+            messageUri = messageUri,
+            displaySender = contactDataSource.getDisplayName(sender)
+                ?: profile?.displayName
+                ?: sender,
+            avatarPath = profile?.avatarPath,
         )
     }
 

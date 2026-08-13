@@ -15,6 +15,7 @@ import kotlinx.coroutines.supervisorScope
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -24,6 +25,8 @@ import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 class SmsReceiver : BroadcastReceiver(), KoinComponent {
     private val conversationCacheRepository: ConversationCacheRepository by inject()
     private val verificationCodeRepository: VerificationCodeRepository by inject()
+    private val senderProfileRepository: vip.mystery0.pixel.text.data.repository.SenderProfileRepository by inject()
+    private val contactDataSource: ContactDataSource by inject()
 
     companion object {
         private const val TAG = "SmsReceiver"
@@ -143,13 +146,27 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
             }
 
             if (!deferNotification || !canScheduleSpamCheck) {
-                SmsNotificationHelper.showSmsNotification(
-                    context = context,
-                    sender = sender,
-                    body = body,
-                    threadId = threadId,
-                    messageUri = insertedUri?.toString(),
-                )
+                val notificationPendingResult = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val profile = runCatching {
+                            senderProfileRepository.findByNumber(sender)
+                        }.getOrNull()
+                        SmsNotificationHelper.showSmsNotification(
+                            context = context,
+                            sender = sender,
+                            body = body,
+                            threadId = threadId,
+                            messageUri = insertedUri?.toString(),
+                            displaySender = contactDataSource.getDisplayName(sender)
+                                ?: profile?.displayName
+                                ?: sender,
+                            avatarPath = profile?.avatarPath,
+                        )
+                    } finally {
+                        notificationPendingResult.finish()
+                    }
+                }
             }
 
             SmartspacerIntegration.notifyChanged(context)

@@ -12,11 +12,20 @@ import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.net.toUri
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.mms.MmsDownloadReceiver
 import vip.mystery0.pixel.text.mms.WapPushPduParser
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
-class MmsReceiver : BroadcastReceiver() {
+class MmsReceiver : BroadcastReceiver(), KoinComponent {
+    private val senderProfileRepository: SenderProfileRepository by inject()
+    private val contactDataSource: ContactDataSource by inject()
     companion object {
         private const val TAG = "MmsReceiver"
     }
@@ -59,12 +68,26 @@ class MmsReceiver : BroadcastReceiver() {
         val sender = notification.from ?: "未知发件人"
         val body = notification.subject ?: "收到一条彩信"
         val threadId = queryThreadId(context, mmsUri)
-        SmsNotificationHelper.showSmsNotification(
-            context = context,
-            sender = sender,
-            body = body,
-            threadId = threadId,
-        )
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val profile = runCatching {
+                    senderProfileRepository.findByNumber(sender)
+                }.getOrNull()
+                SmsNotificationHelper.showSmsNotification(
+                    context = context,
+                    sender = sender,
+                    body = body,
+                    threadId = threadId,
+                    displaySender = contactDataSource.getDisplayName(sender)
+                        ?: profile?.displayName
+                        ?: sender,
+                    avatarPath = profile?.avatarPath,
+                )
+            } finally {
+                pendingResult.finish()
+            }
+        }
 
         // 3. 触发后台下载
         triggerMmsDownload(context, notification, mmsUri, subId)

@@ -15,10 +15,12 @@ import vip.mystery0.pixel.text.data.repository.KeywordSpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
 import vip.mystery0.pixel.text.data.repository.VerificationCodeRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.UnreadSmsCounter
 import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
+import vip.mystery0.pixel.text.data.resource.SenderProfileStore
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
@@ -54,6 +56,7 @@ val appModule = module {
     single<AppSettingsRepository> { AppSettingsRepositoryImpl(androidContext()) }
     single { BundledResourceVersionProvider(androidContext()) }
     single { HubResourceStore(androidContext()) }
+    single { SenderProfileStore(androidContext()) }
     single { PixelTextHubClient("https://pixeltext.api.mystery0.vip") }
     single { MessageParser(androidContext(), get()) }
     single { HubResourceRepository(get(), get(), get(), get(), get()) }
@@ -65,6 +68,7 @@ val appModule = module {
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
     single { ConversationCacheDatabase.create(androidContext()) }
+    single { SenderProfileRepository(get(), get(), get()) }
     single { VerificationCodeIndexDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
     single { TelephonyDataSource(androidContext(), get()) }
@@ -86,16 +90,16 @@ val appModule = module {
         ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
-    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get()) }
+    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get()) }
     viewModel { SearchViewModel(get()) }
-    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get()) }
     viewModel { UnreadBadgeViewModel(androidContext(), get(), get()) }

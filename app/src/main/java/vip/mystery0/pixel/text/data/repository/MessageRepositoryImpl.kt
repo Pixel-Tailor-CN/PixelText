@@ -39,6 +39,7 @@ class MessageRepositoryImpl(
     private val settingsRepository: AppSettingsRepository,
     private val archiveDatabase: ConversationArchiveDatabase,
     val conversationCacheRepository: ConversationCacheRepository,
+    private val senderProfileRepository: SenderProfileRepository,
     private val verificationCodeRepository: VerificationCodeRepository,
     private val context: Context
 ) : MessageRepository {
@@ -75,7 +76,10 @@ class MessageRepositoryImpl(
                                     it.threadId !in hiddenThreadIds
                         }
                         .map {
-                            it.copy(displayName = contactDataSource.getDisplayName(it.address))
+                            it.copy(
+                                displayName = contactDataSource.getDisplayName(it.address)
+                                    ?: it.displayName,
+                            )
                         }
                 }
         )
@@ -89,7 +93,7 @@ class MessageRepositoryImpl(
                 return@flow
             }
 
-            val conversations = fetchConversationDetails(threadIds)
+            val conversations = enrichWithSenderProfiles(fetchConversationDetails(threadIds))
                 .sortedByDescending { it.timestamp }
             val missingThreadIds = threadIds.toSet() - conversations.map { it.threadId }.toSet()
             if (missingThreadIds.isNotEmpty()) {
@@ -105,7 +109,10 @@ class MessageRepositoryImpl(
                 emit(emptyList())
                 return@flow
             }
-            emit(fetchConversationDetails(threadIds).sortedByDescending { it.timestamp })
+            emit(
+                enrichWithSenderProfiles(fetchConversationDetails(threadIds))
+                    .sortedByDescending { it.timestamp }
+            )
         }.flowOn(Dispatchers.IO)
 
     override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
@@ -115,7 +122,7 @@ class MessageRepositoryImpl(
             return@flow
         }
 
-        val sorted = fetchConversationDetails(threadIds)
+        val sorted = enrichWithSenderProfiles(fetchConversationDetails(threadIds))
             .sortedByDescending { it.timestamp }
         emit(sorted)
     }.flowOn(Dispatchers.IO)
@@ -124,7 +131,15 @@ class MessageRepositoryImpl(
         if (conversations.isEmpty()) return
         withContext(Dispatchers.IO) {
             val archivedAt = System.currentTimeMillis()
-            archiveDao.archive(conversations.map { it.toArchivedConversationEntity(archivedAt) })
+            archiveDao.archive(
+                conversations.map { conversation ->
+                    conversation.copy(
+                        displayName = contactDataSource.getDisplayName(conversation.address),
+                        avatarPath = null,
+                        avatarSha256 = null,
+                    ).toArchivedConversationEntity(archivedAt)
+                }
+            )
             SmartspacerIntegration.notifyChanged(context)
         }
     }
@@ -337,6 +352,22 @@ class MessageRepositoryImpl(
                 messageIds.isNotEmpty() && messageIds.all { it in spamMessageIds }
             }
             .keys
+    }
+
+    private suspend fun enrichWithSenderProfiles(
+        conversations: List<ConversationModel>,
+    ): List<ConversationModel> {
+        val profiles = senderProfileRepository.findByNumbers(conversations.map { it.address })
+        return conversations.map { conversation ->
+            val profile = profiles[conversation.address]
+            conversation.copy(
+                displayName = contactDataSource.getDisplayName(conversation.address)
+                    ?: profile?.displayName
+                    ?: conversation.displayName,
+                avatarPath = profile?.avatarPath,
+                avatarSha256 = profile?.avatarSha256,
+            )
+        }
     }
 
     private fun fetchConversationDetails(threadIds: List<Long>): List<ConversationModel> {
