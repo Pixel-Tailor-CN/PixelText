@@ -50,25 +50,27 @@ fun SenderAvatar(
         }
     }
 
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary
-                else getAvatarColor(identifier)
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        val image = bitmap
-        if (image != null) {
-            Image(
-                bitmap = image,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(size),
-            )
-        } else {
+    val image = bitmap
+    if (image != null) {
+        Image(
+            bitmap = image,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary
+                    else getAvatarColor(identifier)
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = Icons.Rounded.AccountCircle,
                 contentDescription = null,
