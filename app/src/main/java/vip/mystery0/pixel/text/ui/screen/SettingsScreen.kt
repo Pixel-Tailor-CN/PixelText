@@ -438,16 +438,15 @@ fun SettingsScreen(
                             )
                         }
                         item(
-                            key = "hide_fully_spam_conversations",
+                            key = "spam_isolation",
                             contentType = "SwitchPreference"
                         ) {
                             SwitchPreference(
-                                value = settings.hideFullySpamConversationsEnabled,
-                                onValueChange =
-                                    viewModel::setHideFullySpamConversationsEnabled,
-                                title = { Text("隐藏完全骚扰会话") },
+                                value = settings.spamIsolationEnabled,
+                                onValueChange = viewModel::setSpamIsolationEnabled,
+                                title = { Text("隔离显示骚扰短信") },
                                 summary = {
-                                    Text("会话中的短信和彩信全部被标记为骚扰时，从普通会话列表隐藏")
+                                    Text("开启后，普通会话与骚扰会话分别只显示对应类型的短信")
                                 },
                                 icon = {
                                     Icon(Icons.Rounded.VisibilityOff, contentDescription = null)

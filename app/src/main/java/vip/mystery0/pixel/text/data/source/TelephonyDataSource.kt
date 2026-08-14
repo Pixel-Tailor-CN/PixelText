@@ -15,6 +15,7 @@ import java.nio.charset.Charset
 private const val TELEPHONY_TAG = "TelephonyDataSource"
 
 data class SmsConversationRow(
+    val id: Long,
     val threadId: Long,
     val address: String,
     val body: String,
@@ -439,6 +440,7 @@ class TelephonyDataSource(
         contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf(
+                Telephony.Sms._ID,
                 Telephony.Sms.THREAD_ID,
                 Telephony.Sms.ADDRESS,
                 Telephony.Sms.BODY,
@@ -449,6 +451,7 @@ class TelephonyDataSource(
             selectionArgs,
             "${Telephony.Sms.DATE} DESC"
         )?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
             val threadIdIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
             val addressIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
             val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
@@ -457,6 +460,7 @@ class TelephonyDataSource(
 
             while (cursor.moveToNext()) {
                 rows += SmsConversationRow(
+                    id = cursor.getLong(idIndex),
                     threadId = cursor.getLong(threadIdIndex),
                     address = cursor.getString(addressIndex).orEmpty(),
                     body = cursor.getString(bodyIndex).orEmpty(),

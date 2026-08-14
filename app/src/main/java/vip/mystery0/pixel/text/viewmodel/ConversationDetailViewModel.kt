@@ -31,6 +31,7 @@ import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
@@ -97,6 +98,7 @@ class ConversationDetailViewModel(
         _manualSpamChecks.asStateFlow()
 
     private var currentThreadId: Long = -1L
+    private var currentContentFilter = ConversationContentFilter.ALL
     private var offset = 0
     private var isLoadingMore = false
     private var hasMore = true
@@ -127,15 +129,25 @@ class ConversationDetailViewModel(
         )
     }
 
-    fun loadThread(threadId: Long, address: String) {
+    fun loadThread(
+        threadId: Long,
+        address: String,
+        contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
+    ) {
         _address.value = address
         _conversationTitle.value = address
         viewModelScope.launch {
             _conversationTitle.value = resolveConversationTitle(address)
         }
-        if (currentThreadId == threadId && _messages.isNotEmpty()) return
+        if (currentThreadId == threadId &&
+            currentContentFilter == contentFilter &&
+            _messages.isNotEmpty()
+        ) {
+            return
+        }
 
         currentThreadId = threadId
+        currentContentFilter = contentFilter
         _messages.clear()
         offset = 0
         isLoadingMore = false
@@ -183,7 +195,12 @@ class ConversationDetailViewModel(
         isLoadingMore = true
         val requestVersion = loadVersion
         viewModelScope.launch {
-            repository.getMessagesByThread(currentThreadId, 20, offset)
+            repository.getMessagesByThread(
+                currentThreadId,
+                20,
+                offset,
+                currentContentFilter,
+            )
                 .catch { e ->
                     if (requestVersion != loadVersion) return@catch
                     if (_messages.isEmpty()) {
@@ -337,8 +354,20 @@ class ConversationDetailViewModel(
     private fun updateMessageSpamScore(messageId: Long, score: Float) {
         val index = _messages.indexOfFirst { it.id == messageId }
         if (index < 0) return
-        _messages[index] = _messages[index].copy(spamScore = score)
+        val isSpam = score >= SPAM_THRESHOLD
+        if (!currentContentFilter.includes(isSpam)) {
+            _messages.removeAt(index)
+            offset = (offset - 1).coerceAtLeast(0)
+        } else {
+            _messages[index] = _messages[index].copy(spamScore = score)
+        }
         _uiState.value = MessageUiState.Success(_messages.toList())
+    }
+
+    private fun ConversationContentFilter.includes(isSpam: Boolean): Boolean = when (this) {
+        ConversationContentFilter.ALL -> true
+        ConversationContentFilter.NORMAL -> !isSpam
+        ConversationContentFilter.SPAM -> isSpam
     }
 
     /**
@@ -459,6 +488,7 @@ class ConversationDetailViewModel(
     companion object {
         private const val TAG = "ConversationDetailViewM"
         private val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
+        private const val SPAM_THRESHOLD = 0.7f
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f
         private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L

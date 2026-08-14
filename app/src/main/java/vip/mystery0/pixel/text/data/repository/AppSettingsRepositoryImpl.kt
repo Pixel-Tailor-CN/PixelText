@@ -24,6 +24,11 @@ import vip.mystery0.pixel.text.domain.settings.preferenceOrderKey
 class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val prefs =
         context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
+
+    init {
+        migrateSpamIsolationSetting()
+    }
+
     private val _settings = MutableStateFlow(readSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
@@ -39,10 +44,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         updatePrefs { putString(AppSettingsKeys.KEY_SPAM_AUTO_ACTION, action.storageValue) }
     }
 
-    override fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
-        updatePrefs {
-            putBoolean(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED, enabled)
-        }
+    override fun setSpamIsolationEnabled(enabled: Boolean) {
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_SPAM_ISOLATION_ENABLED, enabled) }
     }
 
     override fun setShowSpamContentByDefault(enabled: Boolean) {
@@ -190,10 +193,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             )
         )
 
-    override fun isHideFullySpamConversationsEnabled(): Boolean =
+    override fun isSpamIsolationEnabled(): Boolean =
         prefs.getBoolean(
-            AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED,
-            AppSettingsKeys.DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED
+            AppSettingsKeys.KEY_SPAM_ISOLATION_ENABLED,
+            AppSettingsKeys.DEFAULT_SPAM_ISOLATION_ENABLED
         )
 
     override fun isShowSpamContentByDefault(): Boolean =
@@ -346,7 +349,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),
-            hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
+            spamIsolationEnabled = isSpamIsolationEnabled(),
             showSpamContentByDefault = isShowSpamContentByDefault(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
@@ -371,6 +374,20 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             resourceAutoCheckLastCheckedAt = getResourceAutoCheckLastCheckedAt(),
             sampleSubmissionShortcutHintShown = isSampleSubmissionShortcutHintShown()
         )
+    }
+
+    private fun migrateSpamIsolationSetting() {
+        if (prefs.contains(AppSettingsKeys.KEY_SPAM_ISOLATION_ENABLED)) return
+        if (!prefs.contains(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED)) return
+
+        val legacyValue = prefs.getBoolean(
+            AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED,
+            AppSettingsKeys.DEFAULT_SPAM_ISOLATION_ENABLED,
+        )
+        prefs.edit {
+            putBoolean(AppSettingsKeys.KEY_SPAM_ISOLATION_ENABLED, legacyValue)
+            remove(AppSettingsKeys.KEY_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED)
+        }
     }
 
     private inline fun updatePrefs(action: SharedPreferences.Editor.() -> Unit) {

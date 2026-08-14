@@ -27,6 +27,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
@@ -136,7 +137,13 @@ fun AppNavigation(
                 SpamConversationListScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToDetail = { threadId, address ->
-                        navController.navigate(conversationDetailRoute(threadId, address))
+                        navController.navigate(
+                            conversationDetailRoute(
+                                threadId,
+                                address,
+                                contentFilter = ConversationContentFilter.SPAM,
+                            )
+                        )
                     }
                 )
             }
@@ -205,19 +212,29 @@ fun AppNavigation(
                         navController.navigate(
                             conversationDetailRoute(
                                 message.threadId,
-                                message.sender
+                                message.sender,
+                                contentFilter = if (message.spamScore >= 0.7f) {
+                                    ConversationContentFilter.SPAM
+                                } else {
+                                    ConversationContentFilter.NORMAL
+                                },
                             )
                         )
                     }
                 )
             }
             composable(
-                route = "conversation_detail/{threadId}/{address}?messageId={messageId}",
+                route = "conversation_detail/{threadId}/{address}" +
+                    "?messageId={messageId}&contentFilter={contentFilter}",
                 arguments = listOf(
                     navArgument("messageId") {
                         type = NavType.LongType
                         defaultValue = -1L
-                    }
+                    },
+                    navArgument("contentFilter") {
+                        type = NavType.StringType
+                        defaultValue = ConversationContentFilter.NORMAL.name
+                    },
                 ),
             ) { backStackEntry ->
                 val threadId =
@@ -225,10 +242,18 @@ fun AppNavigation(
                 val address = backStackEntry.arguments?.getString("address") ?: ""
                 val targetMessageId = backStackEntry.arguments?.getLong("messageId")
                     ?.takeIf { it > 0L }
+                val contentFilter = backStackEntry.arguments?.getString("contentFilter")
+                    ?.let { value ->
+                        ConversationContentFilter.entries.firstOrNull {
+                            it.name.equals(value, ignoreCase = true)
+                        }
+                    }
+                    ?: ConversationContentFilter.NORMAL
                 ConversationDetailScreen(
                     threadId = threadId,
                     address = address,
                     targetMessageId = targetMessageId,
+                    requestedContentFilter = contentFilter,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = { content, sender ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
@@ -250,9 +275,11 @@ private fun conversationDetailRoute(
     threadId: Long,
     address: String,
     messageId: Long? = null,
+    contentFilter: ConversationContentFilter = ConversationContentFilter.NORMAL,
 ): String {
     val baseRoute = "conversation_detail/$threadId/${Uri.encode(address)}"
-    return messageId?.takeIf { it > 0L }?.let { "$baseRoute?messageId=$it" } ?: baseRoute
+    val messageIdValue = messageId?.takeIf { it > 0L } ?: -1L
+    return "$baseRoute?messageId=$messageIdValue&contentFilter=${contentFilter.name}"
 }
 
 private fun activityLikeEnterTransition(): EnterTransition {

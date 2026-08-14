@@ -94,6 +94,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.util.SimInfo
@@ -110,6 +111,7 @@ fun ConversationDetailScreen(
     threadId: Long,
     address: String,
     targetMessageId: Long? = null,
+    requestedContentFilter: ConversationContentFilter = ConversationContentFilter.NORMAL,
     onNavigateBack: () -> Unit,
     onNavigateToSampleSubmission: (content: String, sender: String) -> Unit = { _, _ -> },
     isTablet: Boolean = false,
@@ -117,15 +119,20 @@ fun ConversationDetailScreen(
     viewModel: ConversationDetailViewModel = koinViewModel(),
     settingsRepository: AppSettingsRepository = koinInject(),
 ) {
-    LaunchedEffect(threadId, address) {
-        viewModel.loadThread(threadId, address)
+    val appSettings by settingsRepository.settings.collectAsState()
+    val effectiveContentFilter = if (appSettings.spamIsolationEnabled) {
+        requestedContentFilter
+    } else {
+        ConversationContentFilter.ALL
+    }
+    LaunchedEffect(threadId, address, effectiveContentFilter) {
+        viewModel.loadThread(threadId, address, effectiveContentFilter)
     }
 
     val uiState by viewModel.uiState.collectAsState()
     val conversationTitle by viewModel.conversationTitle.collectAsState()
     val sending by viewModel.sending.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
-    val appSettings by settingsRepository.settings.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var highlightedMessageId by remember(threadId, targetMessageId) {

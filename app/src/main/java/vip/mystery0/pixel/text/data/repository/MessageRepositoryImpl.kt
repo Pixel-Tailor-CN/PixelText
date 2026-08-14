@@ -2,11 +2,15 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
@@ -20,6 +24,7 @@ import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
+import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
@@ -29,7 +34,9 @@ import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 
 private const val SPAM_THRESHOLD = 0.7f
-private const val FULLY_SPAM_FILTER_CHUNK_SIZE = 200
+private const val FILTERED_MESSAGE_QUERY_STEP = 100
+private const val CONVERSATION_FILTER_CHUNK_SIZE = 200
+private const val SPAM_CHANGE_DEBOUNCE_MILLIS = 300L
 
 class MessageRepositoryImpl(
     private val telephonyDataSource: TelephonyDataSource,
@@ -59,6 +66,7 @@ class MessageRepositoryImpl(
         }
     }
 
+    @OptIn(FlowPreview::class)
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
         if (!conversationCacheRepository.isCacheReady()) {
             val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
@@ -66,21 +74,34 @@ class MessageRepositoryImpl(
         }
 
         emitAll(
-            conversationCacheRepository.observeAllConversations()
-                .map { conversations ->
+            combine(
+                conversationCacheRepository.observeAllConversations(),
+                spamRepository.observeChanges()
+                    .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS)
+                    .onStart { emit(Unit) },
+                settingsRepository.settings,
+            ) { conversations, _, settings -> conversations to settings }
+                .map { (conversations, settings) ->
                     val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-                    val hiddenThreadIds = getHiddenFullySpamThreadIds(archivedThreadIds)
-                    conversations
-                        .filter {
-                            it.threadId !in archivedThreadIds &&
-                                    it.threadId !in hiddenThreadIds
-                        }
-                        .map {
-                            it.copy(
-                                displayName = contactDataSource.getDisplayName(it.address)
-                                    ?: it.displayName,
+                    val activeConversations = conversations.filter {
+                        it.threadId !in archivedThreadIds
+                    }
+                    val visibleConversations = if (settings.spamIsolationEnabled) {
+                        enrichWithSenderProfiles(
+                            fetchConversationDetails(
+                                activeConversations.map { it.threadId },
+                                ConversationContentFilter.NORMAL,
                             )
-                        }
+                        ).sortedByDescending { it.timestamp }
+                    } else {
+                        activeConversations
+                    }
+                    visibleConversations.map {
+                        it.copy(
+                            displayName = contactDataSource.getDisplayName(it.address)
+                                ?: it.displayName,
+                        )
+                    }
                 }
         )
     }.flowOn(Dispatchers.IO)
@@ -109,8 +130,13 @@ class MessageRepositoryImpl(
                 emit(emptyList())
                 return@flow
             }
+            val contentFilter = if (settingsRepository.isSpamIsolationEnabled()) {
+                ConversationContentFilter.SPAM
+            } else {
+                ConversationContentFilter.ALL
+            }
             emit(
-                enrichWithSenderProfiles(fetchConversationDetails(threadIds))
+                enrichWithSenderProfiles(fetchConversationDetails(threadIds, contentFilter))
                     .sortedByDescending { it.timestamp }
             )
         }.flowOn(Dispatchers.IO)
@@ -233,17 +259,47 @@ class MessageRepositoryImpl(
     override fun getMessagesByThread(
         threadId: Long,
         limit: Int,
-        offset: Int
+        offset: Int,
+        contentFilter: ConversationContentFilter,
     ): Flow<List<MessageModel>> = flow {
-        val totalNeeded = limit + offset
-        val smsMessages = telephonyDataSource.getSmsMessagesByThread(threadId, totalNeeded)
+        val visibleNeeded = limit + offset
+        var queryLimit = if (contentFilter == ConversationContentFilter.ALL) {
+            visibleNeeded
+        } else {
+            visibleNeeded.coerceAtLeast(FILTERED_MESSAGE_QUERY_STEP)
+        }
+        var smsRows: List<SmsMessageRow>
+        var mmsRows: List<MmsMessageRow>
+        var spamMessageIds: Set<Long>
+        var filteredMessageIds: List<Long>
+
+        while (true) {
+            smsRows = telephonyDataSource.getSmsMessagesByThread(threadId, queryLimit)
+            mmsRows = telephonyDataSource.getMmsMessagesByThread(threadId, queryLimit)
+            val messageIds = smsRows.map { it.id } + mmsRows.map { -it.mmsId }
+            spamMessageIds = spamRepository.getSpamMessageIds(messageIds, SPAM_THRESHOLD)
+            filteredMessageIds = messageIds.filter { messageId ->
+                contentFilter.includes(messageId in spamMessageIds)
+            }
+            val sourceExhausted = smsRows.size < queryLimit && mmsRows.size < queryLimit
+            if (filteredMessageIds.size >= visibleNeeded || sourceExhausted ||
+                contentFilter == ConversationContentFilter.ALL
+            ) {
+                break
+            }
+            queryLimit += FILTERED_MESSAGE_QUERY_STEP
+        }
+
+        val smsMessages = smsRows
+            .filter { contentFilter.includes(it.id in spamMessageIds) }
             .map { row ->
                 row.toMessageModel(
                     parsedResult = parseMessage(row.address, row.body),
                     spamScore = spamRepository.getScore(row.id) ?: -1f
                 )
             }
-        val mmsMessages = telephonyDataSource.getMmsMessagesByThread(threadId, totalNeeded)
+        val mmsMessages = mmsRows
+            .filter { contentFilter.includes(-it.mmsId in spamMessageIds) }
             .map { row ->
                 row.toMessageModel(
                     parsedResult = parseMessage(row.address, row.textContent),
@@ -251,11 +307,12 @@ class MessageRepositoryImpl(
                 )
             }
 
-        val merged = (smsMessages + mmsMessages)
-            .sortedByDescending { it.timestamp }
-            .drop(offset)
-            .take(limit)
-        emit(merged)
+        emit(
+            (smsMessages + mmsMessages)
+                .sortedByDescending { it.timestamp }
+                .drop(offset)
+                .take(limit)
+        )
     }.flowOn(Dispatchers.IO)
 
     override fun getMessages(): Flow<List<MessageModel>> = flow {
@@ -294,66 +351,6 @@ class MessageRepositoryImpl(
         }
     }
 
-    private suspend fun getHiddenFullySpamThreadIds(archivedThreadIds: Set<Long>): Set<Long> {
-        if (!settingsRepository.isHideFullySpamConversationsEnabled()) {
-            return emptySet()
-        }
-
-        val allThreadIds = telephonyDataSource.queryConversationThreadIds()
-            .distinct()
-            .filter { threadId -> threadId !in archivedThreadIds }
-        if (allThreadIds.isEmpty()) {
-            return emptySet()
-        }
-
-        return allThreadIds.chunked(FULLY_SPAM_FILTER_CHUNK_SIZE)
-            .flatMap { chunk -> findFullySpamThreadIds(chunk) }
-            .toSet()
-    }
-
-    private suspend fun queryFilteredConversationThreadIds(
-        limit: Int,
-        offset: Int,
-        archivedThreadIds: Set<Long>
-    ): List<Long> {
-        val threadIds = telephonyDataSource.queryConversationThreadIds()
-            .distinct()
-            .filter { threadId -> threadId !in archivedThreadIds }
-
-        if (!settingsRepository.isHideFullySpamConversationsEnabled()) {
-            return threadIds
-                .drop(offset)
-                .take(limit)
-        }
-
-        val targetCount = offset + limit
-        val visibleThreadIds = mutableListOf<Long>()
-        threadIds.chunked(FULLY_SPAM_FILTER_CHUNK_SIZE).forEach { chunk ->
-            val fullySpamThreadIds = findFullySpamThreadIds(chunk)
-            visibleThreadIds += chunk.filterNot { it in fullySpamThreadIds }
-            if (visibleThreadIds.size >= targetCount) {
-                return visibleThreadIds.drop(offset).take(limit)
-            }
-        }
-
-        return visibleThreadIds.drop(offset).take(limit)
-    }
-
-    private suspend fun findFullySpamThreadIds(threadIds: List<Long>): Set<Long> {
-        if (threadIds.isEmpty()) return emptySet()
-
-        val messageIdsByThread = telephonyDataSource.getConversationMessageIdsByThread(threadIds)
-        val allMessageIds = messageIdsByThread.values.flatten()
-        if (allMessageIds.isEmpty()) return emptySet()
-
-        val spamMessageIds = spamRepository.getSpamMessageIds(allMessageIds, SPAM_THRESHOLD)
-        return messageIdsByThread
-            .filterValues { messageIds ->
-                messageIds.isNotEmpty() && messageIds.all { it in spamMessageIds }
-            }
-            .keys
-    }
-
     private suspend fun enrichWithSenderProfiles(
         conversations: List<ConversationModel>,
     ): List<ConversationModel> {
@@ -370,16 +367,30 @@ class MessageRepositoryImpl(
         }
     }
 
-    private fun fetchConversationDetails(threadIds: List<Long>): List<ConversationModel> {
+    private suspend fun fetchConversationDetails(
+        threadIds: List<Long>,
+        contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
+    ): List<ConversationModel> {
         val messagesMap = mutableMapOf<Long, ConversationModel>()
-
-        telephonyDataSource.fetchConversationSmsRows(threadIds).forEach { row ->
-            messagesMap.mergeSmsConversation(row)
+        val smsRows = threadIds.chunked(CONVERSATION_FILTER_CHUNK_SIZE)
+            .flatMap(telephonyDataSource::fetchConversationSmsRows)
+        val mmsRows = threadIds.chunked(CONVERSATION_FILTER_CHUNK_SIZE)
+            .flatMap(telephonyDataSource::fetchConversationMmsRows)
+        val spamMessageIds = if (contentFilter == ConversationContentFilter.ALL) {
+            emptySet()
+        } else {
+            spamRepository.getSpamMessageIds(
+                smsRows.map { it.id } + mmsRows.map { -it.mmsId },
+                SPAM_THRESHOLD,
+            )
         }
 
-        telephonyDataSource.fetchConversationMmsRows(threadIds).forEach { row ->
-            messagesMap.mergeMmsConversation(row)
-        }
+        smsRows
+            .filter { contentFilter.includes(it.id in spamMessageIds) }
+            .forEach { row -> messagesMap.mergeSmsConversation(row) }
+        mmsRows
+            .filter { contentFilter.includes(-it.mmsId in spamMessageIds) }
+            .forEach { row -> messagesMap.mergeMmsConversation(row) }
 
         return threadIds.mapNotNull { messagesMap[it] }
     }
@@ -474,6 +485,12 @@ class MessageRepositoryImpl(
             isMms = true,
             spamScore = spamScore
         )
+    }
+
+    private fun ConversationContentFilter.includes(isSpam: Boolean): Boolean = when (this) {
+        ConversationContentFilter.ALL -> true
+        ConversationContentFilter.NORMAL -> !isSpam
+        ConversationContentFilter.SPAM -> isSpam
     }
 
     private fun parseMessage(address: String, content: String): ParsedResult {

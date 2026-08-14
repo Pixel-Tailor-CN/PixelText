@@ -81,8 +81,8 @@ class SettingsViewModel(
         settingsRepository.setSpamAutoAction(action)
     }
 
-    fun setHideFullySpamConversationsEnabled(enabled: Boolean) {
-        settingsRepository.setHideFullySpamConversationsEnabled(enabled)
+    fun setSpamIsolationEnabled(enabled: Boolean) {
+        settingsRepository.setSpamIsolationEnabled(enabled)
     }
 
     fun setShowSpamContentByDefault(enabled: Boolean) {

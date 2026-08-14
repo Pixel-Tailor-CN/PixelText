@@ -54,10 +54,9 @@ class UnreadBadgeViewModel(
                 unreadSmsCounter.count(
                     UnreadSmsCountFilter(
                         includeNormalMessages = true,
-                        includeSpamMessages = true,
+                        includeSpamMessages = !settings.spamIsolationEnabled,
                         includeArchivedMessages = false,
-                        excludeFullySpamConversations =
-                            settings.hideFullySpamConversationsEnabled,
+                        excludeFullySpamConversations = false,
                     )
                 )
             }
