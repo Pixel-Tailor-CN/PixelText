@@ -38,6 +38,7 @@ import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
+import vip.mystery0.pixel.text.ui.message.cards.SpamMessageIndicator
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import java.text.SimpleDateFormat
@@ -56,6 +57,7 @@ fun MessageItem(
     onLongClick: () -> Unit,
     interactionEnabled: Boolean = true,
     timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
+    showSpamContentByDefault: Boolean = false,
 ) {
     val highlightAlpha = remember(message.stableKey) { Animatable(0f) }
     val highlightColor = MaterialTheme.colorScheme.primary
@@ -75,11 +77,13 @@ fun MessageItem(
             )
         }
     }
-    var showOriginal by remember { mutableStateOf(false) }
+    val isSpam = message.spamScore >= 0.7f
+    var showOriginal by remember(message.stableKey, isSpam, showSpamContentByDefault) {
+        mutableStateOf(isSpam && showSpamContentByDefault)
+    }
     var currentTimeDisplayFormat by remember(message.stableKey, timeDisplayFormat) {
         mutableStateOf(timeDisplayFormat)
     }
-    val isSpam = message.spamScore >= 0.7f
     val interactionSource = remember { MutableInteractionSource() }
 
     val arrangement = if (message.isReceived) Arrangement.Start else Arrangement.End
@@ -122,6 +126,10 @@ fun MessageItem(
                             subject = message.mmsSubject,
                             textScale = textScale
                         )
+                        if (isSpam) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            SpamMessageIndicator(isSelected = isSelected)
+                        }
                     } else if (isSpam) {
                         SpamMessageCard(isSelected = isSelected)
                     } else if (message.parsedResult is ParsedResult.None) {
@@ -192,7 +200,11 @@ fun MessageItem(
 
             if (isSpam || message.parsedResult !is ParsedResult.None) {
                 Text(
-                    text = if (showOriginal) "显示智能卡片" else "显示原文",
+                    text = when {
+                        isSpam && showOriginal -> "隐藏内容"
+                        showOriginal -> "显示智能卡片"
+                        else -> "显示原文"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { showOriginal = !showOriginal }

@@ -58,3 +58,48 @@ fun SpamMessageCard(isSelected: Boolean = false) {
         }
     }
 }
+
+@Composable
+fun SpamMessageIndicator(isSelected: Boolean = false) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.inverseSurface
+        } else {
+            MaterialTheme.colorScheme.errorContainer
+        },
+        animationSpec = tween(durationMillis = 200),
+        label = "spamIndicatorBg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.inverseOnSurface
+        } else {
+            MaterialTheme.colorScheme.onErrorContainer
+        },
+        animationSpec = tween(durationMillis = 200),
+        label = "spamIndicatorContent"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = backgroundColor,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Block,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "骚扰短信",
+                style = MaterialTheme.typography.labelSmall,
+                color = contentColor,
+            )
+        }
+    }
+}

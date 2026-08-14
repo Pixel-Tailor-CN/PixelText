@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -450,6 +451,22 @@ fun SettingsScreen(
                                 },
                                 icon = {
                                     Icon(Icons.Rounded.VisibilityOff, contentDescription = null)
+                                }
+                            )
+                        }
+                        item(
+                            key = "show_spam_content_by_default",
+                            contentType = "SwitchPreference"
+                        ) {
+                            SwitchPreference(
+                                value = settings.showSpamContentByDefault,
+                                onValueChange = viewModel::setShowSpamContentByDefault,
+                                title = { Text("骚扰短信默认显示全文") },
+                                summary = {
+                                    Text("开启后仍保留骚扰标识，但不再默认隐藏短信内容")
+                                },
+                                icon = {
+                                    Icon(Icons.Rounded.Visibility, contentDescription = null)
                                 }
                             )
                         }

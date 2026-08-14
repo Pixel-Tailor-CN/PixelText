@@ -651,6 +651,8 @@ fun ConversationDetailScreen(
                                 },
                                 interactionEnabled = !isZoomGestureActive,
                                 timeDisplayFormat = appSettings.messageTimeDisplayFormat,
+                                showSpamContentByDefault =
+                                    appSettings.showSpamContentByDefault,
                             )
                         }
                     }

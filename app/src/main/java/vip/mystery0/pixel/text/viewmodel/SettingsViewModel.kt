@@ -85,6 +85,10 @@ class SettingsViewModel(
         settingsRepository.setHideFullySpamConversationsEnabled(enabled)
     }
 
+    fun setShowSpamContentByDefault(enabled: Boolean) {
+        settingsRepository.setShowSpamContentByDefault(enabled)
+    }
+
     fun setSmartCardEnabled(enabled: Boolean) {
         settingsRepository.setSmartCardEnabled(enabled)
     }

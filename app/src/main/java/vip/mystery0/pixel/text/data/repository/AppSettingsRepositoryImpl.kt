@@ -45,6 +45,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setShowSpamContentByDefault(enabled: Boolean) {
+        updatePrefs { putBoolean(AppSettingsKeys.KEY_SHOW_SPAM_CONTENT_BY_DEFAULT, enabled) }
+    }
+
     override fun setSmartCardEnabled(enabled: Boolean) {
         updatePrefs { putBoolean(AppSettingsKeys.KEY_SMART_CARD_ENABLED, enabled) }
     }
@@ -192,6 +196,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_HIDE_FULLY_SPAM_CONVERSATIONS_ENABLED
         )
 
+    override fun isShowSpamContentByDefault(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_SHOW_SPAM_CONTENT_BY_DEFAULT,
+            AppSettingsKeys.DEFAULT_SHOW_SPAM_CONTENT_BY_DEFAULT
+        )
+
     override fun isSmartCardEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_SMART_CARD_ENABLED,
@@ -337,6 +347,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),
             hideFullySpamConversationsEnabled = isHideFullySpamConversationsEnabled(),
+            showSpamContentByDefault = isShowSpamContentByDefault(),
             smartCardEnabled = isSmartCardEnabled(),
             verificationCodeNotificationActionEnabled =
                 isVerificationCodeNotificationActionEnabled(),
