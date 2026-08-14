@@ -71,6 +71,15 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
+    override fun setShowVerificationCodeContentByDefault(enabled: Boolean) {
+        updatePrefs {
+            putBoolean(
+                AppSettingsKeys.KEY_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT,
+                enabled,
+            )
+        }
+    }
+
     override fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean) {
         updatePrefs {
             putBoolean(AppSettingsKeys.KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED, enabled)
@@ -223,6 +232,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED
         )
 
+    override fun isShowVerificationCodeContentByDefault(): Boolean =
+        prefs.getBoolean(
+            AppSettingsKeys.KEY_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT,
+            AppSettingsKeys.DEFAULT_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT,
+        )
+
     override fun isVerificationCodeAutoDeleteEnabled(): Boolean =
         prefs.getBoolean(
             AppSettingsKeys.KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
@@ -356,6 +371,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
                 isVerificationCodeNotificationActionEnabled(),
             hideVerificationCodeOnLockScreenEnabled =
                 isHideVerificationCodeOnLockScreenEnabled(),
+            showVerificationCodeContentByDefault =
+                isShowVerificationCodeContentByDefault(),
             verificationCodeAutoDeleteEnabled = isVerificationCodeAutoDeleteEnabled(),
             verificationCodeRetentionDays = getVerificationCodeRetentionDays(),
             unreadBadgeEnabled = isUnreadBadgeEnabled(),

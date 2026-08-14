@@ -14,11 +14,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.util.LinkedHashMap
 
@@ -33,7 +35,8 @@ data class VerificationCodeUiState(
     val isRefreshing: Boolean = false,
     val isRebuilding: Boolean = false,
     val loadingBodies: Set<Long> = emptySet(),
-    val expandedMessageIds: Set<Long> = emptySet(),
+    val showOriginalByDefault: Boolean = true,
+    val toggledMessageIds: Set<Long> = emptySet(),
     val messageBodies: Map<Long, String> = emptyMap(),
     val canLoadMore: Boolean = false,
     val errorMessage: String? = null,
@@ -43,13 +46,14 @@ private data class VerificationCodeTransientState(
     val isRefreshing: Boolean,
     val isRebuilding: Boolean,
     val loadingBodies: Set<Long>,
-    val expandedMessageIds: Set<Long>,
+    val showOriginalByDefault: Boolean,
+    val toggledMessageIds: Set<Long>,
     val messageBodies: Map<Long, String>,
     val errorMessage: String?,
 )
 
 private data class VerificationCodeBodyState(
-    val expandedMessageIds: Set<Long>,
+    val toggledMessageIds: Set<Long>,
     val messageBodies: Map<Long, String>,
     val errorMessage: String?,
 )
@@ -63,18 +67,27 @@ class VerificationCodeViewModel(
     private val repository: VerificationCodeRepository,
     private val savedStateHandle: SavedStateHandle,
     private val scheduler: VerificationCodeIndexScheduler,
+    private val settingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private val loadedMonthCount = MutableStateFlow(1)
     private val refreshing = MutableStateFlow(false)
     private val rebuilding = MutableStateFlow(false)
     private val loadingBodies = MutableStateFlow<Set<Long>>(emptySet())
-    private val expandedIds = MutableStateFlow(
-        savedStateHandle.get<LongArray>(EXPANDED_IDS_KEY)?.toSet().orEmpty()
+    private val toggledIds = MutableStateFlow(
+        savedStateHandle.get<LongArray>(TOGGLED_IDS_KEY)?.toSet().orEmpty()
     )
     private val bodies = MutableStateFlow<Map<Long, String>>(emptyMap())
     private val error = MutableStateFlow<String?>(null)
     private val eventsMutable = MutableSharedFlow<VerificationCodeEvent>(extraBufferCapacity = 1)
     val events = eventsMutable.asSharedFlow()
+
+    private val showOriginalByDefault = settingsRepository.settings
+        .map { it.showVerificationCodeContentByDefault }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            settingsRepository.settings.value.showVerificationCodeContentByDefault,
+        )
 
     private val months = repository.observeMonths()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -102,16 +115,21 @@ class VerificationCodeViewModel(
         loadingBodies,
     ) { isRefreshing, isRebuilding, loading -> Triple(isRefreshing, isRebuilding, loading) }
 
-    private val bodyState = combine(expandedIds, bodies, error) { expanded, cachedBodies, message ->
-        VerificationCodeBodyState(expanded, cachedBodies, message)
+    private val bodyState = combine(toggledIds, bodies, error) { toggled, cachedBodies, message ->
+        VerificationCodeBodyState(toggled, cachedBodies, message)
     }
 
-    private val transientState = combine(operationState, bodyState) { operation, body ->
+    private val transientState = combine(
+        operationState,
+        bodyState,
+        showOriginalByDefault,
+    ) { operation, body, showOriginal ->
         VerificationCodeTransientState(
             isRefreshing = operation.first,
             isRebuilding = operation.second,
             loadingBodies = operation.third,
-            expandedMessageIds = body.expandedMessageIds,
+            showOriginalByDefault = showOriginal,
+            toggledMessageIds = body.toggledMessageIds,
             messageBodies = body.messageBodies,
             errorMessage = body.errorMessage,
         )
@@ -129,7 +147,8 @@ class VerificationCodeViewModel(
             isRefreshing = transient.isRefreshing,
             isRebuilding = transient.isRebuilding,
             loadingBodies = transient.loadingBodies,
-            expandedMessageIds = transient.expandedMessageIds,
+            showOriginalByDefault = transient.showOriginalByDefault,
+            toggledMessageIds = transient.toggledMessageIds,
             messageBodies = transient.messageBodies,
             canLoadMore = currentPages.size < allMonths.size,
             errorMessage = transient.errorMessage,
@@ -162,13 +181,11 @@ class VerificationCodeViewModel(
         }
         refresh()
         viewModelScope.launch {
-            pages.collect { loadedPages ->
-                val loadedIds = loadedPages.flatMap { it.messages }
-                    .mapTo(mutableSetOf()) { it.messageId }
-                expandedIds.value.intersect(loadedIds).forEach { messageId ->
-                    if (messageId !in bodies.value && messageId !in loadingBodies.value) {
-                        loadMessageBody(messageId)
-                    }
+            var previousDefault = showOriginalByDefault.value
+            showOriginalByDefault.collect { currentDefault ->
+                if (currentDefault != previousDefault) {
+                    updateToggled(emptySet())
+                    previousDefault = currentDefault
                 }
             }
         }
@@ -190,11 +207,13 @@ class VerificationCodeViewModel(
     }
 
     fun toggleMessageMode(messageId: Long) {
-        if (messageId in expandedIds.value) {
-            updateExpanded(expandedIds.value - messageId)
-            return
-        }
-        updateExpanded(expandedIds.value + messageId)
+        val currentlyVisible = isOriginalVisible(messageId)
+        setOriginalVisible(messageId, !currentlyVisible)
+        if (!currentlyVisible) ensureMessageBodyLoaded(messageId)
+    }
+
+    fun ensureMessageBodyLoaded(messageId: Long) {
+        if (!isOriginalVisible(messageId)) return
         bodyCache[messageId]?.let {
             bodies.value = bodyCache.toMap()
             return
@@ -210,7 +229,7 @@ class VerificationCodeViewModel(
             val result = runCatching { repository.getMessageBody(messageId) }
             loadingBodies.value -= messageId
             result.onFailure {
-                updateExpanded(expandedIds.value - messageId)
+                setOriginalVisible(messageId, false)
                 eventsMutable.emit(VerificationCodeEvent.ShowMessage("读取原文失败，请重试"))
             }.onSuccess { body ->
                 if (body != null) {
@@ -218,7 +237,7 @@ class VerificationCodeViewModel(
                     bodies.value = bodyCache.toMap()
                     return@onSuccess
                 }
-                updateExpanded(expandedIds.value - messageId)
+                setOriginalVisible(messageId, false)
                 runCatching { repository.deleteMessageIds(listOf(messageId)) }
                     .onSuccess {
                         eventsMutable.emit(VerificationCodeEvent.ShowMessage("原短信已不存在"))
@@ -232,13 +251,24 @@ class VerificationCodeViewModel(
         }
     }
 
-    private fun updateExpanded(ids: Set<Long>) {
-        expandedIds.value = ids
-        savedStateHandle[EXPANDED_IDS_KEY] = ids.toLongArray()
+    private fun isOriginalVisible(messageId: Long): Boolean =
+        showOriginalByDefault.value.xor(messageId in toggledIds.value)
+
+    private fun setOriginalVisible(messageId: Long, visible: Boolean) {
+        val shouldToggle = visible != showOriginalByDefault.value
+        updateToggled(
+            if (shouldToggle) toggledIds.value + messageId
+            else toggledIds.value - messageId
+        )
+    }
+
+    private fun updateToggled(ids: Set<Long>) {
+        toggledIds.value = ids
+        savedStateHandle[TOGGLED_IDS_KEY] = ids.toLongArray()
     }
 
     private companion object {
         const val BODY_CACHE_SIZE = 30
-        const val EXPANDED_IDS_KEY = "verification_code_expanded_ids"
+        const val TOGGLED_IDS_KEY = "verification_code_toggled_ids"
     }
 }

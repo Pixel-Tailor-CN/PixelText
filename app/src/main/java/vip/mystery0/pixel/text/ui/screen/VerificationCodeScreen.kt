@@ -65,7 +65,6 @@ import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
-import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.cards.VerificationCodeCard
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
@@ -223,12 +222,17 @@ fun VerificationCodeScreen(
                     }
                     state.pages.forEach { page ->
                         items(page.messages, key = { it.messageId }) { message ->
+                            val showOriginal = state.showOriginalByDefault !=
+                                (message.messageId in state.toggledMessageIds)
                             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                                 VerificationIndexCard(
                                     message = message,
-                                    expanded = message.messageId in state.expandedMessageIds,
+                                    showOriginal = showOriginal,
                                     body = state.messageBodies[message.messageId],
                                     loadingBody = message.messageId in state.loadingBodies,
+                                    onEnsureBodyLoaded = {
+                                        viewModel.ensureMessageBodyLoaded(message.messageId)
+                                    },
                                     onToggle = { viewModel.toggleMessageMode(message.messageId) },
                                     onNavigate = {
                                         onNavigateToConversation(
@@ -304,12 +308,17 @@ fun VerificationCodeScreen(
 @Composable
 private fun VerificationIndexCard(
     message: VerificationCodeIndexModel,
-    expanded: Boolean,
+    showOriginal: Boolean,
     body: String?,
     loadingBody: Boolean,
+    onEnsureBodyLoaded: () -> Unit,
     onToggle: () -> Unit,
     onNavigate: () -> Unit,
 ) {
+    LaunchedEffect(showOriginal, body, loadingBody) {
+        if (showOriginal && body == null && !loadingBody) onEnsureBodyLoaded()
+    }
+
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -319,17 +328,15 @@ private fun VerificationIndexCard(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                when {
-                    expanded && loadingBody -> CircularProgressIndicator(Modifier.padding(20.dp))
-                    expanded && body != null -> OriginalTextCard(content = body)
-                    else -> VerificationCodeCard(
-                        content = body.orEmpty(),
-                        result = ParsedResult.VerificationCode(
-                            code = message.code,
-                            signature = message.signature ?: message.displayName ?: message.address,
-                        ),
-                    )
-                }
+                VerificationCodeCard(
+                    content = body.orEmpty(),
+                    result = ParsedResult.VerificationCode(
+                        code = message.code,
+                        signature = message.signature ?: message.displayName ?: message.address,
+                    ),
+                    showOriginal = showOriginal,
+                    originalLoading = showOriginal && loadingBody,
+                )
             }
             IconButton(onClick = onNavigate) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "进入会话")
@@ -349,7 +356,7 @@ private fun VerificationIndexCard(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = if (expanded) "显示验证码" else "显示原文",
+                text = if (showOriginal) "收起原文" else "展开原文",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable(enabled = !loadingBody, onClick = onToggle),

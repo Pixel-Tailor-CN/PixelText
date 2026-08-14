@@ -589,6 +589,21 @@ fun SettingsScreen(
                             )
                         }
                         item(
+                            key = "show_verification_code_content_by_default",
+                            contentType = "SwitchPreference",
+                        ) {
+                            SwitchPreference(
+                                value = settings.showVerificationCodeContentByDefault,
+                                onValueChange =
+                                    viewModel::setShowVerificationCodeContentByDefault,
+                                title = { Text("验证码默认显示原文") },
+                                summary = { Text("在验证码下方显示完整短信内容") },
+                                icon = {
+                                    Icon(Icons.Rounded.Visibility, contentDescription = null)
+                                },
+                            )
+                        }
+                        item(
                             key = "verification_code_auto_delete",
                             contentType = "SwitchPreference",
                         ) {

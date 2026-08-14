@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.message.cards
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -16,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Password
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,8 @@ fun VerificationCodeCard(
     content: String,
     result: ParsedResult.VerificationCode,
     isSelected: Boolean = false,
+    showOriginal: Boolean = false,
+    originalLoading: Boolean = false,
 ) {
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
@@ -139,6 +144,29 @@ fun VerificationCodeCard(
                             imageVector = Icons.Rounded.ContentCopy,
                             contentDescription = "复制验证码",
                             modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = showOriginal) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    HorizontalDivider(color = onContainerColor.copy(alpha = 0.1f))
+                    if (originalLoading) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    } else if (content.isNotBlank()) {
+                        Text(
+                            text = content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = onContainerColor.copy(alpha = 0.78f),
+                            modifier = Modifier.padding(16.dp),
                         )
                     }
                 }

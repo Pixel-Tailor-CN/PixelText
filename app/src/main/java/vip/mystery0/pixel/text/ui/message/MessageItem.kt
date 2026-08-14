@@ -58,6 +58,7 @@ fun MessageItem(
     interactionEnabled: Boolean = true,
     timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
     showSpamContentByDefault: Boolean = false,
+    showVerificationCodeContentByDefault: Boolean = true,
 ) {
     val highlightAlpha = remember(message.stableKey) { Animatable(0f) }
     val highlightColor = MaterialTheme.colorScheme.primary
@@ -78,8 +79,21 @@ fun MessageItem(
         }
     }
     val isSpam = message.spamScore >= 0.7f
-    var showOriginal by remember(message.stableKey, isSpam, showSpamContentByDefault) {
-        mutableStateOf(isSpam && showSpamContentByDefault)
+    val isVerificationCode = !isSpam && message.parsedResult is ParsedResult.VerificationCode
+    var showOriginal by remember(
+        message.stableKey,
+        isSpam,
+        showSpamContentByDefault,
+        isVerificationCode,
+        showVerificationCodeContentByDefault,
+    ) {
+        mutableStateOf(
+            when {
+                isSpam -> showSpamContentByDefault
+                isVerificationCode -> showVerificationCodeContentByDefault
+                else -> false
+            }
+        )
     }
     var currentTimeDisplayFormat by remember(message.stableKey, timeDisplayFormat) {
         mutableStateOf(timeDisplayFormat)
@@ -119,32 +133,54 @@ fun MessageItem(
                 val hasTextContent =
                     message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
                 if (hasTextContent) {
-                    if (showOriginal) {
-                        OriginalTextCard(
-                            content = message.content,
-                            isSelected = isSelected,
-                            subject = message.mmsSubject,
-                            textScale = textScale
-                        )
-                        if (isSpam) {
+                    when {
+                        isSpam && showOriginal -> {
+                            OriginalTextCard(
+                                content = message.content,
+                                isSelected = isSelected,
+                                subject = message.mmsSubject,
+                                textScale = textScale
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
                             SpamMessageIndicator(isSelected = isSelected)
                         }
-                    } else if (isSpam) {
-                        SpamMessageCard(isSelected = isSelected)
-                    } else if (message.parsedResult is ParsedResult.None) {
-                        OriginalTextCard(
-                            content = message.content,
-                            isSelected = isSelected,
-                            subject = message.mmsSubject,
-                            textScale = textScale
-                        )
-                    } else {
-                        MessageCardFactory.CreateCard(
-                            content = message.content,
-                            parsedResult = message.parsedResult,
-                            isSelected = isSelected
-                        )
+
+                        isSpam -> SpamMessageCard(isSelected = isSelected)
+
+                        message.parsedResult is ParsedResult.None -> {
+                            OriginalTextCard(
+                                content = message.content,
+                                isSelected = isSelected,
+                                subject = message.mmsSubject,
+                                textScale = textScale
+                            )
+                        }
+
+                        isVerificationCode -> {
+                            MessageCardFactory.CreateCard(
+                                content = message.content,
+                                parsedResult = message.parsedResult,
+                                isSelected = isSelected,
+                                showVerificationOriginal = showOriginal,
+                            )
+                        }
+
+                        showOriginal -> {
+                            OriginalTextCard(
+                                content = message.content,
+                                isSelected = isSelected,
+                                subject = message.mmsSubject,
+                                textScale = textScale
+                            )
+                        }
+
+                        else -> {
+                            MessageCardFactory.CreateCard(
+                                content = message.content,
+                                parsedResult = message.parsedResult,
+                                isSelected = isSelected
+                            )
+                        }
                     }
                 } else {
                     OriginalTextCard(
@@ -202,6 +238,8 @@ fun MessageItem(
                 Text(
                     text = when {
                         isSpam && showOriginal -> "隐藏内容"
+                        isVerificationCode && showOriginal -> "收起原文"
+                        isVerificationCode -> "展开原文"
                         showOriginal -> "显示智能卡片"
                         else -> "显示原文"
                     },

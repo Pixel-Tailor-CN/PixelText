@@ -101,6 +101,10 @@ class SettingsViewModel(
         settingsRepository.setHideVerificationCodeOnLockScreenEnabled(enabled)
     }
 
+    fun setShowVerificationCodeContentByDefault(enabled: Boolean) {
+        settingsRepository.setShowVerificationCodeContentByDefault(enabled)
+    }
+
     fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean) {
         settingsRepository.setVerificationCodeAutoDeleteEnabled(enabled)
         verificationCodeCleanupScheduler.sync()

@@ -660,6 +660,8 @@ fun ConversationDetailScreen(
                                 timeDisplayFormat = appSettings.messageTimeDisplayFormat,
                                 showSpamContentByDefault =
                                     appSettings.showSpamContentByDefault,
+                                showVerificationCodeContentByDefault =
+                                    appSettings.showVerificationCodeContentByDefault,
                             )
                         }
                     }

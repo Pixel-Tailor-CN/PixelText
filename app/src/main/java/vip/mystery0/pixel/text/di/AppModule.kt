@@ -101,6 +101,6 @@ val appModule = module {
     viewModel { SearchViewModel(get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
-    viewModel { VerificationCodeViewModel(get(), get(), get()) }
+    viewModel { VerificationCodeViewModel(get(), get(), get(), get()) }
     viewModel { UnreadBadgeViewModel(androidContext(), get(), get()) }
 }

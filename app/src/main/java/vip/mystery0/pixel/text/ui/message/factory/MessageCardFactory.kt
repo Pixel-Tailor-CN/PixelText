@@ -13,7 +13,12 @@ import vip.mystery0.pixel.text.ui.message.cards.ticket.TrainTicketCard
 object MessageCardFactory {
 
     @Composable
-    fun CreateCard(content: String, parsedResult: ParsedResult, isSelected: Boolean = false) {
+    fun CreateCard(
+        content: String,
+        parsedResult: ParsedResult,
+        isSelected: Boolean = false,
+        showVerificationOriginal: Boolean = false,
+    ) {
         when (parsedResult) {
             is ParsedResult.Ticket.TrainTicket -> TrainTicketCard(parsedResult, isSelected)
             is ParsedResult.Ticket.Flight -> FlightCard(parsedResult, isSelected)
@@ -24,6 +29,7 @@ object MessageCardFactory {
                 content = content,
                 result = parsedResult,
                 isSelected = isSelected,
+                showOriginal = showVerificationOriginal,
             )
             else -> NormalMessageCard(content, isSelected)
         }

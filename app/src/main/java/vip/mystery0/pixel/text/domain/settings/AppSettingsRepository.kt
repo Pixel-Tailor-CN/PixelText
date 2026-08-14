@@ -15,6 +15,8 @@ data class AppSettings(
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED,
     val hideVerificationCodeOnLockScreenEnabled: Boolean =
         AppSettingsKeys.DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED,
+    val showVerificationCodeContentByDefault: Boolean =
+        AppSettingsKeys.DEFAULT_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT,
     val verificationCodeAutoDeleteEnabled: Boolean =
         AppSettingsKeys.DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED,
     val verificationCodeRetentionDays: Int =
@@ -92,6 +94,7 @@ interface AppSettingsRepository {
     fun setSmartCardEnabled(enabled: Boolean)
     fun setVerificationCodeNotificationActionEnabled(enabled: Boolean)
     fun setHideVerificationCodeOnLockScreenEnabled(enabled: Boolean)
+    fun setShowVerificationCodeContentByDefault(enabled: Boolean)
     fun setVerificationCodeAutoDeleteEnabled(enabled: Boolean)
     fun setVerificationCodeRetentionDays(days: Int)
     fun setUnreadBadgeEnabled(enabled: Boolean)
@@ -118,6 +121,7 @@ interface AppSettingsRepository {
     fun isSmartCardEnabled(): Boolean
     fun isVerificationCodeNotificationActionEnabled(): Boolean
     fun isHideVerificationCodeOnLockScreenEnabled(): Boolean
+    fun isShowVerificationCodeContentByDefault(): Boolean
     fun isVerificationCodeAutoDeleteEnabled(): Boolean
     fun getVerificationCodeRetentionDays(): Int
     fun isUnreadBadgeEnabled(): Boolean
@@ -151,6 +155,8 @@ object AppSettingsKeys {
         "verification_code_notification_action_enabled"
     const val KEY_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED =
         "hide_verification_code_on_lock_screen_enabled"
+    const val KEY_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT =
+        "show_verification_code_content_by_default"
     const val KEY_VERIFICATION_CODE_AUTO_DELETE_ENABLED =
         "verification_code_auto_delete_enabled"
     const val KEY_VERIFICATION_CODE_RETENTION_DAYS = "verification_code_retention_days"
@@ -186,6 +192,7 @@ object AppSettingsKeys {
     const val DEFAULT_SMART_CARD_ENABLED = true
     const val DEFAULT_VERIFICATION_CODE_NOTIFICATION_ACTION_ENABLED = true
     const val DEFAULT_HIDE_VERIFICATION_CODE_ON_LOCK_SCREEN_ENABLED = true
+    const val DEFAULT_SHOW_VERIFICATION_CODE_CONTENT_BY_DEFAULT = true
     const val DEFAULT_VERIFICATION_CODE_AUTO_DELETE_ENABLED = false
     const val DEFAULT_VERIFICATION_CODE_RETENTION_DAYS = 7
     const val MIN_VERIFICATION_CODE_RETENTION_DAYS = 1
