@@ -9,26 +9,20 @@
         android:translateX="184.32"
         android:translateY="184.32">
         <path
-            android:fillColor="#00000000"
-            android:strokeWidth="24"
-            android:strokeColor="#212121"
-            android:strokeLineJoin="round"
-            android:pathData="M267.4,265.7h486.4c62.1,0 112.2,57.9 112.2,129.8v171.7c0,71.9 -49.9,129.8 -112.2,129.8H593.5L484.9,820.8c-24.1,28 -65.4,8 -65.4,-31.9v-91.9H267.6c-62.1,0 -112.2,-57.9 -112.2,-129.8v-171.7c0,-71.9 49.9,-129.8 112.2,-129.8L267.4,265.7z" />
-
+            android:fillAlpha="0.7"
+            android:fillColor="#000000"
+            android:pathData="M734.3,226.2H294.8c-70.6,0 -127.9,57.3 -127.9,127.9v247.7c0,52.7 31.9,98 77.5,117.6l142,10.3h348c70.6,0 127.9,-57.3 127.9,-127.9V354.1C862.2,283.4 805,226.2 734.3,226.2z" />
         <path
-            android:pathData="M293.9,471.9h183M293.9,551.8h115.4"
-            android:strokeWidth="18"
-            android:strokeColor="#212121"
-            android:strokeLineCap="round" />
-
-        <group
-            android:translateX="752"
-            android:translateY="547.8">
-            <path
-                android:pathData="M-38,0h76M0,-38v76"
-                android:strokeWidth="16"
-                android:strokeColor="#212121"
-                android:strokeLineCap="round" />
-        </group>
+            android:fillAlpha="0.7"
+            android:fillColor="#000000"
+            android:pathData="M244.3,719.3l-16.2,100.8c-2.1,13 12.8,21.8 23.1,13.8l135,-104.2l-142,-10.3L244.3,719.3z" />
+        <path
+            android:fillAlpha="1.0"
+            android:fillColor="#000000"
+            android:pathData="M722.9,442.7H328.1c-21.5,0 -38.9,-17.4 -38.9,-38.9v-0c0,-21.5 17.4,-38.9 38.9,-38.9h394.8c21.5,0 38.9,17.4 38.9,38.9v0C761.8,425.2 744.4,442.7 722.9,442.7z" />
+        <path
+            android:fillAlpha="1.0"
+            android:fillColor="#000000"
+            android:pathData="M629.1,584.7H327.8c-21.3,0 -38.6,-17.3 -38.6,-38.6v-0c0,-21.3 17.3,-38.6 38.6,-38.6h301.3c21.3,0 38.6,17.3 38.6,38.6v0C667.8,567.4 650.5,584.7 629.1,584.7z" />
     </group>
 </vector>
