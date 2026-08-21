@@ -58,12 +58,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
+import vip.mystery0.pixel.text.domain.sample.SampleCategory
 import vip.mystery0.pixel.text.domain.sample.SampleTextToken
 import vip.mystery0.pixel.text.domain.sample.SensitiveType
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 
 internal const val SAMPLE_SUBMISSION_DRAFT_CONTENT = "sample_submission_draft_content"
 internal const val SAMPLE_SUBMISSION_DRAFT_SENDER = "sample_submission_draft_sender"
+internal const val SAMPLE_SUBMISSION_DRAFT_CATEGORY = "sample_submission_draft_category"
 
 @Composable
 fun SampleSubmissionScreen(
@@ -71,14 +73,15 @@ fun SampleSubmissionScreen(
     onNavigateBack: () -> Unit,
     initialContent: String = "",
     initialSender: String = "",
+    initialCategory: String = SampleCategory.NORMAL.value,
 ) {
     val context = LocalContext.current
     var categoryMenuExpanded by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     val canSubmit = viewModel.agreed && viewModel.content.isNotBlank() && !viewModel.submitting
 
-    LaunchedEffect(initialContent, initialSender) {
-        viewModel.applyDraft(initialContent, initialSender)
+    LaunchedEffect(initialContent, initialSender, initialCategory) {
+        viewModel.applyDraft(initialContent, initialSender, initialCategory)
     }
 
     viewModel.desensitizationHintMessage?.let { message ->
@@ -182,7 +185,7 @@ fun SampleSubmissionScreen(
                             expanded = categoryMenuExpanded,
                             onDismissRequest = { categoryMenuExpanded = false }
                         ) {
-                            sampleCategories.forEach { category ->
+                            SampleCategory.entries.forEach { category ->
                                 DropdownMenuItem(
                                     text = { Text(category.label) },
                                     onClick = {
@@ -489,22 +492,8 @@ private fun TokenChip(
     }
 }
 
-private data class SampleCategory(
-    val value: String,
-    val label: String,
-)
-
-private val sampleCategories = listOf(
-    SampleCategory("verification_code", "验证码"),
-    SampleCategory("bank_transaction", "银行动账"),
-    SampleCategory("express_delivery", "快递通知"),
-    SampleCategory("ticket", "票务出行"),
-    SampleCategory("spam", "垃圾短信"),
-    SampleCategory("normal", "普通短信"),
-)
-
 private fun categoryLabel(value: String): String {
-    return sampleCategories.firstOrNull { it.value == value }?.label ?: value
+    return SampleCategory.fromValue(value)?.label ?: value
 }
 
 private fun SampleTextToken.displayText(): String {

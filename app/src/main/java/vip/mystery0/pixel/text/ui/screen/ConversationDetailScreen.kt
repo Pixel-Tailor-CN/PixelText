@@ -95,6 +95,7 @@ import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
+import vip.mystery0.pixel.text.domain.sample.sampleCategory
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.util.SimInfo
@@ -113,7 +114,11 @@ fun ConversationDetailScreen(
     targetMessageId: Long? = null,
     requestedContentFilter: ConversationContentFilter = ConversationContentFilter.NORMAL,
     onNavigateBack: () -> Unit,
-    onNavigateToSampleSubmission: (content: String, sender: String) -> Unit = { _, _ -> },
+    onNavigateToSampleSubmission: (
+        content: String,
+        sender: String,
+        category: String,
+    ) -> Unit = { _, _, _ -> },
     isTablet: Boolean = false,
     initialMessageText: String = "",
     viewModel: ConversationDetailViewModel = koinViewModel(),
@@ -282,7 +287,8 @@ fun ConversationDetailScreen(
         if (result == SnackbarResult.ActionPerformed) {
             onNavigateToSampleSubmission(
                 message.content,
-                message.sender.ifBlank { address }
+                message.sender.ifBlank { address },
+                message.sampleCategory().value,
             )
             selectedMessageIds.clear()
         }
@@ -328,7 +334,8 @@ fun ConversationDetailScreen(
                                 IconButton(onClick = {
                                     onNavigateToSampleSubmission(
                                         selectedMessage.content,
-                                        selectedMessage.sender.ifBlank { address }
+                                        selectedMessage.sender.ifBlank { address },
+                                        selectedMessage.sampleCategory().value,
                                     )
                                     selectedMessageIds.clear()
                                 }) {
@@ -378,7 +385,8 @@ fun ConversationDetailScreen(
                                             selectedMessage?.let { message ->
                                                 onNavigateToSampleSubmission(
                                                     message.content,
-                                                    message.sender.ifBlank { address }
+                                                    message.sender.ifBlank { address },
+                                                    message.sampleCategory().value,
                                                 )
                                             }
                                             selectedMessageIds.clear()

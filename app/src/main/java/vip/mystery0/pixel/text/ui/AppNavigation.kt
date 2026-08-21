@@ -34,6 +34,7 @@ import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.HomeScreen
 import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.KeywordSpamSettingsScreen
+import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CATEGORY
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
@@ -199,10 +200,14 @@ fun AppNavigation(
                 val initialSender = remember(it) {
                     draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_SENDER).orEmpty()
                 }
+                val initialCategory = remember(it) {
+                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CATEGORY).orEmpty()
+                }
                 SampleSubmissionScreen(
                     onNavigateBack = { navController.popBackStack() },
                     initialContent = initialContent,
-                    initialSender = initialSender
+                    initialSender = initialSender,
+                    initialCategory = initialCategory,
                 )
             }
             composable("search") {
@@ -255,10 +260,11 @@ fun AppNavigation(
                     targetMessageId = targetMessageId,
                     requestedContentFilter = contentFilter,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToSampleSubmission = { content, sender ->
+                    onNavigateToSampleSubmission = { content, sender, category ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
                             set(SAMPLE_SUBMISSION_DRAFT_SENDER, sender)
+                            set(SAMPLE_SUBMISSION_DRAFT_CATEGORY, category)
                         }
                         navController.navigate("sample_submission")
                     }

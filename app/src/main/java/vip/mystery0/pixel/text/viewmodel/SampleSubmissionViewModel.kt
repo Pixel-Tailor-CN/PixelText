@@ -10,6 +10,7 @@ import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
 import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
 import vip.mystery0.pixel.text.domain.sample.SampleDesensitizationAssistant
+import vip.mystery0.pixel.text.domain.sample.SampleCategory
 import vip.mystery0.pixel.text.domain.sample.SampleReplacementError
 import vip.mystery0.pixel.text.domain.sample.SensitiveType
 
@@ -109,14 +110,14 @@ class SampleSubmissionViewModel(
     fun applyDraft(
         content: String,
         sender: String,
-        category: String = DRAFT_CATEGORY
+        category: String = SampleCategory.NORMAL.value
     ) {
         if (draftApplied) return
         if (content.isBlank() && sender.isBlank()) return
         draftApplied = true
         this.content = content
         this.sender = sender
-        this.category = category
+        this.category = SampleCategory.fromValue(category)?.value ?: SampleCategory.NORMAL.value
         agreed = false
         resultMessage = null
     }
@@ -147,7 +148,6 @@ class SampleSubmissionViewModel(
     }
 
     private companion object {
-        private const val DEFAULT_CATEGORY = "verification_code"
-        private const val DRAFT_CATEGORY = "normal"
+        private val DEFAULT_CATEGORY = SampleCategory.VERIFICATION_CODE.value
     }
 }
