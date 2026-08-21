@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.ui.screen
 
-import android.text.format.DateFormat
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
@@ -63,17 +62,17 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.message.cards.VerificationCodeCard
+import vip.mystery0.pixel.text.ui.message.formatMessageTime
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MarkAllReadResultEvent
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeEvent
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
-import java.time.Instant
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -227,6 +226,7 @@ fun VerificationCodeScreen(
                             Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                                 VerificationIndexCard(
                                     message = message,
+                                    timeDisplayFormat = state.messageTimeDisplayFormat,
                                     showOriginal = showOriginal,
                                     body = state.messageBodies[message.messageId],
                                     loadingBody = message.messageId in state.loadingBodies,
@@ -308,6 +308,7 @@ fun VerificationCodeScreen(
 @Composable
 private fun VerificationIndexCard(
     message: VerificationCodeIndexModel,
+    timeDisplayFormat: MessageTimeDisplayFormat,
     showOriginal: Boolean,
     body: String?,
     loadingBody: Boolean,
@@ -350,7 +351,7 @@ private fun VerificationIndexCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = formatMessageTime(message.timestamp),
+                text = formatMessageTime(message.timestamp, timeDisplayFormat),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
@@ -392,16 +393,8 @@ private fun requestDefaultSmsRole(context: Context, launch: (android.content.Int
 }
 
 private fun formatMonth(monthKey: String): String = runCatching {
-    val locale = Locale.getDefault()
-    val pattern = DateFormat.getBestDateTimePattern(locale, "yMMMM")
-    DateTimeFormatter.ofPattern(pattern, locale).format(YearMonth.parse(monthKey))
+    DateTimeFormatter.ofPattern("yyyy年M月", Locale.CHINA)
+        .format(YearMonth.parse(monthKey))
 }.getOrDefault(monthKey)
-
-private fun formatMessageTime(timestamp: Long): String {
-    val locale = Locale.getDefault()
-    val pattern = DateFormat.getBestDateTimePattern(locale, "MMMdHm")
-    return DateTimeFormatter.ofPattern(pattern, locale)
-        .format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()))
-}
 
 private const val LOAD_MORE_THRESHOLD = 4

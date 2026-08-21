@@ -320,7 +320,7 @@ fun formatDetailedTime(timestamp: Long): String {
     return formatter.format(Date(timestamp))
 }
 
-private fun formatMessageTime(timestamp: Long, format: MessageTimeDisplayFormat): String {
+internal fun formatMessageTime(timestamp: Long, format: MessageTimeDisplayFormat): String {
     return when (format) {
         MessageTimeDisplayFormat.HUMANIZED -> formatTimeAgo(timestamp)
         MessageTimeDisplayFormat.DETAILED -> formatDetailedTime(timestamp)

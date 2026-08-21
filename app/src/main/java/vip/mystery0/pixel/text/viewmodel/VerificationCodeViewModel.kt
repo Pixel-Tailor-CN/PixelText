@@ -21,6 +21,7 @@ import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.util.LinkedHashMap
 
@@ -36,6 +37,7 @@ data class VerificationCodeUiState(
     val isRebuilding: Boolean = false,
     val loadingBodies: Set<Long> = emptySet(),
     val showOriginalByDefault: Boolean = true,
+    val messageTimeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
     val toggledMessageIds: Set<Long> = emptySet(),
     val messageBodies: Map<Long, String> = emptyMap(),
     val canLoadMore: Boolean = false,
@@ -47,6 +49,7 @@ private data class VerificationCodeTransientState(
     val isRebuilding: Boolean,
     val loadingBodies: Set<Long>,
     val showOriginalByDefault: Boolean,
+    val messageTimeDisplayFormat: MessageTimeDisplayFormat,
     val toggledMessageIds: Set<Long>,
     val messageBodies: Map<Long, String>,
     val errorMessage: String?,
@@ -89,6 +92,14 @@ class VerificationCodeViewModel(
             settingsRepository.settings.value.showVerificationCodeContentByDefault,
         )
 
+    private val messageTimeDisplayFormat = settingsRepository.settings
+        .map { it.messageTimeDisplayFormat }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            settingsRepository.settings.value.messageTimeDisplayFormat,
+        )
+
     private val months = repository.observeMonths()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -123,12 +134,14 @@ class VerificationCodeViewModel(
         operationState,
         bodyState,
         showOriginalByDefault,
-    ) { operation, body, showOriginal ->
+        messageTimeDisplayFormat,
+    ) { operation, body, showOriginal, timeDisplayFormat ->
         VerificationCodeTransientState(
             isRefreshing = operation.first,
             isRebuilding = operation.second,
             loadingBodies = operation.third,
             showOriginalByDefault = showOriginal,
+            messageTimeDisplayFormat = timeDisplayFormat,
             toggledMessageIds = body.toggledMessageIds,
             messageBodies = body.messageBodies,
             errorMessage = body.errorMessage,
@@ -148,6 +161,7 @@ class VerificationCodeViewModel(
             isRebuilding = transient.isRebuilding,
             loadingBodies = transient.loadingBodies,
             showOriginalByDefault = transient.showOriginalByDefault,
+            messageTimeDisplayFormat = transient.messageTimeDisplayFormat,
             toggledMessageIds = transient.toggledMessageIds,
             messageBodies = transient.messageBodies,
             canLoadMore = currentPages.size < allMonths.size,
