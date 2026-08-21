@@ -61,7 +61,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -144,6 +143,7 @@ private const val CONVERSATION_SWIPE_THRESHOLD_FRACTION = 0.5f
 @Composable
 fun ConversationListScreen(
     viewModel: ConversationListViewModel = koinViewModel(),
+    snackbarHostState: SnackbarHostState,
     onNavigateToDetail: (Long, String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToMock: () -> Unit,
@@ -299,7 +299,6 @@ fun ConversationListScreen(
     }
 
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-    val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     var transientSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var showMenuSheet by remember { mutableStateOf(false) }
@@ -354,7 +353,6 @@ fun ConversationListScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     navigationIcon = {
