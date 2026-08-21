@@ -50,24 +50,46 @@ class SpamConversationListViewModel(
     private val workManager = WorkManager.getInstance(appContext)
     private var offset = 0
     private var isLoadingMore = false
+    private var isSilentRefreshActive = false
     private var hasMore = true
+    private var listRequestVersion = 0
     private var scanProgressJob: Job? = null
 
     init {
         resumeActiveHistoricalScan()
     }
 
-    fun loadSpamConversations(force: Boolean = false) {
+    fun loadSpamConversations(
+        force: Boolean = false,
+        showLoading: Boolean = true,
+    ) {
+        val keepCurrentContent = force &&
+            !showLoading &&
+            _uiState.value is SpamConversationListUiState.Success
+        if (keepCurrentContent && isSilentRefreshActive) return
+        val fallbackSnapshot = if (keepCurrentContent) {
+            SpamConversationListSnapshot(conversations.toList(), offset, hasMore)
+        } else {
+            null
+        }
+        if (keepCurrentContent) isSilentRefreshActive = true
         if (force) {
+            listRequestVersion += 1
             offset = 0
             conversations.clear()
             hasMore = true
-            _uiState.value = SpamConversationListUiState.Loading
+            if (!keepCurrentContent) {
+                _uiState.value = SpamConversationListUiState.Loading
+            }
         } else if (conversations.isNotEmpty()) {
             return
         }
 
-        fetchNextBatch(100)
+        fetchNextBatch(
+            limit = 100,
+            showError = !keepCurrentContent,
+            fallbackSnapshot = fallbackSnapshot,
+        )
     }
 
     fun loadMore() {
@@ -114,31 +136,49 @@ class SpamConversationListViewModel(
         _historyStatsState.value = HistorySpamStatsUiState.Idle
     }
 
-    private fun fetchNextBatch(limit: Int) {
+    private fun fetchNextBatch(
+        limit: Int,
+        showError: Boolean = true,
+        fallbackSnapshot: SpamConversationListSnapshot? = null,
+    ) {
+        val requestVersion = listRequestVersion
         isLoadingMore = true
         viewModelScope.launch {
-            repository.getSpamConversations(limit, offset)
-                .catch { e ->
-                    if (conversations.isEmpty()) {
-                        _uiState.value =
-                            SpamConversationListUiState.Error(e.message ?: "Unknown error")
-                    }
-                    isLoadingMore = false
-                }
-                .collect { newList ->
-                    if (newList.isEmpty()) {
-                        hasMore = false
-                        if (conversations.isEmpty()) {
-                            _uiState.value = SpamConversationListUiState.Success(emptyList())
+            try {
+                repository.getSpamConversations(limit, offset)
+                    .catch { e ->
+                        if (requestVersion != listRequestVersion) return@catch
+                        if (fallbackSnapshot != null) {
+                            conversations.clear()
+                            conversations.addAll(fallbackSnapshot.conversations)
+                            offset = fallbackSnapshot.offset
+                            hasMore = fallbackSnapshot.hasMore
+                            _uiState.value =
+                                SpamConversationListUiState.Success(conversations.toList())
+                        } else if (showError && conversations.isEmpty()) {
+                            _uiState.value =
+                                SpamConversationListUiState.Error(e.message ?: "Unknown error")
                         }
-                    } else {
-                        mergeConversations(newList)
-                        offset += newList.size
-                        _uiState.value =
-                            SpamConversationListUiState.Success(conversations.toList())
+                        isLoadingMore = false
                     }
-                    isLoadingMore = false
-                }
+                    .collect { newList ->
+                        if (requestVersion != listRequestVersion) return@collect
+                        if (newList.isEmpty()) {
+                            hasMore = false
+                            if (conversations.isEmpty()) {
+                                _uiState.value = SpamConversationListUiState.Success(emptyList())
+                            }
+                        } else {
+                            mergeConversations(newList)
+                            offset += newList.size
+                            _uiState.value =
+                                SpamConversationListUiState.Success(conversations.toList())
+                        }
+                        isLoadingMore = false
+                    }
+            } finally {
+                if (fallbackSnapshot != null) isSilentRefreshActive = false
+            }
         }
     }
 
@@ -223,6 +263,12 @@ class SpamConversationListViewModel(
             this == WorkInfo.State.CANCELLED
     }
 }
+
+private data class SpamConversationListSnapshot(
+    val conversations: List<ConversationModel>,
+    val offset: Int,
+    val hasMore: Boolean,
+)
 
 sealed class SpamConversationListUiState {
     data object Loading : SpamConversationListUiState()
