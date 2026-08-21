@@ -6,6 +6,7 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
+import vip.mystery0.pixel.text.domain.model.DataUsageStatus
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 data class ParseRule(
@@ -15,6 +16,7 @@ data class ParseRule(
     val fastFailSenderEquals: String?,
     val fastFailSignatureEquals: String?,
     val fastFailKeywords: List<String>?,
+    val dataUsageStatus: DataUsageStatus?,
     val contentRegex: Regex
 )
 
@@ -60,6 +62,9 @@ class MessageParser(
                         fastFailSenderEquals = senderEquals,
                         fastFailSignatureEquals = signatureEquals,
                         fastFailKeywords = keywords.takeIf { it.isNotEmpty() },
+                        dataUsageStatus = ruleObj.dataUsageStatus?.let { status ->
+                            runCatching { DataUsageStatus.valueOf(status) }.getOrNull()
+                        },
                         contentRegex = contentRegex
                     )
                 )
@@ -248,6 +253,52 @@ class MessageParser(
                     details = details
                 )
             }
+            "MissedCall" -> {
+                val phoneNumber = getGroupOrNull(matcher, "phoneNumber")?.trim() ?: return null
+                val digitCount = phoneNumber.count(Char::isDigit)
+                if (digitCount !in 7..15) return null
+                return ParsedResult.MissedCall(
+                    phoneNumber = phoneNumber,
+                    time = getGroupOrNull(matcher, "time"),
+                    location = getGroupOrNull(matcher, "location"),
+                )
+            }
+            "DataUsage" -> {
+                val status = rule.dataUsageStatus ?: DataUsageStatus.NORMAL
+                val remainingData = getGroupOrNull(matcher, "remainingData")
+                val usedData = getGroupOrNull(matcher, "usedData")
+                val primaryData = when (status) {
+                    DataUsageStatus.EXHAUSTED -> null
+                    DataUsageStatus.NORMAL,
+                    DataUsageStatus.LOW -> remainingData ?: usedData ?: return null
+                }
+                val rawLabel = getGroupOrNull(matcher, "dataLabel") ?: "手机上网流量"
+                val dataLabel = when {
+                    status == DataUsageStatus.EXHAUSTED -> rawLabel
+                    remainingData != null -> "$rawLabel · 剩余"
+                    else -> "$rawLabel · 已使用"
+                }
+                val details = mutableMapOf<String, String>()
+                getGroupOrNull(matcher, "totalData")?.let { details["套餐总量"] = it }
+                if (remainingData != null) {
+                    usedData?.let { details["已使用"] = it }
+                }
+                getGroupOrNull(matcher, "throttledUsedData")?.let {
+                    details["达量限速流量"] = "已使用$it"
+                }
+                getGroupOrNull(matcher, "throttleThreshold")?.let {
+                    details["限速阈值"] = it
+                }
+                getGroupOrNull(matcher, "planName")?.let { details["流量类型"] = it }
+
+                return ParsedResult.DataUsage(
+                    status = status,
+                    primaryData = primaryData,
+                    dataLabel = dataLabel,
+                    cutoffTime = getGroupOrNull(matcher, "cutoffTime"),
+                    details = details,
+                )
+            }
             "VerificationCode" -> {
                 val code = getGroupOrNull(matcher, "code")
                 if (code != null) {
@@ -287,6 +338,8 @@ internal data class MessageRuleJson(
     val priority: Int = 0,
     @Json(name = "fast_fail")
     val fastFail: MessageRuleFastFail? = null,
+    @Json(name = "data_usage_status")
+    val dataUsageStatus: String? = null,
     val conditions: MessageRuleConditions,
 )
 

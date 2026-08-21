@@ -5,6 +5,8 @@ import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.ExpressDeliveryCard
 import vip.mystery0.pixel.text.ui.message.cards.NormalMessageCard
 import vip.mystery0.pixel.text.ui.message.cards.VerificationCodeCard
+import vip.mystery0.pixel.text.ui.message.cards.carrier.DataUsageCard
+import vip.mystery0.pixel.text.ui.message.cards.carrier.MissedCallCard
 import vip.mystery0.pixel.text.ui.message.cards.finance.BankTransactionCard
 import vip.mystery0.pixel.text.ui.message.cards.finance.PhoneRechargeCard
 import vip.mystery0.pixel.text.ui.message.cards.ticket.FlightCard
@@ -25,6 +27,8 @@ object MessageCardFactory {
             is ParsedResult.BankTransaction -> BankTransactionCard(parsedResult, isSelected)
             is ParsedResult.PhoneRecharge -> PhoneRechargeCard(parsedResult, isSelected)
             is ParsedResult.ExpressDelivery -> ExpressDeliveryCard(parsedResult, isSelected)
+            is ParsedResult.MissedCall -> MissedCallCard(parsedResult, isSelected)
+            is ParsedResult.DataUsage -> DataUsageCard(parsedResult, isSelected)
             is ParsedResult.VerificationCode -> VerificationCodeCard(
                 content = content,
                 result = parsedResult,

@@ -50,12 +50,32 @@ sealed class ParsedResult {
         val details: Map<String, String>
     ) : ParsedResult()
 
+    data class MissedCall(
+        val phoneNumber: String,
+        val time: String? = null,
+        val location: String? = null,
+    ) : ParsedResult()
+
+    data class DataUsage(
+        val status: DataUsageStatus,
+        val primaryData: String?,
+        val dataLabel: String,
+        val cutoffTime: String? = null,
+        val details: Map<String, String> = emptyMap(),
+    ) : ParsedResult()
+
     data class Dynamic(
         val cardType: String,
         val fields: Map<String, String>
     ) : ParsedResult()
     
     data object None : ParsedResult()
+}
+
+enum class DataUsageStatus {
+    NORMAL,
+    LOW,
+    EXHAUSTED,
 }
 
 data class MessageModel(

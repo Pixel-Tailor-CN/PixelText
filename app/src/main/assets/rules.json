@@ -1,6 +1,63 @@
 {
-  "version": 2,
+  "version": 3,
   "rules": [
+    {
+      "id": "carrier_unicom_missed_call",
+      "target_card": "MissedCall",
+      "priority": 110,
+      "fast_fail": {
+        "keywords": [
+          "主叫",
+          "归属",
+          "时间"
+        ]
+      },
+      "conditions": {
+        "content_regex": "【联通助理】未接听\\s*主叫[：:]\\s*(?<phoneNumber>[+\\d][\\d -]{5,})\\s*归属[：:]\\s*(?<location>[^\\r\\n]+)\\s*时间[：:]\\s*(?<time>\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})"
+      }
+    },
+    {
+      "id": "data_unicom_exhausted_warning",
+      "target_card": "DataUsage",
+      "priority": 108,
+      "data_usage_status": "EXHAUSTED",
+      "fast_fail": {
+        "keywords": [
+          "流量用尽提醒"
+        ]
+      },
+      "conditions": {
+        "content_regex": "流量用尽提醒[：:]截至(?<cutoffTime>\\d{2}月\\d{2}日\\d{2}时\\d{2}分)[，,]?[“\"](?<planName>[^”\"]+)[”\"]部分(?<dataLabel>国内通用流量)已用尽；您[“\"]达量限速[”\"]流量已使用(?<throttledUsedData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))[，,]超过(?<throttleThreshold>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))后将被限速"
+      }
+    },
+    {
+      "id": "data_unicom_low_warning",
+      "target_card": "DataUsage",
+      "priority": 107,
+      "data_usage_status": "LOW",
+      "fast_fail": {
+        "keywords": [
+          "流量不足预警"
+        ]
+      },
+      "conditions": {
+        "content_regex": "【流量不足预警】截至(?<cutoffTime>\\d{2}月\\d{2}日\\d{2}时\\d{2}分)[，,]?[“\"](?<planName>[^”\"]+)[”\"]部分[：:](?<dataLabel>国内通用流量)已用(?<usedData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))[，,]剩余(?<remainingData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))；您[“\"]达量限速[”\"]流量已使用(?<throttledUsedData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))[，,]超过(?<throttleThreshold>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB))后将被限速"
+      }
+    },
+    {
+      "id": "data_cmcc_remaining_query",
+      "target_card": "DataUsage",
+      "priority": 105,
+      "data_usage_status": "NORMAL",
+      "fast_fail": {
+        "keywords": [
+          "剩余流量查询"
+        ]
+      },
+      "conditions": {
+        "content_regex": "【剩余流量查询】.*?本月套餐内流量共(?<totalData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB|K|M|G|T))[，,]已使用(?<usedData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB|K|M|G|T))[。.]目前(?<dataLabel>国内通用流量)剩余(?<remainingData>[0-9]+(?:\\.[0-9]+)?(?:KB|MB|GB|TB|K|M|G|T))"
+      }
+    },
     {
       "id": "bank_boc_credit_fail",
       "target_card": "BankTransaction",

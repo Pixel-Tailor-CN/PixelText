@@ -32,6 +32,7 @@ fun CardHeader(
     iconTint: Color,
     iconBg: Color,
     title: String,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
     dividerColor: Color = MaterialTheme.colorScheme.outlineVariant
 ) {
     Row(
@@ -56,7 +57,7 @@ fun CardHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmallEmphasized,
-            color = MaterialTheme.colorScheme.onSurface
+            color = titleColor
         )
     }
     HorizontalDivider(color = dividerColor)
@@ -91,7 +92,9 @@ fun InfoMapList(
     details: Map<String, String>,
     highlightKey: String? = null,
     highlightColor: Color = MaterialTheme.colorScheme.primary,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     if (details.isEmpty()) return
 
@@ -109,13 +112,13 @@ fun InfoMapList(
                     Text(
                         text = entry.key,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = labelColor
                     )
                     Spacer(modifier = Modifier.width(0.dp))
                     Text(
                         text = entry.value,
                         style = MaterialTheme.typography.bodyMediumEmphasized,
-                        color = if (entry.key == highlightKey) highlightColor else MaterialTheme.colorScheme.onSurface
+                        color = if (entry.key == highlightKey) highlightColor else valueColor
                     )
                 }
                 if (index < details.size - 1) {
