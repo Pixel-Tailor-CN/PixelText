@@ -13,8 +13,10 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
@@ -176,22 +178,31 @@ object SmsNotificationHelper {
         }
         val orderedActions = orderNotificationActions(actionConfigs, actionMap)
 
+        val senderPerson = Person.Builder()
+            .setName(displaySender)
+            .setIcon(
+                avatarPath
+                    ?.let(BitmapFactory::decodeFile)
+                    ?.let(IconCompat::createWithBitmap)
+            )
+            .build()
+        val messagingStyle = NotificationCompat.MessagingStyle(
+            Person.Builder()
+                .setName(context.getString(R.string.app_name))
+                .build()
+        ).addMessage(body, System.currentTimeMillis(), senderPerson)
+
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID_SMS)
             .setSmallIcon(resolveSmallIcon(context))
             .setContentTitle(displaySender)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setStyle(messagingStyle)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAllowSystemGeneratedContextualActions(false)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
             .setGroup("sms_group_$threadId")
-            .apply {
-                avatarPath?.let { path ->
-                    BitmapFactory.decodeFile(path)?.let(::setLargeIcon)
-                }
-            }
 
         verificationCode
             ?.takeIf { shouldHideVerificationCodeOnLockScreen(context) }
