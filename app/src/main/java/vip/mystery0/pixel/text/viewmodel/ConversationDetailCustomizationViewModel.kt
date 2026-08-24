@@ -81,24 +81,11 @@ class ConversationDetailCustomizationViewModel(
             ) { configuration, highTextContrastEnabled ->
                 configuration to highTextContrastEnabled
             }.collect { (configuration, highTextContrastEnabled) ->
-                val current = _uiState.value
-                val dirty = current.draftTheme != baseConfiguration
-                if (!dirty && !current.isSaving) {
-                    if (imageDrafts.isNotEmpty()) {
-                        discardAllImageDrafts()
-                    }
-                    baseConfiguration = configuration
-                    publish(
-                        persistedTheme = configuration,
-                        draftTheme = configuration,
-                        highTextContrastEnabled = highTextContrastEnabled,
-                    )
-                } else {
-                    publish(
-                        persistedTheme = configuration,
-                        highTextContrastEnabled = highTextContrastEnabled,
-                    )
-                }
+                // Rebase / dirty handling is centralized in publish (including stale-clean).
+                publish(
+                    persistedTheme = configuration,
+                    highTextContrastEnabled = highTextContrastEnabled,
+                )
             }
         }
     }
@@ -329,23 +316,29 @@ class ConversationDetailCustomizationViewModel(
         // Claim save synchronously before launching to prevent duplicate concurrent saves.
         val draftSnapshot = current.draftTheme
         val baseSnapshot = baseConfiguration
-        val latestSnapshot = current.persistedTheme
         publish(isSaving = true)
         viewModelScope.launch {
             val newlyCommitted = mutableListOf<ThemeImageReference>()
             var jsonSaved = false
             try {
-                val merged = mergeThemeConfigurations(
-                    base = baseSnapshot,
+                // Commit draft image files first so the mutex-protected merge only writes formal refs.
+                val draftWithFormalBackgrounds = commitDraftBackgrounds(
                     draft = draftSnapshot,
-                    latest = latestSnapshot,
-                )
-                val withFormalBackgrounds = commitDraftBackgrounds(
-                    draft = merged,
                     newlyCommitted = newlyCommitted,
                 )
-                val finalConfiguration = withFormalBackgrounds.normalized()
-                val saveResult = themeRepository.save(finalConfiguration)
+                // Capture latest-before / merged-after inside the repository mutex transform.
+                var latestBefore: ThemeConfiguration? = null
+                var mergedAfter: ThemeConfiguration? = null
+                val saveResult = themeRepository.update { latest ->
+                    latestBefore = latest
+                    val merged = mergeThemeConfigurations(
+                        base = baseSnapshot,
+                        draft = draftWithFormalBackgrounds,
+                        latest = latest,
+                    ).normalized()
+                    mergedAfter = merged
+                    merged
+                }
                 if (saveResult.isFailure) {
                     newlyCommitted.forEach(themeAssetRepository::deleteAsset)
                     Log.w(
@@ -359,8 +352,13 @@ class ConversationDetailCustomizationViewModel(
                 }
                 jsonSaved = true
 
-                // Delete assets present on the latest persisted snapshot but no longer referenced.
-                val oldReferences = latestSnapshot.backgroundReferences()
+                val persistedLatest = latestBefore
+                    ?: error("theme save missing latest-before capture")
+                val finalConfiguration = mergedAfter
+                    ?: error("theme save missing merged-after capture")
+
+                // Delete assets present on the actual pre-merge snapshot but no longer referenced.
+                val oldReferences = persistedLatest.backgroundReferences()
                 val newReferences = finalConfiguration.backgroundReferences()
                 (oldReferences - newReferences).forEach(themeAssetRepository::deleteAsset)
 
@@ -585,13 +583,29 @@ class ConversationDetailCustomizationViewModel(
         highTextContrastEnabled: Boolean = _uiState.value.highTextContrastEnabled,
         isSaving: Boolean = _uiState.value.isSaving,
     ) {
+        var nextBase = baseConfiguration
+        var nextDraft = draftTheme
+        val nextPersisted = persistedTheme
+
+        // Stale-clean rebase: draft matches the old base while persisted moved on (external
+        // update while dirty, then user undid back to base). Do not treat stale base as clean.
+        // Skip while saving so in-flight save publication is not disrupted.
+        if (!isSaving && nextDraft == nextBase && nextBase != nextPersisted) {
+            if (imageDrafts.isNotEmpty()) {
+                discardAllImageDrafts()
+            }
+            nextBase = nextPersisted
+            nextDraft = nextPersisted
+            baseConfiguration = nextBase
+        }
+
         _uiState.value = ConversationDetailCustomizationUiState(
-            persistedTheme = persistedTheme,
-            draftTheme = draftTheme,
+            persistedTheme = nextPersisted,
+            draftTheme = nextDraft,
             previewMode = previewMode,
             highTextContrastEnabled = highTextContrastEnabled,
             isSaving = isSaving,
-            hasUnsavedChanges = draftTheme != baseConfiguration,
+            hasUnsavedChanges = nextDraft != baseConfiguration,
         )
     }
 

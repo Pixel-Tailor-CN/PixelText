@@ -44,6 +44,17 @@ data class ThemeColorReference(
 // Decoded by ThemeImageReferenceAdapter so malformed assetId becomes field-level null.
 data class ThemeImageReference(val assetId: String)
 
+/** Persisted theme asset / draft file id: nonempty `[a-zA-Z0-9_-]+`. */
+private val PERSISTED_THEME_ASSET_ID_PATTERN = Regex("[a-zA-Z0-9_-]+")
+
+/**
+ * True when [assetId] is safe to persist and resolve as a theme asset file stem.
+ * Blank, path-like, or otherwise malformed ids must decode/normalize to null.
+ */
+fun isValidPersistedThemeAssetId(assetId: String): Boolean {
+    return assetId.isNotEmpty() && PERSISTED_THEME_ASSET_ID_PATTERN.matches(assetId)
+}
+
 enum class ThemeMode { LIGHT, DARK }
 
 enum class ThemeColorType { MATERIAL_ROLE, CUSTOM_ARGB }
@@ -157,7 +168,7 @@ private fun ThemeColorReference?.normalizedOrNull(): ThemeColorReference? {
 private fun ThemeImageReference?.normalizedOrNull(): ThemeImageReference? {
     val reference = this ?: return null
     val assetId = reference.assetId.trim()
-    if (assetId.isEmpty()) {
+    if (!isValidPersistedThemeAssetId(assetId)) {
         return null
     }
     return ThemeImageReference(assetId = assetId)

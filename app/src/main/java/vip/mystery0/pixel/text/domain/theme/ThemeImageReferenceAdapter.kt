@@ -50,7 +50,7 @@ class ThemeImageReferenceAdapter : JsonAdapter<ThemeImageReference>() {
         }
         reader.endObject()
         val normalized = assetId?.trim().orEmpty()
-        if (normalized.isEmpty()) {
+        if (!isValidPersistedThemeAssetId(normalized)) {
             return null
         }
         return ThemeImageReference(assetId = normalized)

@@ -14,6 +14,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeImageDraft
 import vip.mystery0.pixel.text.domain.theme.ThemeImageReference
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
+import vip.mystery0.pixel.text.domain.theme.isValidPersistedThemeAssetId
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -274,9 +275,7 @@ class ThemeAssetRepositoryImpl(
         return candidate
     }
 
-    private fun isSafeId(id: String): Boolean {
-        return id.isNotEmpty() && SAFE_ID.matches(id)
-    }
+    private fun isSafeId(id: String): Boolean = isValidPersistedThemeAssetId(id)
 
     private companion object {
         private const val TAG = "ThemeAssetRepository"
@@ -285,6 +284,5 @@ class ThemeAssetRepositoryImpl(
         private const val MAX_BACKGROUND_EDGE_PX = 2160
         private const val WEBP_QUALITY = 88
         private const val STALE_DRAFT_AGE_MILLIS = 24L * 60 * 60 * 1000
-        private val SAFE_ID = Regex("[a-zA-Z0-9_-]+")
     }
 }
