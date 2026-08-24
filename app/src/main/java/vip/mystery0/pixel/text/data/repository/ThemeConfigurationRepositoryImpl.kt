@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -15,6 +16,7 @@ import vip.mystery0.pixel.text.domain.theme.ConversationDetailThemeModule
 import vip.mystery0.pixel.text.domain.theme.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MIN_CONVERSATION_DETAIL_TEXT_SCALE
+import vip.mystery0.pixel.text.domain.theme.ThemeColorReferenceAdapter
 import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
 import vip.mystery0.pixel.text.domain.theme.normalized
@@ -27,10 +29,11 @@ class ThemeConfigurationRepositoryImpl(
     private val legacyPrefs =
         context.getSharedPreferences(LEGACY_APP_PREFS_NAME, Context.MODE_PRIVATE)
     private val adapter = Moshi.Builder()
+        .add(ThemeColorReferenceAdapter.FACTORY)
         .build()
         .adapter(ThemeConfiguration::class.java)
     private val mutex = Mutex()
-    private val _configuration = MutableStateFlow(readOrMigrate())
+    private val _configuration = MutableStateFlow(loadInitialConfiguration())
     override val configuration: StateFlow<ThemeConfiguration> = _configuration.asStateFlow()
 
     override suspend fun save(configuration: ThemeConfiguration): Result<Unit> {
@@ -45,6 +48,15 @@ class ThemeConfigurationRepositoryImpl(
         return mutex.withLock {
             val next = transform(_configuration.value).normalized()
             persist(next)
+        }
+    }
+
+    private fun loadInitialConfiguration(): ThemeConfiguration {
+        // SharedPreferences migration/commit stays off the caller thread (often main via Koin).
+        return runBlocking(Dispatchers.IO) {
+            mutex.withLock {
+                readOrMigrate()
+            }
         }
     }
 
@@ -98,7 +110,12 @@ class ThemeConfigurationRepositoryImpl(
                 )
                 ThemeConfiguration()
             } else {
-                parsed.normalized()
+                val normalized = parsed.normalized()
+                // Retry leftover legacy-key removal after a prior successful theme write.
+                if (legacyPrefs.contains(LEGACY_TEXT_SCALE_KEY)) {
+                    clearLegacyTextScale()
+                }
+                normalized
             }
         } catch (error: Exception) {
             Log.w(
@@ -127,9 +144,12 @@ class ThemeConfigurationRepositoryImpl(
     }
 
     private fun clearLegacyTextScale() {
-        legacyPrefs.edit()
+        val removed = legacyPrefs.edit()
             .remove(LEGACY_TEXT_SCALE_KEY)
             .commit()
+        if (!removed) {
+            Log.w(TAG, "theme legacy scale remove failed")
+        }
     }
 
     private companion object {

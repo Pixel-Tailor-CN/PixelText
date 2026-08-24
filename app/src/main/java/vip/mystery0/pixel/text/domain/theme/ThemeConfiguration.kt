@@ -35,7 +35,7 @@ data class ConversationDetailAppearance(
     val backgroundImage: ThemeImageReference? = null,
 )
 
-@JsonClass(generateAdapter = true)
+// Decoded by ThemeColorReferenceAdapter so unknown type/value becomes field-level null.
 data class ThemeColorReference(
     val type: ThemeColorType,
     val value: String,
