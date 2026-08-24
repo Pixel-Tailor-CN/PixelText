@@ -150,7 +150,8 @@ fun ConversationDetailCustomizationScreen(
         }
     }
 
-    BackHandler(enabled = !state.isSaving, onBack = ::requestNavigateBack)
+    // Always enabled so system back is consumed while saving; requestNavigateBack no-ops then.
+    BackHandler(onBack = ::requestNavigateBack)
 
     Scaffold(
         topBar = {
@@ -527,6 +528,7 @@ fun ConversationDetailCustomizationScreen(
                 current = pickerConfig.current,
                 colorScheme = previewScheme,
                 comparisonBackground = pickerConfig.comparisonBackground,
+                officialDefault = pickerConfig.officialDefault,
                 onDismiss = { colorTarget = null },
                 onConfirm = { reference ->
                     when (activeColorTarget) {
@@ -653,6 +655,7 @@ private data class ColorPickerConfig(
     val title: String,
     val current: ThemeColorReference?,
     val comparisonBackground: Color,
+    val officialDefault: Color,
     val selectedActsAsBackground: Boolean = false,
 )
 
@@ -663,6 +666,7 @@ private fun colorPickerConfig(
 ): ColorPickerConfig {
     val defaultText = colorScheme.onSurface
     val defaultBubble = colorScheme.surfaceVariant
+    val defaultInput = colorScheme.surfaceVariant.copy(alpha = 0.5f)
     val receivedText = appearance.receivedTextColor.resolveOr(colorScheme, defaultText)
     val receivedBubble = appearance.receivedBubbleColor.resolveOr(colorScheme, defaultBubble)
     val sentText = appearance.sentTextColor.resolveOr(colorScheme, defaultText)
@@ -672,28 +676,33 @@ private fun colorPickerConfig(
             title = "接收文字颜色",
             current = appearance.receivedTextColor,
             comparisonBackground = receivedBubble,
+            officialDefault = defaultText,
         )
         ThemeColorTarget.RECEIVED_BUBBLE -> ColorPickerConfig(
             title = "接收气泡颜色",
             current = appearance.receivedBubbleColor,
             comparisonBackground = receivedText,
+            officialDefault = defaultBubble,
             selectedActsAsBackground = true,
         )
         ThemeColorTarget.SENT_TEXT -> ColorPickerConfig(
             title = "发送文字颜色",
             current = appearance.sentTextColor,
             comparisonBackground = sentBubble,
+            officialDefault = defaultText,
         )
         ThemeColorTarget.SENT_BUBBLE -> ColorPickerConfig(
             title = "发送气泡颜色",
             current = appearance.sentBubbleColor,
             comparisonBackground = sentText,
+            officialDefault = defaultBubble,
             selectedActsAsBackground = true,
         )
         ThemeColorTarget.INPUT_BACKGROUND -> ColorPickerConfig(
             title = "输入区域背景色",
             current = appearance.inputBackgroundColor,
             comparisonBackground = colorScheme.onSurfaceVariant,
+            officialDefault = defaultInput,
             selectedActsAsBackground = true,
         )
     }

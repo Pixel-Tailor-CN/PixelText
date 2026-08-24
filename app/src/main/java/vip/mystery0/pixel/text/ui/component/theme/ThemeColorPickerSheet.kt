@@ -119,6 +119,11 @@ fun ThemeColorPickerSheet(
     current: ThemeColorReference?,
     colorScheme: ColorScheme,
     comparisonBackground: Color,
+    /**
+     * Target-specific official default used for “使用官方默认” preview/contrast and as the
+     * starting custom HSV when [current] is null (e.g. surfaceVariant for bubbles).
+     */
+    officialDefault: Color,
     onDismiss: () -> Unit,
     onConfirm: (ThemeColorReference?) -> Unit,
     /**
@@ -131,8 +136,8 @@ fun ThemeColorPickerSheet(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
-    val initialResolved = current.resolveOr(colorScheme, colorScheme.primary)
-    val initialHsv = remember(current, colorScheme) { initialResolved.toHsv() }
+    val initialResolved = current.resolveOr(colorScheme, officialDefault)
+    val initialHsv = remember(current, colorScheme, officialDefault) { initialResolved.toHsv() }
 
     var source by remember(current) {
         mutableStateOf(
@@ -150,13 +155,15 @@ fun ThemeColorPickerSheet(
                 ?.let { MaterialColorRole.fromStorageValue(it.value) },
         )
     }
-    var hue by remember(current, colorScheme) { mutableFloatStateOf(initialHsv[0]) }
-    var saturation by remember(current, colorScheme) { mutableFloatStateOf(initialHsv[1]) }
-    var value by remember(current, colorScheme) { mutableFloatStateOf(initialHsv[2]) }
-    var customAlpha by remember(current, colorScheme) {
+    var hue by remember(current, colorScheme, officialDefault) { mutableFloatStateOf(initialHsv[0]) }
+    var saturation by remember(current, colorScheme, officialDefault) {
+        mutableFloatStateOf(initialHsv[1])
+    }
+    var value by remember(current, colorScheme, officialDefault) { mutableFloatStateOf(initialHsv[2]) }
+    var customAlpha by remember(current, colorScheme, officialDefault) {
         mutableFloatStateOf(initialResolved.alpha.coerceIn(0f, 1f))
     }
-    var hexInput by remember(current, colorScheme) {
+    var hexInput by remember(current, colorScheme, officialDefault) {
         mutableStateOf(initialResolved.toThemeHex())
     }
     var hexEdited by remember(current) { mutableStateOf(false) }
@@ -186,7 +193,7 @@ fun ThemeColorPickerSheet(
         ColorPickerSource.MATERIAL_ROLE -> selectedRole != null
         ColorPickerSource.CUSTOM -> parsedHex != null
     }
-    val previewColor = selectedColor ?: colorScheme.onSurface
+    val previewColor = selectedColor ?: officialDefault
     val previewForeground = if (selectedActsAsBackground) comparisonBackground else previewColor
     val previewBackground = if (selectedActsAsBackground) previewColor else comparisonBackground
     val ratio = contrastRatio(previewForeground, previewBackground)
@@ -228,7 +235,7 @@ fun ThemeColorPickerSheet(
                         selected = source == ColorPickerSource.DEFAULT,
                         title = "使用官方默认",
                         supporting = "跟随 Material You 默认样式",
-                        swatch = colorScheme.onSurface,
+                        swatch = officialDefault,
                         onClick = {
                             source = ColorPickerSource.DEFAULT
                             selectedRole = null
