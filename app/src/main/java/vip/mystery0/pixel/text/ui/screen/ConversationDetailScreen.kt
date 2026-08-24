@@ -181,6 +181,9 @@ fun ConversationDetailScreen(
     // Last attempt whose success/failure UI handling finished; when behind persist generation,
     // ignore older StateFlow emissions so a slower prior save cannot clobber a newer preview.
     var textScaleResolvedGeneration by remember { mutableIntStateOf(0) }
+    // Latest persist generation that failed and still needs UI rollback when zoom is inactive.
+    // Do not advance resolvedGeneration on failure until this is reconciled.
+    var textScaleFailedGeneration by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(detailStyle.textScale) {
@@ -189,6 +192,26 @@ fun ConversationDetailScreen(
         ) {
             textScale = detailStyle.textScale
         }
+    }
+    // Reconcile failed pinch persistence on gesture/generation transitions, not only on
+    // repository scale emissions (failed writes do not update StateFlow).
+    LaunchedEffect(
+        isZoomGestureActive,
+        textScaleFailedGeneration,
+        textScalePersistGeneration,
+        textScaleResolvedGeneration,
+    ) {
+        if (isZoomGestureActive) return@LaunchedEffect
+        val failedGeneration = textScaleFailedGeneration
+        if (failedGeneration == 0 ||
+            failedGeneration != textScalePersistGeneration ||
+            failedGeneration <= textScaleResolvedGeneration
+        ) {
+            return@LaunchedEffect
+        }
+        textScale = themeRepository.configuration.value.conversationDetail.textScale
+        textScaleResolvedGeneration = failedGeneration
+        snackbarHostState.showSnackbar("文字大小保存失败")
     }
     val zoomGestureModifier = Modifier.pointerInput(Unit) {
         awaitEachGesture {
@@ -224,8 +247,8 @@ fun ConversationDetailScreen(
                 val finalScale = gestureScale
                 val persistGeneration = textScalePersistGeneration + 1
                 textScalePersistGeneration = persistGeneration
-                // Persistence itself is non-cancellable inside the repository. Rollback / Snackbar
-                // stay on this lifecycle-bound scope so disposed UI is not mutated.
+                // Persistence itself is non-cancellable inside the repository. Failure is only
+                // recorded here; UI rollback + Snackbar run when zoom is inactive via LaunchedEffect.
                 coroutineScope.launch {
                     val result = themeRepository.update { latest ->
                         latest.copy(
@@ -237,12 +260,10 @@ fun ConversationDetailScreen(
                     if (persistGeneration != textScalePersistGeneration) {
                         return@launch
                     }
-                    if (result.isFailure && !isZoomGestureActive) {
-                        textScale =
-                            themeRepository.configuration.value.conversationDetail.textScale
-                        snackbarHostState.showSnackbar("文字大小保存失败")
-                    }
-                    if (persistGeneration == textScalePersistGeneration) {
+                    if (result.isFailure) {
+                        // Keep resolvedGeneration behind until zoom-inactive reconciliation runs.
+                        textScaleFailedGeneration = persistGeneration
+                    } else {
                         textScaleResolvedGeneration = persistGeneration
                     }
                 }
