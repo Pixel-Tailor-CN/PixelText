@@ -30,6 +30,7 @@ import androidx.navigation.navArgument
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
 import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
+import vip.mystery0.pixel.text.ui.screen.ConversationDetailCustomizationScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.HomeScreen
 import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
@@ -166,6 +167,9 @@ fun AppNavigation(
                     onNavigateToKeywordSpam = {
                         navController.navigate("keyword_spam")
                     },
+                    onNavigateToConversationDetailCustomization = {
+                        navController.navigate("conversation_detail_customization")
+                    },
                     resourceUpdateCheckRequestId = resourceUpdateCheckRequestId,
                     onResourceUpdateCheckRequestConsumed = {
                         resourceUpdateCheckRequestId = null
@@ -190,6 +194,11 @@ fun AppNavigation(
             composable("keyword_spam") {
                 KeywordSpamSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("conversation_detail_customization") {
+                ConversationDetailCustomizationScreen(
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
             composable("sample_submission") {

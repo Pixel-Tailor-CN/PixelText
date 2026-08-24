@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shield
@@ -130,6 +131,7 @@ fun SettingsScreen(
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
+    onNavigateToConversationDetailCustomization: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
     onResourceUpdateCheckRequestConsumed: () -> Unit = {},
 ) {
@@ -361,6 +363,20 @@ fun SettingsScreen(
                                     Icon(Icons.Rounded.UploadFile, contentDescription = null)
                                 },
                                 onClick = onNavigateToSampleSubmission
+                            )
+                        }
+                        preferenceCategory(
+                            key = "category_display",
+                            title = { Text("显示与外观") },
+                        )
+                        item(key = "conversation_detail_customization", contentType = "Preference") {
+                            Preference(
+                                title = { Text("会话详情显示") },
+                                summary = { Text("自定义原文气泡、输入区域、背景图片和 SIM 信息") },
+                                icon = {
+                                    Icon(Icons.Rounded.Palette, contentDescription = null)
+                                },
+                                onClick = onNavigateToConversationDetailCustomization,
                             )
                         }
                         preferenceCategory(
