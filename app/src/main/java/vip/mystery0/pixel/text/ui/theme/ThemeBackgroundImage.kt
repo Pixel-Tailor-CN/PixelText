@@ -19,8 +19,8 @@ private const val TAG = "ThemeBackgroundImage"
 @Composable
 fun ThemeBackgroundImage(
     file: File?,
-    contentDescription: String? = null,
     modifier: Modifier = Modifier,
+    contentDescription: String? = null,
 ) {
     val path = file?.absolutePath
     val bitmap by produceState<ImageBitmap?>(initialValue = null, path) {

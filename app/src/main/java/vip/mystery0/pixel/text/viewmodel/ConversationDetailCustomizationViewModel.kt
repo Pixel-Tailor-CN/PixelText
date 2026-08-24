@@ -395,7 +395,6 @@ class ConversationDetailCustomizationViewModel(
         selectionJobs.clear()
         imageDrafts.values.forEach(themeAssetRepository::discardDraft)
         imageDrafts.clear()
-        super.onCleared()
     }
 
     private fun cancelSelection(mode: ThemeMode) {

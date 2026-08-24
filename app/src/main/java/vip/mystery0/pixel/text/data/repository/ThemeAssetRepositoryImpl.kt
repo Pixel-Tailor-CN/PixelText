@@ -3,8 +3,9 @@ package vip.mystery0.pixel.text.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
-import android.net.Uri
 import android.util.Log
+import androidx.core.graphics.scale
+import androidx.core.net.toUri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -171,7 +172,7 @@ class ThemeAssetRepositoryImpl(
     }
 
     private fun decodeAndCompressToWebp(sourceUri: String, outputFile: File) {
-        val uri = Uri.parse(sourceUri)
+        val uri = sourceUri.toUri()
         val source = ImageDecoder.createSource(appContext.contentResolver, uri)
         var bitmap: Bitmap? = null
         var scaled: Bitmap? = null
@@ -230,7 +231,7 @@ class ThemeAssetRepositoryImpl(
         val scale = MAX_BACKGROUND_EDGE_PX.toFloat() / maxEdge.toFloat()
         val width = (bitmap.width * scale).toInt().coerceAtLeast(1)
         val height = (bitmap.height * scale).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+        return bitmap.scale(width, height)
     }
 
     private fun buildAssetId(mode: ThemeMode): String {
