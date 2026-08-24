@@ -176,6 +176,7 @@ fun ConversationDetailScreen(
     }
     var textScale by remember { mutableFloatStateOf(detailStyle.textScale) }
     var isZoomGestureActive by remember { mutableStateOf(false) }
+    var textScalePersistGeneration by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(detailStyle.textScale) {
@@ -215,13 +216,22 @@ fun ConversationDetailScreen(
             isZoomGestureActive = false
             if (zoomActive && gestureScale != startScale) {
                 val finalScale = gestureScale
+                val persistGeneration = textScalePersistGeneration + 1
+                textScalePersistGeneration = persistGeneration
                 coroutineScope.launch {
-                    themeRepository.update { latest ->
+                    val result = themeRepository.update { latest ->
                         latest.copy(
                             conversationDetail = latest.conversationDetail.copy(
                                 textScale = finalScale,
                             )
                         )
+                    }
+                    if (result.isFailure &&
+                        persistGeneration == textScalePersistGeneration &&
+                        !isZoomGestureActive
+                    ) {
+                        textScale = themeRepository.configuration.value.conversationDetail.textScale
+                        snackbarHostState.showSnackbar("文字大小保存失败")
                     }
                 }
             }
