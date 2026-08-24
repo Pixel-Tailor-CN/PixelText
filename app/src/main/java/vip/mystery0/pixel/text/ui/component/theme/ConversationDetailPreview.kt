@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.ui.message.MessageItem
@@ -35,16 +36,19 @@ import java.io.File
 
 val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
     MockMessageSpec(
-        // Plain conversational text that must stay ParsedResult.None so the preview
-        // initially renders the received original bubble (not a smart card).
-        content = "今天晚饭想吃火锅还是日料？我这边大概六点下班，可以先去拿号。如果路上堵车我会提前跟你说一声，别在外面干等。顺便帮我看一下周末那家店还要不要预约，最近人好像挺多的，最好能定个靠窗的位置。",
+        // Short multi-line conversational sample sized so received + sent bubbles,
+        // timestamps, and SIM labels stay visible through MAX textScale (1.8f).
+        // parsedResultOverride enforces original bubbles regardless of active rules.
+        content = "今天晚饭想吃火锅还是日料？我六点下班后直接过去。",
         isReceived = true,
         simName = "卡1",
+        parsedResultOverride = ParsedResult.None,
     ),
     MockMessageSpec(
         content = "好的，我稍后处理。",
         isReceived = false,
         simName = "卡1",
+        parsedResultOverride = ParsedResult.None,
     ),
 )
 

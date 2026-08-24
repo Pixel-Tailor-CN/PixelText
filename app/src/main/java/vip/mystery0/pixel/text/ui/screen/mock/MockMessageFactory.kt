@@ -1,12 +1,19 @@
 package vip.mystery0.pixel.text.ui.screen.mock
 
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 
 data class MockMessageSpec(
     val content: String,
     val isReceived: Boolean = true,
     val simName: String = "卡1",
+    /**
+     * When non-null, used as [MessageModel.parsedResult] instead of running [MessageParser].
+     * Preview samples set this to [ParsedResult.None] so original bubbles stay stable even if
+     * downloaded active rules would otherwise match the sample wording.
+     */
+    val parsedResultOverride: ParsedResult? = null,
 )
 
 class MockMessageFactory(
@@ -35,7 +42,8 @@ class MockMessageFactory(
                 timestamp = now - index * MESSAGE_INTERVAL_MILLIS,
                 simName = spec.simName,
                 isReceived = spec.isReceived,
-                parsedResult = messageParser.parse(sender, spec.content),
+                parsedResult = spec.parsedResultOverride
+                    ?: messageParser.parse(sender, spec.content),
             )
         }
     }
