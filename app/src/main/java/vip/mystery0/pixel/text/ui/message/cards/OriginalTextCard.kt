@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import vip.mystery0.pixel.text.ui.theme.readableLinkColor
 
 private val DefaultOriginalTextScale = 1f
 
@@ -40,19 +42,34 @@ fun OriginalTextCard(
     isSelected: Boolean = false,
     subject: String? = null,
     textScale: Float = DefaultOriginalTextScale,
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
+    val colorScheme = MaterialTheme.colorScheme
+    val resolvedBackgroundTarget =
+        if (isSelected) colorScheme.inverseSurface else backgroundColor
+    val resolvedTextTarget =
+        if (isSelected) colorScheme.inverseOnSurface else textColor
+    val preferredLink =
+        if (isSelected) colorScheme.inversePrimary else colorScheme.primary
+    val resolvedLinkTarget = readableLinkColor(
+        preferred = preferredLink,
+        textColor = resolvedTextTarget,
+        backgroundColor = resolvedBackgroundTarget,
+    )
+
+    val resolvedBackground by animateColorAsState(
+        targetValue = resolvedBackgroundTarget,
         animationSpec = tween(durationMillis = 200),
         label = "bubbleBackground"
     )
-    val textColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+    val resolvedText by animateColorAsState(
+        targetValue = resolvedTextTarget,
         animationSpec = tween(durationMillis = 200),
         label = "bubbleText"
     )
     val linkColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inversePrimary else MaterialTheme.colorScheme.primary,
+        targetValue = resolvedLinkTarget,
         animationSpec = tween(durationMillis = 200),
         label = "linkColor"
     )
@@ -121,7 +138,7 @@ fun OriginalTextCard(
 
     Surface(
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-        color = backgroundColor,
+        color = resolvedBackground,
         modifier = Modifier.widthIn(max = 320.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -129,7 +146,7 @@ fun OriginalTextCard(
                 Text(
                     text = subject,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        color = textColor,
+                        color = resolvedText,
                         fontWeight = FontWeight.Bold,
                         fontSize = scaledSubjectFontSize
                     )
@@ -142,7 +159,7 @@ fun OriginalTextCard(
                 Text(
                     text = annotatedString,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        color = textColor,
+                        color = resolvedText,
                         fontSize = scaledBodyFontSize
                     )
                 )

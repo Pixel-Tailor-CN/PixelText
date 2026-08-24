@@ -137,12 +137,6 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         }
     }
 
-    override fun setConversationDetailTextScale(scale: Float) {
-        updatePrefs {
-            putFloat(AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE, scale)
-        }
-    }
-
     override fun setRuleResourceVersion(version: String) {
         updatePrefs { putString(AppSettingsKeys.KEY_RULE_RESOURCE_VERSION, version) }
     }
@@ -305,12 +299,6 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             )
         ).storageId
 
-    override fun getConversationDetailTextScale(): Float =
-        prefs.getFloat(
-            AppSettingsKeys.KEY_CONVERSATION_DETAIL_TEXT_SCALE,
-            AppSettingsKeys.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
-        )
-
     override fun getRuleResourceVersion(): String =
         prefs.getString(
             AppSettingsKeys.KEY_RULE_RESOURCE_VERSION,
@@ -381,7 +369,6 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             leftSwipeAction = getLeftSwipeAction(),
             notificationQuickActionConfigs = getNotificationQuickActionConfigs(),
             smsNotificationIconId = getSmsNotificationIconId(),
-            conversationDetailTextScale = getConversationDetailTextScale(),
             ruleResourceVersion = getRuleResourceVersion(),
             spamModelResourceVersion = getSpamModelResourceVersion(),
             vocabResourceVersion = getVocabResourceVersion(),

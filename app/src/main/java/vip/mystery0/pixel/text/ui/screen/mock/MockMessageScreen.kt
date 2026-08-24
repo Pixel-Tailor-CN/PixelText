@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.screen.mock
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +23,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
+import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.ui.message.MessageItem
+import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
 
 @Composable
 fun MockMessageScreen(
@@ -31,6 +35,13 @@ fun MockMessageScreen(
     val mockMessages = remember(messageFactory) {
         messageFactory.create(MOCK_SMS_MESSAGES)
     }
+    val mode = if (isSystemInDarkTheme()) ThemeMode.DARK else ThemeMode.LIGHT
+    val detailStyle = resolveConversationDetailStyle(
+        configuration = ThemeConfiguration(),
+        mode = mode,
+        colorScheme = MaterialTheme.colorScheme,
+        highTextContrastEnabled = false,
+    )
 
     Scaffold(
         topBar = {
@@ -54,7 +65,15 @@ fun MockMessageScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             items(mockMessages) { message ->
-                MessageItem(message, false, 1f, onClick = {}, onLongClick = {})
+                MessageItem(
+                    message = message,
+                    isSelected = false,
+                    textScale = detailStyle.textScale,
+                    originalMessageStyle = detailStyle.originalMessage,
+                    showSimInfo = detailStyle.showSimInfo,
+                    onClick = {},
+                    onLongClick = {},
+                )
             }
             item {
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))

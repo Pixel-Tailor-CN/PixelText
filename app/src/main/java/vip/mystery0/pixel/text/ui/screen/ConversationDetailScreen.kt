@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,7 +98,15 @@ import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.sample.sampleCategory
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
+import vip.mystery0.pixel.text.domain.theme.MIN_CONVERSATION_DETAIL_TEXT_SCALE
+import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
+import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
+import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.ui.message.MessageItem
+import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
+import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
+import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
@@ -123,8 +132,20 @@ fun ConversationDetailScreen(
     initialMessageText: String = "",
     viewModel: ConversationDetailViewModel = koinViewModel(),
     settingsRepository: AppSettingsRepository = koinInject(),
+    themeRepository: ThemeConfigurationRepository = koinInject(),
+    themeAssetRepository: ThemeAssetRepository = koinInject(),
+    highTextContrastMonitor: HighTextContrastMonitor = koinInject(),
 ) {
     val appSettings by settingsRepository.settings.collectAsState()
+    val themeConfiguration by themeRepository.configuration.collectAsState()
+    val highTextContrast by highTextContrastMonitor.enabled.collectAsState()
+    val mode = if (isSystemInDarkTheme()) ThemeMode.DARK else ThemeMode.LIGHT
+    val detailStyle = resolveConversationDetailStyle(
+        themeConfiguration,
+        mode,
+        MaterialTheme.colorScheme,
+        highTextContrast,
+    )
     val effectiveContentFilter = if (appSettings.spamIsolationEnabled) {
         requestedContentFilter
     } else {
@@ -153,15 +174,21 @@ fun ConversationDetailScreen(
     var showAddressInTitle by remember(threadId, address) {
         mutableStateOf(false)
     }
-    var textScale by remember {
-        mutableFloatStateOf(settingsRepository.getConversationDetailTextScale())
-    }
+    var textScale by remember { mutableFloatStateOf(detailStyle.textScale) }
     var isZoomGestureActive by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(detailStyle.textScale) {
+        if (!isZoomGestureActive) {
+            textScale = detailStyle.textScale
+        }
+    }
     val zoomGestureModifier = Modifier.pointerInput(Unit) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             var zoomActive = false
-            var gestureScale = textScale
+            val startScale = textScale
+            var gestureScale = startScale
             do {
                 val event = awaitPointerEvent()
                 val multiTouch = event.changes.count { it.pressed } > 1
@@ -172,12 +199,11 @@ fun ConversationDetailScreen(
                         val updatedScale = (gestureScale * zoom)
                             .coerceIn(
                                 MIN_CONVERSATION_DETAIL_TEXT_SCALE,
-                                MAX_CONVERSATION_DETAIL_TEXT_SCALE
+                                MAX_CONVERSATION_DETAIL_TEXT_SCALE,
                             )
                         if (updatedScale != gestureScale) {
                             gestureScale = updatedScale
                             textScale = updatedScale
-                            settingsRepository.setConversationDetailTextScale(updatedScale)
                         }
                         zoomActive = true
                     }
@@ -187,10 +213,20 @@ fun ConversationDetailScreen(
                 }
             } while (event.changes.any { it.pressed })
             isZoomGestureActive = false
+            if (zoomActive && gestureScale != startScale) {
+                val finalScale = gestureScale
+                coroutineScope.launch {
+                    themeRepository.update { latest ->
+                        latest.copy(
+                            conversationDetail = latest.conversationDetail.copy(
+                                textScale = finalScale,
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
     val selectedMessage = if (selectedMessageIds.size == 1) {
         (uiState as? MessageUiState.Success)
             ?.messages
@@ -494,7 +530,7 @@ fun ConversationDetailScreen(
         bottomBar = {
             Column {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    color = detailStyle.inputArea.backgroundColor,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -529,7 +565,7 @@ fun ConversationDetailScreen(
                                 ) {
                                     if (messageText.isEmpty()) {
                                         Text(
-                                            text = "请输入",
+                                            text = detailStyle.inputPlaceholder,
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -612,18 +648,22 @@ fun ConversationDetailScreen(
                         }
                 }
 
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
                         .then(zoomGestureModifier)
                 ) {
+                    ThemeBackgroundImage(
+                        file = detailStyle.background.image
+                            ?.let(themeAssetRepository::resolve),
+                        modifier = Modifier.matchParentSize(),
+                    )
                     LazyColumn(
                         state = listState,
                         userScrollEnabled = !isZoomGestureActive,
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .padding(horizontal = 16.dp),
                         contentPadding = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -640,6 +680,8 @@ fun ConversationDetailScreen(
                                 isSelected = isSelected,
                                 isHighlighted = isTargetHighlighted,
                                 textScale = textScale,
+                                originalMessageStyle = detailStyle.originalMessage,
+                                showSimInfo = detailStyle.showSimInfo,
                                 manualSpamCheckState = manualSpamChecks[message.id],
                                 onCheckSpam = { viewModel.checkSpamOnce(message) },
                                 onClick = {
@@ -808,8 +850,6 @@ private fun SimSelectorButton(
 private const val SPAM_THRESHOLD = 0.7f
 private const val TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS = 1_100L
 private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
-private const val MIN_CONVERSATION_DETAIL_TEXT_SCALE = 0.85f
-private const val MAX_CONVERSATION_DETAIL_TEXT_SCALE = 1.8f
 
 private class AboveAnchorPositionProvider(
     private val verticalGapPx: Int

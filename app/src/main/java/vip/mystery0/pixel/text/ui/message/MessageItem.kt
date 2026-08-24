@@ -40,6 +40,7 @@ import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageIndicator
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
+import vip.mystery0.pixel.text.ui.theme.ResolvedOriginalMessageStyle
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,6 +51,8 @@ fun MessageItem(
     message: MessageModel,
     isSelected: Boolean,
     textScale: Float,
+    originalMessageStyle: ResolvedOriginalMessageStyle,
+    showSimInfo: Boolean = true,
     isHighlighted: Boolean = false,
     manualSpamCheckState: ManualSpamCheckState? = null,
     onCheckSpam: () -> Unit = {},
@@ -60,6 +63,16 @@ fun MessageItem(
     showSpamContentByDefault: Boolean = false,
     showVerificationCodeContentByDefault: Boolean = true,
 ) {
+    val bubbleColor = if (message.isReceived) {
+        originalMessageStyle.receivedBubbleColor
+    } else {
+        originalMessageStyle.sentBubbleColor
+    }
+    val textColor = if (message.isReceived) {
+        originalMessageStyle.receivedTextColor
+    } else {
+        originalMessageStyle.sentTextColor
+    }
     val highlightAlpha = remember(message.stableKey) { Animatable(0f) }
     val highlightColor = MaterialTheme.colorScheme.primary
     LaunchedEffect(isHighlighted) {
@@ -139,7 +152,9 @@ fun MessageItem(
                                 content = message.content,
                                 isSelected = isSelected,
                                 subject = message.mmsSubject,
-                                textScale = textScale
+                                textScale = textScale,
+                                backgroundColor = bubbleColor,
+                                textColor = textColor,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             SpamMessageIndicator(isSelected = isSelected)
@@ -152,7 +167,9 @@ fun MessageItem(
                                 content = message.content,
                                 isSelected = isSelected,
                                 subject = message.mmsSubject,
-                                textScale = textScale
+                                textScale = textScale,
+                                backgroundColor = bubbleColor,
+                                textColor = textColor,
                             )
                         }
 
@@ -170,7 +187,9 @@ fun MessageItem(
                                 content = message.content,
                                 isSelected = isSelected,
                                 subject = message.mmsSubject,
-                                textScale = textScale
+                                textScale = textScale,
+                                backgroundColor = bubbleColor,
+                                textColor = textColor,
                             )
                         }
 
@@ -187,6 +206,8 @@ fun MessageItem(
                         content = "【不支持的消息】",
                         isSelected = isSelected,
                         textScale = textScale,
+                        backgroundColor = bubbleColor,
+                        textColor = textColor,
                     )
                 }
             }
@@ -210,27 +231,29 @@ fun MessageItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.padding(end = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (showSimInfo) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_sim),
-                        contentDescription = "SIM",
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = message.simName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_sim),
+                            contentDescription = "SIM",
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = message.simName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
