@@ -153,8 +153,9 @@ fun ConversationDetailCustomizationScreen(
     // Always enabled so system back is consumed while saving; requestNavigateBack no-ops then.
     BackHandler(onBack = ::requestNavigateBack)
 
-    Scaffold(
-        topBar = {
+    ConversationDetailPreviewTheme(mode = state.previewMode) { _ ->
+        Scaffold(
+            topBar = {
             TopAppBar(
                 navigationIcon = {
                     IconButton(
@@ -563,6 +564,7 @@ fun ConversationDetailCustomizationScreen(
                 selectedActsAsBackground = pickerConfig.selectedActsAsBackground,
             )
         }
+    }
     }
 }
 
