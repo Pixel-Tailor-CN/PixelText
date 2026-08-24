@@ -41,7 +41,7 @@ data class ThemeColorReference(
     val value: String,
 )
 
-@JsonClass(generateAdapter = true)
+// Decoded by ThemeImageReferenceAdapter so malformed assetId becomes field-level null.
 data class ThemeImageReference(val assetId: String)
 
 enum class ThemeMode { LIGHT, DARK }

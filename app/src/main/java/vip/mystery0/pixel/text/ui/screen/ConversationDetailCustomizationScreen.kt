@@ -294,6 +294,9 @@ fun ConversationDetailCustomizationScreen(
             item(key = "background_section") {
                 val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
                 val hasBackground = appearance.backgroundImage != null
+                // Prefer resolved file when available; otherwise ask for re-selection in-place.
+                val backgroundMissing = hasBackground &&
+                    viewModel.isBackgroundMissing(state.previewMode)
                 val backgroundEnabled = !state.highTextContrastEnabled && !state.isSaving
                 SettingsSectionCard(title = "会话背景") {
                     ListItem(
@@ -312,16 +315,22 @@ fun ConversationDetailCustomizationScreen(
                         },
                         supportingContent = {
                             Text(
-                                if (hasBackground) {
-                                    "已设置当前主题背景"
-                                } else {
-                                    "仅覆盖消息列表区域"
+                                when {
+                                    backgroundMissing -> "背景文件缺失，请重新选择"
+                                    hasBackground -> "已设置当前主题背景"
+                                    else -> "仅覆盖消息列表区域"
                                 },
                             )
                         },
                         colors = listItemColors(enabled = backgroundEnabled),
                         content = {
-                            Text(if (hasBackground) "更换背景图片" else "选择背景图片")
+                            Text(
+                                when {
+                                    backgroundMissing -> "重新选择背景图片"
+                                    hasBackground -> "更换背景图片"
+                                    else -> "选择背景图片"
+                                },
+                            )
                         },
                     )
                     HorizontalDivider()
@@ -332,7 +341,13 @@ fun ConversationDetailCustomizationScreen(
                             viewModel.removeBackground(state.previewMode)
                         },
                         supportingContent = {
-                            Text(if (hasBackground) "清除当前主题背景" else "当前未设置背景")
+                            Text(
+                                when {
+                                    backgroundMissing -> "可移除缺失引用或重新选择"
+                                    hasBackground -> "清除当前主题背景"
+                                    else -> "当前未设置背景"
+                                },
+                            )
                         },
                         colors = listItemColors(enabled = backgroundEnabled && hasBackground),
                         content = { Text("移除背景图片") },

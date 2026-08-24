@@ -20,6 +20,7 @@ import vip.mystery0.pixel.text.domain.theme.MIN_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.ThemeColorReferenceAdapter
 import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
+import vip.mystery0.pixel.text.domain.theme.ThemeImageReferenceAdapter
 import vip.mystery0.pixel.text.domain.theme.normalized
 
 class ThemeConfigurationRepositoryImpl(
@@ -31,6 +32,7 @@ class ThemeConfigurationRepositoryImpl(
         context.getSharedPreferences(LEGACY_APP_PREFS_NAME, Context.MODE_PRIVATE)
     private val adapter = Moshi.Builder()
         .add(ThemeColorReferenceAdapter.FACTORY)
+        .add(ThemeImageReferenceAdapter.FACTORY)
         .build()
         .adapter(ThemeConfiguration::class.java)
     private val mutex = Mutex()

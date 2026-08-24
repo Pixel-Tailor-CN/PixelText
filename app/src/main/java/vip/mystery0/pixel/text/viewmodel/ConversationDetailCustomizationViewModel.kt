@@ -55,6 +55,8 @@ class ConversationDetailCustomizationViewModel(
     private val selectionJobs = mutableMapOf<ThemeMode, Job>()
 
     private val initialConfiguration = themeRepository.configuration.value
+    // Snapshot the draft originated from; used for three-way merge on save.
+    private var baseConfiguration: ThemeConfiguration = initialConfiguration
     private val _uiState = MutableStateFlow(
         ConversationDetailCustomizationUiState(
             persistedTheme = initialConfiguration,
@@ -80,11 +82,12 @@ class ConversationDetailCustomizationViewModel(
                 configuration to highTextContrastEnabled
             }.collect { (configuration, highTextContrastEnabled) ->
                 val current = _uiState.value
-                val dirty = current.draftTheme != current.persistedTheme
+                val dirty = current.draftTheme != baseConfiguration
                 if (!dirty && !current.isSaving) {
                     if (imageDrafts.isNotEmpty()) {
                         discardAllImageDrafts()
                     }
+                    baseConfiguration = configuration
                     publish(
                         persistedTheme = configuration,
                         draftTheme = configuration,
@@ -296,6 +299,18 @@ class ConversationDetailCustomizationViewModel(
         return themeAssetRepository.resolve(reference)
     }
 
+    /**
+     * True when the draft references a background for [mode] but the image file cannot be resolved.
+     * Used to prompt re-selection without snackbar spam.
+     */
+    fun isBackgroundMissing(mode: ThemeMode): Boolean {
+        val reference = _uiState.value.draftTheme.conversationDetail
+            .appearance(mode)
+            .backgroundImage
+            ?: return false
+        return resolvePreviewBackground(mode) == null
+    }
+
     fun save(exitAfterSave: Boolean = false) {
         val current = _uiState.value
         if (current.isSaving) {
@@ -311,15 +326,22 @@ class ConversationDetailCustomizationViewModel(
             }
             return
         }
+        // Claim save synchronously before launching to prevent duplicate concurrent saves.
+        val draftSnapshot = current.draftTheme
+        val baseSnapshot = baseConfiguration
+        val latestSnapshot = current.persistedTheme
+        publish(isSaving = true)
         viewModelScope.launch {
-            publish(isSaving = true)
-            val draftSnapshot = _uiState.value.draftTheme
-            val persistedSnapshot = _uiState.value.persistedTheme
             val newlyCommitted = mutableListOf<ThemeImageReference>()
             var jsonSaved = false
             try {
-                val withFormalBackgrounds = commitDraftBackgrounds(
+                val merged = mergeThemeConfigurations(
+                    base = baseSnapshot,
                     draft = draftSnapshot,
+                    latest = latestSnapshot,
+                )
+                val withFormalBackgrounds = commitDraftBackgrounds(
+                    draft = merged,
                     newlyCommitted = newlyCommitted,
                 )
                 val finalConfiguration = withFormalBackgrounds.normalized()
@@ -337,7 +359,8 @@ class ConversationDetailCustomizationViewModel(
                 }
                 jsonSaved = true
 
-                val oldReferences = persistedSnapshot.backgroundReferences()
+                // Delete assets present on the latest persisted snapshot but no longer referenced.
+                val oldReferences = latestSnapshot.backgroundReferences()
                 val newReferences = finalConfiguration.backgroundReferences()
                 (oldReferences - newReferences).forEach(themeAssetRepository::deleteAsset)
 
@@ -345,6 +368,7 @@ class ConversationDetailCustomizationViewModel(
                 imageDrafts.clear()
                 draftsToDiscard.forEach(themeAssetRepository::discardDraft)
 
+                baseConfiguration = finalConfiguration
                 publish(
                     persistedTheme = finalConfiguration,
                     draftTheme = finalConfiguration,
@@ -386,7 +410,9 @@ class ConversationDetailCustomizationViewModel(
         // recreate dirty draft/image entries after discard.
         cancelAllSelections()
         discardAllImageDrafts()
-        publish(draftTheme = _uiState.value.persistedTheme)
+        val persisted = _uiState.value.persistedTheme
+        baseConfiguration = persisted
+        publish(draftTheme = persisted)
     }
 
     override fun onCleared() {
@@ -423,6 +449,80 @@ class ConversationDetailCustomizationViewModel(
             draftTheme = current.draftTheme.copy(
                 conversationDetail = module.withAppearance(mode, updatedAppearance),
             ),
+        )
+    }
+
+    /**
+     * Three-way merge: apply only fields the user changed (draft vs base) onto the latest
+     * persisted configuration so concurrent repository updates (e.g. pinch text-scale) are kept.
+     */
+    private fun mergeThemeConfigurations(
+        base: ThemeConfiguration,
+        draft: ThemeConfiguration,
+        latest: ThemeConfiguration,
+    ): ThemeConfiguration {
+        val baseModule = base.conversationDetail
+        val draftModule = draft.conversationDetail
+        val latestModule = latest.conversationDetail
+        return latest.copy(
+            conversationDetail = latestModule.copy(
+                light = mergeAppearance(baseModule.light, draftModule.light, latestModule.light),
+                dark = mergeAppearance(baseModule.dark, draftModule.dark, latestModule.dark),
+                showSimInfo = if (draftModule.showSimInfo != baseModule.showSimInfo) {
+                    draftModule.showSimInfo
+                } else {
+                    latestModule.showSimInfo
+                },
+                inputPlaceholder = if (draftModule.inputPlaceholder != baseModule.inputPlaceholder) {
+                    draftModule.inputPlaceholder
+                } else {
+                    latestModule.inputPlaceholder
+                },
+                textScale = if (draftModule.textScale != baseModule.textScale) {
+                    draftModule.textScale
+                } else {
+                    latestModule.textScale
+                },
+            ),
+        )
+    }
+
+    private fun mergeAppearance(
+        base: ConversationDetailAppearance,
+        draft: ConversationDetailAppearance,
+        latest: ConversationDetailAppearance,
+    ): ConversationDetailAppearance {
+        return latest.copy(
+            receivedTextColor = if (draft.receivedTextColor != base.receivedTextColor) {
+                draft.receivedTextColor
+            } else {
+                latest.receivedTextColor
+            },
+            sentTextColor = if (draft.sentTextColor != base.sentTextColor) {
+                draft.sentTextColor
+            } else {
+                latest.sentTextColor
+            },
+            receivedBubbleColor = if (draft.receivedBubbleColor != base.receivedBubbleColor) {
+                draft.receivedBubbleColor
+            } else {
+                latest.receivedBubbleColor
+            },
+            sentBubbleColor = if (draft.sentBubbleColor != base.sentBubbleColor) {
+                draft.sentBubbleColor
+            } else {
+                latest.sentBubbleColor
+            },
+            inputBackgroundColor = if (draft.inputBackgroundColor != base.inputBackgroundColor) {
+                draft.inputBackgroundColor
+            } else {
+                latest.inputBackgroundColor
+            },
+            backgroundImage = if (draft.backgroundImage != base.backgroundImage) {
+                draft.backgroundImage
+            } else {
+                latest.backgroundImage
+            },
         )
     }
 
@@ -491,7 +591,7 @@ class ConversationDetailCustomizationViewModel(
             previewMode = previewMode,
             highTextContrastEnabled = highTextContrastEnabled,
             isSaving = isSaving,
-            hasUnsavedChanges = draftTheme != persistedTheme,
+            hasUnsavedChanges = draftTheme != baseConfiguration,
         )
     }
 
