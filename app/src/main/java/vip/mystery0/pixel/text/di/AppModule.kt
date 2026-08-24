@@ -42,6 +42,7 @@ import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 import vip.mystery0.pixel.text.ui.screen.mock.MockMessageFactory
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
+import vip.mystery0.pixel.text.viewmodel.ConversationDetailCustomizationViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MessageViewModel
@@ -108,6 +109,9 @@ val appModule = module {
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get()) }
+    viewModel {
+        ConversationDetailCustomizationViewModel(get(), get(), get())
+    }
     viewModel { SearchViewModel(get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
