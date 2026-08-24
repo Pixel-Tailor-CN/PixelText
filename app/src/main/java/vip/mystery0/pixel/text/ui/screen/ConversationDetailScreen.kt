@@ -181,9 +181,10 @@ fun ConversationDetailScreen(
     // Last attempt whose success/failure UI handling finished; when behind persist generation,
     // ignore older StateFlow emissions so a slower prior save cannot clobber a newer preview.
     var textScaleResolvedGeneration by remember { mutableIntStateOf(0) }
-    // Latest persist generation that failed and still needs UI rollback when zoom is inactive.
-    // Do not advance resolvedGeneration on failure until this is reconciled.
-    var textScaleFailedGeneration by remember { mutableIntStateOf(0) }
+    // Latest persist generation that failed during an active pinch and still needs end-of-gesture
+    // consumption (Snackbar + optional rollback). 0 means none pending. Stale older generations
+    // are ignored when a newer persistGeneration is current.
+    var textScalePendingFailureGeneration by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(detailStyle.textScale) {
@@ -192,26 +193,6 @@ fun ConversationDetailScreen(
         ) {
             textScale = detailStyle.textScale
         }
-    }
-    // Reconcile failed pinch persistence on gesture/generation transitions, not only on
-    // repository scale emissions (failed writes do not update StateFlow).
-    LaunchedEffect(
-        isZoomGestureActive,
-        textScaleFailedGeneration,
-        textScalePersistGeneration,
-        textScaleResolvedGeneration,
-    ) {
-        if (isZoomGestureActive) return@LaunchedEffect
-        val failedGeneration = textScaleFailedGeneration
-        if (failedGeneration == 0 ||
-            failedGeneration != textScalePersistGeneration ||
-            failedGeneration <= textScaleResolvedGeneration
-        ) {
-            return@LaunchedEffect
-        }
-        textScale = themeRepository.configuration.value.conversationDetail.textScale
-        textScaleResolvedGeneration = failedGeneration
-        snackbarHostState.showSnackbar("文字大小保存失败")
     }
     val zoomGestureModifier = Modifier.pointerInput(Unit) {
         awaitEachGesture {
@@ -243,12 +224,31 @@ fun ConversationDetailScreen(
                 }
             } while (event.changes.any { it.pressed })
             isZoomGestureActive = false
-            if (zoomActive && gestureScale != startScale) {
+
+            // Consume pending latest failure exactly once before any new persist generation.
+            val pendingFailureGeneration = textScalePendingFailureGeneration
+            val hasReplacementWrite = zoomActive && gestureScale != startScale
+            if (pendingFailureGeneration != 0 &&
+                pendingFailureGeneration == textScalePersistGeneration &&
+                pendingFailureGeneration > textScaleResolvedGeneration
+            ) {
+                if (!hasReplacementWrite) {
+                    textScale =
+                        themeRepository.configuration.value.conversationDetail.textScale
+                }
+                textScaleResolvedGeneration = pendingFailureGeneration
+                textScalePendingFailureGeneration = 0
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("文字大小保存失败")
+                }
+            }
+
+            if (hasReplacementWrite) {
                 val finalScale = gestureScale
                 val persistGeneration = textScalePersistGeneration + 1
                 textScalePersistGeneration = persistGeneration
-                // Persistence itself is non-cancellable inside the repository. Failure is only
-                // recorded here; UI rollback + Snackbar run when zoom is inactive via LaunchedEffect.
+                // Persistence itself is non-cancellable inside the repository.
+                // Failure UI uses an explicit pending-failure state machine (no LaunchedEffect).
                 coroutineScope.launch {
                     val result = themeRepository.update { latest ->
                         latest.copy(
@@ -257,14 +257,26 @@ fun ConversationDetailScreen(
                             )
                         )
                     }
+                    // Stale failures/successes from generations older than current are ignored.
                     if (persistGeneration != textScalePersistGeneration) {
                         return@launch
                     }
                     if (result.isFailure) {
-                        // Keep resolvedGeneration behind until zoom-inactive reconciliation runs.
-                        textScaleFailedGeneration = persistGeneration
+                        if (isZoomGestureActive) {
+                            // Defer until gesture end; do not mark resolved yet.
+                            textScalePendingFailureGeneration = persistGeneration
+                        } else {
+                            textScale =
+                                themeRepository.configuration.value.conversationDetail.textScale
+                            textScaleResolvedGeneration = persistGeneration
+                            textScalePendingFailureGeneration = 0
+                            snackbarHostState.showSnackbar("文字大小保存失败")
+                        }
                     } else {
                         textScaleResolvedGeneration = persistGeneration
+                        if (textScalePendingFailureGeneration == persistGeneration) {
+                            textScalePendingFailureGeneration = 0
+                        }
                     }
                 }
             }
