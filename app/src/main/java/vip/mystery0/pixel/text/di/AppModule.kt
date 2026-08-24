@@ -40,6 +40,7 @@ import vip.mystery0.pixel.text.smartspacer.SmartspacerSmsRepository
 import vip.mystery0.pixel.text.smartspacer.UnreadSmsComplicationSettingsRepository
 import vip.mystery0.pixel.text.ui.message.search.SearchViewModel
 import vip.mystery0.pixel.text.ui.screen.mock.MockMessageFactory
+import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
@@ -62,6 +63,7 @@ val appModule = module {
         ThemeConfigurationRepositoryImpl(androidContext())
     }
     single<ThemeAssetRepository> { ThemeAssetRepositoryImpl(androidContext()) }
+    single { HighTextContrastMonitor(androidContext()) }
     single { BundledResourceVersionProvider(androidContext()) }
     single { HubResourceStore(androidContext()) }
     single { SenderProfileStore(androidContext()) }
