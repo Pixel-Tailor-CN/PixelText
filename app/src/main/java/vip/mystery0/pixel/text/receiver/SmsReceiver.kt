@@ -85,11 +85,26 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
 
             // 触发骚扰检测
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
-            if (threadId > 0) {
-                val pendingResult = goAsync()
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        supervisorScope {
+            val deferNotification = shouldDeferNotificationForSpamCheck(context)
+            val canScheduleSpamCheck = messageId != null && threadId > 0
+            if (canScheduleSpamCheck) {
+                SpamDetectionWorker.schedule(
+                    context = context,
+                    messageId = messageId,
+                    threadId = threadId,
+                    sender = sender,
+                    content = body,
+                    deferNotification = deferNotification,
+                    messageUri = insertedUri.toString()
+                )
+            }
+
+            val shouldShowNotification = !deferNotification || !canScheduleSpamCheck
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    supervisorScope {
+                        if (threadId > 0) {
                             launch {
                                 try {
                                     conversationCacheRepository.syncThreads(listOf(threadId))
@@ -126,46 +141,28 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
                                 }
                             }
                         }
-                    } finally {
-                        pendingResult.finish()
-                    }
-                }
-            }
-            val deferNotification = shouldDeferNotificationForSpamCheck(context)
-            val canScheduleSpamCheck = messageId != null && threadId > 0
-            if (canScheduleSpamCheck) {
-                SpamDetectionWorker.schedule(
-                    context = context,
-                    messageId = messageId,
-                    threadId = threadId,
-                    sender = sender,
-                    content = body,
-                    deferNotification = deferNotification,
-                    messageUri = insertedUri.toString()
-                )
-            }
 
-            if (!deferNotification || !canScheduleSpamCheck) {
-                val notificationPendingResult = goAsync()
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val profile = runCatching {
-                            senderProfileRepository.findByNumber(sender)
-                        }.getOrNull()
-                        SmsNotificationHelper.showSmsNotification(
-                            context = context,
-                            sender = sender,
-                            body = body,
-                            threadId = threadId,
-                            messageUri = insertedUri?.toString(),
-                            displaySender = contactDataSource.getDisplayName(sender)
-                                ?: profile?.displayName
-                                ?: sender,
-                            avatarPath = profile?.avatarPath,
-                        )
-                    } finally {
-                        notificationPendingResult.finish()
+                        if (shouldShowNotification) {
+                            launch {
+                                val profile = runCatching {
+                                    senderProfileRepository.findByNumber(sender)
+                                }.getOrNull()
+                                SmsNotificationHelper.showSmsNotification(
+                                    context = context,
+                                    sender = sender,
+                                    body = body,
+                                    threadId = threadId,
+                                    messageUri = insertedUri?.toString(),
+                                    displaySender = contactDataSource.getDisplayName(sender)
+                                        ?: profile?.displayName
+                                        ?: sender,
+                                    avatarPath = profile?.avatarPath,
+                                )
+                            }
+                        }
                     }
+                } finally {
+                    pendingResult.finish()
                 }
             }
 
