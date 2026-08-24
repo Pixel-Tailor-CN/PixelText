@@ -5,13 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import vip.mystery0.pixel.text.domain.theme.ConversationDetailAppearance
 import vip.mystery0.pixel.text.domain.theme.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
@@ -49,6 +52,7 @@ class ConversationDetailCustomizationViewModel(
     private val highTextContrastMonitor: HighTextContrastMonitor,
 ) : ViewModel() {
     private val imageDrafts = mutableMapOf<ThemeMode, ThemeImageDraft>()
+    private val selectionJobs = mutableMapOf<ThemeMode, Job>()
 
     private val initialConfiguration = themeRepository.configuration.value
     private val _uiState = MutableStateFlow(
@@ -173,6 +177,7 @@ class ConversationDetailCustomizationViewModel(
     }
 
     fun removeBackground(mode: ThemeMode) {
+        cancelSelection(mode)
         imageDrafts.remove(mode)?.let { draft ->
             themeAssetRepository.discardDraft(draft)
         }
@@ -197,6 +202,7 @@ class ConversationDetailCustomizationViewModel(
     fun resetCurrentMode() {
         val current = _uiState.value
         val mode = current.previewMode
+        cancelSelection(mode)
         imageDrafts.remove(mode)?.let { draft ->
             themeAssetRepository.discardDraft(draft)
         }
@@ -212,6 +218,7 @@ class ConversationDetailCustomizationViewModel(
     }
 
     fun resetAll() {
+        cancelAllSelections()
         discardAllImageDrafts()
         publish(draftTheme = ThemeConfiguration())
     }
@@ -220,35 +227,57 @@ class ConversationDetailCustomizationViewModel(
         if (_uiState.value.isSaving) {
             return
         }
-        viewModelScope.launch {
-            val mode = _uiState.value.previewMode
-            val result = themeAssetRepository.createDraftBackground(mode, sourceUri)
-            result
-                .onSuccess { newDraft ->
-                    imageDrafts.put(mode, newDraft)?.let { previous ->
-                        themeAssetRepository.discardDraft(previous)
+        // Capture target mode before launch so previewMode switches cannot retarget the request.
+        val mode = _uiState.value.previewMode
+        cancelSelection(mode)
+        val job = viewModelScope.launch {
+            try {
+                val result = themeAssetRepository.createDraftBackground(mode, sourceUri)
+                if (!isActive) {
+                    result.getOrNull()?.let(themeAssetRepository::discardDraft)
+                    return@launch
+                }
+                result
+                    .onSuccess { newDraft ->
+                        // Main-thread continuation: bail before mutating maps if superseded/saving.
+                        if (!isActive || _uiState.value.isSaving) {
+                            themeAssetRepository.discardDraft(newDraft)
+                            return@onSuccess
+                        }
+                        imageDrafts.put(mode, newDraft)?.let { previous ->
+                            themeAssetRepository.discardDraft(previous)
+                        }
+                        val current = _uiState.value
+                        val module = current.draftTheme.conversationDetail
+                        val appearance = module.appearance(mode).copy(
+                            backgroundImage = draftImageReference(newDraft),
+                        )
+                        publish(
+                            draftTheme = current.draftTheme.copy(
+                                conversationDetail = module.withAppearance(mode, appearance),
+                            ),
+                        )
                     }
-                    val current = _uiState.value
-                    val module = current.draftTheme.conversationDetail
-                    val appearance = module.appearance(mode).copy(
-                        backgroundImage = draftImageReference(newDraft),
-                    )
-                    publish(
-                        draftTheme = current.draftTheme.copy(
-                            conversationDetail = module.withAppearance(mode, appearance),
-                        ),
-                    )
+                    .onFailure { error ->
+                        if (error is CancellationException || !isActive) {
+                            return@onFailure
+                        }
+                        Log.w(
+                            TAG,
+                            "theme background draft failed mode=$mode error=${error.message}",
+                        )
+                        _events.trySend(
+                            ThemeCustomizationEvent.Message("图片处理失败，请重试"),
+                        )
+                    }
+            } finally {
+                val currentJob = coroutineContext[Job]
+                if (currentJob != null && selectionJobs[mode] == currentJob) {
+                    selectionJobs.remove(mode)
                 }
-                .onFailure { error ->
-                    Log.w(
-                        TAG,
-                        "theme background draft failed mode=$mode error=${error.message}",
-                    )
-                    _events.trySend(
-                        ThemeCustomizationEvent.Message("图片处理失败，请重试"),
-                    )
-                }
+            }
         }
+        selectionJobs[mode] = job
     }
 
     fun resolvePreviewBackground(mode: ThemeMode): File? {
@@ -272,6 +301,8 @@ class ConversationDetailCustomizationViewModel(
         if (current.isSaving) {
             return
         }
+        // Drop in-flight picks so they cannot mutate draft after the save snapshot/event.
+        cancelAllSelections()
         if (!current.hasUnsavedChanges) {
             if (exitAfterSave) {
                 viewModelScope.launch {
@@ -351,15 +382,32 @@ class ConversationDetailCustomizationViewModel(
         if (_uiState.value.isSaving) {
             return
         }
+        // Cancel in-flight picks before restoring persisted state so late completions cannot
+        // recreate dirty draft/image entries after discard.
+        cancelAllSelections()
         discardAllImageDrafts()
         publish(draftTheme = _uiState.value.persistedTheme)
     }
 
     override fun onCleared() {
-        // Must not depend on cancelled viewModelScope; discard remaining private drafts now.
+        // viewModelScope is already cancelling; clear job tracking and discard private drafts
+        // synchronously without launching new scoped work.
+        selectionJobs.clear()
         imageDrafts.values.forEach(themeAssetRepository::discardDraft)
         imageDrafts.clear()
         super.onCleared()
+    }
+
+    private fun cancelSelection(mode: ThemeMode) {
+        selectionJobs.remove(mode)?.cancel()
+    }
+
+    private fun cancelAllSelections() {
+        if (selectionJobs.isEmpty()) {
+            return
+        }
+        selectionJobs.values.forEach { job -> job.cancel() }
+        selectionJobs.clear()
     }
 
     private fun updateCurrentAppearance(
