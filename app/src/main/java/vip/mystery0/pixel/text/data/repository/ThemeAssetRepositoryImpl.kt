@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeImageDraft
@@ -28,63 +30,82 @@ class ThemeAssetRepositoryImpl(
         mode: ThemeMode,
         sourceUri: String,
     ): Result<ThemeImageDraft> {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                val draftId = UUID.randomUUID().toString()
-                require(isSafeId(draftId)) {
-                    "invalid draft id draft_id=$draftId"
+        var publishedFile: File? = null
+        return try {
+            withContext(Dispatchers.IO) {
+                try {
+                    val draftId = UUID.randomUUID().toString()
+                    require(isSafeId(draftId)) {
+                        "invalid draft id draft_id=$draftId"
+                    }
+                    val draftFile = draftFile(draftId)
+                    decodeAndCompressToWebp(sourceUri, draftFile)
+                    publishedFile = draftFile
+                    Result.success(ThemeImageDraft(draftId = draftId, mode = mode))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    publishedFile?.delete()
+                    publishedFile = null
+                    Log.w(
+                        TAG,
+                        "theme image decode failed uri=$sourceUri error=${error.message}",
+                    )
+                    Result.failure(error)
                 }
-                val draftFile = draftFile(draftId)
-                decodeAndCompressToWebp(sourceUri, draftFile)
-                ThemeImageDraft(draftId = draftId, mode = mode)
-            }.onFailure { error ->
-                Log.w(
-                    TAG,
-                    "theme image decode failed uri=$sourceUri error=${error.message}",
-                )
             }
+        } catch (error: CancellationException) {
+            cleanupPublishedFile(publishedFile)
+            throw error
         }
     }
 
     override suspend fun commitDraft(draft: ThemeImageDraft): Result<ThemeImageReference> {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                val draftFile = resolve(draft)
-                    ?: error("draft file missing draft_id=${draft.draftId}")
-                val assetId = buildAssetId(draft.mode)
-                require(isSafeId(assetId)) {
-                    "invalid asset id asset_id=$assetId"
-                }
-                val finalFile = assetFile(assetId)
-                val tempFile = File(
-                    assetsDir,
-                    "$assetId.tmp-${UUID.randomUUID()}.webp",
-                )
+        var publishedFile: File? = null
+        return try {
+            withContext(Dispatchers.IO) {
                 try {
-                    draftFile.copyTo(tempFile, overwrite = true)
-                    if (finalFile.exists() && !finalFile.delete()) {
-                        error("failed to replace existing asset asset_id=$assetId")
+                    val draftFile = resolve(draft)
+                        ?: error("draft file missing draft_id=${draft.draftId}")
+                    val assetId = buildAssetId(draft.mode)
+                    require(isSafeId(assetId)) {
+                        "invalid asset id asset_id=$assetId"
                     }
-                    if (!tempFile.renameTo(finalFile)) {
-                        // Fallback copy+delete when rename crosses unexpected fs edge cases.
-                        tempFile.copyTo(finalFile, overwrite = true)
-                        tempFile.delete()
-                        if (!finalFile.exists()) {
-                            error("failed to publish asset asset_id=$assetId")
+                    val finalFile = assetFile(assetId)
+                    val tempFile = File(
+                        assetsDir,
+                        "$assetId.tmp-${UUID.randomUUID()}.webp",
+                    )
+                    try {
+                        draftFile.copyTo(tempFile, overwrite = true)
+                        if (finalFile.exists() && !finalFile.delete()) {
+                            error("failed to replace existing asset asset_id=$assetId")
                         }
+                        if (!tempFile.renameTo(finalFile)) {
+                            error("failed to publish asset atomically asset_id=$assetId")
+                        }
+                        publishedFile = finalFile
+                    } catch (error: Throwable) {
+                        tempFile.delete()
+                        throw error
                     }
-                } catch (error: Throwable) {
-                    tempFile.delete()
+                    // Keep the draft until theme JSON save succeeds so callers can retry.
+                    Result.success(ThemeImageReference(assetId = assetId))
+                } catch (error: CancellationException) {
                     throw error
+                } catch (error: Throwable) {
+                    publishedFile?.delete()
+                    publishedFile = null
+                    Log.w(
+                        TAG,
+                        "theme image commit failed draft_id=${draft.draftId} error=${error.message}",
+                    )
+                    Result.failure(error)
                 }
-                // Keep the draft until theme JSON save succeeds so callers can retry.
-                ThemeImageReference(assetId = assetId)
-            }.onFailure { error ->
-                Log.w(
-                    TAG,
-                    "theme image commit failed draft_id=${draft.draftId} error=${error.message}",
-                )
             }
+        } catch (error: CancellationException) {
+            cleanupPublishedFile(publishedFile)
+            throw error
         }
     }
 
@@ -103,7 +124,7 @@ class ThemeAssetRepositoryImpl(
     }
 
     override fun resolve(reference: ThemeImageReference): File? {
-        val assetId = reference.assetId.trim()
+        val assetId = reference.assetId
         if (!isSafeId(assetId)) {
             Log.w(TAG, "theme asset resolve rejected asset_id=$assetId")
             return null
@@ -112,7 +133,7 @@ class ThemeAssetRepositoryImpl(
     }
 
     override fun resolve(draft: ThemeImageDraft): File? {
-        val draftId = draft.draftId.trim()
+        val draftId = draft.draftId
         if (!isSafeId(draftId)) {
             Log.w(TAG, "theme draft resolve rejected draft_id=$draftId")
             return null
@@ -134,6 +155,17 @@ class ThemeAssetRepositoryImpl(
                         Log.w(TAG, "theme stale draft delete failed path=${file.name}")
                     }
                 }
+            }
+        }
+    }
+
+    private suspend fun cleanupPublishedFile(file: File?) {
+        if (file == null) {
+            return
+        }
+        withContext(NonCancellable + Dispatchers.IO) {
+            if (!file.delete() && file.exists()) {
+                Log.w(TAG, "theme published file cleanup failed path=${file.name}")
             }
         }
     }
@@ -174,11 +206,7 @@ class ThemeAssetRepositoryImpl(
                     error("failed to replace draft output")
                 }
                 if (!tempOutput.renameTo(outputFile)) {
-                    tempOutput.copyTo(outputFile, overwrite = true)
-                    tempOutput.delete()
-                    if (!outputFile.exists()) {
-                        error("failed to publish draft output")
-                    }
+                    error("failed to publish draft output atomically")
                 }
             } catch (error: Throwable) {
                 tempOutput.delete()
