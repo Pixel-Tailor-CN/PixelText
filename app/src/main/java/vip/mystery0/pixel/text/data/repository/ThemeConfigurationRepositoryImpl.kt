@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,17 +38,23 @@ class ThemeConfigurationRepositoryImpl(
     override val configuration: StateFlow<ThemeConfiguration> = _configuration.asStateFlow()
 
     override suspend fun save(configuration: ThemeConfiguration): Result<Unit> {
-        return mutex.withLock {
-            persist(configuration.normalized())
+        // Once submitted, mutex + commit must finish even if the caller scope is cancelled
+        // (e.g. conversation detail leaves composition mid pinch-scale persist).
+        return withContext(NonCancellable) {
+            mutex.withLock {
+                persist(configuration.normalized())
+            }
         }
     }
 
     override suspend fun update(
         transform: (ThemeConfiguration) -> ThemeConfiguration,
     ): Result<Unit> {
-        return mutex.withLock {
-            val next = transform(_configuration.value).normalized()
-            persist(next)
+        return withContext(NonCancellable) {
+            mutex.withLock {
+                val next = transform(_configuration.value).normalized()
+                persist(next)
+            }
         }
     }
 
@@ -61,7 +68,8 @@ class ThemeConfigurationRepositoryImpl(
     }
 
     private suspend fun persist(configuration: ThemeConfiguration): Result<Unit> {
-        return withContext(Dispatchers.IO) {
+        // Caller (save/update) already entered NonCancellable; IO hop must preserve that.
+        return withContext(Dispatchers.IO + NonCancellable) {
             runCatching {
                 val json = adapter.toJson(configuration)
                 val committed = prefs.edit()

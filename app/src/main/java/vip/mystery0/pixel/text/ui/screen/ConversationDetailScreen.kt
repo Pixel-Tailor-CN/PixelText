@@ -176,11 +176,17 @@ fun ConversationDetailScreen(
     }
     var textScale by remember { mutableFloatStateOf(detailStyle.textScale) }
     var isZoomGestureActive by remember { mutableStateOf(false) }
+    // Monotonic attempt id for pinch-scale persistence.
     var textScalePersistGeneration by remember { mutableIntStateOf(0) }
+    // Last attempt whose success/failure UI handling finished; when behind persist generation,
+    // ignore older StateFlow emissions so a slower prior save cannot clobber a newer preview.
+    var textScaleResolvedGeneration by remember { mutableIntStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     LaunchedEffect(detailStyle.textScale) {
-        if (!isZoomGestureActive) {
+        if (!isZoomGestureActive &&
+            textScalePersistGeneration == textScaleResolvedGeneration
+        ) {
             textScale = detailStyle.textScale
         }
     }
@@ -218,6 +224,8 @@ fun ConversationDetailScreen(
                 val finalScale = gestureScale
                 val persistGeneration = textScalePersistGeneration + 1
                 textScalePersistGeneration = persistGeneration
+                // Persistence itself is non-cancellable inside the repository. Rollback / Snackbar
+                // stay on this lifecycle-bound scope so disposed UI is not mutated.
                 coroutineScope.launch {
                     val result = themeRepository.update { latest ->
                         latest.copy(
@@ -226,12 +234,16 @@ fun ConversationDetailScreen(
                             )
                         )
                     }
-                    if (result.isFailure &&
-                        persistGeneration == textScalePersistGeneration &&
-                        !isZoomGestureActive
-                    ) {
-                        textScale = themeRepository.configuration.value.conversationDetail.textScale
+                    if (persistGeneration != textScalePersistGeneration) {
+                        return@launch
+                    }
+                    if (result.isFailure && !isZoomGestureActive) {
+                        textScale =
+                            themeRepository.configuration.value.conversationDetail.textScale
                         snackbarHostState.showSnackbar("文字大小保存失败")
+                    }
+                    if (persistGeneration == textScalePersistGeneration) {
+                        textScaleResolvedGeneration = persistGeneration
                     }
                 }
             }
