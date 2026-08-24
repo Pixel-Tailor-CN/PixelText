@@ -268,7 +268,9 @@ fun MessageItem(
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { showOriginal = !showOriginal }
+                    modifier = Modifier.clickable(enabled = interactionEnabled) {
+                        showOriginal = !showOriginal
+                    }
                 )
             }
         }

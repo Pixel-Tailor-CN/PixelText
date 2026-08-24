@@ -35,7 +35,9 @@ import java.io.File
 
 val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
     MockMessageSpec(
-        content = "【流量不足预警】截至08月06日13时20分，“限量流量”部分：国内通用流量已用845.7MB，剩余178.3MB；您“达量限速”流量已使用5.0MB，超过40.000GB后将被限速；使用情况请登录中国联通APP或拨打10010客服热线查询。【中国联通】",
+        // Plain conversational text that must stay ParsedResult.None so the preview
+        // initially renders the received original bubble (not a smart card).
+        content = "今天晚饭想吃火锅还是日料？我这边大概六点下班，可以先去拿号。如果路上堵车我会提前跟你说一声，别在外面干等。顺便帮我看一下周末那家店还要不要预约，最近人好像挺多的，最好能定个靠窗的位置。",
         isReceived = true,
         simName = "卡1",
     ),
