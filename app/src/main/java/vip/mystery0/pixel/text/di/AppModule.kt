@@ -16,6 +16,7 @@ import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
+import vip.mystery0.pixel.text.data.repository.ThemeAssetRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.ThemeConfigurationRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.VerificationCodeRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.UnreadSmsCounter
@@ -33,6 +34,7 @@ import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
 import vip.mystery0.pixel.text.smartspacer.SmartspacerSmsRepository
 import vip.mystery0.pixel.text.smartspacer.UnreadSmsComplicationSettingsRepository
@@ -59,6 +61,7 @@ val appModule = module {
     single<ThemeConfigurationRepository> {
         ThemeConfigurationRepositoryImpl(androidContext())
     }
+    single<ThemeAssetRepository> { ThemeAssetRepositoryImpl(androidContext()) }
     single { BundledResourceVersionProvider(androidContext()) }
     single { HubResourceStore(androidContext()) }
     single { SenderProfileStore(androidContext()) }
