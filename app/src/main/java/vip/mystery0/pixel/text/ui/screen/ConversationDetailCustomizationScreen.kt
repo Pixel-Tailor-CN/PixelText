@@ -1,11 +1,15 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,7 +67,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
@@ -152,6 +159,22 @@ fun ConversationDetailCustomizationScreen(
 
     // Always enabled so system back is consumed while saving; requestNavigateBack no-ops then.
     BackHandler(onBack = ::requestNavigateBack)
+
+    val view = LocalView.current
+    val systemDarkTheme = isSystemInDarkTheme()
+    DisposableEffect(view, state.previewMode, systemDarkTheme) {
+        val window = view.context.findActivity()?.window
+        window?.let {
+            WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars =
+                state.previewMode == ThemeMode.LIGHT
+        }
+        onDispose {
+            window?.let {
+                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars =
+                    !systemDarkTheme
+            }
+        }
+    }
 
     ConversationDetailPreviewTheme(mode = state.previewMode) { _ ->
         Scaffold(
@@ -722,6 +745,14 @@ private fun colorPickerConfig(
             officialDefault = defaultInput,
             selectedActsAsBackground = true,
         )
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
 
