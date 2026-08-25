@@ -28,7 +28,11 @@ import vip.mystery0.pixel.text.domain.model.ParsedResult
 @Composable
 fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery, isSelected: Boolean = false) {
     val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.tertiary
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surface
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.inverseSurface
+    } else {
+        smartCardContainerColor(MaterialTheme.colorScheme.tertiary)
+    }
     val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
     val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
     val headerBgColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.tertiaryContainer

@@ -51,7 +51,7 @@ fun VerificationCodeCard(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.inverseSurface
         } else {
-            MaterialTheme.colorScheme.surface
+            smartCardContainerColor(baseThemeColor)
         },
         animationSpec = tween(durationMillis = 200),
         label = "containerColor",

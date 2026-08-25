@@ -23,8 +23,17 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+
+@Composable
+fun smartCardContainerColor(
+    accentColor: Color,
+    accentAlpha: Float = SMART_CARD_CONTAINER_ACCENT_ALPHA,
+): Color = accentColor
+    .copy(alpha = accentAlpha)
+    .compositeOver(MaterialTheme.colorScheme.surfaceContainer)
 
 @Composable
 fun CardHeader(
@@ -128,3 +137,5 @@ fun InfoMapList(
         }
     }
 }
+
+private const val SMART_CARD_CONTAINER_ACCENT_ALPHA = 0.08f

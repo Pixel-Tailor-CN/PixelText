@@ -24,7 +24,7 @@ Issue #9 要求改善会话详情页短信原文的可读性，并提供会话�
 
 本期不支持：
 
-- 智能卡片颜色配置。验证码、银行、铁路、快递等智能卡片保持现有配色。
+- 智能卡片颜色配置。验证码、银行、铁路、快递等智能卡片保持现有配色；其主容器使用主题强调色与 Material 3 表面色合成的最终不透明颜色，避免背景图片透出后降低可读性。
 - 背景图片统一透明度。后续按上层组件分别增加透明度配置。
 - 会话详情独立时间格式。预览和真实页面始终读取现有全局 `messageTimeDisplayFormat`。
 - 多个命名主题、主题导入导出及主题文件分发。
@@ -206,7 +206,7 @@ data class ResolvedConversationDetailStyle(
 )
 ```
 
-智能卡片本期不加入有效样式模型。未来可独立增加 `ResolvedSmartCardStyle`，再由 `MessageCardFactory` 消费。
+智能卡片本期不加入有效样式模型。卡片继续使用自身的强调色，但主容器必须将低透明度强调色预先合成到 Material 3 `surfaceContainer` 上，得到最终不透明颜色；不得直接把透明容器叠在会话背景图片上。未来可独立增加 `ResolvedSmartCardStyle`，再由 `MessageCardFactory` 消费。
 
 解析优先级固定为：
 
@@ -263,7 +263,7 @@ ConversationDetailScreen
 - 多选状态仍强制使用 `inverseSurface` 和 `inverseOnSurface`，保证交互反馈稳定。
 - 链接优先使用 `primary`；如果与自定义气泡对比度不足，则使用正文色并保留下划线。
 - SIM 标签由 `showSimInfo` 控制。
-- 智能卡片保持自身现有配色。
+- 智能卡片保持自身现有强调色，并统一使用不透明的合成表面色作为主容器背景。
 - 背景图片只绘制在消息列表底层。
 
 ## 配置页面

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
+import vip.mystery0.pixel.text.ui.message.cards.smartCardContainerColor
 
 @Composable
 fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolean = false) {
@@ -36,7 +37,11 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolea
     val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor
     val headerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else (if (result.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary)
     
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f)
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.inverseSurface
+    } else {
+        smartCardContainerColor(baseThemeColor)
+    }
     val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
     val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
 

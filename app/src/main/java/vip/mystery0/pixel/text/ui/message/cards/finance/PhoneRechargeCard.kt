@@ -23,13 +23,18 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
+import vip.mystery0.pixel.text.ui.message.cards.smartCardContainerColor
 
 @Composable
 fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge, isSelected: Boolean = false) {
     val baseThemeColor = MaterialTheme.colorScheme.primary
     val themeColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor
     
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f)
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.inverseSurface
+    } else {
+        smartCardContainerColor(baseThemeColor)
+    }
     val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(

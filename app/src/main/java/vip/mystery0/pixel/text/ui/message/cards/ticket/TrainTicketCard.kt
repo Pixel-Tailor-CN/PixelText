@@ -28,12 +28,17 @@ import androidx.compose.ui.unit.sp
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
+import vip.mystery0.pixel.text.ui.message.cards.smartCardContainerColor
 
 @Composable
 fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean = false) {
     val baseThemeColor = MaterialTheme.colorScheme.primary
     val containerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.inverseSurface else baseThemeColor.copy(alpha = 0.03f),
+        targetValue = if (isSelected) {
+            MaterialTheme.colorScheme.inverseSurface
+        } else {
+            smartCardContainerColor(baseThemeColor)
+        },
         animationSpec = tween(durationMillis = 200),
         label = "containerColor"
     )

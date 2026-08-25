@@ -536,7 +536,7 @@ val preferredLink = if (isSelected) inversePrimary else primary
 val resolvedLink = readableLinkColor(preferredLink, resolvedText, resolvedBackground)
 ```
 
-不要修改智能卡片组件。
+本任务初始实现不向智能卡片传递主题配置。后续背景图片可读性修复允许统一修改智能卡片主容器：将少量现有强调色预合成到 Material 3 `surfaceContainer`，生成最终不透明背景；不得改变卡片强调色、内部层级、选中态或向 `MessageCardFactory` 增加主题参数。
 
 - [ ] **Step 2: 修改 MessageItem 接口和 SIM 开关**
 
@@ -639,7 +639,7 @@ Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
 
 Loading/Error 页面不必显示用户背景；TopAppBar 和 bottomBar 保持独立。
 
-- [ ] **Step 7: 保持全局时间格式和智能卡片不变**
+- [ ] **Step 7: 保持全局时间格式和智能卡片业务配色不变**
 
 `MessageItem.timeDisplayFormat` 继续传：
 
@@ -647,7 +647,7 @@ Loading/Error 页面不必显示用户背景；TopAppBar 和 bottomBar 保持独
 timeDisplayFormat = appSettings.messageTimeDisplayFormat
 ```
 
-`MessageCardFactory.CreateCard` 不新增样式参数。
+`MessageCardFactory.CreateCard` 不新增样式参数。智能卡片继续自行使用现有强调色；主容器背景统一为强调色与 `surfaceContainer` 预合成后的不透明颜色，以保证会话背景图片上的可读性。
 
 - [ ] **Step 8: 更新现有 MockMessageScreen 调用保证本任务可独立编译**
 
@@ -1125,14 +1125,21 @@ Expected:
 - 不存在背景透明度配置。
 - `messageTimeDisplayFormat` 只在全局设置、真实消息和预览读取处出现，不在主题模型/ViewModel 的 setter 中出现。
 
-检查智能卡片未被主题化：
+检查智能卡片没有接入用户主题配置，并且主容器使用统一的不透明合成色：
 
 ```bash
-git diff -- app/src/main/java/vip/mystery0/pixel/text/ui/message/cards \
-  | rg "Verification|Bank|Ticket|Express|MessageCardFactory"
+rg -n "smartCardContainerColor" \
+  app/src/main/java/vip/mystery0/pixel/text/ui/message/cards
+rg -n "ResolvedConversationDetailStyle|ThemeConfiguration" \
+  app/src/main/java/vip/mystery0/pixel/text/ui/message/cards \
+  app/src/main/java/vip/mystery0/pixel/text/ui/message/factory
 ```
 
-Expected: 除 `OriginalTextCard.kt` 调用边界外，无智能卡片配色修改。
+Expected:
+
+- `MessageCardFactory` 覆盖的智能卡片主容器均调用 `smartCardContainerColor`。
+- 智能卡片和工厂不消费用户主题配置。
+- 现有强调色、内部层级和选中态配色不变。
 
 - [ ] **Step 2: 完整编译**
 
