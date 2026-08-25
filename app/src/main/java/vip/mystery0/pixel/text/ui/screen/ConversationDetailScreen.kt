@@ -62,6 +62,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,6 +90,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -154,11 +158,31 @@ fun ConversationDetailScreen(
     LaunchedEffect(threadId, address, effectiveContentFilter) {
         viewModel.loadThread(threadId, address, effectiveContentFilter)
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val lifecycle = lifecycleOwner.lifecycle
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.startObservingTelephony()
+                Lifecycle.Event.ON_STOP -> viewModel.stopObservingTelephony()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            viewModel.startObservingTelephony()
+        }
+        onDispose {
+            lifecycle.removeObserver(observer)
+            viewModel.stopObservingTelephony()
+        }
+    }
 
     val uiState by viewModel.uiState.collectAsState()
     val conversationTitle by viewModel.conversationTitle.collectAsState()
     val sending by viewModel.sending.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
+    val newMessageKeys by viewModel.newMessageKeys.collectAsState()
     val context = LocalContext.current
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var highlightedMessageId by remember(threadId, targetMessageId) {
@@ -677,6 +701,18 @@ fun ConversationDetailScreen(
 
             is MessageUiState.Success -> {
                 val listState = rememberLazyListState()
+                val currentMessageKeys = state.messages.map { it.stableKey }
+                val entranceMessageKeys = currentMessageKeys.toSet() intersect newMessageKeys
+                val hasNewSentMessage = state.messages.any { message ->
+                    message.stableKey in entranceMessageKeys && !message.isReceived
+                }
+                LaunchedEffect(entranceMessageKeys, hasNewSentMessage) {
+                    if (entranceMessageKeys.isEmpty()) return@LaunchedEffect
+                    if (hasNewSentMessage || listState.firstVisibleItemIndex <= 1) {
+                        listState.animateScrollToItem(0)
+                    }
+                    viewModel.consumeNewMessageKeys(entranceMessageKeys)
+                }
 
                 LaunchedEffect(targetMessageId) {
                     val targetId = targetMessageId ?: return@LaunchedEffect
@@ -767,6 +803,7 @@ fun ConversationDetailScreen(
                                     appSettings.showSpamContentByDefault,
                                 showVerificationCodeContentByDefault =
                                     appSettings.showVerificationCodeContentByDefault,
+                                animateEntrance = message.stableKey in entranceMessageKeys,
                             )
                         }
                     }

@@ -2,6 +2,8 @@ package vip.mystery0.pixel.text.ui.message
 
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
@@ -29,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.R
@@ -43,6 +46,8 @@ import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.ui.theme.ResolvedOriginalMessageStyle
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import java.text.SimpleDateFormat
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.Locale
 
@@ -62,6 +67,7 @@ fun MessageItem(
     timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
     showSpamContentByDefault: Boolean = false,
     showVerificationCodeContentByDefault: Boolean = true,
+    animateEntrance: Boolean = false,
 ) {
     val bubbleColor = if (message.isReceived) {
         originalMessageStyle.receivedBubbleColor
@@ -74,7 +80,38 @@ fun MessageItem(
         originalMessageStyle.sentTextColor
     }
     val highlightAlpha = remember(message.stableKey) { Animatable(0f) }
+    val shouldAnimateEntrance = remember(message.stableKey) { animateEntrance }
+    val entranceAlpha = remember(message.stableKey) {
+        Animatable(if (shouldAnimateEntrance) 0f else 1f)
+    }
+    val entranceScale = remember(message.stableKey) {
+        Animatable(if (shouldAnimateEntrance) MESSAGE_ENTRANCE_START_SCALE else 1f)
+    }
     val highlightColor = MaterialTheme.colorScheme.primary
+    LaunchedEffect(message.stableKey) {
+        if (!shouldAnimateEntrance) {
+            entranceAlpha.snapTo(1f)
+            entranceScale.snapTo(1f)
+            return@LaunchedEffect
+        }
+        coroutineScope {
+            launch {
+                entranceAlpha.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(MESSAGE_ENTRANCE_FADE_MILLIS),
+                )
+            }
+            launch {
+                entranceScale.animateTo(
+                    targetValue = 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                )
+            }
+        }
+    }
     LaunchedEffect(isHighlighted) {
         if (!isHighlighted) {
             highlightAlpha.snapTo(0f)
@@ -119,6 +156,11 @@ fun MessageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                alpha = entranceAlpha.value
+                scaleX = entranceScale.value
+                scaleY = entranceScale.value
+            }
             .background(
                 color = highlightColor.copy(alpha = highlightAlpha.value),
                 shape = RoundedCornerShape(16.dp),
@@ -339,6 +381,8 @@ private const val TARGET_HIGHLIGHT_PULSE_COUNT = 3
 private const val TARGET_HIGHLIGHT_MAX_ALPHA = 0.12f
 private const val TARGET_HIGHLIGHT_FADE_IN_MILLIS = 120
 private const val TARGET_HIGHLIGHT_FADE_OUT_MILLIS = 240
+private const val MESSAGE_ENTRANCE_START_SCALE = 0.88f
+private const val MESSAGE_ENTRANCE_FADE_MILLIS = 180
 
 fun formatDetailedTime(timestamp: Long): String {
     val formatter = SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault())

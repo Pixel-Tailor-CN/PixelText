@@ -6,8 +6,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Telephony
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.util.Log
@@ -15,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,6 +102,9 @@ class ConversationDetailViewModel(
     val manualSpamChecks: StateFlow<Map<Long, ManualSpamCheckState>> =
         _manualSpamChecks.asStateFlow()
 
+    private val _newMessageKeys = MutableStateFlow<Set<String>>(emptySet())
+    val newMessageKeys: StateFlow<Set<String>> = _newMessageKeys.asStateFlow()
+
     private var currentThreadId: Long = -1L
     private var currentContentFilter = ConversationContentFilter.ALL
     private var offset = 0
@@ -105,6 +113,27 @@ class ConversationDetailViewModel(
     private var loadVersion = 0
     private val _messages = mutableListOf<MessageModel>()
     private val manualClassificationMutex = Mutex()
+    private var isTelephonyObserverRegistered = false
+    private var isTelephonyObservationActive = false
+    private var telephonyRefreshJob: Job? = null
+    private val telephonyObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            if (!isTelephonyObservationActive || currentThreadId < 0L) return
+            telephonyRefreshJob?.cancel()
+            telephonyRefreshJob = viewModelScope.launch {
+                delay(TELEPHONY_REFRESH_DEBOUNCE_MILLIS)
+                if (!isTelephonyObservationActive) return@launch
+                val changedThreadId = withContext(Dispatchers.IO) {
+                    telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
+                }
+                if (isTelephonyObservationActive &&
+                    (changedThreadId == null || changedThreadId == currentThreadId)
+                ) {
+                    refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
+                }
+            }
+        }
+    }
     private val spamDetectionReceiver = object : BroadcastReceiver() {
         override fun onReceive(receivedContext: Context?, intent: Intent?) {
             if (intent?.action != SpamDetectionWorker.ACTION_SPAM_DETECTED) return
@@ -129,6 +158,54 @@ class ConversationDetailViewModel(
         )
     }
 
+    fun startObservingTelephony(): Boolean {
+        if (isTelephonyObserverRegistered) {
+            isTelephonyObservationActive = true
+            return true
+        }
+        var smsRegistered = false
+        return try {
+            context.contentResolver.registerContentObserver(
+                Telephony.Sms.CONTENT_URI,
+                true,
+                telephonyObserver,
+            )
+            smsRegistered = true
+            context.contentResolver.registerContentObserver(
+                Telephony.Mms.CONTENT_URI,
+                true,
+                telephonyObserver,
+            )
+            isTelephonyObserverRegistered = true
+            isTelephonyObservationActive = true
+            true
+        } catch (error: Throwable) {
+            if (smsRegistered) {
+                runCatching {
+                    context.contentResolver.unregisterContentObserver(telephonyObserver)
+                }
+            }
+            isTelephonyObservationActive = false
+            Log.e(TAG, "failed to observe telephony messages", error)
+            false
+        }
+    }
+
+    fun stopObservingTelephony(): Boolean {
+        isTelephonyObservationActive = false
+        if (!isTelephonyObserverRegistered) return true
+        telephonyRefreshJob?.cancel()
+        telephonyRefreshJob = null
+        return try {
+            context.contentResolver.unregisterContentObserver(telephonyObserver)
+            isTelephonyObserverRegistered = false
+            true
+        } catch (error: Throwable) {
+            Log.e(TAG, "failed to stop observing telephony messages", error)
+            false
+        }
+    }
+
     fun loadThread(
         threadId: Long,
         address: String,
@@ -149,6 +226,7 @@ class ConversationDetailViewModel(
         currentThreadId = threadId
         currentContentFilter = contentFilter
         _messages.clear()
+        _newMessageKeys.value = emptySet()
         offset = 0
         isLoadingMore = false
         hasMore = true
@@ -176,6 +254,10 @@ class ConversationDetailViewModel(
         fetchMessages()
     }
 
+    fun consumeNewMessageKeys(keys: Set<String>) {
+        _newMessageKeys.value = _newMessageKeys.value - keys
+    }
+
     suspend fun loadUntilMessage(messageId: Long): Int? {
         while (true) {
             val targetIndex = _messages.indexOfFirst { it.id == messageId }
@@ -197,7 +279,7 @@ class ConversationDetailViewModel(
         viewModelScope.launch {
             repository.getMessagesByThread(
                 currentThreadId,
-                20,
+                MESSAGE_PAGE_SIZE,
                 offset,
                 currentContentFilter,
             )
@@ -258,14 +340,14 @@ class ConversationDetailViewModel(
                 }
 
                 // 2. 立刻把占位插入到 UI 头部，给用户即时反馈
-                refreshMessages()
+                refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
 
                 // 3. 用 PendingIntent 发短信，监听系统返回的发送结果
                 val resultCode = sendSmsAndAwaitResult(address, message, subId)
 
                 // 4. 根据结果更新数据库中的那条占位记录
                 handleSendResult(pendingUri, resultCode)
-                refreshMessages()
+                refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
             } catch (e: Exception) {
                 _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
             } finally {
@@ -471,16 +553,62 @@ class ConversationDetailViewModel(
         else -> "发送失败"
     }
 
-    private fun refreshMessages() {
-        _messages.clear()
-        offset = 0
-        isLoadingMore = false
-        hasMore = true
-        loadVersion++
-        fetchMessages()
+    private fun refreshMessages(
+        preserveLoadedHistory: Boolean = false,
+        reportInsertions: Boolean = false,
+    ) {
+        val existingMessages = _messages.toList()
+        val requestedLimit = if (preserveLoadedHistory) {
+            existingMessages.size.coerceAtLeast(MESSAGE_PAGE_SIZE) + MESSAGE_PAGE_SIZE
+        } else {
+            existingMessages.size.coerceAtLeast(MESSAGE_PAGE_SIZE)
+        }
+        val requestVersion = ++loadVersion
+        isLoadingMore = true
+        viewModelScope.launch {
+            repository.getMessagesByThread(
+                currentThreadId,
+                requestedLimit,
+                0,
+                currentContentFilter,
+            )
+                .catch { error ->
+                    if (requestVersion != loadVersion) return@catch
+                    if (_messages.isEmpty()) {
+                        _uiState.value = MessageUiState.Error(error.message ?: "Unknown error")
+                    }
+                    isLoadingMore = false
+                }
+                .collect { refreshedMessages ->
+                    if (requestVersion != loadVersion) return@collect
+                    val refreshedKeys = refreshedMessages.mapTo(mutableSetOf()) { it.stableKey }
+                    val reconciledMessages = if (preserveLoadedHistory) {
+                        refreshedMessages + existingMessages.filter { it.stableKey !in refreshedKeys }
+                    } else {
+                        refreshedMessages
+                    }
+                    _newMessageKeys.value = _newMessageKeys.value intersect
+                        reconciledMessages.mapTo(mutableSetOf()) { it.stableKey }
+                    if (reportInsertions) {
+                        val existingKeys = existingMessages.mapTo(mutableSetOf()) { it.stableKey }
+                        _newMessageKeys.value += refreshedKeys - existingKeys
+                    }
+                    _messages.clear()
+                    _messages.addAll(reconciledMessages)
+                    offset = reconciledMessages.size
+                    hasMore = if (preserveLoadedHistory) {
+                        hasMore || refreshedMessages.size >= requestedLimit
+                    } else {
+                        refreshedMessages.size >= requestedLimit
+                    }
+                    _uiState.value = MessageUiState.Success(_messages.toList())
+                    isLoadingMore = false
+                }
+        }
     }
 
     override fun onCleared() {
+        runCatching { stopObservingTelephony() }
         runCatching { context.unregisterReceiver(spamDetectionReceiver) }
         super.onCleared()
     }
@@ -491,7 +619,9 @@ class ConversationDetailViewModel(
         private const val SPAM_THRESHOLD = 0.7f
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f
+        private const val MESSAGE_PAGE_SIZE = 20
         private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L
+        private const val TELEPHONY_REFRESH_DEBOUNCE_MILLIS = 120L
         private val sendRequestCounter = AtomicInteger(0)
     }
 }
