@@ -58,6 +58,7 @@ fun isValidPersistedThemeAssetId(assetId: String): Boolean {
     return assetId.isNotEmpty() && PERSISTED_THEME_ASSET_ID_PATTERN.matches(assetId)
 }
 
+@JsonClass(generateAdapter = false)
 enum class ThemeMode { LIGHT, DARK }
 
 enum class ThemeColorType { MATERIAL_ROLE, CUSTOM_ARGB }
