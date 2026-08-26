@@ -83,6 +83,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeColorReference
 import vip.mystery0.pixel.text.domain.theme.ThemeColorType
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.appearance
+import vip.mystery0.pixel.text.domain.theme.backgroundMode
 import vip.mystery0.pixel.text.ui.component.theme.ConversationDetailPreview
 import vip.mystery0.pixel.text.ui.component.theme.ConversationDetailPreviewMessageSpecs
 import vip.mystery0.pixel.text.ui.component.theme.ConversationDetailPreviewTheme
@@ -176,7 +177,14 @@ fun ConversationDetailCustomizationScreen(
         }
     }
 
-    ConversationDetailPreviewTheme(mode = state.previewMode) { _ ->
+    ConversationDetailPreviewTheme(
+        mode = state.previewMode,
+        backgroundFile = backgroundFile,
+        generateColorsFromBackgroundImage =
+            state.draftTheme.conversationDetail.generateColorsFromBackgroundImage &&
+                !state.highTextContrastEnabled,
+        applyGeneratedColorScheme = false,
+    ) { backgroundPreviewScheme, backgroundColorsApplied, backgroundColorsLoading ->
         Scaffold(
             topBar = {
             TopAppBar(
@@ -233,7 +241,10 @@ fun ConversationDetailCustomizationScreen(
             }
 
             item(key = "preview") {
-                ConversationDetailPreviewTheme(mode = state.previewMode) { previewScheme ->
+                ConversationDetailPreviewTheme(
+                    mode = state.previewMode,
+                    fallbackColorScheme = backgroundPreviewScheme,
+                ) { previewScheme, _, _ ->
                     val previewStyle = resolveConversationDetailStyle(
                         configuration = state.draftTheme,
                         mode = state.previewMode,
@@ -271,7 +282,10 @@ fun ConversationDetailCustomizationScreen(
             }
 
             item(key = "bubble_section") {
-                ConversationDetailPreviewTheme(mode = state.previewMode) { previewScheme ->
+                ConversationDetailPreviewTheme(
+                    mode = state.previewMode,
+                    fallbackColorScheme = backgroundPreviewScheme,
+                ) { previewScheme, _, _ ->
                     val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
                     val colorControlsEnabled =
                         !state.highTextContrastEnabled && !state.isSaving
@@ -316,15 +330,77 @@ fun ConversationDetailCustomizationScreen(
             }
 
             item(key = "background_section") {
-                val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
+                val module = state.draftTheme.conversationDetail
+                val backgroundMode = module.backgroundMode(state.previewMode)
+                val appearance = module.appearance(backgroundMode)
                 val hasBackground = appearance.backgroundImage != null
                 // Prefer resolved file when available; otherwise ask for re-selection in-place.
                 val backgroundMissing = hasBackground &&
                     viewModel.isBackgroundMissing(state.previewMode)
-                val backgroundEnabled = !state.highTextContrastEnabled && !state.isSaving
+                val backgroundCustomizationEnabled =
+                    !state.highTextContrastEnabled && !state.isSaving
+                val currentModeOwnsBackground = !module.useSameBackgroundImage ||
+                    state.previewMode == module.sharedBackgroundImageMode
+                val backgroundControlsEnabled =
+                    backgroundCustomizationEnabled && currentModeOwnsBackground
+                val sourceModeLabel = if (module.sharedBackgroundImageMode == ThemeMode.LIGHT) {
+                    "日间"
+                } else {
+                    "暗黑"
+                }
                 SettingsSectionCard(title = "会话背景") {
                     ListItem(
-                        modifier = Modifier.clickable(enabled = backgroundEnabled) {
+                        trailingContent = {
+                            Switch(
+                                checked = module.useSameBackgroundImage,
+                                onCheckedChange = viewModel::setUseSameBackgroundImage,
+                                enabled = backgroundCustomizationEnabled,
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                if (module.useSameBackgroundImage) {
+                                    "当前统一使用${sourceModeLabel}主题的背景图片"
+                                } else {
+                                    "开启时以当前选中的主题背景为准"
+                                },
+                            )
+                        },
+                        colors = listItemColors(enabled = backgroundCustomizationEnabled),
+                        content = { Text("不同主题使用相同背景图片") },
+                    )
+                    HorizontalDivider()
+                    ListItem(
+                        trailingContent = {
+                            Switch(
+                                checked = module.generateColorsFromBackgroundImage,
+                                onCheckedChange =
+                                    viewModel::setGenerateColorsFromBackgroundImage,
+                                enabled = backgroundCustomizationEnabled,
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                when {
+                                    !module.generateColorsFromBackgroundImage ->
+                                        "开启后根据当前生效背景生成本页面的 Material 颜色"
+                                    backgroundMissing ->
+                                        "背景文件缺失，暂时使用系统颜色"
+                                    !hasBackground ->
+                                        "未设置有效背景，暂时使用系统颜色"
+                                    backgroundColorsLoading -> "正在从背景图片生成主体颜色"
+                                    backgroundColorsApplied ->
+                                        "已根据当前生效背景生成本页面的 Material 颜色"
+                                    else -> "图片取色失败，暂时使用系统颜色"
+                                },
+                            )
+                        },
+                        colors = listItemColors(enabled = backgroundCustomizationEnabled),
+                        content = { Text("从背景图片生成主体颜色") },
+                    )
+                    HorizontalDivider()
+                    ListItem(
+                        modifier = Modifier.clickable(enabled = backgroundControlsEnabled) {
                             photoPicker.launch(
                                 PickVisualMediaRequest(
                                     ActivityResultContracts.PickVisualMedia.ImageOnly,
@@ -340,16 +416,19 @@ fun ConversationDetailCustomizationScreen(
                         supportingContent = {
                             Text(
                                 when {
+                                    !currentModeOwnsBackground ->
+                                        "当前使用${sourceModeLabel}主题背景，本主题原设置已保留"
                                     backgroundMissing -> "背景文件缺失，请重新选择"
                                     hasBackground -> "已设置当前主题背景"
                                     else -> "仅覆盖消息列表区域"
                                 },
                             )
                         },
-                        colors = listItemColors(enabled = backgroundEnabled),
+                        colors = listItemColors(enabled = backgroundControlsEnabled),
                         content = {
                             Text(
                                 when {
+                                    !currentModeOwnsBackground -> "背景图片由${sourceModeLabel}主题控制"
                                     backgroundMissing -> "重新选择背景图片"
                                     hasBackground -> "更换背景图片"
                                     else -> "选择背景图片"
@@ -360,27 +439,33 @@ fun ConversationDetailCustomizationScreen(
                     HorizontalDivider()
                     ListItem(
                         modifier = Modifier.clickable(
-                            enabled = backgroundEnabled && hasBackground,
+                            enabled = backgroundControlsEnabled && hasBackground,
                         ) {
                             viewModel.removeBackground(state.previewMode)
                         },
                         supportingContent = {
                             Text(
                                 when {
+                                    !currentModeOwnsBackground -> "关闭统一背景后恢复本主题原设置"
                                     backgroundMissing -> "可移除缺失引用或重新选择"
                                     hasBackground -> "清除当前主题背景"
                                     else -> "当前未设置背景"
                                 },
                             )
                         },
-                        colors = listItemColors(enabled = backgroundEnabled && hasBackground),
+                        colors = listItemColors(
+                            enabled = backgroundControlsEnabled && hasBackground,
+                        ),
                         content = { Text("移除背景图片") },
                     )
                 }
             }
 
             item(key = "input_section") {
-                ConversationDetailPreviewTheme(mode = state.previewMode) { previewScheme ->
+                ConversationDetailPreviewTheme(
+                    mode = state.previewMode,
+                    fallbackColorScheme = backgroundPreviewScheme,
+                ) { previewScheme, _, _ ->
                     val appearance =
                         state.draftTheme.conversationDetail.appearance(state.previewMode)
                     val colorControlsEnabled =
@@ -555,7 +640,10 @@ fun ConversationDetailCustomizationScreen(
 
     val activeColorTarget = colorTarget
     if (activeColorTarget != null) {
-        ConversationDetailPreviewTheme(mode = state.previewMode) { previewScheme ->
+        ConversationDetailPreviewTheme(
+                    mode = state.previewMode,
+                    fallbackColorScheme = backgroundPreviewScheme,
+                ) { previewScheme, _, _ ->
             val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
             val pickerConfig = colorPickerConfig(
                 target = activeColorTarget,

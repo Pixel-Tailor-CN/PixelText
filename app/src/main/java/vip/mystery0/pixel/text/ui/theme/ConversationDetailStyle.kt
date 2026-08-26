@@ -12,6 +12,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
 import vip.mystery0.pixel.text.domain.theme.ThemeImageReference
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.appearance
+import vip.mystery0.pixel.text.domain.theme.backgroundAppearance
 import kotlin.math.max
 
 private const val MIN_LINK_CONTRAST_RATIO = 3f
@@ -131,7 +132,9 @@ fun resolveConversationDetailStyle(
                 defaultInput,
             ),
         ),
-        background = ResolvedConversationBackgroundStyle(image = appearance.backgroundImage),
+        background = ResolvedConversationBackgroundStyle(
+            image = module.backgroundAppearance(mode).backgroundImage,
+        ),
         showSimInfo = module.showSimInfo,
         inputPlaceholder = module.inputPlaceholder,
         textScale = module.textScale,

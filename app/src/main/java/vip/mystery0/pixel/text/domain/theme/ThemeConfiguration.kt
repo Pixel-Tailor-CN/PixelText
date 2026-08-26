@@ -20,6 +20,9 @@ data class ThemeConfiguration(
 data class ConversationDetailThemeModule(
     val light: ConversationDetailAppearance = ConversationDetailAppearance(),
     val dark: ConversationDetailAppearance = ConversationDetailAppearance(),
+    val useSameBackgroundImage: Boolean = false,
+    val sharedBackgroundImageMode: ThemeMode = ThemeMode.LIGHT,
+    val generateColorsFromBackgroundImage: Boolean = false,
     val showSimInfo: Boolean = true,
     val inputPlaceholder: String = DEFAULT_CONVERSATION_INPUT_PLACEHOLDER,
     val textScale: Float = DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE,
@@ -112,6 +115,16 @@ fun ConversationDetailThemeModule.withAppearance(
         ThemeMode.LIGHT -> copy(light = appearance)
         ThemeMode.DARK -> copy(dark = appearance)
     }
+}
+
+fun ConversationDetailThemeModule.backgroundMode(mode: ThemeMode): ThemeMode {
+    return if (useSameBackgroundImage) sharedBackgroundImageMode else mode
+}
+
+fun ConversationDetailThemeModule.backgroundAppearance(
+    mode: ThemeMode,
+): ConversationDetailAppearance {
+    return appearance(backgroundMode(mode))
 }
 
 private fun ConversationDetailThemeModule.normalized(): ConversationDetailThemeModule {

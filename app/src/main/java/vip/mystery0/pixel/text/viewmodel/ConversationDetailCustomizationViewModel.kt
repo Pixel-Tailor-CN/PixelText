@@ -27,6 +27,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeImageDraft
 import vip.mystery0.pixel.text.domain.theme.ThemeImageReference
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.appearance
+import vip.mystery0.pixel.text.domain.theme.backgroundMode
 import vip.mystery0.pixel.text.domain.theme.normalized
 import vip.mystery0.pixel.text.domain.theme.withAppearance
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
@@ -95,6 +96,41 @@ class ConversationDetailCustomizationViewModel(
             return
         }
         publish(previewMode = mode)
+    }
+
+    fun setUseSameBackgroundImage(useSame: Boolean) {
+        val current = _uiState.value
+        val module = current.draftTheme.conversationDetail
+        if (module.useSameBackgroundImage == useSame) {
+            return
+        }
+        publish(
+            draftTheme = current.draftTheme.copy(
+                conversationDetail = module.copy(
+                    useSameBackgroundImage = useSame,
+                    sharedBackgroundImageMode = if (useSame) {
+                        current.previewMode
+                    } else {
+                        module.sharedBackgroundImageMode
+                    },
+                ),
+            ),
+        )
+    }
+
+    fun setGenerateColorsFromBackgroundImage(generate: Boolean) {
+        val current = _uiState.value
+        val module = current.draftTheme.conversationDetail
+        if (module.generateColorsFromBackgroundImage == generate) {
+            return
+        }
+        publish(
+            draftTheme = current.draftTheme.copy(
+                conversationDetail = module.copy(
+                    generateColorsFromBackgroundImage = generate,
+                ),
+            ),
+        )
     }
 
     fun setReceivedTextColor(reference: ThemeColorReference?) {
@@ -167,6 +203,12 @@ class ConversationDetailCustomizationViewModel(
     }
 
     fun removeBackground(mode: ThemeMode) {
+        val currentModule = _uiState.value.draftTheme.conversationDetail
+        if (currentModule.useSameBackgroundImage &&
+            mode != currentModule.sharedBackgroundImageMode
+        ) {
+            return
+        }
         cancelSelection(mode)
         imageDrafts.remove(mode)?.let { draft ->
             themeAssetRepository.discardDraft(draft)
@@ -192,17 +234,25 @@ class ConversationDetailCustomizationViewModel(
     fun resetCurrentMode() {
         val current = _uiState.value
         val mode = current.previewMode
-        cancelSelection(mode)
-        imageDrafts.remove(mode)?.let { draft ->
-            themeAssetRepository.discardDraft(draft)
-        }
         val module = current.draftTheme.conversationDetail
+        val preserveBackground = module.useSameBackgroundImage &&
+            mode != module.sharedBackgroundImageMode
+        if (!preserveBackground) {
+            cancelSelection(mode)
+            imageDrafts.remove(mode)?.let { draft ->
+                themeAssetRepository.discardDraft(draft)
+            }
+        }
+        val resetAppearance = ConversationDetailAppearance(
+            backgroundImage = if (preserveBackground) {
+                module.appearance(mode).backgroundImage
+            } else {
+                null
+            },
+        )
         publish(
             draftTheme = current.draftTheme.copy(
-                conversationDetail = module.withAppearance(
-                    mode,
-                    ConversationDetailAppearance(),
-                ),
+                conversationDetail = module.withAppearance(mode, resetAppearance),
             ),
         )
     }
@@ -218,7 +268,12 @@ class ConversationDetailCustomizationViewModel(
             return
         }
         // Capture target mode before launch so previewMode switches cannot retarget the request.
-        val mode = _uiState.value.previewMode
+        val current = _uiState.value
+        val mode = current.previewMode
+        val module = current.draftTheme.conversationDetail
+        if (module.useSameBackgroundImage && mode != module.sharedBackgroundImageMode) {
+            return
+        }
         cancelSelection(mode)
         val job = viewModelScope.launch {
             try {
@@ -271,16 +326,15 @@ class ConversationDetailCustomizationViewModel(
     }
 
     fun resolvePreviewBackground(mode: ThemeMode): File? {
-        imageDrafts[mode]?.let { draft ->
+        val module = _uiState.value.draftTheme.conversationDetail
+        val backgroundMode = module.backgroundMode(mode)
+        imageDrafts[backgroundMode]?.let { draft ->
             themeAssetRepository.resolve(draft)?.let { return it }
         }
-        val reference = _uiState.value.draftTheme.conversationDetail
-            .appearance(mode)
-            .backgroundImage
-            ?: return null
+        val reference = module.appearance(backgroundMode).backgroundImage ?: return null
         parseDraftId(reference)?.let { draftId ->
             return themeAssetRepository.resolve(
-                ThemeImageDraft(draftId = draftId, mode = mode),
+                ThemeImageDraft(draftId = draftId, mode = backgroundMode),
             )
         }
         return themeAssetRepository.resolve(reference)
@@ -291,9 +345,8 @@ class ConversationDetailCustomizationViewModel(
      * Used to prompt re-selection without snackbar spam.
      */
     fun isBackgroundMissing(mode: ThemeMode): Boolean {
-        val reference = _uiState.value.draftTheme.conversationDetail
-            .appearance(mode)
-            .backgroundImage
+        val module = _uiState.value.draftTheme.conversationDetail
+        val reference = module.appearance(module.backgroundMode(mode)).backgroundImage
             ?: return false
         return resolvePreviewBackground(mode) == null
     }
@@ -462,10 +515,33 @@ class ConversationDetailCustomizationViewModel(
         val baseModule = base.conversationDetail
         val draftModule = draft.conversationDetail
         val latestModule = latest.conversationDetail
+        val useSameBackgroundChanged =
+            draftModule.useSameBackgroundImage != baseModule.useSameBackgroundImage
         return latest.copy(
             conversationDetail = latestModule.copy(
                 light = mergeAppearance(baseModule.light, draftModule.light, latestModule.light),
                 dark = mergeAppearance(baseModule.dark, draftModule.dark, latestModule.dark),
+                useSameBackgroundImage = if (useSameBackgroundChanged) {
+                    draftModule.useSameBackgroundImage
+                } else {
+                    latestModule.useSameBackgroundImage
+                },
+                sharedBackgroundImageMode = if (
+                    useSameBackgroundChanged ||
+                    draftModule.sharedBackgroundImageMode != baseModule.sharedBackgroundImageMode
+                ) {
+                    draftModule.sharedBackgroundImageMode
+                } else {
+                    latestModule.sharedBackgroundImageMode
+                },
+                generateColorsFromBackgroundImage = if (
+                    draftModule.generateColorsFromBackgroundImage !=
+                    baseModule.generateColorsFromBackgroundImage
+                ) {
+                    draftModule.generateColorsFromBackgroundImage
+                } else {
+                    latestModule.generateColorsFromBackgroundImage
+                },
                 showSimInfo = if (draftModule.showSimInfo != baseModule.showSimInfo) {
                     draftModule.showSimInfo
                 } else {

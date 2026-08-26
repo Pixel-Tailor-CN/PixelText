@@ -31,6 +31,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.ui.screen.mock.MockMessageSpec
 import vip.mystery0.pixel.text.ui.theme.ResolvedConversationDetailStyle
+import vip.mystery0.pixel.text.ui.theme.rememberConversationBackgroundColorScheme
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
 import java.io.File
 
@@ -55,15 +56,31 @@ val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
 @Composable
 fun ConversationDetailPreviewTheme(
     mode: ThemeMode,
-    content: @Composable (ColorScheme) -> Unit,
+    backgroundFile: File? = null,
+    generateColorsFromBackgroundImage: Boolean = false,
+    fallbackColorScheme: ColorScheme? = null,
+    applyGeneratedColorScheme: Boolean = true,
+    content: @Composable (ColorScheme, Boolean, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
-    val colorScheme = when (mode) {
+    val fallback = fallbackColorScheme ?: when (mode) {
         ThemeMode.LIGHT -> dynamicLightColorScheme(context)
         ThemeMode.DARK -> dynamicDarkColorScheme(context)
     }
-    MaterialExpressiveTheme(colorScheme = colorScheme) {
-        content(colorScheme)
+    val result = rememberConversationBackgroundColorScheme(
+        file = backgroundFile,
+        mode = mode,
+        enabled = generateColorsFromBackgroundImage,
+        fallback = fallback,
+    )
+    MaterialExpressiveTheme(
+        colorScheme = if (applyGeneratedColorScheme) result.colorScheme else fallback,
+    ) {
+        content(
+            result.colorScheme,
+            result.usesBackgroundImageColors,
+            result.isLoading,
+        )
     }
 }
 

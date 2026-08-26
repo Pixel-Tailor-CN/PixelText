@@ -50,6 +50,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -107,9 +108,11 @@ import vip.mystery0.pixel.text.domain.theme.MIN_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
+import vip.mystery0.pixel.text.domain.theme.backgroundAppearance
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
+import vip.mystery0.pixel.text.ui.theme.rememberConversationBackgroundColorScheme
 import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
 import vip.mystery0.pixel.text.util.SimInfo
 import vip.mystery0.pixel.text.util.SimInfoProvider
@@ -144,12 +147,24 @@ fun ConversationDetailScreen(
     val themeConfiguration by themeRepository.configuration.collectAsState()
     val highTextContrast by highTextContrastMonitor.enabled.collectAsState()
     val mode = if (isSystemInDarkTheme()) ThemeMode.DARK else ThemeMode.LIGHT
-    val detailStyle = resolveConversationDetailStyle(
-        themeConfiguration,
-        mode,
-        MaterialTheme.colorScheme,
-        highTextContrast,
+    val backgroundFile = themeConfiguration.conversationDetail
+        .backgroundAppearance(mode)
+        .backgroundImage
+        ?.let(themeAssetRepository::resolve)
+    val backgroundColorScheme = rememberConversationBackgroundColorScheme(
+        file = backgroundFile,
+        mode = mode,
+        enabled = themeConfiguration.conversationDetail.generateColorsFromBackgroundImage &&
+            !highTextContrast,
+        fallback = MaterialTheme.colorScheme,
     )
+    MaterialExpressiveTheme(colorScheme = backgroundColorScheme.colorScheme) {
+        val detailStyle = resolveConversationDetailStyle(
+            themeConfiguration,
+            mode,
+            MaterialTheme.colorScheme,
+            highTextContrast,
+        )
     val effectiveContentFilter = if (appSettings.spamIsolationEnabled) {
         requestedContentFilter
     } else {
@@ -835,6 +850,7 @@ fun ConversationDetailScreen(
                 }
             }
         )
+    }
     }
 }
 
