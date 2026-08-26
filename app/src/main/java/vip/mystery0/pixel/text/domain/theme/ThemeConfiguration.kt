@@ -3,7 +3,7 @@ package vip.mystery0.pixel.text.domain.theme
 import com.squareup.moshi.JsonClass
 
 const val CURRENT_THEME_SCHEMA_VERSION = 1
-const val DEFAULT_CONVERSATION_INPUT_PLACEHOLDER = "请输入"
+const val DEFAULT_CONVERSATION_INPUT_PLACEHOLDER = "请输入内容……"
 const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
 const val MIN_CONVERSATION_DETAIL_TEXT_SCALE = 0.85f
 const val MAX_CONVERSATION_DETAIL_TEXT_SCALE = 1.8f

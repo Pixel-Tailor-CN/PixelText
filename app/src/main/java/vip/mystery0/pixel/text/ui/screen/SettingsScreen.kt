@@ -372,7 +372,7 @@ fun SettingsScreen(
                         item(key = "conversation_detail_customization", contentType = "Preference") {
                             Preference(
                                 title = { Text("会话详情显示") },
-                                summary = { Text("自定义原文气泡、输入区域、背景图片和 SIM 信息") },
+                                summary = { Text("自定义消息气泡、输入区域、背景图片和 SIM 信息") },
                                 icon = {
                                     Icon(Icons.Rounded.Palette, contentDescription = null)
                                 },

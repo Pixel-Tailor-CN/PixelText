@@ -49,7 +49,7 @@ val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
         parsedResultOverride = ParsedResult.None,
     ),
     MockMessageSpec(
-        content = "太好————啥？",
+        content = "太好——啥？",
         isReceived = true,
         simName = "无漾",
         parsedResultOverride = ParsedResult.None,

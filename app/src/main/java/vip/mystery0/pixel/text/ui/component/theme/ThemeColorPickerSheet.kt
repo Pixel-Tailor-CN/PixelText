@@ -120,7 +120,7 @@ fun ThemeColorPickerSheet(
     colorScheme: ColorScheme,
     comparisonBackground: Color,
     /**
-     * Target-specific official default used for “使用官方默认” preview/contrast and as the
+     * Target-specific built-in default used for “使用应用内置” preview/contrast and as the
      * starting custom HSV when [current] is null (e.g. surfaceVariant for bubbles).
      */
     officialDefault: Color,
@@ -233,7 +233,7 @@ fun ThemeColorPickerSheet(
                 item(key = "default") {
                     SourceRow(
                         selected = source == ColorPickerSource.DEFAULT,
-                        title = "使用官方默认",
+                        title = "使用应用内置",
                         supporting = "跟随 Material You 默认样式",
                         swatch = officialDefault,
                         onClick = {
@@ -421,7 +421,7 @@ private fun ColorCombinationPreview(
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (usingDefault) "官方默认预览" else "文字预览",
+                text = if (usingDefault) "应用内置预览" else "文字预览",
                 color = foreground,
                 style = MaterialTheme.typography.titleMedium,
             )

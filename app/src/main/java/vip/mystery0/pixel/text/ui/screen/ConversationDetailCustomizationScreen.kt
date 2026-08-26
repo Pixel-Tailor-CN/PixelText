@@ -289,7 +289,7 @@ fun ConversationDetailCustomizationScreen(
                     val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
                     val colorControlsEnabled =
                         !state.highTextContrastEnabled && !state.isSaving
-                    SettingsSectionCard(title = "原文气泡") {
+                    SettingsSectionCard(title = "消息气泡") {
                         ColorSettingRow(
                             title = "接收文字颜色",
                             reference = appearance.receivedTextColor,
@@ -552,9 +552,9 @@ fun ConversationDetailCustomizationScreen(
                         supportingContent = {
                             Text(
                                 if (state.previewMode == ThemeMode.LIGHT) {
-                                    "重置日间外观为官方默认"
+                                    "重置日间外观为应用内置"
                                 } else {
-                                    "重置暗黑外观为官方默认"
+                                    "重置暗黑外观为应用内置"
                                 },
                             )
                         },
@@ -618,7 +618,7 @@ fun ConversationDetailCustomizationScreen(
             onDismissRequest = { showResetAllDialog = false },
             title = { Text("恢复全部默认？") },
             text = {
-                Text("将把日间、暗黑外观以及 SIM、提示文字和文字缩放重置为官方默认。仍需点击保存后才会生效。")
+                Text("将把日间、暗黑外观以及 SIM、提示文字和文字缩放重置为应用内置。仍需点击保存后才会生效。")
             },
             confirmButton = {
                 TextButton(
@@ -846,12 +846,12 @@ private tailrec fun Context.findActivity(): Activity? {
 
 private fun colorReferenceLabel(reference: ThemeColorReference?): String {
     if (reference == null) {
-        return "官方默认"
+        return "应用内置"
     }
     return when (reference.type) {
         ThemeColorType.MATERIAL_ROLE -> {
             val role = MaterialColorRole.fromStorageValue(reference.value)
-            role?.let { "MD3 · ${it.storageValue}" } ?: "官方默认"
+            role?.let { "MD3 · ${it.storageValue}" } ?: "应用内置"
         }
         ThemeColorType.CUSTOM_ARGB -> reference.value.ifBlank { "自定义" }
     }
