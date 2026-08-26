@@ -37,16 +37,25 @@ import java.io.File
 
 val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
     MockMessageSpec(
-        // Short multi-line conversational sample sized so received + sent bubbles,
-        // timestamps, and SIM labels stay visible through MAX textScale (1.8f).
-        // parsedResultOverride enforces original bubbles regardless of active rules.
-        content = "今天晚饭想吃火锅还是日料？我六点下班后直接过去。",
+        content = "宝宝，我可以摸摸你那里吗？",
         isReceived = true,
         simName = "卡1",
         parsedResultOverride = ParsedResult.None,
     ),
     MockMessageSpec(
-        content = "好的，我稍后处理。",
+        content = "哪里？",
+        isReceived = false,
+        simName = "卡1",
+        parsedResultOverride = ParsedResult.None,
+    ),
+    MockMessageSpec(
+        content = "想啥呢？我说摸摸那里的钱包",
+        isReceived = true,
+        simName = "卡1",
+        parsedResultOverride = ParsedResult.None,
+    ),
+    MockMessageSpec(
+        content = "🤡\n👆🤣",
         isReceived = false,
         simName = "卡1",
         parsedResultOverride = ParsedResult.None,
@@ -116,7 +125,7 @@ fun ConversationDetailPreview(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    userScrollEnabled = false,
+                    userScrollEnabled = true,
                 ) {
                     items(
                         items = messages,
