@@ -193,6 +193,7 @@ fun MessageItem(
                             OriginalTextCard(
                                 content = message.content,
                                 isSelected = isSelected,
+                                isReceived = message.isReceived,
                                 subject = message.mmsSubject,
                                 textScale = textScale,
                                 backgroundColor = bubbleColor,
@@ -208,6 +209,7 @@ fun MessageItem(
                             OriginalTextCard(
                                 content = message.content,
                                 isSelected = isSelected,
+                                isReceived = message.isReceived,
                                 subject = message.mmsSubject,
                                 textScale = textScale,
                                 backgroundColor = bubbleColor,
@@ -228,6 +230,7 @@ fun MessageItem(
                             OriginalTextCard(
                                 content = message.content,
                                 isSelected = isSelected,
+                                isReceived = message.isReceived,
                                 subject = message.mmsSubject,
                                 textScale = textScale,
                                 backgroundColor = bubbleColor,
@@ -247,6 +250,7 @@ fun MessageItem(
                     OriginalTextCard(
                         content = "【不支持的消息】",
                         isSelected = isSelected,
+                        isReceived = message.isReceived,
                         textScale = textScale,
                         backgroundColor = bubbleColor,
                         textColor = textColor,

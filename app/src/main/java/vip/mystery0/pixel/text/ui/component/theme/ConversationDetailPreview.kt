@@ -37,27 +37,21 @@ import java.io.File
 
 val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
     MockMessageSpec(
-        content = "宝宝，我可以摸摸你那里吗？",
+        content = "能说服爸妈同意我休学一段时间，真是多谢了。应该费了不少功夫吧？",
         isReceived = true,
-        simName = "卡1",
+        simName = "无漾",
         parsedResultOverride = ParsedResult.None,
     ),
     MockMessageSpec(
-        content = "哪里？",
+        content = "呃……倒也没那么难。我就是告诉他们你回来后回去读研。",
         isReceived = false,
-        simName = "卡1",
+        simName = "安燃",
         parsedResultOverride = ParsedResult.None,
     ),
     MockMessageSpec(
-        content = "想啥呢？我说摸摸那里的钱包",
+        content = "太好————啥？",
         isReceived = true,
-        simName = "卡1",
-        parsedResultOverride = ParsedResult.None,
-    ),
-    MockMessageSpec(
-        content = "🤡\n👆🤣",
-        isReceived = false,
-        simName = "卡1",
+        simName = "无漾",
         parsedResultOverride = ParsedResult.None,
     ),
 )

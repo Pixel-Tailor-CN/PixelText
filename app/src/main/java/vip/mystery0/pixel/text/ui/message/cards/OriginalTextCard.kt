@@ -40,6 +40,7 @@ private val DefaultOriginalTextScale = 1f
 fun OriginalTextCard(
     content: String,
     isSelected: Boolean = false,
+    isReceived: Boolean = true,
     subject: String? = null,
     textScale: Float = DefaultOriginalTextScale,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
@@ -137,7 +138,11 @@ fun OriginalTextCard(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
+        shape = if (isReceived) {
+            RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp)
+        } else {
+            RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+        },
         color = resolvedBackground,
         modifier = Modifier.widthIn(max = 320.dp)
     ) {
