@@ -23,10 +23,11 @@
 
 - 会话命中字段：联系人显示名、号码归一化 key、服务号资料名。
 - 短信命中字段：短信正文、彩信文本、彩信主题。不要把 `ADDRESS LIKE` 并入短信查询。
-- 会话最多 20 条，短信最多 100 条，均按时间倒序。
+- 会话最多 20 条；短信最多 100 条。短信 100 是合并 SMS/MMS 并完成筛选之后的总上限。
 - 会话分区排除归档；开启骚扰隔离时排除骚扰会话。
 - 无联系人权限时不按姓名命中，但号码和服务号名仍可命中。
 - 保留现有联系人 picker、未读 / SIM / 彩信筛选。
+- 彩信 `message.id` 为负数；路由 sentinel 只使用 `-1`。
 
 ---
 
@@ -72,8 +73,10 @@
 - [ ] 将会话筛选叠加到会话分区：联系人 chip、未读、彩信。SIM 筛选不作用于会话分区。
 - [ ] 会话结果按时间倒序，最多 20 条。
 - [ ] 短信分区继续使用现有正文 / 主题检索 + 联系人号码过滤，不要因为姓名或号码命中而自动加入短信结果。
-- [ ] 为 `searchSmsMessages()` / `searchMmsMessages()` 增加 100 条上限，或在仓库层截断到 100 条。优先在查询层加 LIMIT，避免万级扫表。
-- [ ] query 为空但筛选激活时，会话分区为空，只返回短信结果，保持旧的「仅联系人筛选列出全部短信」行为。
+- [ ] 查询层可加安全 `LIMIT` 防万级扫表，但不要把产品 100 落在 `searchSmsMessages()` 和 `searchMmsMessages()` 各自的查询结果上。
+- [ ] 产品 100 条上限必须在仓库层按这个顺序落地：合并 SMS + MMS → 联系人 / 未读 / SIM / 彩信筛选 → 按时间倒序 `take(100)`。
+- [ ] 有联系人 chip 时，先过滤号码再截断。能把号码约束推进 Telephony 查询就推；否则过量取回后用 `matchesAddress()` 过滤。禁止先 `LIMIT 100` 再按联系人过滤。
+- [ ] query 为空但筛选激活时，会话分区为空，只返回短信结果，保持旧的「仅联系人筛选列出短信」行为；这条路径同样要先筛选再截 100。
 - [ ] 若会话缓存未 ready，先走与列表相同的同步，避免搜索不到列表里已有的会话。
 - [ ] 日志只输出英文小写短语和关键计数，例如 `search query_len=2 conversations=3 messages=12`。
 
@@ -83,6 +86,7 @@
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchViewModel.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchScreen.kt`
+- Modify: 会话详情路由解析与定位逻辑，通常是 `AppNavigation.kt` 和 `ConversationDetailScreen` / `ConversationDetailViewModel`
 
 **Interfaces:**
 - Consumes: `MessageRepository.search()`
@@ -94,7 +98,9 @@
 - [ ] ViewModel 改调 `repository.search(query, filter)`，保持 300ms debounce 和现有筛选 toggle API。
 - [ ] `SearchScreen` 增加会话点击回调；短信点击回调保持。
 - [ ] `AppNavigation` 中，会话点击进入 `conversationDetailRoute(threadId, address)`。
-- [ ] 短信点击传入 `messageId = message.id`，复用详情页已有定位参数。骚扰分数阈值逻辑保持现有 `contentFilter` 判断。
+- [ ] 消息点击传入 `messageId = message.id`。骚扰分数阈值逻辑保持现有 `contentFilter` 判断。
+- [ ] 修正 `conversationDetailRoute()`：只把 `-1` 当作缺省 sentinel，不要再用 `takeIf { it > 0L }` 丢掉负数彩信 ID。
+- [ ] 修正详情页路由解析和定位逻辑，使 `targetMessageId != -1L` 的消息都能被定位，包括 MMS 负数 ID。
 - [ ] 占位文案改为「搜索联系人或短信」。
 
 ### Task 4: 分区结果 UI 与显示名
@@ -125,5 +131,7 @@
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期 `BUILD SUCCESSFUL`。
 - [ ] 确认没有把 `ADDRESS LIKE` 加进短信正文查询。
 - [ ] 确认搜索页不再只依赖 `searchMessages()`。
+- [ ] 确认短信 100 条上限落在合并加筛选之后，而不是 SMS/MMS 各自 `LIMIT 100`。
+- [ ] 确认彩信搜索结果点击能把负数 `messageId` 传到详情页并定位。
 - [ ] 手动核对设计文档验收标准：姓名出会话、号码出会话、关键词出短信、姓名不刷全量历史短信、筛选仍可用、无权限时有提示、结果展示显示名。
 - [ ] 确认联系人 picker、chip 关闭、未读 / SIM / 彩信筛选没有回归。
