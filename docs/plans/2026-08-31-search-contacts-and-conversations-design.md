@@ -62,7 +62,7 @@
 - 搜索框占位改为「搜索联系人或短信」。
 - Idle 辅助文案改为同时说明可以输入姓名、号码或关键词。
 - 结果标题优先显示联系人姓名或服务号名称，号码作为次要信息。
-- 会话结果点击进入该会话；短信结果点击进入该会话并尽量定位到该条消息。
+- 会话结果点击进入该会话；短信和彩信结果点击进入该会话并尽量定位到该条消息。
 
 ## 搜索语义
 
@@ -123,7 +123,7 @@ query 非空时，短信命中任一即可入选：
 ### 排序与数量
 
 - 会话按 `timestamp` 倒序，最多 20 条。
-- 短信按 `timestamp` 倒序，最多 100 条。
+- 短信按 `timestamp` 倒序，最多 100 条。这 100 是合并短信和彩信、再完成联系人 / 未读 / SIM / 彩信筛选之后的总上限，不是 SMS 查询 100 加 MMS 查询 100。
 - 两类结果各自独立排序，不为「同会话去重」打乱时间序。
 
 ## 结果模型
@@ -155,7 +155,14 @@ sealed class SearchUiState {
 导航：
 
 - 会话点击：`conversationDetailRoute(threadId, address)`
-- 短信点击：`conversationDetailRoute(threadId, sender, messageId = message.id)`，把已有但搜索页未使用的 `messageId` 传进去，便于详情定位。
+- 消息点击：`conversationDetailRoute(threadId, sender, messageId = message.id)`
+
+`MessageModel` 里彩信 ID 是负数（`-mmsId`）。现有 `conversationDetailRoute()` 和路由解析只保留 `messageId > 0`，并把 `-1` 当作缺省 sentinel。直接把 `message.id` 传进去会让彩信搜索结果无法定位。
+
+实现时必须：
+
+- 路由只把 `-1` 视为「未指定消息」，接受其他任何非 `-1` 的 ID，包括负数彩信 ID
+- 详情页用 `message.id` 相等比较定位，不要再用 `id > 0` 把彩信过滤掉
 
 ## UI
 
@@ -260,10 +267,10 @@ query 本身也生成一份 lookup keys；两边有包含关系即命中。纯�
 
 本次允许的小改动：
 
-- 为短信查询增加 `LIMIT 100`，避免万级 `BODY LIKE` 无上限扫表。
 - 不把 `ADDRESS LIKE` 并入短信查询。号码找人只走会话分区。
-
-联系人 chip 仍在仓库层用 `ContactDataSource.matchesAddress()` 过滤短信结果。
+- 查询层可以加安全上限，避免万级 `BODY LIKE` 无上限扫表；这个上限只是防卡死，不是产品上的 100 条。
+- 产品上限 100 必须在仓库层一次性落在：合并 SMS + MMS → 联系人 / 未读 / SIM / 彩信筛选 → 按时间倒序截断到 100。
+- 有联系人 chip 时，不能先对全量结果 `LIMIT` 再过滤号码。否则更新的其他发件人正文命中会把该联系人较旧的命中挤掉。优先把号码约束推进查询；若 Telephony 无法复用归一化匹配，就先过量取回再在仓库层按 `matchesAddress()` 过滤，最后才截 100。
 
 ## 代码结构
 
@@ -283,7 +290,7 @@ query 本身也生成一份 lookup keys；两边有包含关系即命中。纯�
 - `app/src/main/java/vip/mystery0/pixel/text/data/repository/MessageRepositoryImpl.kt`
   - 实现会话 + 短信聚合搜索
 - `app/src/main/java/vip/mystery0/pixel/text/data/source/TelephonyDataSource.kt`
-  - 短信 / 彩信正文搜索增加数量上限
+  - 短信 / 彩信正文搜索可加安全上限，但不要把产品 100 落在单侧查询上
 - `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchViewModel.kt`
   - 改用聚合搜索结果
 - `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchScreen.kt`
@@ -293,7 +300,9 @@ query 本身也生成一份 lookup keys；两边有包含关系即命中。纯�
 - `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchResultItem.kt`
   - 展示显示名
 - `app/src/main/java/vip/mystery0/pixel/text/ui/AppNavigation.kt`
-  - 会话点击与短信点击带 `messageId`
+  - 会话点击；消息点击传 `messageId`，且路由接受负数彩信 ID
+- 会话详情页相关定位逻辑
+  - 确认 `targetMessageId` 能定位负数 ID
 
 ### 不需要改
 
@@ -321,7 +330,9 @@ query 本身也生成一份 lookup keys；两边有包含关系即命中。纯�
   - 输入正文关键词出现短信分区和高亮
   - 姓名命中但正文未命中时，不刷出该会话全部短信
   - 联系人 chip、未读、SIM、彩信筛选仍可用
+  - 联系人 chip + 关键词时，结果仍是该联系人的命中，不被更新的其他发件人挤掉
   - 关闭联系人权限后，号码仍能搜到会话，姓名空结果有权限提示
   - 点击会话进入对应详情
   - 点击短信进入对应详情
+  - 点击彩信搜索结果能定位到该条彩信，而不是只打开会话顶部
   - 结果标题显示联系人姓名而不是纯号码
