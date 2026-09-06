@@ -69,6 +69,10 @@ class SettingsViewModel(
         }
     }
 
+    fun setAutoDownloadMms(enabled: Boolean) {
+        settingsRepository.setAutoDownloadMms(enabled)
+    }
+
     fun setSpamDetectionEnabled(enabled: Boolean) {
         settingsRepository.setSpamDetectionEnabled(enabled)
     }

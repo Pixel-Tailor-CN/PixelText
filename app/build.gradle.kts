@@ -24,6 +24,10 @@ val gitVersionName: String =
     }.standardOutput.asText.get().trim()
 val appVersionName: String = libs.versions.app.version.get()
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)

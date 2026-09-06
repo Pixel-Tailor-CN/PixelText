@@ -19,13 +19,14 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
 import vip.mystery0.pixel.text.data.source.ContactDataSource
-import vip.mystery0.pixel.text.mms.MmsDownloadReceiver
+import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 import vip.mystery0.pixel.text.mms.WapPushPduParser
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 
 class MmsReceiver : BroadcastReceiver(), KoinComponent {
     private val senderProfileRepository: SenderProfileRepository by inject()
     private val contactDataSource: ContactDataSource by inject()
+    private val downloads: MmsDownloadCoordinator by inject()
     companion object {
         private const val TAG = "MmsReceiver"
     }
@@ -35,7 +36,7 @@ class MmsReceiver : BroadcastReceiver(), KoinComponent {
 
         val pushData = intent.getByteArrayExtra("data")
         if (pushData == null || pushData.isEmpty()) {
-            Log.w(TAG, "WAP Push data is null or empty")
+            Log.w(TAG, "wap push data missing")
             return
         }
 
@@ -47,15 +48,25 @@ class MmsReceiver : BroadcastReceiver(), KoinComponent {
 
         Log.d(
             TAG,
-            "MMS notification: from=${notification.from}, " +
-                    "location=${notification.contentLocation}, " +
-                    "size=${notification.messageSize}"
+            "mms notification received"
         )
 
         val subId = intent.getIntExtra(
             "subscription",
             SubscriptionManager.INVALID_SUBSCRIPTION_ID
         )
+        // 系统可能重复投递同一个通知；在插入前按事务、位置和接收卡去重。
+        val duplicate = runCatching {
+            context.contentResolver.query(
+                Telephony.Mms.CONTENT_URI, arrayOf("_id"),
+                "tr_id = ? AND ct_l = ? AND sub_id = ?",
+                arrayOf(notification.transactionId, notification.contentLocation, subId.toString()), null,
+            )?.use { it.moveToFirst() } ?: error("mms dedup query unavailable")
+        }.getOrElse {
+            Log.w(TAG, "mms dedup unavailable")
+            return
+        }
+        if (duplicate) return
 
         // 1. 在 Telephony.Mms 中插入占位记录
         val mmsUri = insertMmsPlaceholder(context, notification, subId)
@@ -84,13 +95,15 @@ class MmsReceiver : BroadcastReceiver(), KoinComponent {
                         ?: sender,
                     avatarPath = profile?.avatarPath,
                 )
+                vip.mystery0.pixel.text.worker.MessageMirrorScheduler(context).schedule()
+                runCatching { downloads.requestDownload(mmsUri.lastPathSegment!!.toLong(), false) }
+                    .onFailure { Log.w(TAG, "mms automatic download unavailable category=${it.javaClass.simpleName}") }
             } finally {
                 pendingResult.finish()
             }
         }
 
-        // 3. 触发后台下载
-        triggerMmsDownload(context, notification, mmsUri, subId)
+
     }
 
     private fun insertMmsPlaceholder(
@@ -104,25 +117,43 @@ class MmsReceiver : BroadcastReceiver(), KoinComponent {
             put(Telephony.Mms.READ, 0)
             put(Telephony.Mms.SEEN, 0)
             put(Telephony.Mms.MESSAGE_BOX, Telephony.Mms.MESSAGE_BOX_INBOX)
-            put(Telephony.Mms.MESSAGE_TYPE, 130) // MESSAGE_TYPE_RETRIEVE_CONF
+            put(Telephony.Mms.MESSAGE_TYPE, 130) // NotificationInd
             put(Telephony.Mms.CONTENT_LOCATION, notification.contentLocation)
             put(Telephony.Mms.TRANSACTION_ID, notification.transactionId)
             put(Telephony.Mms.MESSAGE_SIZE, notification.messageSize)
+            put(Telephony.Mms.EXPIRY, notification.expiry)
             if (!notification.subject.isNullOrBlank()) {
-                put(Telephony.Mms.SUBJECT, notification.subject)
+                put(Telephony.Mms.SUBJECT, notification.subject.toByteArray(Charsets.UTF_8).toString(Charsets.ISO_8859_1))
+                put(Telephony.Mms.SUBJECT_CHARSET, 106)
             }
             if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
                 put(Telephony.Mms.SUBSCRIPTION_ID, subId)
             }
-            // 标记为"下载中"状态
-            put(Telephony.Mms.STATUS, 128) // STATUS_DOWNLOADING
+            // 尚未开始下载
+            put(Telephony.Mms.STATUS, 0) // 下载状态由独立请求管理
         }
         return try {
-            context.contentResolver.insert(Telephony.Mms.CONTENT_URI, values)
+            notification.from?.takeIf { it.isNotBlank() }?.let {
+                putThread(values, context, it)
+            }
+            context.contentResolver.insert(Telephony.Mms.CONTENT_URI, values)?.also { uri ->
+                notification.from?.takeIf { it.isNotBlank() }?.let { sender ->
+                    context.contentResolver.insert("$uri/addr".toUri(), ContentValues().apply {
+                        put("address", sender.substringBefore("/TYPE="))
+                        put("type", 137)
+                        put("charset", 106)
+                    })
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "failed to insert MMS placeholder", e)
             null
         }
+    }
+
+    private fun putThread(values: ContentValues, context: Context, sender: String) {
+        runCatching { Telephony.Threads.getOrCreateThreadId(context, sender.substringBefore("/TYPE=")) }
+            .getOrNull()?.let { values.put(Telephony.Mms.THREAD_ID, it) }
     }
 
     private fun queryThreadId(context: Context, mmsUri: Uri): Long {
@@ -142,50 +173,4 @@ class MmsReceiver : BroadcastReceiver(), KoinComponent {
         return 0L
     }
 
-    private fun triggerMmsDownload(
-        context: Context,
-        notification: vip.mystery0.pixel.text.mms.MmsNotificationInd,
-        mmsUri: Uri,
-        subId: Int,
-    ) {
-        try {
-            val downloadIntent = Intent(context, MmsDownloadReceiver::class.java).apply {
-                action = MmsDownloadReceiver.ACTION_MMS_DOWNLOADED
-                putExtra(MmsDownloadReceiver.EXTRA_MMS_URI, mmsUri.toString())
-                putExtra(MmsDownloadReceiver.EXTRA_CONTENT_LOCATION, notification.contentLocation)
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                mmsUri.hashCode(),
-                downloadIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val locationUri = notification.contentLocation.toUri()
-            val configOverrides = Bundle()
-
-            val smsManager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                context.getSystemService(SmsManager::class.java)
-                    .createForSubscriptionId(subId)
-            } else {
-                context.getSystemService(SmsManager::class.java)
-            }
-
-            smsManager.downloadMultimediaMessage(
-                context,
-                locationUri.toString(),
-                mmsUri,
-                configOverrides,
-                pendingIntent,
-            )
-            Log.d(TAG, "MMS download triggered for ${notification.contentLocation}")
-        } catch (e: Exception) {
-            Log.e(TAG, "failed to trigger MMS download", e)
-            // 标记下载失败
-            val values = ContentValues().apply {
-                put(Telephony.Mms.STATUS, 135) // STATUS_DEFERRED
-            }
-            context.contentResolver.update(mmsUri, values, null, null)
-        }
-    }
 }

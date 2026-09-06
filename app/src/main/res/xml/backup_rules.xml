@@ -2,4 +2,9 @@
 <full-backup-content>
     <!-- 兼容旧版备份配置；项目最低 SDK 为 31，实际以 data_extraction_rules 为准。 -->
     <exclude domain="root" path="." />
+    <exclude domain="database" path="message_mirror.db" />
+    <exclude domain="database" path="message_mirror.db-wal" />
+    <exclude domain="database" path="message_mirror.db-shm" />
+    <exclude domain="file" path="mms-download/" />
+    <exclude domain="sharedpref" path="mms_download_requests.xml" />
 </full-backup-content>

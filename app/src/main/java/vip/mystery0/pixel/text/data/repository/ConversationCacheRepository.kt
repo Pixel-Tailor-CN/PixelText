@@ -1,238 +1,43 @@
 package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
-import android.database.ContentObserver
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.provider.Telephony
-import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
-import vip.mystery0.pixel.text.data.db.CacheMetadataEntity
-import vip.mystery0.pixel.text.data.db.CachedConversationDao
-import vip.mystery0.pixel.text.data.db.toCachedConversationEntity
-import vip.mystery0.pixel.text.data.db.toConversationModel
-import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import kotlinx.coroutines.flow.first
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 
-private const val TAG = "ConversationCacheRepo"
-
+/** 兼容旧接口；会话是本地消息的投影，不再独立扫描系统摘要。 */
 class ConversationCacheRepository(
     private val context: Context,
-    private val dao: CachedConversationDao,
-    private val telephonyDataSource: TelephonyDataSource,
+    private val mirror: MessageMirrorRepository,
+    private val synchronizer: MessageMirrorSynchronizer,
+    private val observer: MirrorChangeObserver,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val handler = Handler(Looper.getMainLooper())
-    private val isObserving = AtomicBoolean(false)
-    private val syncMutex = Mutex()
-
-    private val observer = object : ContentObserver(handler) {
-        override fun onChange(selfChange: Boolean, uri: Uri?) {
-            scope.launch { syncChangedThreads(uri) }
-        }
-    }
-
-    @Synchronized
     fun startObserving() {
-        if (!isObserving.compareAndSet(false, true)) return
-        var smsObserverRegistered = false
-        try {
-            context.contentResolver.registerContentObserver(
-                Telephony.Sms.CONTENT_URI, true, observer
-            )
-            smsObserverRegistered = true
-            context.contentResolver.registerContentObserver(
-                Telephony.Mms.CONTENT_URI, true, observer
-            )
-        } catch (error: Throwable) {
-            if (smsObserverRegistered) {
-                runCatching {
-                    context.contentResolver.unregisterContentObserver(observer)
-                }
-            }
-            isObserving.set(false)
-            throw error
-        }
+        observer.start()
+        MessageMirrorScheduler(context).schedule()
     }
-
-    @Synchronized
-    fun stopObserving() {
-        if (!isObserving.compareAndSet(true, false)) return
-        try {
-            context.contentResolver.unregisterContentObserver(observer)
-        } catch (error: Throwable) {
-            isObserving.set(true)
-            throw error
-        }
+    fun stopObserving() = observer.stop()
+    suspend fun isCacheReady(): Boolean {
+        val state = mirror.observeSyncState().first()
+        return state.completedCollections.containsAll(setOf("SMS", "MMS"))
     }
-
-    suspend fun isCacheReady(): Boolean = withContext(Dispatchers.IO) {
-        dao.getMetadataValue(KEY_CACHE_VERSION) == CURRENT_CACHE_VERSION
+    suspend fun fullSync(archivedThreadIds: Set<Long>) {
+        synchronizer.requestAttachmentVerification()
+        synchronizer.reconcile()
+        MessageMirrorScheduler(context).schedule()
     }
-
-    suspend fun fullSync(archivedThreadIds: Set<Long>) = withContext(Dispatchers.IO) {
-        syncMutex.withLock {
-            fullSyncLocked(archivedThreadIds)
-        }
+    suspend fun syncThreads(threadIds: List<Long>) {
+        synchronizer.markDirty(null)
+        // 系统写入后的通知只持久排队，不让 Receiver 或用户操作等待整库扫描。
+        MessageMirrorScheduler(context).enqueueMetadata()
     }
-
-    private suspend fun fullSyncLocked(archivedThreadIds: Set<Long>) {
-        Log.d(TAG, "starting full sync cache_version=$CURRENT_CACHE_VERSION")
-        val allThreadIds = telephonyDataSource.queryConversationThreadIds()
-            .distinct()
-            .filter { it !in archivedThreadIds }
-
-        if (allThreadIds.isEmpty()) {
-            dao.deleteAll()
-            markCacheReady()
-            Log.d(TAG, "full sync done cache_version=$CURRENT_CACHE_VERSION upserted=0 deleted=all")
-            return
-        }
-
-        val conversations = fetchAndBuildConversations(allThreadIds)
-        val cachedThreadIds = dao.getAllThreadIds().toSet()
-        val deletedIds = cachedThreadIds - allThreadIds.toSet()
-
-        dao.upsert(conversations.map { it.toCachedConversationEntity() })
-        if (deletedIds.isNotEmpty()) dao.delete(deletedIds)
-        markCacheReady()
-        Log.d(
-            TAG,
-            "full sync done cache_version=$CURRENT_CACHE_VERSION upserted=${conversations.size} deleted=${deletedIds.size}"
-        )
-    }
-
-    private suspend fun syncChangedThreads(uri: Uri?) {
-        syncMutex.withLock {
-            // 系统通知的 URI 通常是单条消息 URI，末尾 ID 是 messageId，不是 threadId。
-            val threadId = telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
-            if (threadId != null) {
-                syncThreadsLocked(listOf(threadId))
-            } else {
-                syncAllKnownThreadsLocked()
-            }
-        }
-    }
-
-    suspend fun syncThreads(threadIds: List<Long>) = withContext(Dispatchers.IO) {
-        syncMutex.withLock {
-            syncThreadsLocked(threadIds)
-        }
-    }
-
-    private suspend fun syncThreadsLocked(threadIds: List<Long>) {
-        val conversations = fetchAndBuildConversations(threadIds)
-        if (conversations.isEmpty()) {
-            dao.delete(threadIds.toSet())
-        } else {
-            dao.upsert(conversations.map { it.toCachedConversationEntity() })
-            val fetchedIds = conversations.map { it.threadId }.toSet()
-            val missingIds = threadIds.toSet() - fetchedIds
-            if (missingIds.isNotEmpty()) dao.delete(missingIds)
-        }
-    }
-
-    private suspend fun syncAllKnownThreadsLocked() {
-        val currentThreadIds = telephonyDataSource.queryConversationThreadIds()
-            .distinct()
-        val cachedThreadIds = dao.getAllThreadIds()
-
-        val deletedThreadIds = cachedThreadIds.toSet() - currentThreadIds.toSet()
-        if (deletedThreadIds.isNotEmpty()) {
-            dao.delete(deletedThreadIds)
-        }
-
-        if (currentThreadIds.isNotEmpty()) {
-            syncThreadsLocked(currentThreadIds)
-        }
-    }
-
-    private suspend fun markCacheReady() {
-        dao.upsertMetadata(CacheMetadataEntity(KEY_CACHE_INITIALIZED, 1))
-        dao.upsertMetadata(CacheMetadataEntity(KEY_CACHE_VERSION, CURRENT_CACHE_VERSION))
-    }
-
-    private fun fetchAndBuildConversations(threadIds: List<Long>): List<ConversationModel> {
-        val map = mutableMapOf<Long, ConversationModel>()
-
-        telephonyDataSource.fetchConversationSmsRows(threadIds).forEach { row ->
-            val existing = map[row.threadId]
-            if (existing == null) {
-                map[row.threadId] = ConversationModel(
-                    threadId = row.threadId,
-                    address = row.address,
-                    displayName = null,
-                    snippet = row.body,
-                    timestamp = row.date,
-                    unreadCount = if (row.read) 0 else 1
-                )
-            } else if (!row.read) {
-                map[row.threadId] = existing.copy(unreadCount = existing.unreadCount + 1)
-            }
-        }
-
-        telephonyDataSource.fetchConversationMmsRows(threadIds).forEach { row ->
-            val existing = map[row.threadId]
-            if (existing == null) {
-                map[row.threadId] = ConversationModel(
-                    threadId = row.threadId,
-                    address = row.address,
-                    displayName = null,
-                    snippet = row.subject ?: row.textContent,
-                    timestamp = row.date,
-                    unreadCount = if (row.read) 0 else 1,
-                    isMms = true,
-                    hasMms = true
-                )
-            } else if (row.date > existing.timestamp) {
-                val address = if (existing.address.isNotBlank()) existing.address else row.address
-                map[row.threadId] = existing.copy(
-                    snippet = row.subject ?: row.textContent,
-                    timestamp = row.date,
-                    address = address,
-                    unreadCount = existing.unreadCount + if (row.read) 0 else 1,
-                    isMms = true,
-                    hasMms = true
-                )
-            } else {
-                map[row.threadId] = existing.copy(
-                    unreadCount = existing.unreadCount + if (row.read) 0 else 1,
-                    hasMms = true
-                )
-            }
-        }
-
-        return threadIds.mapNotNull { map[it] }
-    }
-
     suspend fun getAllConversations(
-        archivedThreadIds: Set<Long>,
-        hiddenThreadIds: Set<Long> = emptySet()
-    ): List<ConversationModel> = withContext(Dispatchers.IO) {
-        dao.getAllConversations()
-            .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
-            .map { it.toConversationModel() }
-    }
-
-    fun observeAllConversations(): Flow<List<ConversationModel>> =
-        dao.observeAllConversationsWithSenderProfile()
-            .map { conversations ->
-                conversations.map { it.toConversationModel() }
-            }
-
-    private companion object {
-        const val KEY_CACHE_INITIALIZED = "cache_initialized"
-        const val KEY_CACHE_VERSION = "cache_version"
-        const val CURRENT_CACHE_VERSION = 2
-    }
+        archivedThreadIds: Set<Long>, hiddenThreadIds: Set<Long> = emptySet(),
+    ): List<ConversationModel> = mirror.observeConversationSummaries().first()
+        .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
+    fun observeAllConversations(): Flow<List<ConversationModel>> = mirror.observeConversationSummaries()
 }

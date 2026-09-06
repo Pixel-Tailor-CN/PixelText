@@ -383,6 +383,14 @@ fun SettingsScreen(
                             key = "category_app_features",
                             title = { Text("应用功能") }
                         )
+                        item(key = "auto_download_mms", contentType = "SwitchPreference") {
+                            SwitchPreference(
+                                value = settings.autoDownloadMms,
+                                onValueChange = viewModel::setAutoDownloadMms,
+                                title = { Text("自动下载彩信") },
+                                summary = { Text("开启后自动下载新收到的彩信，可能使用移动数据") },
+                            )
+                        }
                         item(key = "spam_detection", contentType = "SwitchPreference") {
                             SwitchPreference(
                                 value = settings.spamDetectionEnabled,

@@ -3,6 +3,8 @@ package vip.mystery0.pixel.text.data.repository
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -25,6 +27,8 @@ import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.data.repository.mirror.toMessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
@@ -48,6 +52,7 @@ class MessageRepositoryImpl(
     val conversationCacheRepository: ConversationCacheRepository,
     private val senderProfileRepository: SenderProfileRepository,
     private val verificationCodeRepository: VerificationCodeRepository,
+    private val mirror: MessageMirrorRepository,
     private val context: Context
 ) : MessageRepository {
 
@@ -69,8 +74,7 @@ class MessageRepositoryImpl(
     @OptIn(FlowPreview::class)
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
         if (!conversationCacheRepository.isCacheReady()) {
-            val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-            conversationCacheRepository.fullSync(archivedThreadIds)
+            conversationCacheRepository.startObserving()
         }
 
         emitAll(
@@ -94,7 +98,7 @@ class MessageRepositoryImpl(
                             )
                         ).sortedByDescending { it.timestamp }
                     } else {
-                        activeConversations
+                        enrichWithSenderProfiles(activeConversations)
                     }
                     visibleConversations.map {
                         it.copy(
@@ -116,10 +120,7 @@ class MessageRepositoryImpl(
 
             val conversations = enrichWithSenderProfiles(fetchConversationDetails(threadIds))
                 .sortedByDescending { it.timestamp }
-            val missingThreadIds = threadIds.toSet() - conversations.map { it.threadId }.toSet()
-            if (missingThreadIds.isNotEmpty()) {
-                archiveDao.unarchive(missingThreadIds)
-            }
+            // 本地暂缺不代表系统删除；首次镜像或失败期间必须保留归档选择。
             emit(conversations)
         }.flowOn(Dispatchers.IO)
 
@@ -142,7 +143,7 @@ class MessageRepositoryImpl(
         }.flowOn(Dispatchers.IO)
 
     override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
-        val threadIds = telephonyDataSource.searchConversationThreadIds(query)
+        val threadIds = localMessages().filter { it.sender.contains(query, true) || it.content.contains(query, true) }.map { it.threadId }.distinct()
         if (threadIds.isEmpty()) {
             emit(emptyList())
             return@flow
@@ -219,115 +220,48 @@ class MessageRepositoryImpl(
         }
     }
 
-    override fun searchMessages(
-        query: String,
-        filter: MessageSearchFilter
-    ): Flow<List<MessageModel>> = flow {
-        val smsMessages = if (filter.mmsOnly) {
-            emptyList()
-        } else {
-            telephonyDataSource.searchSmsMessages(
-                query = query,
-                unreadOnly = filter.unreadOnly,
-                simSubId = filter.simSubId
-            ).map { it.toMessageModel(parsedResult = ParsedResult.None) }
-        }
-        val mmsMessages = telephonyDataSource.searchMmsMessages(
-            query = query,
-            unreadOnly = filter.unreadOnly,
-            simSubId = filter.simSubId
-        )
-            .map { it.toMessageModel(parsedResult = ParsedResult.None) }
-
-        val filteredMessages = (smsMessages + mmsMessages)
-            .filter { message ->
-                val selectedContactAddress = filter.contactAddress
-                if (selectedContactAddress.isNullOrBlank()) {
-                    true
-                } else {
-                    contactDataSource.matchesAddress(
-                        selectedAddress = selectedContactAddress,
-                        candidateAddress = message.sender
-                    )
-                }
-            }
-            .sortedByDescending { it.timestamp }
-
-        emit(filteredMessages)
-    }.flowOn(Dispatchers.IO)
+    override fun searchMessages(query: String, filter: MessageSearchFilter): Flow<List<MessageModel>> =
+        mirror.observeAllMessages().map { rows -> rows.map { it.toMessageModel() }.filter { message ->
+            (query.isBlank() || message.content.contains(query, true) || message.mmsSubject.orEmpty().contains(query, true)) &&
+                (!filter.unreadOnly || !message.isRead) &&
+                (filter.simSubId == null || message.subId == filter.simSubId) &&
+                (!filter.mmsOnly || message.isMms) &&
+                (filter.contactAddress.isNullOrBlank() || contactDataSource.matchesAddress(filter.contactAddress, message.sender))
+        }.map { message -> message.copy(simName = telephonyDataSource.getSimName(message.subId)) }
+    }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     override fun getMessagesByThread(
-        threadId: Long,
-        limit: Int,
-        offset: Int,
-        contentFilter: ConversationContentFilter,
+        threadId: Long, limit: Int, offset: Int, contentFilter: ConversationContentFilter,
     ): Flow<List<MessageModel>> = flow {
-        val visibleNeeded = limit + offset
-        var queryLimit = if (contentFilter == ConversationContentFilter.ALL) {
-            visibleNeeded
-        } else {
-            visibleNeeded.coerceAtLeast(FILTERED_MESSAGE_QUERY_STEP)
+        if (limit <= 0) { emit(emptyList()); return@flow }
+        val result = mutableListOf<MessageModel>()
+        var sourceOffset = if (contentFilter == ConversationContentFilter.ALL) offset else 0
+        var skipped = 0
+        while (result.size < limit) {
+            val batchSize = if (contentFilter == ConversationContentFilter.ALL) minOf(limit - result.size, 200) else 200
+            val rows = mirror.observeMessagesByThread(threadId, batchSize, sourceOffset).first().map { it.toMessageModel() }
+            if (rows.isEmpty()) break
+            val spamIds = spamRepository.getSpamMessageIds(rows.map { it.id }, SPAM_THRESHOLD)
+            for (message in rows) {
+                if (!contentFilter.includes(message.id in spamIds)) continue
+                if (contentFilter != ConversationContentFilter.ALL && skipped++ < offset) continue
+                result += message.copy(simName = telephonyDataSource.getSimName(message.subId),
+                    parsedResult = parseMessage(message.sender, message.content), spamScore = spamRepository.getScore(message.id) ?: -1f)
+                if (result.size == limit) break
+            }
+            sourceOffset += rows.size
+            if (rows.size < batchSize) break
         }
-        var smsRows: List<SmsMessageRow>
-        var mmsRows: List<MmsMessageRow>
-        var spamMessageIds: Set<Long>
-        var filteredMessageIds: List<Long>
-
-        while (true) {
-            smsRows = telephonyDataSource.getSmsMessagesByThread(threadId, queryLimit)
-            mmsRows = telephonyDataSource.getMmsMessagesByThread(threadId, queryLimit)
-            val messageIds = smsRows.map { it.id } + mmsRows.map { -it.mmsId }
-            spamMessageIds = spamRepository.getSpamMessageIds(messageIds, SPAM_THRESHOLD)
-            filteredMessageIds = messageIds.filter { messageId ->
-                contentFilter.includes(messageId in spamMessageIds)
-            }
-            val sourceExhausted = smsRows.size < queryLimit && mmsRows.size < queryLimit
-            if (filteredMessageIds.size >= visibleNeeded || sourceExhausted ||
-                contentFilter == ConversationContentFilter.ALL
-            ) {
-                break
-            }
-            queryLimit += FILTERED_MESSAGE_QUERY_STEP
-        }
-
-        val smsMessages = smsRows
-            .filter { contentFilter.includes(it.id in spamMessageIds) }
-            .map { row ->
-                row.toMessageModel(
-                    parsedResult = parseMessage(row.address, row.body),
-                    spamScore = spamRepository.getScore(row.id) ?: -1f
-                )
-            }
-        val mmsMessages = mmsRows
-            .filter { contentFilter.includes(-it.mmsId in spamMessageIds) }
-            .map { row ->
-                row.toMessageModel(
-                    parsedResult = parseMessage(row.address, row.textContent),
-                    spamScore = spamRepository.getScore(-row.mmsId) ?: -1f
-                )
-            }
-
-        emit(
-            (smsMessages + mmsMessages)
-                .sortedByDescending { it.timestamp }
-                .drop(offset)
-                .take(limit)
-        )
+        emit(result)
     }.flowOn(Dispatchers.IO)
 
     override fun getMessages(): Flow<List<MessageModel>> = flow {
-        val smsMessages = telephonyDataSource.getAllSmsMessages()
-            .map { row ->
-                row.toMessageModel(parsedResult = parseMessage(row.address, row.body))
-            }
-        val mmsMessages = telephonyDataSource.getAllMmsMessages()
-            .map { row ->
-                row.toMessageModel(parsedResult = parseMessage(row.address, row.textContent))
-            }
-
-        emit((smsMessages + mmsMessages).sortedByDescending { it.timestamp })
+        emit(localMessages().map { it.copy(parsedResult = parseMessage(it.sender, it.content)) })
     }.flowOn(Dispatchers.IO)
 
+    private suspend fun localMessages(): List<MessageModel> = mirror.observeAllMessages().first().map {
+        it.toMessageModel().let { message -> message.copy(simName = telephonyDataSource.getSimName(message.subId)) }
+    }.sortedByDescending { it.timestamp }
     override suspend fun markThreadAsRead(threadId: Long) {
         markThreadsAsRead(setOf(threadId))
     }
@@ -368,125 +302,22 @@ class MessageRepositoryImpl(
     }
 
     private suspend fun fetchConversationDetails(
-        threadIds: List<Long>,
-        contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
+        threadIds: List<Long>, contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
     ): List<ConversationModel> {
-        val messagesMap = mutableMapOf<Long, ConversationModel>()
-        val smsRows = threadIds.chunked(CONVERSATION_FILTER_CHUNK_SIZE)
-            .flatMap(telephonyDataSource::fetchConversationSmsRows)
-        val mmsRows = threadIds.chunked(CONVERSATION_FILTER_CHUNK_SIZE)
-            .flatMap(telephonyDataSource::fetchConversationMmsRows)
-        val spamMessageIds = if (contentFilter == ConversationContentFilter.ALL) {
-            emptySet()
-        } else {
-            spamRepository.getSpamMessageIds(
-                smsRows.map { it.id } + mmsRows.map { -it.mmsId },
-                SPAM_THRESHOLD,
+        val selected = threadIds.toSet()
+        val messages = localMessages().filter { it.threadId in selected }
+        val spamIds = if (contentFilter == ConversationContentFilter.ALL) emptySet() else
+            messages.map { it.id }.chunked(500).flatMap { spamRepository.getSpamMessageIds(it, SPAM_THRESHOLD) }.toSet()
+        return messages.filter { contentFilter.includes(it.id in spamIds) }.groupBy { it.threadId }.map { (thread, rows) ->
+            val latest = rows.first()
+            ConversationModel(
+                threadId = thread, address = latest.sender,
+                snippet = latest.mmsSubject?.takeIf { it.isNotBlank() } ?: latest.content,
+                timestamp = latest.timestamp, unreadCount = rows.count { !it.isRead },
+                isMms = latest.isMms, hasMms = rows.any { it.isMms },
             )
-        }
-
-        smsRows
-            .filter { contentFilter.includes(it.id in spamMessageIds) }
-            .forEach { row -> messagesMap.mergeSmsConversation(row) }
-        mmsRows
-            .filter { contentFilter.includes(-it.mmsId in spamMessageIds) }
-            .forEach { row -> messagesMap.mergeMmsConversation(row) }
-
-        return threadIds.mapNotNull { messagesMap[it] }
+        }.sortedByDescending { it.timestamp }
     }
-
-    private fun MutableMap<Long, ConversationModel>.mergeSmsConversation(row: SmsConversationRow) {
-        val existing = this[row.threadId]
-        if (existing == null) {
-            this[row.threadId] = ConversationModel(
-                threadId = row.threadId,
-                address = row.address,
-                displayName = contactDataSource.getDisplayName(row.address),
-                snippet = row.body,
-                timestamp = row.date,
-                unreadCount = if (row.read) 0 else 1
-            )
-        } else if (!row.read) {
-            this[row.threadId] = existing.copy(unreadCount = existing.unreadCount + 1)
-        }
-    }
-
-    private fun MutableMap<Long, ConversationModel>.mergeMmsConversation(row: MmsConversationRow) {
-        val existing = this[row.threadId]
-        if (existing == null) {
-            this[row.threadId] = ConversationModel(
-                threadId = row.threadId,
-                address = row.address,
-                displayName = contactDataSource.getDisplayName(row.address),
-                snippet = row.subject ?: row.textContent,
-                timestamp = row.date,
-                unreadCount = if (row.read) 0 else 1,
-                isMms = true,
-                hasMms = true
-            )
-            return
-        }
-
-        if (row.date > existing.timestamp) {
-            val address = if (existing.address.isNotBlank()) existing.address else row.address
-            this[row.threadId] = existing.copy(
-                snippet = row.subject ?: row.textContent,
-                timestamp = row.date,
-                address = address,
-                displayName = existing.displayName ?: contactDataSource.getDisplayName(address),
-                unreadCount = existing.unreadCount + if (row.read) 0 else 1,
-                isMms = true,
-                hasMms = true
-            )
-        } else {
-            this[row.threadId] = existing.copy(
-                unreadCount = existing.unreadCount + if (row.read) 0 else 1,
-                hasMms = true
-            )
-        }
-    }
-
-    private fun SmsMessageRow.toMessageModel(
-        parsedResult: ParsedResult,
-        spamScore: Float = -1f
-    ): MessageModel {
-        return MessageModel(
-            id = id,
-            threadId = threadId,
-            sender = address,
-            content = body,
-            timestamp = date,
-            subId = subId,
-            simName = telephonyDataSource.getSimName(subId),
-            isRead = read,
-            isReceived = isReceived,
-            parsedResult = parsedResult,
-            spamScore = spamScore
-        )
-    }
-
-    private fun MmsMessageRow.toMessageModel(
-        parsedResult: ParsedResult,
-        spamScore: Float = -1f
-    ): MessageModel {
-        return MessageModel(
-            id = -mmsId,
-            threadId = threadId,
-            sender = address,
-            content = textContent,
-            timestamp = date,
-            subId = subId,
-            simName = telephonyDataSource.getSimName(subId),
-            isRead = read,
-            isReceived = isReceived,
-            parsedResult = parsedResult,
-            imageUris = imageUris,
-            mmsSubject = subject,
-            isMms = true,
-            spamScore = spamScore
-        )
-    }
-
     private fun ConversationContentFilter.includes(isSpam: Boolean): Boolean = when (this) {
         ConversationContentFilter.ALL -> true
         ConversationContentFilter.NORMAL -> !isSpam

@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
@@ -29,19 +31,19 @@ class SearchViewModel(private val repository: MessageRepository) : ViewModel() {
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     init {
-        combine(
+        viewModelScope.launch { combine(
             _searchQuery.debounce(300.milliseconds),
             _searchFilter
         ) { query, filter -> query to filter }
             .distinctUntilChanged()
-            .onEach { (query, filter) ->
+            .collectLatest { (query, filter) ->
                 if (query.isBlank() && !filter.isActive()) {
                     _uiState.value = SearchUiState.Idle
                 } else {
                     performSearch(query, filter)
                 }
             }
-            .launchIn(viewModelScope)
+        }
     }
 
     fun updateQuery(query: String) {

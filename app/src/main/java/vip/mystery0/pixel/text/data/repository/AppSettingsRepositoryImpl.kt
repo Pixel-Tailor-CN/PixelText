@@ -32,6 +32,10 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private val _settings = MutableStateFlow(readSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    override fun setAutoDownloadMms(enabled: Boolean) {
+        updatePrefs { putBoolean("auto_download_mms", enabled) }
+    }
+
     override fun setSpamDetectionEnabled(enabled: Boolean) {
         updatePrefs { putBoolean(AppSettingsKeys.KEY_SPAM_DETECTION_ENABLED, enabled) }
     }
@@ -349,6 +353,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
 
     private fun readSettings(): AppSettings {
         return AppSettings(
+            autoDownloadMms = prefs.getBoolean("auto_download_mms", false),
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),

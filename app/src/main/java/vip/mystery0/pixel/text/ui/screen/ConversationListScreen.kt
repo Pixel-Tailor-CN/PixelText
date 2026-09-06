@@ -439,6 +439,7 @@ fun ConversationListScreen(
                     .padding(paddingValues)
                     .consumeWindowInsets(paddingValues)
             ) {
+                vip.mystery0.pixel.text.ui.message.MirrorSyncBanner()
                 Box(modifier = Modifier.weight(1f)) {
                     when (val state = uiState) {
                         is ConversationListUiState.Loading -> {

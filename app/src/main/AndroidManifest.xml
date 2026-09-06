@@ -135,6 +135,16 @@
             </intent-filter>
         </receiver>
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.mms.download"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/mms_download_paths" />
+        </provider>
+
         <!-- 7. Smartspacer 验证码 Target -->
         <provider
             android:name=".smartspacer.VerificationCodeTargetProvider"

@@ -179,6 +179,9 @@ fun MessageItem(
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
             Column(horizontalAlignment = cardAlignment) {
+                if (message.mmsDownloadPending) {
+                    vip.mystery0.pixel.text.ui.message.cards.MmsDownloadCard(-message.id)
+                }
                 if (message.imageUris.isNotEmpty()) {
                     MmsImageCard(imageUris = message.imageUris, isSelected = isSelected)
                     if (message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()) {

@@ -92,6 +92,7 @@ data class MessageModel(
     val imageUris: List<String> = emptyList(),
     val mmsSubject: String? = null,
     val isMms: Boolean = false,
+    val mmsDownloadPending: Boolean = false,
     val spamScore: Float = -1f
 ) {
     val stableKey: String

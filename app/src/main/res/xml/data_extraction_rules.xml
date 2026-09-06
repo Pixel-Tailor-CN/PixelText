@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="database" path="message_mirror.db" />
+        <exclude domain="database" path="message_mirror.db-wal" />
+        <exclude domain="database" path="message_mirror.db-shm" />
+        <exclude domain="file" path="mms-download/" />
+        <exclude domain="sharedpref" path="mms_download_requests.xml" />
         <!-- 短信、彩信和本地分类结果属于敏感数据，不参与云端备份。 -->
         <exclude domain="root" path="." />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="database" path="message_mirror.db" />
+        <exclude domain="database" path="message_mirror.db-wal" />
+        <exclude domain="database" path="message_mirror.db-shm" />
+        <exclude domain="file" path="mms-download/" />
+        <exclude domain="sharedpref" path="mms_download_requests.xml" />
         <!-- 设备迁移同样不复制应用私有数据，避免携带旧设备的短信元数据。 -->
         <exclude domain="root" path="." />
     </device-transfer>

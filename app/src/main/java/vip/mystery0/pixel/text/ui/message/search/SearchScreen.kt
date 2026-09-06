@@ -265,6 +265,7 @@ fun SearchScreen(
                 )
             }
 
+            vip.mystery0.pixel.text.ui.message.MirrorSyncBanner()
             SearchResultList(
                 uiState = uiState,
                 query = searchQuery,

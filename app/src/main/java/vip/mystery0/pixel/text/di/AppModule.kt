@@ -1,6 +1,20 @@
 package vip.mystery0.pixel.text.di
 
 import android.content.ContentResolver
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
+import vip.mystery0.pixel.text.data.source.mirror.TelephonyMirrorSource
+import vip.mystery0.pixel.text.data.source.mirror.MirrorAttachmentStore
+import vip.mystery0.pixel.text.data.repository.mirror.MirrorAttachmentCopier
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorRepositoryImpl
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
+import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
+import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -83,6 +97,29 @@ val appModule = module {
     single { VerificationCodeIndexDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
     single { TelephonyDataSource(androidContext(), get()) }
+    single { MessageMirrorDatabase.create(androidContext()) }
+    single { TelephonyMirrorSource(androidContext()) }
+    single { MirrorAttachmentStore(androidContext()) }
+    single { MirrorAttachmentCopier(get(), get()) }
+    single { MessageMirrorScheduler(androidContext()) }
+    single { MmsDownloadCoordinator(androidContext(), get()) }
+    single {
+        MessageMirrorSynchronizer(get(), get(), get()).apply {
+            onMessageDeleted = { key ->
+                val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
+                get<SpamRepository>().delete(setOf(id))
+                if (key.transport == MessageTransport.SMS) {
+                    get<VerificationCodeRepository>().deleteMessageIds(listOf(id))
+                }
+            }
+        }
+    }
+    single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
+    single {
+        MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
+            onDirty = { get<MessageMirrorScheduler>().schedule() }
+        }
+    }
     factory { SpamClassifier(androidContext(), get()) }
     single<SpamClassifierFactory> {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
@@ -97,18 +134,18 @@ val appModule = module {
     factory { MockMessageFactory(get()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
-        val db = get<ConversationCacheDatabase>()
-        ConversationCacheRepository(androidContext(), db.cachedConversationDao(), get())
+        ConversationCacheRepository(androidContext(), get(), get(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
-    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get()) }
+    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
     }

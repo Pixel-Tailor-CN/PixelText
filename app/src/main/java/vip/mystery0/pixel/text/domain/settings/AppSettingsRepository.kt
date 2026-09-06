@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.domain.settings
 import kotlinx.coroutines.flow.StateFlow
 
 data class AppSettings(
+    val autoDownloadMms: Boolean = false,
     val spamDetectionEnabled: Boolean = AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED,
     val muteSpamNotificationsEnabled: Boolean =
         AppSettingsKeys.DEFAULT_MUTE_SPAM_NOTIFICATIONS_ENABLED,
@@ -83,6 +84,8 @@ enum class ConversationSwipeAction(val storageValue: String) {
 
 interface AppSettingsRepository {
     val settings: StateFlow<AppSettings>
+
+    fun setAutoDownloadMms(enabled: Boolean)
 
     fun setSpamDetectionEnabled(enabled: Boolean)
     fun setMuteSpamNotificationsEnabled(enabled: Boolean)

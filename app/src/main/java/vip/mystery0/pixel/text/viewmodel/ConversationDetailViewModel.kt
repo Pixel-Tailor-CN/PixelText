@@ -25,6 +25,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -75,7 +77,8 @@ class ConversationDetailViewModel(
     private val context: Context,
     private val senderProfileRepository: vip.mystery0.pixel.text.data.repository.SenderProfileRepository,
     private val spamClassifierFactory: SpamClassifierFactory,
-    private val spamRepository: SpamRepository
+    private val spamRepository: SpamRepository,
+    private val mirror: vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
@@ -113,27 +116,6 @@ class ConversationDetailViewModel(
     private var loadVersion = 0
     private val _messages = mutableListOf<MessageModel>()
     private val manualClassificationMutex = Mutex()
-    private var isTelephonyObserverRegistered = false
-    private var isTelephonyObservationActive = false
-    private var telephonyRefreshJob: Job? = null
-    private val telephonyObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean, uri: Uri?) {
-            if (!isTelephonyObservationActive || currentThreadId < 0L) return
-            telephonyRefreshJob?.cancel()
-            telephonyRefreshJob = viewModelScope.launch {
-                delay(TELEPHONY_REFRESH_DEBOUNCE_MILLIS)
-                if (!isTelephonyObservationActive) return@launch
-                val changedThreadId = withContext(Dispatchers.IO) {
-                    telephonyDataSource.queryThreadIdFromChangedMessageUri(uri)
-                }
-                if (isTelephonyObservationActive &&
-                    (changedThreadId == null || changedThreadId == currentThreadId)
-                ) {
-                    refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
-                }
-            }
-        }
-    }
     private val spamDetectionReceiver = object : BroadcastReceiver() {
         override fun onReceive(receivedContext: Context?, intent: Intent?) {
             if (intent?.action != SpamDetectionWorker.ACTION_SPAM_DETECTED) return
@@ -158,54 +140,25 @@ class ConversationDetailViewModel(
         )
     }
 
+    private val mirrorThreadId = MutableStateFlow(-1L)
+    private var mirrorObservationJob: Job? = null
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun startObservingTelephony(): Boolean {
-        if (isTelephonyObserverRegistered) {
-            isTelephonyObservationActive = true
-            return true
-        }
-        var smsRegistered = false
-        return try {
-            context.contentResolver.registerContentObserver(
-                Telephony.Sms.CONTENT_URI,
-                true,
-                telephonyObserver,
-            )
-            smsRegistered = true
-            context.contentResolver.registerContentObserver(
-                Telephony.Mms.CONTENT_URI,
-                true,
-                telephonyObserver,
-            )
-            isTelephonyObserverRegistered = true
-            isTelephonyObservationActive = true
-            true
-        } catch (error: Throwable) {
-            if (smsRegistered) {
-                runCatching {
-                    context.contentResolver.unregisterContentObserver(telephonyObserver)
-                }
+        if (mirrorObservationJob?.isActive == true) return true
+        mirrorObservationJob = viewModelScope.launch {
+            mirrorThreadId.flatMapLatest { mirror.observeThreadChanges(it) }.collect {
+                if (currentThreadId >= 0) refreshMessages(reportInsertions = true)
             }
-            isTelephonyObservationActive = false
-            Log.e(TAG, "failed to observe telephony messages", error)
-            false
         }
+        return true
     }
 
     fun stopObservingTelephony(): Boolean {
-        isTelephonyObservationActive = false
-        if (!isTelephonyObserverRegistered) return true
-        telephonyRefreshJob?.cancel()
-        telephonyRefreshJob = null
-        return try {
-            context.contentResolver.unregisterContentObserver(telephonyObserver)
-            isTelephonyObserverRegistered = false
-            true
-        } catch (error: Throwable) {
-            Log.e(TAG, "failed to stop observing telephony messages", error)
-            false
-        }
+        mirrorObservationJob?.cancel()
+        mirrorObservationJob = null
+        return true
     }
-
     fun loadThread(
         threadId: Long,
         address: String,
@@ -224,6 +177,7 @@ class ConversationDetailViewModel(
         }
 
         currentThreadId = threadId
+        mirrorThreadId.value = threadId
         currentContentFilter = contentFilter
         _messages.clear()
         _newMessageKeys.value = emptySet()
@@ -337,6 +291,7 @@ class ConversationDetailViewModel(
                     telephonyDataSource.queryThreadIdFromUri(pendingUri) ?: currentThreadId
                 if (currentThreadId == -1L && resolvedThreadId != -1L) {
                     currentThreadId = resolvedThreadId
+                    mirrorThreadId.value = resolvedThreadId
                 }
 
                 // 2. 立刻把占位插入到 UI 头部，给用户即时反馈

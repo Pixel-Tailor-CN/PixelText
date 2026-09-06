@@ -224,9 +224,12 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                     onResultClick = { message ->
                         navController.navigate(
-                            conversationDetailRoute(
+                            if (message.threadId <= 0) {
+                                "mirror_message/${if (message.isMms) "MMS" else "SMS"}/${if (message.isMms) -message.id else message.id}"
+                            } else conversationDetailRoute(
                                 message.threadId,
                                 message.sender,
+                                messageId = message.id,
                                 contentFilter = if (message.spamScore >= 0.7f) {
                                     ConversationContentFilter.SPAM
                                 } else {
@@ -237,13 +240,26 @@ fun AppNavigation(
                     }
                 )
             }
+            composable("mirror_message/{transport}/{sourceId}") { entry ->
+                val transport = entry.arguments?.getString("transport")?.let {
+                    runCatching { vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.valueOf(it) }.getOrNull()
+                }
+                val sourceId = entry.arguments?.getString("sourceId")?.toLongOrNull()
+                if (transport != null && sourceId != null) {
+                    vip.mystery0.pixel.text.ui.screen.MirrorMessageDetailScreen(
+                        vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(transport, sourceId),
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+            }
             composable(
                 route = "conversation_detail/{threadId}/{address}" +
                     "?messageId={messageId}&contentFilter={contentFilter}",
                 arguments = listOf(
                     navArgument("messageId") {
-                        type = NavType.LongType
-                        defaultValue = -1L
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     },
                     navArgument("contentFilter") {
                         type = NavType.StringType
@@ -254,8 +270,7 @@ fun AppNavigation(
                 val threadId =
                     backStackEntry.arguments?.getString("threadId")?.toLongOrNull() ?: -1L
                 val address = backStackEntry.arguments?.getString("address") ?: ""
-                val targetMessageId = backStackEntry.arguments?.getLong("messageId")
-                    ?.takeIf { it > 0L }
+                val targetMessageId = backStackEntry.arguments?.getString("messageId")?.toLongOrNull()
                 val contentFilter = backStackEntry.arguments?.getString("contentFilter")
                     ?.let { value ->
                         ConversationContentFilter.entries.firstOrNull {
@@ -293,8 +308,8 @@ private fun conversationDetailRoute(
     contentFilter: ConversationContentFilter = ConversationContentFilter.NORMAL,
 ): String {
     val baseRoute = "conversation_detail/$threadId/${Uri.encode(address)}"
-    val messageIdValue = messageId?.takeIf { it > 0L } ?: -1L
-    return "$baseRoute?messageId=$messageIdValue&contentFilter=${contentFilter.name}"
+    val messageParameter = messageId?.let { "&messageId=$it" }.orEmpty()
+    return "$baseRoute?contentFilter=${contentFilter.name}$messageParameter"
 }
 
 private fun activityLikeEnterTransition(): EnterTransition {
