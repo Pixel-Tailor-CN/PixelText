@@ -4,16 +4,18 @@
 
 **目标：** 以 Gmail 风格筛选栏重做消息检索，支持号码片段、SIM 多选、消息类型、早于日期及未读筛选。
 
-**架构：** 保留 `searchMessages()` 和单一消息结果列表。ViewModel 管理已应用状态，号码页与弹层管理草稿；仓库统一筛选语义，Telephony 处理系统查询，号码选择只读取系统临时授权 URI。
+**架构：** 保留 `searchMessages()` 和单一消息结果列表。ViewModel 管理已应用状态，号码页与弹层管理草稿；仓库读取前置需求的本地消息镜像，号码选择只读取系统临时授权 URI。
 
 **技术栈：** Kotlin、Compose、Material 3、Flow、Koin、Telephony、Activity Result、java.time。
 
 **设计：** [检索页面与筛选交互重新设计](2026-09-06-search-filters-redesign-design.md)。
 
+**前置需求：** [完整消息镜像实施计划](2026-09-06-message-mirror.md)。必须先具备消息、全部 MMS part、附件副本与同步状态，再执行本计划的数据查询和导航接入。
+
 ## 全局约束
 
 - 中文文档与注释；英文小写开头日志，不打印短信、联系人或输入号码。
-- Android 12+、JVM 21；不新增依赖、权限、数据库、网络请求或 XML layout。
+- Android 12+、JVM 21；复用前置镜像库，不为检索新增依赖、权限、网络请求或 XML layout。
 - 不新增/运行单元测试，使用编译、Lint、手动与真机验证。
 - 不恢复旧方案的会话分区、姓名联想、聚合结果模型及 100 条上限。
 - 当前 Gradle 版本配置是用户未提交修改，不能覆盖或纳入本任务提交。
@@ -21,7 +23,7 @@
 
 ## 任务 1：筛选模型与号码/日期语义
 
-**文件：** 修改 `app/src/main/java/vip/mystery0/pixel/text/domain/repository/MessageRepository.kt`，新增同目录 `MessageSearchFilter.kt`；修改 `data/source/ContactDataSource.kt`（以下路径均相对上述应用包）。
+**文件：** 修改 `app/src/main/java/vip/mystery0/pixel/text/domain/repository/MessageRepository.kt`，新增同目录 `MessageSearchFilter.kt`；必要时扩展前置镜像中的公共号码归一化逻辑（以下路径均相对上述应用包）。
 
 **接口：** 保留 `searchMessages(query: String, filter: MessageSearchFilter): Flow<List<MessageModel>>`。
 
@@ -48,25 +50,25 @@ data class MessageSearchFilter(
 - [ ] 将旧模型移至独立文件，查全调用点，替换 `simSubId`、`mmsOnly`、`contactAddress`，不修改与搜索无关的同名系统参数。
 - [ ] SIM 全选在 UI 提交时依据当前卡集合归一化为空集合；类型集合保留选择状态，查询只在大小为 1 时生效。
 - [ ] 添加 `SearchDateFilter.cutoffMillis(now: ZonedDateTime): Long?`，使用 `when` 分别返回 null、`now.minusDays(7)`、`minusMonths(1)`、`minusMonths(6)`、`minusYears(1)` 的 epoch millis。
-- [ ] 在 ContactDataSource 添加 `matchesNumberFragment(fragment: String, candidateAddress: String): Boolean`，先检查有效数字非空，再生成非空号码别名，判断候选包含片段，禁止反向包含或纯文字转换成电话号码数字。
-- [ ] 保留现有 `matchesAddress()` 的完整号码语义，避免影响旧调用者；不因片段搜索加载联系人缓存或检查联系人权限。
+- [ ] 复用镜像的号码别名规则生成非空查询片段，先检查有效数字，判断候选包含片段，禁止反向包含或纯文字转换成电话号码数字。号码条件通过本地 SQL 的 instr 或等价参数化表达式应用。
+- [ ] 保留现有 ContactDataSource.matchesAddress() 的完整号码语义，避免影响旧调用者；不因片段搜索加载联系人缓存或检查联系人权限。
 - [ ] 手动静态核对 `138`、`106`、`+86 138…`、`0086 138…`、空格及纯文字；核对日期跨月与闰日的定义。
 
-## 任务 2：统一短信和彩信检索条件
+## 任务 2：在本地镜像上组合查询
 
-**文件：** `data/repository/MessageRepositoryImpl.kt`、`data/source/TelephonyDataSource.kt`。
+**文件：** `data/repository/MessageRepositoryImpl.kt`、`data/repository/mirror/MessageMirrorRepositoryImpl.kt`、`data/db/mirror/MirrorDao.kt`、`domain/repository/MessageMirrorRepository.kt`。
 
-**接口：** 两个 Telephony 搜索方法均接受 `query: String, unreadOnly: Boolean, simSubIds: Set<Int>, beforeTimestampMillis: Long?`，返回原有 row 列表。
+**接口：** 镜像仓库新增 `search(query: String, filter: MessageSearchFilter, beforeTimestampMillis: Long?): Flow<List<MirrorMessageModel>>`；外部 `searchMessages()` 通过既有兼容 mapper 返回 MessageModel。同步状态由镜像仓库的 observeSyncState 提供。
 
 - [ ] 仓库开始查询时只捕获一次 `ZonedDateTime.now()`，用任务 1 方法计算 cutoff。
-- [ ] 类型为空或包含两项查询两种消息；单项集合仅查询对应类型，避免无用 MMS part 扫描。
-- [ ] SMS SQL 保留 BODY 查询，并组合 READ、`SUBSCRIPTION_ID IN (?, …)`、`DATE < ?`；所有用户值通过参数传入。
-- [ ] MMS 主题 SQL 同样组合未读、SIM 和日期；MMS 秒级日期上界使用毫秒上界向上取整到秒，使严格小于条件与模型毫秒比较一致。
-- [ ] MMS 文本 part 命中映射 row 后统一检查未读、集合包含和时间；更新旧 `matchesSearchFilters()`，禁止仅修主题入口。
-- [ ] 两个 MMS 入口按 ID 去重后映射。仓库合并 SMS/MMS，调用号码片段匹配，按 timestamp 倒序返回；不要添加 `ADDRESS LIKE` 到正文的 OR 分支。
-- [ ] 不添加早于号码筛选的 LIMIT；不引入旧方案的 take(100)。大结果集读取循环检查协程取消，耗时 ContentResolver 查询按可用重载接入 CancellationSignal，取消不能吞为普通空结果。
-- [ ] 如查询文本的 `%`、`_` 沿用现有 LIKE 行为，本任务不扩展搜索语法；不要拼接号码和 SIM ID 进 SQL。
-- [ ] 检查 SMS 与 MMS 在空关键词、单类型和多筛选下的查询路径，对照设计验证日期与去重。
+- [ ] 本地消息表组合 transport、read、subscription_id 集合与 timestampMillis < cutoff 条件，所有用户值参数化；类型零选/全选不加条件。
+- [ ] 正文谓词为 SMS body 或 MMS subject/全部文本 part，part 使用 EXISTS，禁止连接多个 part 导致重复消息；号码条件与正文谓词取交集。
+- [ ] 号码片段查询本地归一化地址。SMS 使用通信地址，MMS 接收使用 FROM，发出记录使用外部 TO/CC/BCC；全部真实参与方都已保存在镜像，无需联系人权限。
+- [ ] 结果按 timestamp、transport、sourceId 稳定倒序；旧 take(100) 或先 LIMIT 后号码过滤不得加入。
+- [ ] 空关键词有筛选时仍查询所有符合条件的消息；全文 LIKE 通配符保持既有行为，不新增搜索语法；数据库执行支持取消。
+- [ ] 保留全部箱类型，pending MMS 可按主题命中但不触发下载；附件复制失败不清除正文。
+- [ ] 观察 Room 变化自动更新当前查询；首次导入状态与结果组合展示“不完整”，不能以当前零行宣告全库无结果。
+- [ ] 静态确认本搜索路径不再调用 TelephonyDataSource.searchSmsMessages/searchMmsMessages；旧方法仅在无其他调用者时删除。
 
 ## 任务 3：ViewModel 提交与取消
 
@@ -75,6 +77,7 @@ data class MessageSearchFilter(
 **接口：** 提供 `setSenderFilter(number: String, displayName: String?)`、`clearSenderFilter()`、`setSimFilter(subIds: Set<Int>)`、`setMessageTypes(types: Set<SearchMessageType>)`、`setDateFilter(date: SearchDateFilter)`、保留 `toggleUnreadFilter()` 与 `updateQuery()`。
 
 - [ ] 使用新模型，删除分散的旧 `isActive()`，由模型统一判断空条件；Success 仍持有 `List<MessageModel>`。
+- [ ] 暴露独立 MirrorSyncState 供 Screen 显示同步进度/部分结果，不把附件 pending 当整个搜索失败；查询观察不排队等待所有附件复制完成。
 - [ ] 将请求流改为最新请求替换旧请求。查询输入与筛选变更统一携带请求版本，输入一变即使旧版本失效，300ms 后启动新关键词请求；筛选提交不等待防抖。
 - [ ] 使用 `flatMapLatest` 或持有可取消 Job，并在发布 Loading/Success/Error 前确认版本仍有效；取消异常继续传播。
 - [ ] 号码提交清理首尾空白，无有效数字不提交；清除号码同时清除显示名。
@@ -126,14 +129,15 @@ Intent(Intent.ACTION_PICK).apply {
 - [ ] 路由 messageId 参数改为 `NavType.StringType`、`nullable = true`、`defaultValue = null`；构造路由时无消息 ID 就不附加该参数，有值则使用真实 Long 字符串。
 - [ ] 路由解析使用 `getString("messageId")?.toLongOrNull()`，移除针对消息 ID 的 `> 0` 与 `-1` 缺省判断，不修改 threadId 校验或真正的 SMS-only 分支。
 - [ ] 详情页继续接受 `Long?`，loadUntilMessage 继续使用相等比较；核对其他会话和验证码入口仍能跳转。
+- [ ] 无有效 thread 的草稿/占位结果转到前置需求提供的按 SourceMessageKey 独立详情，不能使用 `threadId=-1` 会话路由；不增加草稿编辑器。
 - [ ] 手动覆盖正数 SMS、负数 MMS、`-1` MMS、无目标普通会话和已删除消息提示。
 
 ## 任务 7：整体验证与交付
 
 - [ ] 执行 `./gradlew :app:compileDebugKotlin`，必须通过；如用户本地 Gradle 配置导致环境问题，记录真实错误而非回滚配置。
 - [ ] 执行 `./gradlew :app:lintDebug`，区分新增问题与既有问题，不运行 test 类任务。
-- [ ] 静态搜索确认搜索流程无 READ_CONTACTS 请求，无聚合会话结果，无单卡旧字段，无丢弃负数消息 ID 的逻辑。
+- [ ] 静态搜索确认搜索流程无 READ_CONTACTS 请求，无聚合会话结果，无单卡旧字段，无丢弃负数消息 ID 的逻辑，查询只读本地镜像。
 - [ ] 真机无联系人权限选择多号码联系人、取消、手动片段输入，确认无权限弹窗；不可用真机时明确标记未验证，不能勾选为完成。
-- [ ] 按设计验证所有筛选组合与日期边界，尤其 MMS 主题/part、全选不限、失效 SIM、旧联系人发件人的较早消息召回。
+- [ ] 按设计验证所有筛选组合与日期边界，尤其非首个 MMS 文本 part、全选不限、失效 SIM、旧联系人发件人的较早消息召回；验证同步进行中和系统删除后的结果变化。
 - [ ] 验证无条件引导、条件清除、快速输入、返回与旋转、暗色和消息定位；记录构建结果与仍需真机验证项。
 - [ ] `git diff --check`，只提交本任务文件，不夹带现有 Gradle 修改与构建产物。
