@@ -72,7 +72,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -488,7 +488,7 @@ fun ConversationListScreen(
                                 return@Box
                             }
 
-                            PullToRefreshBox(
+                            ExpressivePullToRefreshBox(
                                 isRefreshing = isRefreshing,
                                 onRefresh = {
                                     viewModel.refreshConversations()

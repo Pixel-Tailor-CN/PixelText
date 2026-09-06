@@ -32,7 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -180,7 +180,7 @@ fun SpamConversationListScreen(
                             }
                         }
 
-                        PullToRefreshBox(
+                        ExpressivePullToRefreshBox(
                             isRefreshing = isRefreshing,
                             onRefresh = {
                                 isRefreshing = true
