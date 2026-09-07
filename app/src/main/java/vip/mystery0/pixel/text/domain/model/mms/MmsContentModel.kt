@@ -36,6 +36,9 @@ data class MmsPartContent(
     val contentId: String?,
     val contentLocation: String?,
     val issue: String?,
+    /** 仅在原容器与本消息子项唯一匹配时设置；空列表不表示恢复成功。 */
+    val childPartIds: List<Long> = emptyList(),
+    val multipartResolved: Boolean = false,
 )
 
 /** SMIL 派生的顺序页；尚未解析展示结构时为空列表。 */
@@ -55,4 +58,10 @@ data class MmsContentModel(
     val summary: String,
     val searchableText: String,
     val pendingDownload: Boolean,
+    /** 正文展示选择；parts 始终保留全部原件。SMIL 已引用项可在页中展示。 */
+    val bodyPartIds: List<Long> = emptyList(),
+    /** 未被 SMIL 引用的叶子项（含 alternative 未选项），均保留附件入口。 */
+    val attachmentPartIds: List<Long> = emptyList(),
+    /** 稳定英文问题分类，不包含源文或异常信息。 */
+    val issues: List<String> = emptyList(),
 )

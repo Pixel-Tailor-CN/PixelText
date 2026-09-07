@@ -21,6 +21,10 @@ import vip.mystery0.pixel.text.domain.model.mms.MmsContentModel
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
+import vip.mystery0.pixel.text.domain.parser.mms.MmsMultipartResolver
+import vip.mystery0.pixel.text.domain.parser.mms.MmsSmilParser
+import vip.mystery0.pixel.text.mms.vendor.pdu.PduBody
+import vip.mystery0.pixel.text.mms.vendor.pdu.PduParser
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 
@@ -93,7 +97,7 @@ class MmsContentRepositoryImpl(
 
     private suspend fun parseAndCache(snapshot: MirrorMessageModel, fingerprint: String, epoch: Long): MmsContentModel {
         val budget = MmsPartReader.Budget()
-        val parts = orderedParts(snapshot).map { part ->
+        val decodedParts = orderedParts(snapshot).map { part ->
             currentCoroutineContext().ensureActive()
             val content = partContent(snapshot, part)
             if (MmsMimeTypes.isText(content.kind)) {
@@ -101,10 +105,20 @@ class MmsContentRepositoryImpl(
                 content.copy(text = result.text, byteCount = result.byteCount, issue = result.issue)
             } else content
         }
+        val parts = restoreMultipart(snapshot, decodedParts, budget)
+        val selection = MmsMultipartResolver().selectWithIssues(parts)
+        val smilResults = parts.filter { it.kind == MmsContentKind.SMIL && it.text != null }.map {
+            MmsSmilParser().parseWithIssues(it.text!!, parts)
+        }
+        // 多份控制文档没有可靠的主文档指示时不猜测，全部回退附件。
+        val pages = if (smilResults.size == 1) smilResults.single().pages else emptyList()
+        val issues = (selection.issues + smilResults.flatMap { it.issues } +
+            if (smilResults.size > 1) listOf("smil_ambiguous_document") else emptyList()).distinct()
+        val referenced = pages.flatMap { it.partIds }.toSet()
         val subject = snapshot.decodedSubject ?: snapshot.subject
         val searchableText = buildString {
             subject?.takeIf { it.isNotBlank() }?.let { append(it) }
-            parts.filter { it.kind == MmsContentKind.TEXT }.forEach { part ->
+            selection.parts.filter { it.kind == MmsContentKind.TEXT }.forEach { part ->
                 part.text?.takeIf { it.isNotBlank() }?.let {
                     if (isNotEmpty()) append('\n')
                     append(it)
@@ -114,10 +128,15 @@ class MmsContentRepositoryImpl(
         val pending = pendingDownload(snapshot)
         val model = MmsContentModel(
             key = snapshot.key, revision = snapshot.revision, subject = subject,
-            parts = parts, pages = emptyList(),
+            parts = parts, pages = pages,
             summary = searchableText.takeIf { it.isNotBlank() }?.take(160)
                 ?: if (pending) "等待下载彩信" else "彩信（${parts.size} 个附件）",
             searchableText = searchableText, pendingDownload = pending,
+            bodyPartIds = selection.parts.map { it.key.partId },
+            attachmentPartIds = parts.filter {
+                it.kind !in setOf(MmsContentKind.SMIL, MmsContentKind.MULTIPART) && it.key.partId !in referenced
+            }.map { it.key.partId },
+            issues = issues,
         )
         currentCoroutineContext().ensureActive()
         val bytes = estimateBytes(model)
@@ -136,6 +155,68 @@ class MmsContentRepositoryImpl(
             }
         }
         return model
+    }
+
+    /** Provider 不增加私有列；只从本地原容器与唯一的消息内标识恢复关系。 */
+    private suspend fun restoreMultipart(
+        snapshot: MirrorMessageModel, parts: List<MmsPartContent>, budget: MmsPartReader.Budget,
+    ): List<MmsPartContent> {
+        val sources = snapshot.parts.associateBy { it.sourceId }
+        val relations = mutableMapOf<Long, List<Long>>()
+        val problems = mutableMapOf<Long, String>()
+        val parseBudget = PduParser.MultipartBudget()
+        fun identity(value: String?) = value?.trim()?.removeSurrounding("<", ">")?.takeIf { it.isNotEmpty() }
+        fun match(body: PduBody, parentId: Long, staged: MutableMap<Long, List<Long>>, ancestors: Set<Long>): Boolean {
+            if (parentId in ancestors || ancestors.size > 8) return false
+            val children = mutableListOf<Long>()
+            for (index in 0 until body.partsNum) {
+                val child = body.getPart(index)
+                val cid = identity(child.contentId?.toString(Charsets.ISO_8859_1))
+                val location = child.contentLocation?.toString(Charsets.ISO_8859_1)
+                if (cid == null && location.isNullOrBlank()) return false
+                val candidates = parts.filter {
+                    (cid == null || identity(it.contentId) == cid) &&
+                        (location == null || it.contentLocation == location)
+                }
+                val target = candidates.singleOrNull() ?: return false
+                if (target.key.partId == parentId || target.key.partId in ancestors || target.key.partId in children ||
+                    target.mimeType != MmsMimeTypes.normalize(child.contentType?.toString(Charsets.ISO_8859_1))) return false
+                children += target.key.partId
+                if (target.kind == MmsContentKind.MULTIPART) {
+                    val nested = child.children ?: return false
+                    if (!match(nested, target.key.partId, staged, ancestors + parentId)) return false
+                }
+            }
+            staged[parentId] = children
+            return true
+        }
+        for (container in parts.filter { it.kind == MmsContentKind.MULTIPART }) {
+            currentCoroutineContext().ensureActive()
+            val id = container.key.partId
+            if (id in relations) continue
+            val read = reader.readBytes(sources.getValue(id), budget)
+            if (read.bytes == null) {
+                problems[id] = read.issue ?: "multipart_unresolved"
+                continue
+            }
+            val body = PduParser.parseMultipart(read.bytes, parseBudget)
+            currentCoroutineContext().ensureActive()
+            val staged = mutableMapOf<Long, List<Long>>()
+            if (body == null || !match(body, id, staged, emptySet())) problems[id] = "multipart_ambiguous"
+            else relations.putAll(staged)
+        }
+        val children = relations.values.flatten()
+        if (children.distinct().size != children.size) {
+            relations.keys.forEach { problems[it] = "multipart_ambiguous" }
+            relations.clear()
+        }
+        return parts.map { part ->
+            part.copy(
+                childPartIds = relations[part.key.partId].orEmpty(),
+                multipartResolved = part.key.partId in relations,
+                issue = part.issue ?: problems[part.key.partId],
+            )
+        }
     }
 
     private fun prepare(snapshot: MirrorMessageModel) = MmsContentModel(
@@ -201,9 +282,12 @@ class MmsContentRepositoryImpl(
     private fun estimateBytes(model: MmsContentModel): Long {
         fun size(value: String?) = if (value == null) 0L else 48L + value.length.toLong() * 2
         return 512L + size(model.subject) + size(model.summary) + size(model.searchableText) +
+            24L * (model.bodyPartIds.size + model.attachmentPartIds.size) + model.issues.sumOf(::size) +
+            model.pages.sumOf { 64L + 24L * it.partIds.size } +
             model.parts.sumOf { part ->
                 256L + size(part.mimeType) + size(part.displayName) + size(part.localUri) +
-                    size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue)
+                    size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
+                    24L * part.childPartIds.size
             }
     }
 

@@ -43,13 +43,22 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
             if (result.issue != null) return@withContext TextResult(null, part.attachment?.byteCount, result.issue)
             return@withContext TextResult(inline.removePrefix("\uFEFF"), part.attachment?.byteCount ?: result.byteCount.toLong(), null)
         }
+        val result = readBytes(part, budget)
+        result.bytes?.let { decode(it, part) } ?: TextResult(null, result.byteCount, result.issue)
+    }
+
+    data class BytesResult(val bytes: ByteArray?, val byteCount: Long?, val issue: String?)
+
+    /** 容器与文本共享本次消息读取预算；原件过大时保留 URI，不做截断解析。 */
+    suspend fun readBytes(part: MirrorPartModel, budget: Budget): BytesResult = withContext(Dispatchers.IO) {
+        currentCoroutineContext().ensureActive()
         val attachment = part.attachment
         if (attachment?.state != MirrorAttachmentState.READY || attachment.localUri == null) {
-            return@withContext TextResult(null, attachment?.byteCount, issueFor(part))
+            return@withContext BytesResult(null, attachment?.byteCount, issueFor(part))
         }
         val limit = minOf(MAX_TEXT_BYTES, budget.remaining)
         if (limit == 0 || (attachment.byteCount ?: 0) > limit) {
-            return@withContext TextResult(null, attachment.byteCount, "too_large")
+            return@withContext BytesResult(null, attachment.byteCount, "too_large")
         }
         try {
             // 当前镜像附件均为 file URI，拒绝远程或其他来源，避免内容解析触网。
@@ -65,25 +74,25 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
                     if (allowed == 0) {
                         // 没有预算探测 EOF 时仅信任镜像复制时记录的精确长度。
                         if (attachment.byteCount == output.size().toLong()) break
-                        return@withContext TextResult(null, attachment.byteCount, "too_large")
+                        return@withContext BytesResult(null, attachment.byteCount, "too_large")
                     }
                     val count = input.read(buffer, 0, allowed)
                     currentCoroutineContext().ensureActive()
                     if (count < 0) break
                     if (count == 0) continue
                     budget.consume(count)
-                    if (count > remaining) return@withContext TextResult(null, attachment.byteCount, "too_large")
+                    if (count > remaining) return@withContext BytesResult(null, attachment.byteCount, "too_large")
                     output.write(buffer, 0, count)
                 }
                 output.toByteArray()
-            } ?: return@withContext TextResult(null, attachment.byteCount, "read_failed")
+            } ?: return@withContext BytesResult(null, attachment.byteCount, "read_failed")
             currentCoroutineContext().ensureActive()
-            decode(bytes, part).also { currentCoroutineContext().ensureActive() }
+            BytesResult(bytes, bytes.size.toLong(), null)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             currentCoroutineContext().ensureActive()
-            TextResult(null, attachment.byteCount, "read_failed")
+            BytesResult(null, attachment.byteCount, "read_failed")
         }
     }
 

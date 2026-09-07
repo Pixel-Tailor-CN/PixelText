@@ -71,12 +71,12 @@ public class PduParser {
     /**
      * Store the "type" parameter in "Content-Type" header field.
      */
-    private static byte[] mTypeParam = null;
+    private byte[] mTypeParam = null;
 
     /**
      * Store the "start" parameter in "Content-Type" header field.
      */
-    private static byte[] mStartParam = null;
+    private byte[] mStartParam = null;
 
     /**
      * The log tag.
@@ -133,10 +133,35 @@ public class PduParser {
         if ((PduHeaders.MESSAGE_TYPE_SEND_REQ == messageType) ||
                 (PduHeaders.MESSAGE_TYPE_RETRIEVE_CONF == messageType)) {
             /* need to parse the parts */
-            mBody = parseParts(mPduDataStream);
+            byte[] rootType = mHeaders.getTextString(PduHeaders.CONTENT_TYPE);
+            String rootMime = rootType == null ? "" : new String(rootType, java.nio.charset.StandardCharsets.US_ASCII);
+            boolean rootAlternative = rootMime.equalsIgnoreCase(ContentType.MULTIPART_ALTERNATIVE)
+                    || rootMime.equalsIgnoreCase("multipart/alternative");
+            byte[] rootData = null;
+            MultipartBudget budget = new MultipartBudget();
+            if (rootAlternative) {
+                // 顶层 alternative 也需要持久化真实分组依据，不能按所有文本的 MIME 猜测。
+                int length = mPduDataStream.available();
+                if (length > 64L * 1024 * 1024) return null;
+                budget.bytes = length;
+                budget.parts = 1;
+                rootData = new byte[length];
+                mPduDataStream.mark(length);
+                if (length > 0 && mPduDataStream.read(rootData, 0, length) != length) return null;
+                mPduDataStream.reset();
+            }
+            mBody = parseParts(mPduDataStream, 0, budget);
             if (null == mBody) {
                 // Parse parts failed.
                 return null;
+            }
+            if (rootAlternative) {
+                PduPart root = new PduPart();
+                root.setContentType(rootType);
+                root.setData(rootData);
+                root.setChildren(mBody);
+                mBody = new PduBody();
+                mBody.addPart(root);
             }
         }
 
@@ -179,21 +204,7 @@ public class PduParser {
                     return null;
                 }
                 String ctTypeStr = new String(contentType);
-                if (ctTypeStr.equals(ContentType.MULTIPART_MIXED)
-                        || ctTypeStr.equals(ContentType.MULTIPART_RELATED)
-                        || ctTypeStr.equals(ContentType.MULTIPART_ALTERNATIVE)) {
-                    // The MMS content type must be "application/vnd.wap.multipart.mixed"
-                    // or "application/vnd.wap.multipart.related"
-                    // or "application/vnd.wap.multipart.alternative"
-                    return retrieveConf;
-                } else if (ctTypeStr.equals(ContentType.MULTIPART_ALTERNATIVE)) {
-                    // "application/vnd.wap.multipart.alternative"
-                    // should take only the first part.
-                    PduPart firstPart = mBody.getPart(0);
-                    mBody.removeAll();
-                    mBody.addPart(0, firstPart);
-                    return retrieveConf;
-                }
+                if (isMultipart(ctTypeStr)) return retrieveConf;
                 return null;
             case PduHeaders.MESSAGE_TYPE_DELIVERY_IND:
                 if (LOCAL_LOGV) {
@@ -835,134 +846,102 @@ public class PduParser {
      * @return parts in PduBody structure
      */
     protected PduBody parseParts(ByteArrayInputStream pduDataStream) {
-        return parseParts(pduDataStream, 0);
+        return parseParts(pduDataStream, 0, new MultipartBudget());
     }
 
-    private long decodedPartBytes = 0;
-    private int decodedPartCount = 0;
+    /** 整次解析共享；失败恢复也不返还已经消耗的计数和字节。 */
+    public static final class MultipartBudget {
+        private long bytes;
+        private int parts;
+        private boolean exhausted;
+    }
 
-    private PduBody parseParts(ByteArrayInputStream pduDataStream, int depth) {
-        // 限制嵌套和累计分配，畸形 PDU 不能绕过下载文件大小限制。
-        if (depth > 8) return null;
-        if (pduDataStream == null) {
+    /** 从 Provider 保存的容器载荷恢复结构，不读取任何外部资源。 */
+    public static PduBody parseMultipart(byte[] data, MultipartBudget budget) {
+        return new PduParser(new byte[0], true)
+                .parseParts(new ByteArrayInputStream(data), 0, budget);
+    }
+
+    public static boolean isMultipart(String type) {
+        return type.equalsIgnoreCase(ContentType.MULTIPART_MIXED)
+                || type.equalsIgnoreCase(ContentType.MULTIPART_RELATED)
+                || type.equalsIgnoreCase(ContentType.MULTIPART_ALTERNATIVE)
+                || type.equalsIgnoreCase("multipart/mixed")
+                || type.equalsIgnoreCase("multipart/related")
+                || type.equalsIgnoreCase("multipart/alternative");
+    }
+
+    private PduBody parseParts(ByteArrayInputStream input, int depth, MultipartBudget budget) {
+        if (depth > 8 || input == null || budget.exhausted) return null;
+        int count = parseUnsignedInt(input);
+        if (count < 0 || count > input.available() / 2) return null;
+        budget.parts += count;
+        if (budget.parts > 4096) {
+            budget.exhausted = true;
             return null;
         }
-
-        int count = parseUnsignedInt(pduDataStream); // get the number of parts
-        if (count < 0 || count > pduDataStream.available() / 2) return null;
-        decodedPartCount += count;
-        if (decodedPartCount > 4096) return null;
         PduBody body = new PduBody();
-
-        for (int i = 0 ; i < count ; i++) {
-            int headerLength = parseUnsignedInt(pduDataStream);
-            int dataLength = parseUnsignedInt(pduDataStream);
-            if (headerLength < 0 || dataLength < 0 || headerLength > pduDataStream.available()
-                    || dataLength > pduDataStream.available() - headerLength) return null;
-            decodedPartBytes += dataLength;
-            if (decodedPartBytes > 64L * 1024 * 1024) return null;
+        for (int i = 0; i < count; i++) {
+            int headerLength = parseUnsignedInt(input);
+            int dataLength = parseUnsignedInt(input);
+            if (headerLength <= 0 || dataLength < 0 || headerLength > input.available()
+                    || dataLength > input.available() - headerLength) return null;
+            budget.bytes += (long) headerLength + dataLength;
+            if (budget.bytes > 64L * 1024 * 1024) {
+                budget.exhausted = true;
+                return null;
+            }
+            // 头使用独立有界流，损坏的字符串/参数不能越界吃掉正文或后续 part。
+            byte[] headers = new byte[headerLength];
+            if (input.read(headers, 0, headerLength) != headerLength) return null;
+            ByteArrayInputStream headerInput = new ByteArrayInputStream(headers);
             PduPart part = new PduPart();
-            int startPos = pduDataStream.available();
-            if (startPos <= 0) {
-                // Invalid part.
+            try {
+                HashMap<Integer, Object> map = new HashMap<Integer, Object>();
+                byte[] type = parseContentType(headerInput, map);
+                if (type == null) return null;
+                part.setContentType(type);
+                byte[] name = (byte[]) map.get(PduPart.P_NAME);
+                if (name != null) part.setName(name);
+                Integer charset = (Integer) map.get(PduPart.P_CHARSET);
+                if (charset != null) part.setCharset(charset);
+                if (headerInput.available() > 0
+                        && !parsePartHeaders(headerInput, part, headerInput.available())) return null;
+                if (headerInput.available() != 0) return null;
+            } catch (RuntimeException malformed) {
                 return null;
             }
-
-            /* parse part's content-type */
-            HashMap<Integer, Object> map = new HashMap<Integer, Object>();
-            byte[] contentType = parseContentType(pduDataStream, map);
-            if (null != contentType) {
-                part.setContentType(contentType);
-            } else {
-                part.setContentType((PduContentTypes.contentTypes[0]).getBytes()); //"*/*"
-            }
-
-            /* get name parameter */
-            byte[] name = (byte[]) map.get(PduPart.P_NAME);
-            if (null != name) {
-                part.setName(name);
-            }
-
-            /* get charset parameter */
-            Integer charset = (Integer) map.get(PduPart.P_CHARSET);
-            if (null != charset) {
-                part.setCharset(charset);
-            }
-
-            /* parse part's headers */
-            int endPos = pduDataStream.available();
-            int partHeaderLen = headerLength - (startPos - endPos);
-            if (partHeaderLen > 0) {
-                if (false == parsePartHeaders(pduDataStream, part, partHeaderLen)) {
-                    // Parse part header faild.
-                    return null;
-                }
-            } else if (partHeaderLen < 0) {
-                // Invalid length of content-type.
-                return null;
-            }
-
-            /* FIXME: check content-id, name, filename and content location,
-             * if not set anyone of them, generate a default content-location
-             */
-            if ((null == part.getContentLocation())
-                    && (null == part.getName())
-                    && (null == part.getFilename())
-                    && (null == part.getContentId())) {
-                part.setContentLocation(Long.toOctalString(
-                        System.currentTimeMillis()).getBytes());
-            }
-
-            /* get part's data */
-            if (dataLength > 0) {
-                byte[] partData = new byte[dataLength];
-                String partContentType = new String(part.getContentType());
-                if (pduDataStream.read(partData, 0, dataLength) != dataLength) return null;
-                if (partContentType.equalsIgnoreCase(ContentType.MULTIPART_ALTERNATIVE)) {
-                    // parse "multipart/vnd.wap.multipart.alternative".
-                    PduBody childBody = parseParts(new ByteArrayInputStream(partData), depth + 1);
-                    // 保留容器原始数据和全部子项，不能只选择第一个替代内容。
-                    if (childBody == null) return null;
-                    part.setData(partData);
-                    body.addPart(part);
-                    for (int child = 0; child < childBody.getPartsNum(); child++) {
-                        body.addPart(childBody.getPart(child));
-                    }
-                    continue;
+            byte[] data = new byte[dataLength];
+            if (dataLength > 0 && input.read(data, 0, dataLength) != dataLength) return null;
+            String type = new String(part.getContentType(), java.nio.charset.StandardCharsets.ISO_8859_1);
+            byte[] encoding = part.getContentTransferEncoding();
+            // 容器原件保存传输载荷；不支持的传输编码保留原件，不猜测其子项。
+            if (isMultipart(type)) {
+                part.setData(data);
+                if (encoding != null && !new String(encoding, java.nio.charset.StandardCharsets.US_ASCII)
+                        .equalsIgnoreCase(PduPart.P_BINARY)) {
+                    part.setMultipartIssue("multipart_encoding_unsupported");
                 } else {
-                    // Check Content-Transfer-Encoding.
-                    byte[] partDataEncoding = part.getContentTransferEncoding();
-                    if (null != partDataEncoding) {
-                        String encoding = new String(partDataEncoding);
-                        if (encoding.equalsIgnoreCase(PduPart.P_BASE64)) {
-                            // Decode "base64" into "binary".
-                            partData = Base64.decodeBase64(partData);
-                        } else if (encoding.equalsIgnoreCase(PduPart.P_QUOTED_PRINTABLE)) {
-                            // Decode "quoted-printable" into "binary".
-                            partData = QuotedPrintable.decodeQuotedPrintable(partData);
-                        } else {
-                            // "binary" is the default encoding.
-                        }
-                    }
-                    if (null == partData) {
-                        log("Decode part data error!");
-                        return null;
-                    }
-                    part.setData(partData);
+                    PduBody children = parseParts(new ByteArrayInputStream(data), depth + 1, budget);
+                    if (budget.exhausted) return null;
+                    part.setChildren(children);
+                    if (children == null) part.setMultipartIssue("multipart_invalid");
                 }
-            }
-
-            /* add this part to body */
-            if (THE_FIRST_PART == checkPartPosition(part)) {
-                /* this is the first part */
-                body.addPart(0, part);
             } else {
-                /* add the part to the end */
-                body.addPart(part);
+                if (encoding != null) {
+                    String value = new String(encoding, java.nio.charset.StandardCharsets.US_ASCII);
+                    if (value.equalsIgnoreCase(PduPart.P_BASE64)) data = Base64.decodeBase64(data);
+                    else if (value.equalsIgnoreCase(PduPart.P_QUOTED_PRINTABLE)) {
+                        data = QuotedPrintable.decodeQuotedPrintable(data);
+                    }
+                }
+                if (data == null) return null;
+                part.setData(data);
             }
+            // 保留载荷顺序，不能被全消息 start/type 重排嵌套子项。
+            body.addPart(part);
         }
-
-        return body;
+        return input.available() == 0 ? body : null;
     }
 
     /**
@@ -1225,6 +1204,7 @@ public class PduParser {
             assert(-1 != temp);
         }
 
+        if (temp == -1) throw new IllegalArgumentException("unterminated wap string");
         if (out.size() > 0) {
             return out.toByteArray();
         }
@@ -1335,13 +1315,8 @@ public class PduParser {
      */
     protected static int skipWapValue(ByteArrayInputStream pduDataStream, int length) {
         assert(null != pduDataStream);
-        byte[] area = new byte[length];
-        int readLen = pduDataStream.read(area, 0, length);
-        if (readLen < length) { //The actually read length is lower than the length
-            return -1;
-        } else {
-            return readLen;
-        }
+        if (length < 0 || length > pduDataStream.available()) return -1;
+        return pduDataStream.skip(length) == length ? length : -1;
     }
 
     /**
@@ -1380,7 +1355,7 @@ public class PduParser {
         int lastLen = length;
         while(0 < lastLen) {
             int param = pduDataStream.read();
-            assert(-1 != param);
+            if (param < 0) throw new IllegalArgumentException("content type parameter eof");
             lastLen--;
 
             switch (param) {
@@ -1535,72 +1510,30 @@ public class PduParser {
      * @param map to store parameters in Content-Type header field
      * @return Content-Type value
      */
-    protected static byte[] parseContentType(ByteArrayInputStream pduDataStream,
+    protected static byte[] parseContentType(ByteArrayInputStream input,
             HashMap<Integer, Object> map) {
-        /**
-         * From wap-230-wsp-20010705-a.pdf
-         * Content-type-value = Constrained-media | Content-general-form
-         * Content-general-form = Value-length Media-type
-         * Media-type = (Well-known-media | Extension-Media) *(Parameter)
-         */
-        assert(null != pduDataStream);
-
-        byte[] contentType = null;
-        pduDataStream.mark(1);
-        int temp = pduDataStream.read();
-        assert(-1 != temp);
-        pduDataStream.reset();
-
-        int cur = (temp & 0xFF);
-
-        if (cur < TEXT_MIN) {
-            int length = parseValueLength(pduDataStream);
-            int startPos = pduDataStream.available();
-            if (length > startPos) {
-                vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "parseContentType: Invalid length " + length
-                        + " when available bytes are " + startPos);
-                return (PduContentTypes.contentTypes[0]).getBytes(); //"*/*"
+        input.mark(1);
+        int first = input.read();
+        if (first < 0) throw new IllegalArgumentException("content type eof");
+        input.reset();
+        if (first < TEXT_MIN) {
+            int length = parseValueLength(input);
+            if (length <= 0 || length > input.available()) {
+                throw new IllegalArgumentException("invalid content type length");
             }
-            pduDataStream.mark(1);
-            temp = pduDataStream.read();
-            assert(-1 != temp);
-            pduDataStream.reset();
-            int first = (temp & 0xFF);
-
-            if ((first >= TEXT_MIN) && (first <= TEXT_MAX)) {
-                contentType = parseWapString(pduDataStream, TYPE_TEXT_STRING);
-            } else if (first > TEXT_MAX) {
-                int index = parseShortInteger(pduDataStream);
-
-                if (index < PduContentTypes.contentTypes.length) { //well-known type
-                    contentType = (PduContentTypes.contentTypes[index]).getBytes();
-                } else {
-                    pduDataStream.reset();
-                    contentType = parseWapString(pduDataStream, TYPE_TEXT_STRING);
-                }
-            } else {
-                vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt content-type");
-                return (PduContentTypes.contentTypes[0]).getBytes(); //"*/*"
-            }
-
-            int endPos = pduDataStream.available();
-            int parameterLen = length - (startPos - endPos);
-            if (parameterLen > 0) {//have parameters
-                parseContentTypeParams(pduDataStream, map, parameterLen);
-            }
-
-            if (parameterLen < 0) {
-                vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt MMS message");
-                return (PduContentTypes.contentTypes[0]).getBytes(); //"*/*"
-            }
-        } else if (cur <= TEXT_MAX) {
-            contentType = parseWapString(pduDataStream, TYPE_TEXT_STRING);
-        } else {
-            contentType =
-                (PduContentTypes.contentTypes[parseShortInteger(pduDataStream)]).getBytes();
+            byte[] value = new byte[length];
+            if (input.read(value, 0, length) != length) return null;
+            ByteArrayInputStream bounded = new ByteArrayInputStream(value);
+            if ((value[0] & 0xff) < TEXT_MIN) throw new IllegalArgumentException("invalid media type");
+            byte[] type = parseContentType(bounded, map);
+            if (bounded.available() > 0) parseContentTypeParams(bounded, map, bounded.available());
+            if (bounded.available() != 0) throw new IllegalArgumentException("invalid content type parameters");
+            return type;
         }
-
-        return contentType;
+        if (first <= TEXT_MAX) return parseWapString(input, TYPE_TEXT_STRING);
+        int index = parseShortInteger(input);
+        if (index >= PduContentTypes.contentTypes.length) throw new IllegalArgumentException("unknown content type token");
+        return PduContentTypes.contentTypes[index].getBytes(java.nio.charset.StandardCharsets.US_ASCII);
     }
 
     /**
@@ -1637,8 +1570,9 @@ public class PduParser {
         int tempPos = 0;
         int lastLen = length;
         while(0 < lastLen) {
+            pduDataStream.mark(1);
             int header = pduDataStream.read();
-            assert(-1 != header);
+            if (header < 0) return false;
             lastLen--;
 
             if (header > TEXT_MAX) {
@@ -1687,6 +1621,7 @@ public class PduParser {
                          */
                         if (mParseContentDisposition) {
                             int len = parseValueLength(pduDataStream);
+                            if (len <= 0 || len > pduDataStream.available()) return false;
                             pduDataStream.mark(1);
                             int thisStartPos = pduDataStream.available();
                             int thisEndPos = 0;
@@ -1718,13 +1653,17 @@ public class PduParser {
                                 thisEndPos = pduDataStream.available();
                                 if (thisStartPos - thisEndPos < len) {
                                     int last = len - (thisStartPos - thisEndPos);
-                                    byte[] temp = new byte[last];
-                                    pduDataStream.read(temp, 0, last);
+                                    if (skipWapValue(pduDataStream, last) != last) return false;
                                 }
                             }
 
+                            if (thisStartPos - pduDataStream.available() != len) return false;
                             tempPos = pduDataStream.available();
                             lastLen = length - (startPos - tempPos);
+                        } else {
+                            int len = parseValueLength(pduDataStream);
+                            if (skipWapValue(pduDataStream, len) != len) return false;
+                            lastLen = length - (startPos - pduDataStream.available());
                         }
                         break;
                     default:
@@ -1739,7 +1678,8 @@ public class PduParser {
                     break;
                 }
             } else if ((header >= TEXT_MIN) && (header <= TEXT_MAX)) {
-                // Not assigned header.
+                // 文本字段名要从首字符开始解析。
+                pduDataStream.reset();
                 byte[] tempHeader = parseWapString(pduDataStream, TYPE_TEXT_STRING);
                 byte[] tempValue = parseWapString(pduDataStream, TYPE_TEXT_STRING);
 
@@ -1779,7 +1719,7 @@ public class PduParser {
      * @return part position, THE_FIRST_PART when it's the
      * first one, THE_LAST_PART when it's the last one.
      */
-    private static int checkPartPosition(PduPart part) {
+    private int checkPartPosition(PduPart part) {
         assert(null != part);
         if ((null == mTypeParam) &&
                 (null == mStartParam)) {

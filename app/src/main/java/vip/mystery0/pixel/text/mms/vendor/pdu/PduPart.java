@@ -120,6 +120,15 @@ public class PduPart {
       */
      private byte[] mPartData = null;
 
+     // 容器保留原始载荷；子项单独保存，不把扁平列表误当作同一 alternative 组。
+     private PduBody mChildren = null;
+     private String mMultipartIssue = null;
+
+     public PduBody getChildren() { return mChildren; }
+     public void setChildren(PduBody children) { mChildren = children; }
+     public String getMultipartIssue() { return mMultipartIssue; }
+     public void setMultipartIssue(String issue) { mMultipartIssue = issue; }
+
      private static final String TAG = "PduPart";
 
      /**

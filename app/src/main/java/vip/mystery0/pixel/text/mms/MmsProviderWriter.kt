@@ -8,6 +8,7 @@ import androidx.core.net.toUri
 import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
 import vip.mystery0.pixel.text.mms.vendor.pdu.EncodedStringValue
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduHeaders
+import vip.mystery0.pixel.text.mms.vendor.pdu.PduPart
 import vip.mystery0.pixel.text.mms.vendor.pdu.RetrieveConf
 import java.nio.charset.Charset
 
@@ -59,9 +60,19 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             message.cc?.forEach { address(it, PduHeaders.CC) }
             message.pduHeaders.getEncodedStringValues(PduHeaders.BCC)?.forEach { address(it, PduHeaders.BCC) }
             val body = message.body
-            for (index in 0 until body.partsNum) {
+            // Provider 没有父子列：先保存容器原件，再按深度优先顺序保存实际子项。
+            // 展示层从容器原件和 CID/Content-Location 派生关系，不改写原始标识。
+            val flattened = buildList {
+                fun append(part: PduPart) {
+                    add(part)
+                    part.children?.let { children ->
+                        for (child in 0 until children.partsNum) append(children.getPart(child))
+                    }
+                }
+                for (index in 0 until body.partsNum) append(body.getPart(index))
+            }
+            for ((index, part) in flattened.withIndex()) {
                 check(exists(mmsId)) { "mms deleted" }
-                val part = body.getPart(index)
                 val contentType = part.contentType?.toString(Charsets.ISO_8859_1)
                     ?: "application/octet-stream"
                 val bytes = part.data ?: byteArrayOf()
