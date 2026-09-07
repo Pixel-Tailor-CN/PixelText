@@ -12,6 +12,9 @@ import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorRepositoryImpl
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.data.repository.mms.MmsContentRepositoryImpl
+import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
+import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
@@ -106,6 +109,7 @@ val appModule = module {
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
             onMessageDeleted = { key ->
+                get<MmsContentRepositoryImpl>().invalidate(key)
                 val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
                 get<SpamRepository>().delete(setOf(id))
                 if (key.transport == MessageTransport.SMS) {
@@ -115,6 +119,9 @@ val appModule = module {
         }
     }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
+    single { MmsPartReader() }
+    single { MmsContentRepositoryImpl(get(), get()) }
+    single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
         MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
             onDirty = { get<MessageMirrorScheduler>().schedule() }

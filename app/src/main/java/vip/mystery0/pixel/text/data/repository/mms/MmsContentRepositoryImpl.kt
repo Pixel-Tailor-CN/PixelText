@@ -1,0 +1,214 @@
+package vip.mystery0.pixel.text.data.repository.mms
+
+import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
+import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
+import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
+import vip.mystery0.pixel.text.domain.model.mirror.MirrorMessageModel
+import vip.mystery0.pixel.text.domain.model.mirror.MirrorPartModel
+import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
+import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
+import vip.mystery0.pixel.text.domain.model.mms.MmsContentModel
+import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
+import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
+
+class MmsContentRepositoryImpl(
+    private val mirror: MessageMirrorRepository,
+    private val reader: MmsPartReader,
+) : MmsContentRepository {
+    private data class Entry(val fingerprint: String, val model: MmsContentModel, val bytes: Long)
+
+    private val cache = LinkedHashMap<SourceMessageKey, Entry>(16, 0.75f, true)
+    private val cacheLock = Any()
+    private var cachedBytes = 0L
+    private var invalidationEpoch = 0L
+
+    override fun observe(key: SourceMessageKey): Flow<MmsContentModel?> = channelFlow {
+        try {
+            mirror.observeMessage(key).collectLatest { snapshot ->
+                if (snapshot == null || key.transport != MessageTransport.MMS) {
+                    invalidate(key)
+                    send(null)
+                } else {
+                    try {
+                        val epoch = synchronized(cacheLock) { invalidationEpoch }
+                        val fingerprint = fingerprint(snapshot)
+                        val cached = cached(key, fingerprint)
+                        if (cached != null) {
+                            send(cached)
+                        } else {
+                            send(prepare(snapshot))
+                            send(parseAndCache(snapshot, fingerprint, epoch))
+                        }
+                    } catch (cancelled: CancellationException) {
+                        invalidate(key)
+                        throw cancelled
+                    }
+                }
+            }
+        } finally {
+            // 订阅取消后不保留该消息的派生正文。
+            invalidate(key)
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun read(key: SourceMessageKey): MmsContentModel? = try {
+        withContext(Dispatchers.IO) {
+            val epoch = synchronized(cacheLock) { invalidationEpoch }
+            val snapshot = mirror.getMessage(key)
+            if (snapshot == null || key.transport != MessageTransport.MMS) {
+                invalidate(key)
+                return@withContext null
+            }
+            val fingerprint = fingerprint(snapshot)
+            cached(key, fingerprint) ?: parseAndCache(snapshot, fingerprint, epoch)
+        }
+    } catch (cancelled: CancellationException) {
+        invalidate(key)
+        throw cancelled
+    }
+
+    /** 删除同步回调也调用此方法，覆盖当前没有订阅者但曾单次读取的消息。 */
+    fun invalidate(key: SourceMessageKey) = synchronized(cacheLock) {
+        invalidationEpoch++
+        cache.remove(key)?.let { cachedBytes -= it.bytes }
+        Unit
+    }
+
+    private fun cached(key: SourceMessageKey, fingerprint: String): MmsContentModel? = synchronized(cacheLock) {
+        cache[key]?.takeIf { it.fingerprint == fingerprint }?.model
+    }
+
+    private suspend fun parseAndCache(snapshot: MirrorMessageModel, fingerprint: String, epoch: Long): MmsContentModel {
+        val budget = MmsPartReader.Budget()
+        val parts = orderedParts(snapshot).map { part ->
+            currentCoroutineContext().ensureActive()
+            val content = partContent(snapshot, part)
+            if (MmsMimeTypes.isText(content.kind)) {
+                val result = reader.readText(part, budget)
+                content.copy(text = result.text, byteCount = result.byteCount, issue = result.issue)
+            } else content
+        }
+        val subject = snapshot.decodedSubject ?: snapshot.subject
+        val searchableText = buildString {
+            subject?.takeIf { it.isNotBlank() }?.let { append(it) }
+            parts.filter { it.kind == MmsContentKind.TEXT }.forEach { part ->
+                part.text?.takeIf { it.isNotBlank() }?.let {
+                    if (isNotEmpty()) append('\n')
+                    append(it)
+                }
+            }
+        }
+        val pending = pendingDownload(snapshot)
+        val model = MmsContentModel(
+            key = snapshot.key, revision = snapshot.revision, subject = subject,
+            parts = parts, pages = emptyList(),
+            summary = searchableText.takeIf { it.isNotBlank() }?.take(160)
+                ?: if (pending) "等待下载彩信" else "彩信（${parts.size} 个附件）",
+            searchableText = searchableText, pendingDownload = pending,
+        )
+        currentCoroutineContext().ensureActive()
+        val bytes = estimateBytes(model)
+        synchronized(cacheLock) {
+            // 删除或取消可能与单次读取并发，旧解析不能把已清除的正文重新放回缓存。
+            if (epoch != invalidationEpoch) return@synchronized
+            cache.remove(snapshot.key)?.let { cachedBytes -= it.bytes }
+            if (bytes <= MAX_CACHE_BYTES) {
+                cache[snapshot.key] = Entry(fingerprint, model, bytes)
+                cachedBytes += bytes
+                while (cache.size > MAX_CACHE_ENTRIES || cachedBytes > MAX_CACHE_BYTES) {
+                    val iterator = cache.entries.iterator()
+                    cachedBytes -= iterator.next().value.bytes
+                    iterator.remove()
+                }
+            }
+        }
+        return model
+    }
+
+    private fun prepare(snapshot: MirrorMessageModel) = MmsContentModel(
+        key = snapshot.key, revision = snapshot.revision,
+        subject = snapshot.decodedSubject ?: snapshot.subject,
+        parts = orderedParts(snapshot).map { partContent(snapshot, it).copy(issue = "preparing") },
+        pages = emptyList(), summary = "正在准备彩信内容", searchableText = "",
+        pendingDownload = pendingDownload(snapshot),
+    )
+
+    private fun orderedParts(snapshot: MirrorMessageModel) = snapshot.parts.sortedWith(
+        compareBy<MirrorPartModel> { it.sequence ?: Int.MAX_VALUE }.thenBy { it.sourceId },
+    )
+
+    private fun partContent(snapshot: MirrorMessageModel, part: MirrorPartModel): MmsPartContent {
+        val kind = MmsMimeTypes.classify(part.mimeType)
+        val hasInlineText = part.text != null && MmsMimeTypes.isText(kind)
+        return MmsPartContent(
+            key = MmsPartKey(snapshot.key, part.sourceId), revision = snapshot.revision,
+            kind = kind, mimeType = MmsMimeTypes.normalize(part.mimeType),
+            displayName = listOf(part.filename, part.name, part.contentLocation)
+                .firstOrNull { !it.isNullOrBlank() } ?: "附件 ${part.sourceId}",
+            byteCount = part.attachment?.byteCount,
+            state = if (hasInlineText) MirrorAttachmentState.READY else part.attachment?.state ?: MirrorAttachmentState.UNKNOWN,
+            localUri = part.attachment?.localUri, text = null,
+            contentId = part.contentId, contentLocation = part.contentLocation,
+            issue = if (hasInlineText) null else reader.issueFor(part),
+        )
+    }
+
+    private fun pendingDownload(snapshot: MirrorMessageModel): Boolean =
+        snapshot.pduType == 130 ||
+            snapshot.parts.any { it.attachment?.state == MirrorAttachmentState.PENDING_DOWNLOAD }
+
+    /** 不持有原始镜像；逐字符散列避免为超长内联文本再分配整份字节数组。 */
+    private suspend fun fingerprint(snapshot: MirrorMessageModel): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        suspend fun add(value: String?) {
+            digest.update(if (value == null) 0.toByte() else 1.toByte())
+            if (value == null) return
+            for (shift in listOf(24, 16, 8, 0)) digest.update((value.length ushr shift).toByte())
+            value.forEachIndexed { index, char ->
+                if (index % 4096 == 0) currentCoroutineContext().ensureActive()
+                digest.update((char.code ushr 8).toByte())
+                digest.update(char.code.toByte())
+            }
+        }
+        add(snapshot.revision.toString())
+        add(snapshot.subject); add(snapshot.decodedSubject)
+        add(snapshot.pduType.toString()); add(snapshot.structureComplete.toString())
+        snapshot.parts.forEach { part ->
+            currentCoroutineContext().ensureActive()
+            add(part.sourceId.toString()); add(part.sequence.toString()); add(part.mimeType)
+            add(part.charset.toString()); add(part.filename); add(part.name)
+            add(part.contentId); add(part.contentLocation); add(part.text)
+            add(part.attachment?.state?.name); add(part.attachment?.localUri)
+            add(part.attachment?.sha256); add(part.attachment?.byteCount.toString())
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /** 按 UTF-16 字符及对象开销保守估算，包含搜索文本的副本，不只统计原始字节。 */
+    private fun estimateBytes(model: MmsContentModel): Long {
+        fun size(value: String?) = if (value == null) 0L else 48L + value.length.toLong() * 2
+        return 512L + size(model.subject) + size(model.summary) + size(model.searchableText) +
+            model.parts.sumOf { part ->
+                256L + size(part.mimeType) + size(part.displayName) + size(part.localUri) +
+                    size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue)
+            }
+    }
+
+    private companion object {
+        const val MAX_CACHE_ENTRIES = 64
+        const val MAX_CACHE_BYTES = 16L * 1024 * 1024
+    }
+}
