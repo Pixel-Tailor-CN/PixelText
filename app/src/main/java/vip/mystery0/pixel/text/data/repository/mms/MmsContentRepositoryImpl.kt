@@ -243,6 +243,7 @@ class MmsContentRepositoryImpl(
             displayName = listOf(part.filename, part.name, part.contentLocation)
                 .firstOrNull { !it.isNullOrBlank() } ?: "附件 ${part.sourceId}",
             byteCount = part.attachment?.byteCount,
+            contentHash = part.attachment?.sha256,
             state = if (hasInlineText) MirrorAttachmentState.READY else part.attachment?.state ?: MirrorAttachmentState.UNKNOWN,
             localUri = part.attachment?.localUri, text = null,
             contentId = part.contentId, contentLocation = part.contentLocation,
@@ -289,7 +290,7 @@ class MmsContentRepositoryImpl(
             model.pages.sumOf { 64L + 24L * it.partIds.size } +
             model.parts.sumOf { part ->
                 256L + size(part.mimeType) + size(part.displayName) + size(part.localUri) +
-                    size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
+                    size(part.contentHash) + size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
                     24L * part.childPartIds.size
             }
     }

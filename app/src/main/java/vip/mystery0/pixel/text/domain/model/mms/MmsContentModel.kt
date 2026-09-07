@@ -39,6 +39,8 @@ data class MmsPartContent(
     /** 仅在原容器与本消息子项唯一匹配时设置；空列表不表示恢复成功。 */
     val childPartIds: List<Long> = emptyList(),
     val multipartResolved: Boolean = false,
+    /** 镜像原件的 SHA-256；附件更新可能不改变消息 revision。 */
+    val contentHash: String? = null,
 )
 
 /** SMIL 派生的顺序页；尚未解析展示结构时为空列表。 */

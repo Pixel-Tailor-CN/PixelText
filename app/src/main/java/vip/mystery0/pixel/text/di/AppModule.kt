@@ -1,5 +1,9 @@
 package vip.mystery0.pixel.text.di
 
+import coil3.ImageLoader
+import coil3.gif.AnimatedImageDecoder
+import vip.mystery0.pixel.text.data.source.mms.MmsMediaMetadataReader
+import vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackController
 import android.content.ContentResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +113,10 @@ val appModule = module {
     single { MmsDownloadCoordinator(androidContext(), get()) }
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
-            onMessageDeletionCommitted = { key -> get<MmsContentRepositoryImpl>().invalidate(key) }
+            onMessageDeletionCommitted = { key ->
+                get<MmsContentRepositoryImpl>().invalidate(key)
+                get<MmsPlaybackController>().onMessageDeleted(key)
+            }
             onMessageDeleted = { key ->
                 get<MmsContentRepositoryImpl>().invalidate(key)
                 val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
@@ -122,6 +129,9 @@ val appModule = module {
     }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
     single { MmsPartReader() }
+    single { ImageLoader.Builder(androidContext()).components { add(AnimatedImageDecoder.Factory()) }.build() }
+    single { MmsMediaMetadataReader(androidContext()) }
+    single { MmsPlaybackController(androidContext(), get()) }
     single { MmsAttachmentExporter(androidContext(), get()) }
     single { MmsContentRepositoryImpl(get(), get()) }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }

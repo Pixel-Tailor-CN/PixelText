@@ -110,6 +110,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.material.icons.core)
     implementation(libs.material.icons.extended)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui.compose)
 
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
