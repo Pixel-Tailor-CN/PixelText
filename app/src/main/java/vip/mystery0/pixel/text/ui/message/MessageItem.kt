@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,7 +39,6 @@ import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
-import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.ui.message.cards.OriginalTextCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageIndicator
@@ -68,6 +68,8 @@ fun MessageItem(
     showSpamContentByDefault: Boolean = false,
     showVerificationCodeContentByDefault: Boolean = true,
     animateEntrance: Boolean = false,
+    selectionMode: Boolean = false,
+    onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
 ) {
     val bubbleColor = if (message.isReceived) {
         originalMessageStyle.receivedBubbleColor
@@ -165,13 +167,13 @@ fun MessageItem(
                 color = highlightColor.copy(alpha = highlightAlpha.value),
                 shape = RoundedCornerShape(16.dp),
             )
-            .combinedClickable(
+            .then(if (message.isMms) Modifier else Modifier.combinedClickable(
                 enabled = interactionEnabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
                 indication = null,
                 interactionSource = interactionSource
-            ),
+            )),
         horizontalAlignment = cardAlignment
     ) {
         Box(
@@ -179,85 +181,93 @@ fun MessageItem(
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
             Column(horizontalAlignment = cardAlignment) {
-                if (message.mmsDownloadPending) {
-                    vip.mystery0.pixel.text.ui.message.cards.MmsDownloadCard(-message.id)
-                }
-                if (message.imageUris.isNotEmpty()) {
-                    MmsImageCard(imageUris = message.imageUris, isSelected = isSelected)
-                    if (message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                if (message.isMms) {
+                    val key = vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                        vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS, -message.id)
+                    val contentViewModel = org.koin.androidx.compose.koinViewModel<vip.mystery0.pixel.text.viewmodel.MmsContentViewModel>(key = "mms:${key.sourceId}")
+                    val model by contentViewModel.content.collectAsState()
+                    androidx.compose.runtime.DisposableEffect(key) {
+                        contentViewModel.load(key)
+                        onDispose { contentViewModel.stop() }
                     }
-                }
-                val hasTextContent =
-                    message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
-                if (hasTextContent) {
-                    when {
-                        isSpam && showOriginal -> {
-                            OriginalTextCard(
-                                content = message.content,
-                                isSelected = isSelected,
-                                isReceived = message.isReceived,
-                                subject = message.mmsSubject,
-                                textScale = textScale,
-                                backgroundColor = bubbleColor,
-                                textColor = textColor,
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            SpamMessageIndicator(isSelected = isSelected)
-                        }
-
-                        isSpam -> SpamMessageCard(isSelected = isSelected)
-
-                        message.parsedResult is ParsedResult.None -> {
-                            OriginalTextCard(
-                                content = message.content,
-                                isSelected = isSelected,
-                                isReceived = message.isReceived,
-                                subject = message.mmsSubject,
-                                textScale = textScale,
-                                backgroundColor = bubbleColor,
-                                textColor = textColor,
-                            )
-                        }
-
-                        isVerificationCode -> {
-                            MessageCardFactory.CreateCard(
-                                content = message.content,
-                                parsedResult = message.parsedResult,
-                                isSelected = isSelected,
-                                showVerificationOriginal = showOriginal,
-                            )
-                        }
-
-                        showOriginal -> {
-                            OriginalTextCard(
-                                content = message.content,
-                                isSelected = isSelected,
-                                isReceived = message.isReceived,
-                                subject = message.mmsSubject,
-                                textScale = textScale,
-                                backgroundColor = bubbleColor,
-                                textColor = textColor,
-                            )
-                        }
-
-                        else -> {
-                            MessageCardFactory.CreateCard(
-                                content = message.content,
-                                parsedResult = message.parsedResult,
-                                isSelected = isSelected
-                            )
-                        }
-                    }
+                    model?.let {
+                        vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected, interactionEnabled,
+                            onOpenMmsPart, selectionMode, onClick, onLongClick)
+                        androidx.compose.material3.TextButton(enabled = interactionEnabled && !selectionMode,
+                            onClick = { onOpenMmsPart(vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(key, -1)) }) { Text("彩信详情") }
+                    } ?: Text("正在读取彩信", color = textColor)
                 } else {
-                    OriginalTextCard(
-                        content = "【不支持的消息】",
-                        isSelected = isSelected,
-                        isReceived = message.isReceived,
-                        textScale = textScale,
-                        backgroundColor = bubbleColor,
-                        textColor = textColor,
-                    )
+                    val hasTextContent =
+                        message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
+                    if (hasTextContent) {
+                        when {
+                            isSpam && showOriginal -> {
+                                OriginalTextCard(
+                                    content = message.content,
+                                    isSelected = isSelected,
+                                    isReceived = message.isReceived,
+                                    subject = message.mmsSubject,
+                                    textScale = textScale,
+                                    backgroundColor = bubbleColor,
+                                    textColor = textColor,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                SpamMessageIndicator(isSelected = isSelected)
+                            }
+
+                            isSpam -> SpamMessageCard(isSelected = isSelected)
+
+                            message.parsedResult is ParsedResult.None -> {
+                                OriginalTextCard(
+                                    content = message.content,
+                                    isSelected = isSelected,
+                                    isReceived = message.isReceived,
+                                    subject = message.mmsSubject,
+                                    textScale = textScale,
+                                    backgroundColor = bubbleColor,
+                                    textColor = textColor,
+                                )
+                            }
+
+                            isVerificationCode -> {
+                                MessageCardFactory.CreateCard(
+                                    content = message.content,
+                                    parsedResult = message.parsedResult,
+                                    isSelected = isSelected,
+                                    showVerificationOriginal = showOriginal,
+                                )
+                            }
+
+                            showOriginal -> {
+                                OriginalTextCard(
+                                    content = message.content,
+                                    isSelected = isSelected,
+                                    isReceived = message.isReceived,
+                                    subject = message.mmsSubject,
+                                    textScale = textScale,
+                                    backgroundColor = bubbleColor,
+                                    textColor = textColor,
+                                )
+                            }
+
+                            else -> {
+                                MessageCardFactory.CreateCard(
+                                    content = message.content,
+                                    parsedResult = message.parsedResult,
+                                    isSelected = isSelected
+                                )
+                            }
+                        }
+                    } else if (message.imageUris.isEmpty() && !message.mmsDownloadPending) {
+                        OriginalTextCard(
+                            content = "【不支持的消息】",
+                            isSelected = isSelected,
+                            isReceived = message.isReceived,
+                            textScale = textScale,
+                            backgroundColor = bubbleColor,
+                            textColor = textColor,
+                        )
+                    }
                 }
             }
         }
@@ -306,7 +316,7 @@ fun MessageItem(
                 }
             }
 
-            if (isSpam || message.parsedResult !is ParsedResult.None) {
+            if (!message.isMms && (isSpam || message.parsedResult !is ParsedResult.None)) {
                 Text(
                     text = when {
                         isSpam && showOriginal -> "隐藏内容"

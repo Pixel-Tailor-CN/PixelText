@@ -86,8 +86,9 @@ fun SearchResultItem(
             Spacer(modifier = Modifier.height(2.dp))
 
             val highlightColor = MaterialTheme.colorScheme.primary
-            val snippet = remember(message.content, query, highlightColor) {
-                getContextSnippet(message.content, query, highlightColor)
+            val displayText = message.content.ifBlank { message.mmsSummary.orEmpty() }
+            val snippet = remember(displayText, query, highlightColor) {
+                getContextSnippet(displayText, query, highlightColor)
             }
 
             Text(

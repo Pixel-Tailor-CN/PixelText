@@ -5,6 +5,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class MirrorDao {
+    @Query("SELECT * FROM mms_text_index WHERE localId=:localId")
+    abstract suspend fun getMmsText(localId: Long): MmsTextIndexEntity?
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun putMmsText(entity: MmsTextIndexEntity)
+
     @Transaction @Query("SELECT * FROM mirror_message WHERE transport=:transport AND sourceId=:sourceId")
     abstract suspend fun get(transport: String, sourceId: Long): MirrorMessageRecord?
 
@@ -18,7 +23,7 @@ abstract class MirrorDao {
     abstract fun observeThread(threadId: Long, limit: Int, offset: Int): Flow<List<MirrorMessageRecord>>
 
     // 仅订阅关联表失效，无需为每次变化解码整段历史。
-    @Query("SELECT COUNT(*) FROM mirror_message m LEFT JOIN mirror_attachment a ON a.localId=m.localId WHERE m.threadId=:threadId")
+    @Query("SELECT COUNT(*) FROM mirror_message m LEFT JOIN mirror_attachment a ON a.localId=m.localId LEFT JOIN mms_text_index tx ON tx.localId=m.localId WHERE m.threadId=:threadId")
     abstract fun observeThreadChanges(threadId: Long): Flow<Long>
 
     @Transaction @Query("SELECT * FROM mirror_message ORDER BY timestamp DESC, localId DESC")
@@ -29,13 +34,12 @@ abstract class MirrorDao {
           COALESCE(s.address, (SELECT a.address FROM mirror_mms_address a WHERE a.localId=m.localId
             AND a.address != 'insert-address-token' AND a.type=(CASE WHEN m.boxType=1 THEN 137 ELSE 151 END) ORDER BY a.ordinal LIMIT 1),
             (SELECT a.address FROM mirror_mms_address a WHERE a.localId=m.localId AND a.address != 'insert-address-token' ORDER BY a.ordinal LIMIT 1)) AS address,
-          COALESCE(s.body, (SELECT group_concat(text, char(10)) FROM
-            (SELECT text FROM mirror_mms_part WHERE localId=m.localId AND mimeType LIKE 'text/%' ORDER BY sequence, sourceId)), mm.decodedSubject) AS snippet,
+          COALESCE(s.body, tx.summary, mm.decodedSubject, mm.subject, '正在准备彩信内容') AS snippet,
           m.timestamp AS timestamp,
           (SELECT COUNT(*) FROM mirror_message u WHERE u.threadId=m.threadId AND u.read=0 AND u.boxType=1) AS unreadCount,
           m.transport='MMS' AS latestIsMms,
           EXISTS(SELECT 1 FROM mirror_message x WHERE x.threadId=m.threadId AND x.transport='MMS') AS containsMms
-        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId LEFT JOIN mirror_mms mm ON mm.localId=m.localId
+        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId LEFT JOIN mirror_mms mm ON mm.localId=m.localId LEFT JOIN mms_text_index tx ON tx.localId=m.localId
         WHERE m.threadId > 0 AND m.localId=(SELECT n.localId FROM mirror_message n WHERE n.threadId=m.threadId ORDER BY n.timestamp DESC, n.localId DESC LIMIT 1)
         ORDER BY m.timestamp DESC, m.localId DESC
     """)
@@ -45,12 +49,27 @@ abstract class MirrorDao {
     abstract suspend fun missingCandidates(transport: String, generation: Long, afterLocalId: Long): List<MirrorMessageEntity>
 
     @Insert abstract suspend fun insertMessage(entity: MirrorMessageEntity): Long
-    @Update abstract suspend fun updateMessage(entity: MirrorMessageEntity)
+    @Query("DELETE FROM mms_text_index WHERE localId=:localId")
+    abstract suspend fun deleteMmsText(localId: Long)
+    @Query("SELECT revision FROM mirror_message WHERE localId=:localId")
+    abstract suspend fun messageRevision(localId: Long): Long?
+    @Update abstract suspend fun updateMessageRow(entity: MirrorMessageEntity)
+    @Transaction open suspend fun updateMessage(entity: MirrorMessageEntity) {
+        val previous = messageRevision(entity.localId)
+        if (previous != entity.revision) deleteMmsText(entity.localId)
+        updateMessageRow(entity)
+    }
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putSms(entity: MirrorSmsEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putMms(entity: MirrorMmsEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putAddresses(entities: List<MirrorAddressEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putParts(entities: List<MirrorPartEntity>)
-    @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putAttachment(entity: MirrorAttachmentEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putAttachmentRow(entity: MirrorAttachmentEntity)
+    @Transaction open suspend fun putAttachment(entity: MirrorAttachmentEntity) {
+        val previous = attachment(entity.localId, entity.partId)
+        if (previous?.state != entity.state || previous.relativePath != entity.relativePath ||
+            previous.sha256 != entity.sha256 || previous.byteCount != entity.byteCount) deleteMmsText(entity.localId)
+        putAttachmentRow(entity)
+    }
     @Insert(onConflict = OnConflictStrategy.IGNORE) abstract suspend fun enqueueCleanup(entity: MirrorFileCleanupEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putSyncState(entity: MirrorSyncStateEntity)
     @Query("DELETE FROM mirror_mms_address WHERE localId=:localId") abstract suspend fun deleteAddresses(localId: Long)
@@ -92,7 +111,9 @@ abstract class MirrorDao {
             deleteParts(id)
             putAddresses(addresses)
             putParts(parts)
-            retained.forEach { putAttachment(it) }
+            // 重放同一结构时旧附件已被级联删除，不能把重放误判为内容变化。
+            // 实际结构变化已在上面的 revision 更新中清除派生索引。
+            retained.forEach { putAttachmentRow(it) }
         } else {
             // 头发生变化时旧附件暂不可视为新结构的完整副本，但不丢失已有文件。
             old?.attachments?.forEach { putAttachment(it.copy(revision = revision)) }

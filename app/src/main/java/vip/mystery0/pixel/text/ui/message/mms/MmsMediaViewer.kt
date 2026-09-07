@@ -54,7 +54,7 @@ fun MmsMediaViewer(part: MmsPartContent, onBack: () -> Unit, controller: MmsPlay
 
 /** SMIL 可直接复用；外壳安装一次 MmsPlaybackSession，并在翻页时调用 stop。 */
 @Composable
-fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, modifier: Modifier = Modifier) {
+fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, modifier: Modifier = Modifier, interactionEnabled: Boolean = true) {
     val playback by controller.state.collectAsState()
     val player by controller.player.collectAsState()
     val selected = playback.partKey == part.key
@@ -76,16 +76,16 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
             value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()),
             onValueChange = { dragPosition = it },
             onValueChangeFinished = { dragPosition?.let { controller.seekTo(it.toLong()) }; dragPosition = null },
-            enabled = selected && duration > 0 && player?.isCurrentMediaItemSeekable == true,
+            enabled = interactionEnabled && selected && duration > 0 && player?.isCurrentMediaItemSeekable == true,
             valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
             modifier = Modifier.semantics { contentDescription = "播放进度" },
         )
         Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(enabled = part.statusInfo().actionable, onClick = {
+            Button(enabled = interactionEnabled && part.statusInfo().actionable, onClick = {
                 if (showPause) controller.pause() else controller.play(part)
             }) { Text(if (showPause) "暂停" else "播放") }
-            TextButton(enabled = selected, onClick = controller::stop) { Text("停止") }
+            TextButton(enabled = interactionEnabled && selected, onClick = controller::stop) { Text("停止") }
         }
     }
 }

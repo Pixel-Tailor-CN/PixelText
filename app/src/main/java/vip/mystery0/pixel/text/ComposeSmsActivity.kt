@@ -56,7 +56,21 @@ class ComposeSmsActivity : ComponentActivity() {
                         if (targetAddress.isBlank()) -1L else getThreadIdForAddress(targetAddress)
                     }
 
-                    if (targetAddress.isBlank()) {
+                    var openedMmsId by rememberSaveable { mutableStateOf<Long?>(null) }
+                    var openedPartId by rememberSaveable { mutableStateOf<Long?>(null) }
+                    val mmsId = openedMmsId
+                    val partId = openedPartId
+                    if (mmsId != null && partId != null) {
+                        androidx.activity.compose.BackHandler { openedMmsId = null; openedPartId = null }
+                        val key = vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                            vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS, mmsId)
+                        if (partId < 0) vip.mystery0.pixel.text.ui.screen.MirrorMessageDetailScreen(key,
+                            onBack = { openedMmsId = null; openedPartId = null },
+                            onOpenPart = { openedPartId = it.partId })
+                        else vip.mystery0.pixel.text.ui.screen.MmsPartScreen(
+                            vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(key, partId),
+                            onBack = { openedMmsId = null; openedPartId = null })
+                    } else if (targetAddress.isBlank()) {
                         RecipientEntryScreen(
                             onNavigateBack = { finish() },
                             onRecipientConfirmed = { targetAddress = it }
@@ -66,6 +80,7 @@ class ComposeSmsActivity : ComponentActivity() {
                             threadId = threadId,
                             address = targetAddress,
                             initialMessageText = body,
+                            onOpenMmsPart = { openedMmsId = it.message.sourceId; openedPartId = it.partId },
                             onNavigateBack = { finish() }
                         )
                     }

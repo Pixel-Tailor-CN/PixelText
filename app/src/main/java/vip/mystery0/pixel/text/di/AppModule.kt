@@ -140,6 +140,7 @@ val appModule = module {
     single { MmsPlaybackController(androidContext(), get()) }
     single { MmsAttachmentExporter(androidContext(), get()) }
     single { MmsContentRepositoryImpl(get(), get(), get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer(get(), get(), get()) }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
         MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
@@ -163,10 +164,11 @@ val appModule = module {
         ConversationCacheRepository(androidContext(), get(), get(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MmsContentViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }

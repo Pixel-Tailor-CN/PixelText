@@ -31,4 +31,6 @@ data class MirrorMessageModel(
     val pduType: Int?, val downloadStatus: Int?, val structureComplete: Boolean,
     val rawValues: List<RawProviderValue>, val addresses: List<MirrorAddressModel>,
     val parts: List<MirrorPartModel>,
+    val mmsSummary: String? = null,
+    val mmsSearchableText: String? = null,
 )

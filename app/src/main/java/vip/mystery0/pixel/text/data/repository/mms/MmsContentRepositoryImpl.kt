@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.data.repository.mms
 
-import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -54,7 +53,7 @@ class MmsContentRepositoryImpl(
                 } else {
                     try {
                         val epoch = synchronized(cacheLock) { invalidationEpoch }
-                        val fingerprint = fingerprint(snapshot)
+                        val fingerprint = mmsContentFingerprint(snapshot)
                         val cached = cached(key, fingerprint)
                         if (cached != null) {
                             send(cached)
@@ -82,7 +81,7 @@ class MmsContentRepositoryImpl(
                 invalidate(key)
                 return@withContext null
             }
-            val fingerprint = fingerprint(snapshot)
+            val fingerprint = mmsContentFingerprint(snapshot)
             cached(key, fingerprint) ?: parseAndCache(snapshot, fingerprint, epoch)
         }
     } catch (cancelled: CancellationException) {
@@ -143,15 +142,29 @@ class MmsContentRepositoryImpl(
             MmsSmilParser().parseWithIssues(it.text!!, parts)
         }
         // 多份控制文档没有可靠的主文档指示时不猜测，全部回退附件。
-        val pages = if (smilResults.size == 1) smilResults.single().pages else emptyList()
+        val pages = if (smilResults.size == 1 && smilResults.single().issues.isEmpty()) smilResults.single().pages else emptyList()
         val issues = (selection.issues + smilResults.flatMap { it.issues } +
+            (if (parts.any { it.kind == MmsContentKind.SMIL && it.text == null }) listOf("smil_unreadable") else emptyList()) +
             if (smilResults.size > 1) listOf("smil_ambiguous_document") else emptyList()).distinct()
         val referenced = pages.flatMap { it.partIds }.toSet()
         val subject = snapshot.decodedSubject ?: snapshot.subject
         val searchableText = buildString {
             subject?.takeIf { it.isNotBlank() }?.let { append(it) }
-            selection.parts.filter { it.kind == MmsContentKind.TEXT || it.kind == MmsContentKind.HTML }.forEach { part ->
-                val text = if (part.kind == MmsContentKind.HTML && part.text != null) htmlParser.prepare(part, parts).plainText else part.text
+            selection.parts.forEach { part ->
+                context.ensureActive()
+                val text = when (part.kind) {
+                    MmsContentKind.TEXT -> part.text
+                    MmsContentKind.HTML -> if (part.text != null) htmlParser.prepare(part, parts).plainText else null
+                    MmsContentKind.CONTACT -> part.contacts.joinToString("\n") { contact ->
+                        (listOfNotNull(contact.name, contact.organization, contact.title, contact.notes) +
+                            (contact.phones + contact.emails + contact.addresses).map { it.value }).joinToString("\n")
+                    }
+                    MmsContentKind.CALENDAR -> part.calendarEvents.joinToString("\n") { event ->
+                        listOfNotNull(event.title, event.location, event.description,
+                            event.start?.toString(), event.end?.toString()).joinToString("\n")
+                    }
+                    else -> null
+                }
                 text?.takeIf { it.isNotBlank() }?.let {
                     if (isNotEmpty()) append('\n')
                     append(it)
@@ -163,7 +176,7 @@ class MmsContentRepositoryImpl(
             key = snapshot.key, revision = snapshot.revision, subject = subject,
             parts = parts, pages = pages,
             summary = searchableText.takeIf { it.isNotBlank() }?.take(160)
-                ?: if (pending) "等待下载彩信" else "彩信（${parts.size} 个附件）",
+                ?: if (pending) "等待下载彩信" else mmsAttachmentSummary(parts.map { it.kind }),
             searchableText = searchableText, pendingDownload = pending,
             bodyPartIds = selection.parts.map { it.key.partId },
             attachmentPartIds = parts.filter {
@@ -259,7 +272,7 @@ class MmsContentRepositoryImpl(
         key = snapshot.key, revision = snapshot.revision,
         subject = snapshot.decodedSubject ?: snapshot.subject,
         parts = orderedParts(snapshot).map { partContent(snapshot, it).copy(issue = "preparing") },
-        pages = emptyList(), summary = "正在准备彩信内容", searchableText = "",
+        pages = emptyList(), summary = "正在准备彩信内容", searchableText = "", preparing = true,
         pendingDownload = pendingDownload(snapshot),
     )
 
@@ -289,32 +302,6 @@ class MmsContentRepositoryImpl(
             snapshot.parts.any { it.attachment?.state == MirrorAttachmentState.PENDING_DOWNLOAD }
 
     /** 不持有原始镜像；逐字符散列避免为超长内联文本再分配整份字节数组。 */
-    private suspend fun fingerprint(snapshot: MirrorMessageModel): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        suspend fun add(value: String?) {
-            digest.update(if (value == null) 0.toByte() else 1.toByte())
-            if (value == null) return
-            for (shift in listOf(24, 16, 8, 0)) digest.update((value.length ushr shift).toByte())
-            value.forEachIndexed { index, char ->
-                if (index % 4096 == 0) currentCoroutineContext().ensureActive()
-                digest.update((char.code ushr 8).toByte())
-                digest.update(char.code.toByte())
-            }
-        }
-        add(snapshot.revision.toString())
-        add(snapshot.subject); add(snapshot.decodedSubject)
-        add(snapshot.pduType.toString()); add(snapshot.structureComplete.toString())
-        snapshot.parts.forEach { part ->
-            currentCoroutineContext().ensureActive()
-            add(part.sourceId.toString()); add(part.sequence.toString()); add(part.mimeType)
-            add(part.charset.toString()); add(part.filename); add(part.name)
-            add(part.contentId); add(part.contentLocation); add(part.text)
-            add(part.attachment?.state?.name); add(part.attachment?.localUri)
-            add(part.attachment?.sha256); add(part.attachment?.byteCount.toString())
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-
     /** 按 UTF-16 字符及对象开销保守估算，包含搜索文本的副本，不只统计原始字节。 */
     private fun estimateBytes(model: MmsContentModel): Long {
         fun size(value: String?) = if (value == null) 0L else 48L + value.length.toLong() * 2

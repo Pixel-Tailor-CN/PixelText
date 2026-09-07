@@ -78,6 +78,7 @@ data class MirrorMessageRecord(
     @Relation(parentColumn = "localId", entityColumn = "localId") val mms: MirrorMmsEntity?,
     @Relation(parentColumn = "localId", entityColumn = "localId") val addresses: List<MirrorAddressEntity>,
     @Relation(parentColumn = "localId", entityColumn = "localId") val parts: List<MirrorPartEntity>,
+    @Relation(parentColumn = "localId", entityColumn = "localId") val mmsText: MmsTextIndexEntity?,
     @Relation(parentColumn = "localId", entityColumn = "localId") val attachments: List<MirrorAttachmentEntity>,
 )
 
@@ -92,3 +93,9 @@ data class MirrorConversationRow(
     val threadId: Long, val address: String?, val snippet: String?, val timestamp: Long?,
     val unreadCount: Int, val latestIsMms: Boolean, val containsMms: Boolean,
 )
+
+/** 可重新生成的可读文本，不替代原件。父消息删除时自动级联清理。 */
+@Entity(tableName = "mms_text_index", foreignKeys = [ForeignKey(entity = MirrorMessageEntity::class,
+    parentColumns = ["localId"], childColumns = ["localId"], onDelete = ForeignKey.CASCADE)])
+data class MmsTextIndexEntity(@PrimaryKey val localId: Long, val version: Int,
+    val fingerprint: String, val summary: String, val searchableText: String)

@@ -69,4 +69,5 @@ data class MmsContentModel(
     val attachmentPartIds: List<Long> = emptyList(),
     /** 稳定英文问题分类，不包含源文或异常信息。 */
     val issues: List<String> = emptyList(),
+    val preparing: Boolean = false,
 )

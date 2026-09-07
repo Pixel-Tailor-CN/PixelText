@@ -61,6 +61,13 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
     private val main = Handler(Looper.getMainLooper())
     private val mutableState = MutableStateFlow(MmsPlaybackState())
     val state: StateFlow<MmsPlaybackState> = mutableState.asStateFlow()
+    private val mutablePresentation = MutableStateFlow<SourceMessageKey?>(null)
+    val presentation: StateFlow<SourceMessageKey?> = mutablePresentation.asStateFlow()
+    fun beginPresentation(key: SourceMessageKey) { checkMainThread(); stop(); mutablePresentation.value = key }
+    fun endPresentation(key: SourceMessageKey) {
+        checkMainThread()
+        if (mutablePresentation.value == key) { mutablePresentation.value = null; stop() }
+    }
     private val mutablePlayer = MutableStateFlow<ExoPlayer?>(null)
     val player: StateFlow<ExoPlayer?> = mutablePlayer.asStateFlow()
     private var owner: Any? = null
@@ -162,6 +169,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
     }
 
     private fun releaseCurrent() {
+        mutablePresentation.value = null
         stop()
         mutablePlayer.value?.release()
         mutablePlayer.value = null
@@ -195,6 +203,7 @@ fun MmsPlaybackSession(controller: MmsPlaybackController) {
         controller.acquire(session)
         controller.setForeground(session, lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
         val observer = LifecycleEventObserver { _, _ ->
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) controller.acquire(session)
             controller.setForeground(session, lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
         }
         lifecycle.addObserver(observer)

@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
@@ -53,8 +56,11 @@ class MessageRepositoryImpl(
     private val senderProfileRepository: SenderProfileRepository,
     private val verificationCodeRepository: VerificationCodeRepository,
     private val mirror: MessageMirrorRepository,
+    private val mmsTextIndexer: vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer,
     private val context: Context
 ) : MessageRepository {
+
+    init { mmsTextIndexer.start() }
 
     private val archiveDao = archiveDatabase.archivedConversationDao()
 
@@ -220,9 +226,11 @@ class MessageRepositoryImpl(
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override fun searchMessages(query: String, filter: MessageSearchFilter): Flow<List<MessageModel>> =
-        mirror.observeAllMessages().map { rows -> rows.map { it.toMessageModel() }.filter { message ->
-            (query.isBlank() || message.content.contains(query, true) || message.mmsSubject.orEmpty().contains(query, true)) &&
+        mirror.observeAllMessages().mapLatest { rows -> rows.map { currentCoroutineContext().ensureActive(); it.toMessageModel() }.filter { message ->
+            currentCoroutineContext().ensureActive()
+            (query.isBlank() || message.content.contains(query, true) || message.mmsSubject.orEmpty().contains(query, true) || message.mmsSummary.orEmpty().contains(query, true)) &&
                 (!filter.unreadOnly || !message.isRead) &&
                 (filter.simSubId == null || message.subId == filter.simSubId) &&
                 (!filter.mmsOnly || message.isMms) &&
@@ -312,7 +320,7 @@ class MessageRepositoryImpl(
             val latest = rows.first()
             ConversationModel(
                 threadId = thread, address = latest.sender,
-                snippet = latest.mmsSubject?.takeIf { it.isNotBlank() } ?: latest.content,
+                snippet = latest.mmsSummary ?: latest.content,
                 timestamp = latest.timestamp, unreadCount = rows.count { !it.isRead },
                 isMms = latest.isMms, hasMms = rows.any { it.isMms },
             )
