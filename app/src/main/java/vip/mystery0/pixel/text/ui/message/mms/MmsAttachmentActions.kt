@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.CancellationException
@@ -31,7 +32,10 @@ import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExporter
 import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentFailureReason
 import vip.mystery0.pixel.text.data.source.mms.SharedMmsAttachment
 import vip.mystery0.pixel.text.data.source.mms.suggestedMmsAttachmentName
+import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
+import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 
 private enum class ActiveAttachmentAction { OPEN, SAVE, SHARE }
 
@@ -49,6 +53,7 @@ fun MmsAttachmentActions(
     val currentPart by rememberUpdatedState(part)
     val currentFeedback by rememberUpdatedState(onFeedback)
     var activeAction by remember(part.key) { mutableStateOf<ActiveAttachmentAction?>(null) }
+    var pendingSaveKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun feedback(message: String) {
         currentFeedback?.invoke(message)
@@ -81,11 +86,17 @@ fun MmsAttachmentActions(
         ActivityResultContracts.CreateDocument(part.mimeType)
     }
     val saveLauncher = rememberLauncherForActivityResult(createDocument) { destination ->
+        val requestedPart = pendingSaveKey?.let(::decodePartKey)
+        pendingSaveKey = null
         // 用户取消系统文件选择器时 destination 为空，不显示错误。
         if (destination != null) {
-            runAction(ActiveAttachmentAction.SAVE) {
-                exporter.export(currentPart.key, destination)
-                feedback("附件已保存")
+            if (requestedPart == null) {
+                feedback("保存请求已失效，请重新选择附件")
+            } else {
+                runAction(ActiveAttachmentAction.SAVE) {
+                    exporter.export(requestedPart, destination)
+                    feedback("附件已保存")
+                }
             }
         }
     }
@@ -109,7 +120,10 @@ fun MmsAttachmentActions(
         }
         TextButton(
             enabled = actionsEnabled,
-            onClick = { saveLauncher.launch(suggestedMmsAttachmentName(currentPart)) },
+            onClick = {
+                pendingSaveKey = encodePartKey(currentPart.key)
+                saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
+            },
         ) {
             Icon(Icons.Rounded.SaveAlt, contentDescription = null)
             Text("保存")
@@ -127,6 +141,18 @@ fun MmsAttachmentActions(
             Text("分享")
         }
     }
+}
+
+private fun encodePartKey(key: MmsPartKey): String =
+    "${key.message.transport.name}:${key.message.sourceId}:${key.partId}"
+
+private fun decodePartKey(value: String): MmsPartKey? {
+    val fields = value.split(':')
+    if (fields.size != 3) return null
+    val transport = runCatching { MessageTransport.valueOf(fields[0]) }.getOrNull() ?: return null
+    val messageId = fields[1].toLongOrNull() ?: return null
+    val partId = fields[2].toLongOrNull() ?: return null
+    return MmsPartKey(SourceMessageKey(transport, messageId), partId)
 }
 
 private fun openIntent(shared: SharedMmsAttachment): Intent = Intent(Intent.ACTION_VIEW).apply {

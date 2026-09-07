@@ -14,6 +14,7 @@ import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
@@ -62,7 +63,8 @@ class MmsAttachmentExporter(
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
     private val mirrorRoot = File(appContext.noBackupFilesDir, "message-mirror").canonicalFile
-    private val shareRoot = File(appContext.cacheDir, "mms-share").apply { mkdirs() }.canonicalFile
+    private val cacheRoot = appContext.cacheDir.canonicalFile
+    private val shareRoot = File(cacheRoot, "mms-share")
 
     suspend fun export(part: MmsPartKey, destination: Uri) = withContext(Dispatchers.IO) {
         val source = resolveFresh(part)
@@ -80,13 +82,16 @@ class MmsAttachmentExporter(
     }
 
     suspend fun prepareShare(part: MmsPartKey): SharedMmsAttachment = withContext(Dispatchers.IO) {
-        cleanupExpiredShares()
-        val source = resolveFresh(part)
-        val directory = File(shareRoot, UUID.randomUUID().toString()).canonicalFile
-        require(directory.parentFile == shareRoot) { "invalid_share_path" }
-        check(directory.mkdir()) { "share_directory_failed" }
-        activeShareDirectories += directory.path
+        var restrictedRoot: File? = null
+        var directory: File? = null
         try {
+            restrictedRoot = ensureShareRoot()
+            cleanupExpiredShares(restrictedRoot)
+            val source = resolveFresh(part)
+            directory = File(restrictedRoot, UUID.randomUUID().toString()).canonicalFile
+            require(directory.parentFile == restrictedRoot) { "invalid_share_path" }
+            Files.createDirectory(directory.toPath())
+            activeShareDirectories += directory.path
             val destination = File(directory, source.displayName).canonicalFile
             require(destination.parentFile == directory) { "invalid_share_path" }
             FileOutputStream(destination).use { output ->
@@ -102,20 +107,35 @@ class MmsAttachmentExporter(
             )
             SharedMmsAttachment(uri, source.sharedMimeType, source.displayName)
         } catch (cancelled: CancellationException) {
-            activeShareDirectories -= directory.path
-            deleteShareDirectory(directory)
+            directory?.let { failedDirectory ->
+                activeShareDirectories -= failedDirectory.path
+                restrictedRoot?.let { deleteShareDirectory(failedDirectory, it) }
+            }
             throw cancelled
         } catch (failure: MmsAttachmentExportException) {
-            activeShareDirectories -= directory.path
-            deleteShareDirectory(directory)
+            directory?.let { failedDirectory ->
+                activeShareDirectories -= failedDirectory.path
+                restrictedRoot?.let { deleteShareDirectory(failedDirectory, it) }
+            }
             throw failure
         } catch (failure: Throwable) {
-            activeShareDirectories -= directory.path
-            deleteShareDirectory(directory)
+            directory?.let { failedDirectory ->
+                activeShareDirectories -= failedDirectory.path
+                restrictedRoot?.let { deleteShareDirectory(failedDirectory, it) }
+            }
             throw classifyWriteFailure(failure)
         } finally {
-            activeShareDirectories -= directory.path
+            directory?.let { activeShareDirectories -= it.path }
         }
+    }
+
+    private fun ensureShareRoot(): File {
+        Files.createDirectories(shareRoot.toPath())
+        val canonical = shareRoot.canonicalFile
+        if (canonical.parentFile != cacheRoot || !canonical.isDirectory) {
+            throw IOException("invalid_share_root")
+        }
+        return canonical
     }
 
     private suspend fun resolveFresh(key: MmsPartKey): Source {
@@ -142,7 +162,7 @@ class MmsAttachmentExporter(
             return Source.FileSource(file, mimeType, displayName)
         }
         if (part.text != null && MmsMimeTypes.isText(kind)) {
-            return Source.InlineText(part.text, "$mimeType; charset=utf-8", displayName)
+            return Source.InlineText(part.text, mimeType, displayName)
         }
         if (part.attachment?.state == MirrorAttachmentState.READY) {
             throw MmsAttachmentExportException(MmsAttachmentFailureReason.SOURCE_MISSING)
@@ -209,22 +229,22 @@ class MmsAttachmentExporter(
         writer.flush()
     }
 
-    private suspend fun cleanupExpiredShares() {
+    private suspend fun cleanupExpiredShares(restrictedRoot: File) {
         currentCoroutineContext().ensureActive()
         val threshold = System.currentTimeMillis() - SHARE_MAX_AGE_MILLIS
-        shareRoot.listFiles()?.forEach { directory ->
+        restrictedRoot.listFiles()?.forEach { directory ->
             currentCoroutineContext().ensureActive()
             val canonical = runCatching { directory.canonicalFile }.getOrNull() ?: return@forEach
-            if (canonical.parentFile == shareRoot && canonical.path !in activeShareDirectories &&
+            if (canonical.parentFile == restrictedRoot && canonical.path !in activeShareDirectories &&
                 canonical.lastModified() < threshold) {
-                deleteShareDirectory(canonical)
+                deleteShareDirectory(canonical, restrictedRoot)
             }
         }
     }
 
-    private fun deleteShareDirectory(directory: File) {
+    private fun deleteShareDirectory(directory: File, restrictedRoot: File) {
         val canonical = runCatching { directory.canonicalFile }.getOrNull() ?: return
-        if (canonical.parentFile != shareRoot || canonical.path in activeShareDirectories) return
+        if (canonical.parentFile != restrictedRoot || canonical.path in activeShareDirectories) return
         canonical.listFiles()?.forEach { child ->
             if (runCatching { child.canonicalFile.parentFile == canonical }.getOrDefault(false)) child.delete()
         }

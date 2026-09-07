@@ -55,10 +55,11 @@ fun MmsFileCard(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val cardClickEnabled = interactionEnabled && (selectionMode || part.statusInfo().actionable)
     Surface(
         modifier = modifier
             .widthIn(max = 360.dp)
-            .clickable(enabled = interactionEnabled) {
+            .clickable(enabled = cardClickEnabled) {
                 if (selectionMode) onMessageClick() else onOpenPart(part.key)
             },
         shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
