@@ -23,6 +23,7 @@ import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMultipartResolver
 import vip.mystery0.pixel.text.domain.parser.mms.MmsSmilParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsHtmlParser
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduBody
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduParser
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
@@ -31,6 +32,7 @@ import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 class MmsContentRepositoryImpl(
     private val mirror: MessageMirrorRepository,
     private val reader: MmsPartReader,
+    private val htmlParser: MmsHtmlParser,
 ) : MmsContentRepository {
     private data class Entry(val fingerprint: String, val model: MmsContentModel, val bytes: Long)
 
@@ -118,8 +120,9 @@ class MmsContentRepositoryImpl(
         val subject = snapshot.decodedSubject ?: snapshot.subject
         val searchableText = buildString {
             subject?.takeIf { it.isNotBlank() }?.let { append(it) }
-            selection.parts.filter { it.kind == MmsContentKind.TEXT }.forEach { part ->
-                part.text?.takeIf { it.isNotBlank() }?.let {
+            selection.parts.filter { it.kind == MmsContentKind.TEXT || it.kind == MmsContentKind.HTML }.forEach { part ->
+                val text = if (part.kind == MmsContentKind.HTML && part.text != null) htmlParser.prepare(part, parts).plainText else part.text
+                text?.takeIf { it.isNotBlank() }?.let {
                     if (isNotEmpty()) append('\n')
                     append(it)
                 }
@@ -236,7 +239,7 @@ class MmsContentRepositoryImpl(
 
     private fun partContent(snapshot: MirrorMessageModel, part: MirrorPartModel): MmsPartContent {
         val kind = MmsMimeTypes.classify(part.mimeType)
-        val hasInlineText = part.text != null && MmsMimeTypes.isText(kind)
+        val hasInlineText = part.text != null && MmsMimeTypes.canExportInlineText(part.mimeType)
         return MmsPartContent(
             key = MmsPartKey(snapshot.key, part.sourceId), revision = snapshot.revision,
             kind = kind, mimeType = MmsMimeTypes.normalize(part.mimeType),

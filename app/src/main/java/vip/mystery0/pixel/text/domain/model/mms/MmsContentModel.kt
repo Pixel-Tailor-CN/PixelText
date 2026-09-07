@@ -48,7 +48,7 @@ data class MmsPresentationPage(val partIds: List<Long>, val durationMillis: Long
 
 /**
  * subject 优先使用镜像解码标题；parts 保留所有部件，包含未知类型。
- * summary 是短摘要；searchableText 为本层成功读取的普通文本，不包含 HTML/SMIL 源码。
+ * summary 是短摘要；searchableText 含普通文本及 HTML DOM 提取文本，不包含 HTML/SMIL 源码。
  * pendingDownload 表示消息或部件仍待下载；准备中的模型使用 summary=正在准备彩信内容。
  */
 data class MmsContentModel(

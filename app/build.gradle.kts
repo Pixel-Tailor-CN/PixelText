@@ -114,6 +114,8 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui.compose)
+    implementation(libs.jsoup)
+    implementation(libs.androidx.webkit)
 
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)

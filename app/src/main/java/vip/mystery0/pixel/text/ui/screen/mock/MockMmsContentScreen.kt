@@ -35,6 +35,8 @@ import vip.mystery0.pixel.text.ui.message.mms.MmsImageContent
 import vip.mystery0.pixel.text.ui.message.mms.MmsImageViewer
 import vip.mystery0.pixel.text.ui.message.mms.MmsMediaCard
 import vip.mystery0.pixel.text.ui.message.mms.MmsMediaViewer
+import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlCard
+import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlViewer
 
 /** 现有 Mock 页的本地消息入口，复用正式组件，不生成或修改消息。 */
 @Composable
@@ -51,6 +53,7 @@ fun MockMmsContentScreen(onBack: () -> Unit, repository: MmsContentRepository = 
         when (opened.kind) {
             MmsContentKind.IMAGE -> MmsImageViewer(opened, onBack = { openedPartId = null })
             MmsContentKind.AUDIO, MmsContentKind.VIDEO -> MmsMediaViewer(opened, onBack = { openedPartId = null })
+            MmsContentKind.HTML -> MmsHtmlViewer(opened, model?.parts.orEmpty(), onBack = { openedPartId = null })
             else -> MmsFileCard(opened)
         }
         return
@@ -71,6 +74,7 @@ fun MockMmsContentScreen(onBack: () -> Unit, repository: MmsContentRepository = 
                     when (part.kind) {
                         MmsContentKind.IMAGE -> MmsImageContent(part, onOpen = { openedPartId = part.key.partId })
                         MmsContentKind.AUDIO, MmsContentKind.VIDEO -> MmsMediaCard(part, onOpenPart = { openedPartId = it.partId })
+                        MmsContentKind.HTML -> MmsHtmlCard(part, onOpenPart = { openedPartId = it.partId })
                         else -> MmsFileCard(part)
                     }
                 }

@@ -161,7 +161,7 @@ class MmsAttachmentExporter(
             val file = localMirrorFile(localUri)
             return Source.FileSource(file, mimeType, displayName)
         }
-        if (part.text != null && MmsMimeTypes.isText(kind)) {
+        if (part.text != null && MmsMimeTypes.canExportInlineText(part.mimeType)) {
             return Source.InlineText(part.text, mimeType, displayName)
         }
         if (part.attachment?.state == MirrorAttachmentState.READY) {

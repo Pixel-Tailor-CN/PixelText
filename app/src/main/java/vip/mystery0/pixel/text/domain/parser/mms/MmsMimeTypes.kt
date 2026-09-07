@@ -18,6 +18,8 @@ object MmsMimeTypes {
             mime.startsWith("image/") -> MmsContentKind.IMAGE
             mime.startsWith("audio/") || mime in setOf("application/ogg", "application/x-ogg") -> MmsContentKind.AUDIO
             mime.startsWith("video/") -> MmsContentKind.VIDEO
+            // 网页样式/脚本只保留附件，不能作为普通正文参与摘要。
+            mime in setOf("text/css", "text/javascript", "text/ecmascript", "text/vbscript", "text/x-javascript") -> MmsContentKind.FILE
             mime.startsWith("text/") -> MmsContentKind.TEXT
             else -> MmsContentKind.FILE
         }
@@ -27,6 +29,9 @@ object MmsMimeTypes {
         MmsContentKind.TEXT, MmsContentKind.HTML, MmsContentKind.CONTACT,
         MmsContentKind.CALENDAR, MmsContentKind.SMIL,
     )
+
+    /** 可导出 Provider 内联字符串不等于可显示为正文，样式/脚本也保留 UTF-8 副本。 */
+    fun canExportInlineText(raw: String?): Boolean = normalize(raw).startsWith("text/") || isText(classify(raw))
 
     /** MIME 参数仅用于声明字符集，不修改原始镜像。 */
     fun charsetName(raw: String?): String? = raw?.split(';')?.drop(1)?.firstNotNullOfOrNull {
