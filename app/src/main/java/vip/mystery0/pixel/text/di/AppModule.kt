@@ -20,6 +20,8 @@ import vip.mystery0.pixel.text.data.repository.mms.MmsContentRepositoryImpl
 import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExporter
 import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
 import vip.mystery0.pixel.text.domain.parser.mms.MmsHtmlParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsContactParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsCalendarParser
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
@@ -131,11 +133,13 @@ val appModule = module {
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
     single { MmsPartReader() }
     single { MmsHtmlParser() }
+    single { MmsContactParser() }
+    single { MmsCalendarParser() }
     single { ImageLoader.Builder(androidContext()).components { add(AnimatedImageDecoder.Factory()) }.build() }
     single { MmsMediaMetadataReader(androidContext()) }
     single { MmsPlaybackController(androidContext(), get()) }
     single { MmsAttachmentExporter(androidContext(), get()) }
-    single { MmsContentRepositoryImpl(get(), get(), get()) }
+    single { MmsContentRepositoryImpl(get(), get(), get(), get(), get()) }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
         MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {

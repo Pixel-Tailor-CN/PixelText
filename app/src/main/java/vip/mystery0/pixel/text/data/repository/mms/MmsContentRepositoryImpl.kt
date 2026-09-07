@@ -24,6 +24,8 @@ import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMultipartResolver
 import vip.mystery0.pixel.text.domain.parser.mms.MmsSmilParser
 import vip.mystery0.pixel.text.domain.parser.mms.MmsHtmlParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsContactParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsCalendarParser
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduBody
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduParser
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
@@ -33,6 +35,8 @@ class MmsContentRepositoryImpl(
     private val mirror: MessageMirrorRepository,
     private val reader: MmsPartReader,
     private val htmlParser: MmsHtmlParser,
+    private val contactParser: MmsContactParser,
+    private val calendarParser: MmsCalendarParser,
 ) : MmsContentRepository {
     private data class Entry(val fingerprint: String, val model: MmsContentModel, val bytes: Long)
 
@@ -107,7 +111,33 @@ class MmsContentRepositoryImpl(
                 content.copy(text = result.text, byteCount = result.byteCount, issue = result.issue)
             } else content
         }
-        val parts = restoreMultipart(snapshot, decodedParts, budget)
+        val restoredParts = restoreMultipart(snapshot, decodedParts, budget)
+        val context = currentCoroutineContext()
+        val parts = restoredParts.map { part ->
+            context.ensureActive()
+            when {
+                part.kind == MmsContentKind.CONTACT && part.text != null -> part.copy(
+                    contacts = contactParser.parse(part.text) { context.ensureActive() }.map { contact ->
+                        val reference = contact.photoReference
+                        if (reference == null) contact else {
+                            val target = restoredParts.filter { candidate ->
+                                candidate.kind == MmsContentKind.IMAGE && candidate.localUri != null &&
+                                    candidate.byteCount?.let { it in 1..MmsContactParser.MAX_PHOTO_BYTES.toLong() } == true &&
+                                    if (reference.startsWith("cid:", true)) {
+                                        candidate.contentId?.trim()?.removeSurrounding("<", ">") == reference.substring(4)
+                                    } else candidate.contentLocation == reference
+                            }.singleOrNull()
+                            contact.copy(photoPartId = target?.key?.partId, photoReference = null,
+                                importWarning = contact.importWarning ?: if (target == null) "名片照片无法在本消息内读取，请核对原件" else null)
+                        }
+                    },
+                )
+                part.kind == MmsContentKind.CALENDAR && part.text != null -> part.copy(
+                    calendarEvents = calendarParser.parse(part.text) { context.ensureActive() },
+                )
+                else -> part
+            }
+        }
         val selection = MmsMultipartResolver().selectWithIssues(parts)
         val smilResults = parts.filter { it.kind == MmsContentKind.SMIL && it.text != null }.map {
             MmsSmilParser().parseWithIssues(it.text!!, parts)
@@ -294,7 +324,13 @@ class MmsContentRepositoryImpl(
             model.parts.sumOf { part ->
                 256L + size(part.mimeType) + size(part.displayName) + size(part.localUri) +
                     size(part.contentHash) + size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
-                    24L * part.childPartIds.size
+                    24L * part.childPartIds.size + part.contacts.sumOf { contact ->
+                        256L + size(contact.name) + size(contact.organization) + size(contact.title) + size(contact.notes) +
+                            size(contact.importWarning) + (contact.photoBytes?.size ?: 0) +
+                            (contact.phones + contact.emails + contact.addresses).sumOf { 64L + size(it.value) + size(it.label) }
+                    } + part.calendarEvents.sumOf { event ->
+                        256L + size(event.title) + size(event.location) + size(event.description) + size(event.recurrence) + size(event.importWarning)
+                    }
             }
     }
 

@@ -30,6 +30,7 @@ coil = "3.6.2"
 media3 = "1.11.0"
 jsoup = "1.23.2"
 webkit = "1.17.0"
+ezvcard = "0.12.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -65,6 +66,8 @@ media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", versi
 media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "media3" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
+
+ezvcard = { group = "com.googlecode.ez-vcard", name = "ez-vcard", version.ref = "ezvcard" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

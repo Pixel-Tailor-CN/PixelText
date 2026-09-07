@@ -115,6 +115,7 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui.compose)
     implementation(libs.jsoup)
+    implementation(libs.ezvcard)
     implementation(libs.androidx.webkit)
 
     implementation(libs.koin.android)

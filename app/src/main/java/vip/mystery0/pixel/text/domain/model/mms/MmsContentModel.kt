@@ -41,6 +41,9 @@ data class MmsPartContent(
     val multipartResolved: Boolean = false,
     /** 镜像原件的 SHA-256；附件更新可能不改变消息 revision。 */
     val contentHash: String? = null,
+    /** 后台派生的名片/事件；异常时保留带提示的模型和本 part 原件。 */
+    val contacts: List<MmsContactModel> = emptyList(),
+    val calendarEvents: List<MmsCalendarModel> = emptyList(),
 )
 
 /** SMIL 派生的顺序页；尚未解析展示结构时为空列表。 */

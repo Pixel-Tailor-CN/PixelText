@@ -37,6 +37,8 @@ import vip.mystery0.pixel.text.ui.message.mms.MmsMediaCard
 import vip.mystery0.pixel.text.ui.message.mms.MmsMediaViewer
 import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlCard
 import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlViewer
+import vip.mystery0.pixel.text.ui.message.mms.MmsContactCard
+import vip.mystery0.pixel.text.ui.message.mms.MmsCalendarCard
 
 /** 现有 Mock 页的本地消息入口，复用正式组件，不生成或修改消息。 */
 @Composable
@@ -75,6 +77,8 @@ fun MockMmsContentScreen(onBack: () -> Unit, repository: MmsContentRepository = 
                         MmsContentKind.IMAGE -> MmsImageContent(part, onOpen = { openedPartId = part.key.partId })
                         MmsContentKind.AUDIO, MmsContentKind.VIDEO -> MmsMediaCard(part, onOpenPart = { openedPartId = it.partId })
                         MmsContentKind.HTML -> MmsHtmlCard(part, onOpenPart = { openedPartId = it.partId })
+                        MmsContentKind.CONTACT -> MmsContactCard(part, model?.parts.orEmpty())
+                        MmsContentKind.CALENDAR -> MmsCalendarCard(part)
                         else -> MmsFileCard(part)
                     }
                 }
