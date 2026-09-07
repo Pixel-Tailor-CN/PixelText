@@ -40,7 +40,7 @@ fun MmsCalendarCard(
     val enabled = interactionEnabled && !selectionMode
     val feedback: (String) -> Unit = { onFeedback?.invoke(it) ?: Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     var confirmEvent by remember(part.key, part.contentHash, part.calendarEvents) { mutableStateOf<MmsCalendarModel?>(null) }
-    fun insert(event: MmsCalendarModel) = launchMmsStructuredIntent(context, calendarInsertIntent(event), feedback)
+    fun insert(event: MmsCalendarModel) = launchMmsStructuredIntent(context, feedback) { calendarInsertIntent(event) }
     confirmEvent?.let { event ->
         AlertDialog(onDismissRequest = { confirmEvent = null }, title = { Text("核对日历导入") },
             text = { Text("${event.importWarning}\n\n仅把卡片中的本次事件交给系统编辑，保存前请核对日期、时区与字段。") },

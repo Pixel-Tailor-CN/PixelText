@@ -40,9 +40,10 @@ internal fun contactInsertIntent(contact: MmsContactModel): Intent {
 }
 
 internal fun calendarInsertIntent(event: MmsCalendarModel): Intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
+    require(event.canImport)
     putExtra(CalendarContract.Events.TITLE, event.title ?: "未命名事件")
-    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.start!!.toEpochMilli())
-    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.end!!.toEpochMilli())
+    putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, requireNotNull(event.start).toEpochMilli())
+    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, requireNotNull(event.end).toEpochMilli())
     putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, event.allDay)
     putExtra(CalendarContract.Events.EVENT_TIMEZONE, event.zoneId)
     putExtra(CalendarContract.Events.EVENT_END_TIMEZONE, event.zoneId)
@@ -50,14 +51,20 @@ internal fun calendarInsertIntent(event: MmsCalendarModel): Intent = Intent(Inte
     putExtra(CalendarContract.Events.DESCRIPTION, event.description)
 }
 
-internal fun launchMmsStructuredIntent(context: Context, intent: Intent, feedback: (String) -> Unit) {
+internal fun launchMmsStructuredIntent(context: Context, intent: Intent, feedback: (String) -> Unit) =
+    launchMmsStructuredIntent(context, feedback) { intent }
+
+/** 把构造和启动放在同一保护范围，防止派生字段无法转换成系统参数。 */
+internal fun launchMmsStructuredIntent(context: Context, feedback: (String) -> Unit, createIntent: () -> Intent) {
     try {
-        context.startActivity(intent)
+        context.startActivity(createIntent())
     } catch (_: ActivityNotFoundException) {
         feedback("未找到可处理此操作的应用，可保存或打开原件")
     } catch (_: SecurityException) {
         feedback("系统不允许打开此操作，可保存或打开原件")
     } catch (_: IllegalArgumentException) {
         feedback("此字段无法交给系统应用，请核对原件")
+    } catch (_: ArithmeticException) {
+        feedback("日期或时长超出系统支持范围，请打开原件")
     }
 }

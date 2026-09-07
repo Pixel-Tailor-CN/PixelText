@@ -13,10 +13,16 @@ class MmsContactParser {
         val result = mutableListOf<MmsContactModel>()
         var lines: MutableList<String>? = null
         var nested = false
-        for (line in text.lineSequence()) {
+        for (line in unfoldMmsContentLines(text, quotedPrintable = true, checkCancelled)) {
             checkCancelled()
-            when (line.trim().uppercase(Locale.ROOT)) {
+            when (line.uppercase(Locale.ROOT)) {
                 "BEGIN:VCARD" -> {
+                    if (lines == null && result.size == MAX_CONTACTS) {
+                        val last = result.last()
+                        result[result.lastIndex] = last.copy(importWarning = listOfNotNull(last.importWarning,
+                            "最多展示 $MAX_CONTACTS 位联系人，其余内容请打开原件").joinToString("；"))
+                        break
+                    }
                     if (lines != null) nested = true else lines = mutableListOf(line)
                 }
                 "END:VCARD" -> {
@@ -25,10 +31,6 @@ class MmsContactParser {
                     result += if (nested) failed("嵌套名片无法完整读取，请打开原件") else parseOne(block, checkCancelled)
                     lines = null
                     nested = false
-                    if (result.size >= MAX_CONTACTS) {
-                        result[result.lastIndex] = result.last().copy(importWarning = "最多展示 $MAX_CONTACTS 位联系人，其余内容请打开原件")
-                        break
-                    }
                 }
                 else -> lines?.add(line)
             }
@@ -41,18 +43,13 @@ class MmsContactParser {
         // 仅把本任务支持的属性交给库，避免 AGENT 嵌套解析及无关二进制扩展。
         val accepted = setOf("BEGIN", "END", "VERSION", "FN", "N", "ORG", "TEL", "EMAIL", "ADR", "LABEL", "TITLE", "NOTE", "PHOTO")
         val filtered = mutableListOf<String>()
-        var keep = false
         var incomplete = false
         var propertyCount = 0
         lines.forEach { line ->
             checkCancelled()
-            if (line.startsWith(' ') || line.startsWith('\t') || (filtered.lastOrNull()?.endsWith('=') == true && keep)) {
-                if (keep) filtered += line
-            } else {
-                val name = line.substringBefore(':').substringBefore(';').substringAfterLast('.').uppercase(Locale.ROOT)
-                keep = name in accepted && ++propertyCount <= 512
-                if (keep) filtered += line else if (line.isNotBlank()) incomplete = true
-            }
+            val name = line.substringBefore(':').substringBefore(';').substringAfterLast('.').uppercase(Locale.ROOT)
+            val keep = name in accepted && ++propertyCount <= 512
+            if (keep) filtered += line else if (line.isNotBlank()) incomplete = true
         }
         VCardReader(filtered.joinToString("\r\n")).use { reader ->
             reader.defaultQuotedPrintableCharset = Charsets.UTF_8

@@ -20,13 +20,7 @@ class MmsCalendarParser {
 
     fun parse(text: String, checkCancelled: () -> Unit = {}): List<MmsCalendarModel> {
         if (text.length > 512 * 1024) return listOf(failed("日历过大，请打开原件"))
-        val unfolded = mutableListOf<String>()
-        text.lineSequence().forEach { line ->
-            checkCancelled()
-            if ((line.startsWith(' ') || line.startsWith('\t')) && unfolded.isNotEmpty()) {
-                unfolded[unfolded.lastIndex] += line.drop(1)
-            } else unfolded += line
-        }
+        val unfolded = unfoldMmsContentLines(text, checkCancelled = checkCancelled).toList()
         val result = mutableListOf<MmsCalendarModel>()
         val hasTimezoneDefinition = unfolded.any { it.equals("BEGIN:VTIMEZONE", true) }
         var properties: MutableList<Property>? = null
@@ -40,6 +34,12 @@ class MmsCalendarParser {
                 continue
             }
             if (property.name == "BEGIN" && property.value.equals("VEVENT", true)) {
+                if (properties == null && result.size == 32) {
+                    val last = result.last()
+                    result[result.lastIndex] = last.copy(importWarning = listOfNotNull(last.importWarning,
+                        "最多展示 32 个事件，其余事件请打开原件").joinToString("；"))
+                    break
+                }
                 if (properties != null) incomplete = true
                 else { properties = mutableListOf(); nested = 0; incomplete = false }
             } else if (properties != null) {
@@ -47,10 +47,6 @@ class MmsCalendarParser {
                     property.name == "END" && property.value.equals("VEVENT", true) -> {
                         result += parseEvent(properties, incomplete, hasTimezoneDefinition)
                         properties = null
-                        if (result.size >= 32) {
-                            result[result.lastIndex] = result.last().copy(importWarning = "最多展示 32 个事件，其余事件请打开原件")
-                            break
-                        }
                     }
                     property.name == "BEGIN" -> { nested++; incomplete = true }
                     property.name == "END" -> { nested--; incomplete = true }
@@ -104,9 +100,13 @@ class MmsCalendarParser {
                 else -> start.value.toInstant()
             }
             if (end < start.value.toInstant() || (start.allDay && end == start.value.toInstant())) error("invalid end")
+            // 系统日历使用 Long 毫秒，java.time 能表示的日期范围更大。
+            start.value.toInstant().toEpochMilli()
+            end.toEpochMilli()
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
             valid = false
+            end = null
             warnings += "日期、时区或时长无法可靠读取，请打开原件"
         }
         return MmsCalendarModel(title, start?.value?.toInstant(), end, start?.value?.zone?.id, start?.allDay ?: false,
@@ -132,8 +132,11 @@ class MmsCalendarParser {
 
     private fun addDuration(start: EventTime, value: String): ZonedDateTime {
         val match = DURATION.matchEntire(value) ?: error("invalid duration")
-        val weeks = match.groupValues[1].toLongOrNull() ?: 0
-        val days = match.groupValues[2].toLongOrNull() ?: 0
+        fun amount(index: Int): Long = match.groupValues[index].let {
+            if (it.isEmpty()) 0L else it.toLongOrNull() ?: error("duration amount overflow")
+        }
+        val weeks = amount(1)
+        val days = amount(2)
         val time = match.groupValues[3]
         if (weeks == 0L && days == 0L && time.isEmpty()) error("empty duration")
         if (start.allDay && time.isNotEmpty()) error("date duration contains time")
