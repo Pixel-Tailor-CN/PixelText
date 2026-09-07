@@ -38,6 +38,11 @@ class MmsDownloadCoordinator(
             val previous = requests.getString(key, null)?.let(::JSONObject)
             if (previous?.optString("phase") == "downloading" &&
                 System.currentTimeMillis() - previous.optLong("started") < REQUEST_TIMEOUT) return@withLock
+            if (previous?.optString("phase") == "parse_failed") {
+                // 自动恢复不重复解析确定被拒绝的原件；用户可在更新解析器后重试本地解析。
+                if (userInitiated) persist(key, previous)
+                return@withLock
+            }
             if (previous?.optString("phase") in setOf("persisting", "save_failed")) {
                 requireNotNull(previous)
                 persist(key, previous)
@@ -122,9 +127,8 @@ class MmsDownloadCoordinator(
                 } else if (record.optString("phase") == "downloading" &&
                     System.currentTimeMillis() - record.optLong("started") >= REQUEST_TIMEOUT) {
                     val downloaded = File(root, "${record.getString("token")}.pdu")
-                    if (downloaded.length() in 1..MAX_PDU_BYTES && runCatching {
-                            RetrieveConfParser.parse(downloaded.readBytes())
-                        }.isSuccess) {
+                    if (downloaded.length() > 0) {
+                        // 超时不能证明原件无价值；统一进入保留解析失败原件的持久化边界。
                         record.put("phase", "persisting")
                         requests.edit().putString(key, record.toString()).commit()
                         try { persist(key, record) } catch (cancelled: CancellationException) { throw cancelled }
@@ -145,14 +149,18 @@ class MmsDownloadCoordinator(
             if (writer.exists(key.toLong())) {
                 val file = File(root, "$token.pdu")
                 // 限制解析器内存上界，过大内容明确失败，不能截断为成功消息。
-                if (file.length() !in 1..MAX_PDU_BYTES) {
+                if (file.length() == 0L) {
                     fail(key, record)
+                    return
+                }
+                if (file.length() > MAX_PDU_BYTES) {
+                    retainParseFailure(key, record)
                     return
                 }
                 val bytes = file.readBytes()
                 val parsed = try { RetrieveConfParser.parse(bytes) }
-                catch (_: IllegalArgumentException) { fail(key, record); return }
-                catch (_: IllegalStateException) { fail(key, record); return }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: RuntimeException) { retainParseFailure(key, record); return }
                 vip.mystery0.pixel.text.data.repository.mirror.MirrorSynchronizationLock.mutex.withLock {
                     val original = record.optJSONArray("original_addresses")
                     val addressIds = if (original == null) emptyList() else (0 until original.length()).map(original::getLong)
@@ -174,6 +182,14 @@ class MmsDownloadCoordinator(
             requests.edit().putString(key, record.toString()).commit()
             throw error
         }
+    }
+
+    private fun retainParseFailure(key: String, record: JSONObject) {
+        // 下载原件已存在，解析拒绝不能删除它或伪装成尚未下载。
+        // 此状态不参加后台自动重试；源消息删除仍由 recover 清理文件和日志。
+        record.put("phase", "parse_failed")
+        check(requests.edit().putString(key, record.toString()).commit()) { "mms parse state unavailable" }
+        revokeFile(record.getString("token"))
     }
 
     private fun fail(key: String, record: JSONObject) {

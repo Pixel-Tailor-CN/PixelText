@@ -872,6 +872,17 @@ public class PduParser {
     }
 
     private PduBody parseParts(ByteArrayInputStream input, int depth, MultipartBudget budget) {
+        try {
+            return parsePartsChecked(input, depth, budget);
+        } catch (java.util.concurrent.CancellationException cancelled) {
+            throw cancelled;
+        } catch (RuntimeException malformed) {
+            // 包含叶子解码异常；父容器可保留原件并继续外层兄弟项，不返还共享预算。
+            return null;
+        }
+    }
+
+    private PduBody parsePartsChecked(ByteArrayInputStream input, int depth, MultipartBudget budget) {
         if (depth > 8 || input == null || budget.exhausted) return null;
         int count = parseUnsignedInt(input);
         if (count < 0 || count > input.available() / 2) return null;
@@ -908,6 +919,8 @@ public class PduParser {
                 if (headerInput.available() > 0
                         && !parsePartHeaders(headerInput, part, headerInput.available())) return null;
                 if (headerInput.available() != 0) return null;
+            } catch (java.util.concurrent.CancellationException cancelled) {
+                throw cancelled;
             } catch (RuntimeException malformed) {
                 return null;
             }

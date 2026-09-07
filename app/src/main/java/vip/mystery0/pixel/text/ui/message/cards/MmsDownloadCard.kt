@@ -40,6 +40,7 @@ fun MmsDownloadCard(mmsId: Long) {
                 phase == "persisting" -> "正在保存彩信"
                 busy -> "正在下载彩信"
                 phase == "save_failed" -> "彩信已下载，保存失败，可重试保存"
+                phase == "parse_failed" -> "彩信已下载，暂时无法解析，原件已保留"
                 phase == "failed" -> "彩信下载失败"
                 else -> "彩信尚未下载"
             })
@@ -60,7 +61,7 @@ fun MmsDownloadCard(mmsId: Long) {
                         submitting = false
                     }
                 }
-            }) { Text(when (phase) { "save_failed" -> "重试保存"; "failed" -> "重试"; else -> "下载" }) }
+            }) { Text(when (phase) { "parse_failed" -> "重试解析"; "save_failed" -> "重试保存"; "failed" -> "重试"; else -> "下载" }) }
         }
     }
 }

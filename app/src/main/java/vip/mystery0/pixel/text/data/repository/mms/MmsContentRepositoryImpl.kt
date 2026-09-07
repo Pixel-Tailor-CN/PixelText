@@ -199,10 +199,13 @@ class MmsContentRepositoryImpl(
                 problems[id] = read.issue ?: "multipart_unresolved"
                 continue
             }
-            val body = PduParser.parseMultipart(read.bytes, parseBudget)
+            val body = try { PduParser.parseMultipart(read.bytes, parseBudget) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: RuntimeException) { null }
             currentCoroutineContext().ensureActive()
             val staged = mutableMapOf<Long, List<Long>>()
-            if (body == null || !match(body, id, staged, emptySet())) problems[id] = "multipart_ambiguous"
+            if (body == null) problems[id] = "multipart_invalid"
+            else if (!match(body, id, staged, emptySet())) problems[id] = "multipart_ambiguous"
             else relations.putAll(staged)
         }
         val children = relations.values.flatten()
