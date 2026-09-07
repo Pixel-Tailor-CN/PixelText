@@ -120,8 +120,9 @@ fun MmsHtmlViewer(
 
                                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                                         val url = request.url.toString()
-                                        if (request.isForMainFrame && request.hasGesture() && !request.isRedirect && url in themed.externalLinks) {
-                                            pendingLink = url
+                                        val target = themed.externalLinks[url]
+                                        if (request.isForMainFrame && request.hasGesture() && !request.isRedirect && target != null) {
+                                            pendingLink = target
                                         }
                                         return true
                                     }

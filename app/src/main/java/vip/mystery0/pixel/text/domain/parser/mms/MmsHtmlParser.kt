@@ -17,7 +17,8 @@ data class MmsHtmlDocument(
     val resourceMap: Map<String, MmsPartKey>,
     val origin: String,
     val documentUrl: String,
-    val externalLinks: Set<String>,
+    /** 应用生成的导航标识 → 已校验的原目标，不依赖浏览器对来信 URL 的规范化。 */
+    val externalLinks: Map<String, String>,
     /** 只记录分类与数量，不暴露未解析的原始引用。 */
     val unresolvedReferenceCount: Int,
     val issue: String? = null,
@@ -32,7 +33,7 @@ class MmsHtmlParser {
         // 在构建 DOM 前限制输入；jsoup 在建树时限制栈深度，非事后裁剪。
         val input = part.text.orEmpty()
         if (input.length > MAX_HTML_CHARACTERS) return MmsHtmlDocument(
-            "", "", emptyMap(), origin, documentUrl, emptySet(), 0, "html_too_large",
+            "", "", emptyMap(), origin, documentUrl, emptyMap(), 0, "html_too_large",
         )
         val source = Jsoup.parse(input, "", Parser.htmlParser().setMaxDepth(64))
         // 来信样式全部丢弃，避免 CSS URL、导入、覆盖控件和隐藏内容。
@@ -45,7 +46,7 @@ class MmsHtmlParser {
             .addAttributes("td", "colspan", "rowspan").addAttributes("th", "colspan", "rowspan")
         val doc = Cleaner(safe).clean(source)
         val resources = linkedMapOf<String, MmsPartKey>()
-        val links = linkedSetOf<String>()
+        val links = linkedMapOf<String, String>()
         var unresolved = 0
         val messageParts = allParts.filter { it.key.message == part.key.message && it.mimeType in IMAGE_TYPES }
         val baseLocation = relativeLocation(part.contentLocation.orEmpty())
@@ -76,8 +77,10 @@ class MmsHtmlParser {
             val web = uri?.scheme?.lowercase() in setOf("http", "https") && !uri?.host.isNullOrBlank() && uri.rawUserInfo == null
             val system = uri?.scheme?.lowercase() in setOf("tel", "mailto") && !uri?.rawSchemeSpecificPart.isNullOrBlank()
             if (uri != null && (web || system)) {
-                anchor.attr("href", uri.toASCIIString())
-                links += uri.toASCIIString()
+                // 固定小写来源与非空路径由应用构造，不将外部目标交给 WebView 规范化。
+                val navigationUrl = "$origin${path}link/${links.size}"
+                anchor.attr("href", navigationUrl)
+                links[navigationUrl] = uri.toASCIIString()
             } else anchor.removeAttr("href")
         }
         doc.select("td,th").forEach { cell ->
@@ -100,7 +103,7 @@ class MmsHtmlParser {
         doc.head().appendElement("meta").attr("name", "viewport").attr("content", "width=device-width, initial-scale=1")
         doc.head().appendElement("meta").attr("name", "referrer").attr("content", "no-referrer")
         doc.head().appendElement("style").attr("nonce", token).appendChild(DataNode(STYLE))
-        return MmsHtmlDocument(doc.outerHtml(), plainText, resources.toMap(), origin, documentUrl, links.toSet(), unresolved)
+        return MmsHtmlDocument(doc.outerHtml(), plainText, resources.toMap(), origin, documentUrl, links.toMap(), unresolved)
     }
 
     /** 拒绝协议、绝对路径、反斜线及越过消息目录的相对路径。 */
