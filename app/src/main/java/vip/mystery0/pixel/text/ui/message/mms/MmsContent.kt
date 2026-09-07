@@ -11,6 +11,7 @@ import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.domain.model.mms.*
@@ -24,8 +25,8 @@ fun MmsContent(
     interactionEnabled: Boolean,
     onOpenPart: (MmsPartKey) -> Unit,
     selectionMode: Boolean = false,
-    onMessageClick: () -> Unit = {},
-    onLongClick: () -> Unit = {},
+    onMessageClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     var originals by rememberSaveable(model.key.sourceId) { mutableStateOf(false) }
     val controller: MmsPlaybackController = koinInject()
@@ -36,7 +37,8 @@ fun MmsContent(
     Surface(color = color, contentColor = textColor, shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().semantics {
             selected = isSelected
-            if (interactionEnabled) onLongClick("选择彩信") { longClick(); true }
+            if (interactionEnabled && longClick != null) onLongClick("选择彩信") { longClick?.invoke(); true }
+            if (interactionEnabled && selectionMode && click != null) onClick("切换选择") { click?.invoke(); true }
         }.pointerInput(selectionMode, interactionEnabled) {
             // 初始阶段观察长按，达到阈值才消费；普通附件点击仍只交给一个子控件。
             awaitEachGesture {
@@ -53,16 +55,16 @@ fun MmsContent(
                     }
                     true
                 }
-                if (up == null && !moved && interactionEnabled) {
-                    longClick()
+                if (up == null && !moved && interactionEnabled && longClick != null) {
+                    longClick?.invoke()
                     do { val event = awaitPointerEvent(PointerEventPass.Initial); event.changes.forEach { it.consume() }
                     } while (event.changes.any { it.pressed })
-                } else if (up == true && !moved && selectionMode && interactionEnabled) click()
+                } else if (up == true && !moved && selectionMode && interactionEnabled) click?.invoke()
             }
         }) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             model.subject?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            if (model.pendingDownload) MmsDownloadCard(model.key.sourceId)
+            if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode)
             if (model.issues.isNotEmpty()) Text("彩信结构或资源引用不完整，已按可用附件显示；全部原件仍可查看", style = MaterialTheme.typography.bodySmall)
             if (model.preparing) Text(model.summary)
             else if (model.pages.isNotEmpty()) {

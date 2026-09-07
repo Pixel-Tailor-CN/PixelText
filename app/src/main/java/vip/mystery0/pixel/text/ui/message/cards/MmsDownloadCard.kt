@@ -21,7 +21,7 @@ import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 @Composable
-fun MmsDownloadCard(mmsId: Long) {
+fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true) {
     val downloads = koinInject<MmsDownloadCoordinator>()
     val scope = rememberCoroutineScope()
     var phase by remember(mmsId) { mutableStateOf(downloads.state(mmsId)) }
@@ -44,7 +44,7 @@ fun MmsDownloadCard(mmsId: Long) {
                 phase == "failed" -> "彩信下载失败"
                 else -> "彩信尚未下载"
             })
-            TextButton(enabled = !busy, onClick = {
+            TextButton(enabled = interactionEnabled && !busy, onClick = {
                 submitting = true
                 error = null
                 scope.launch {

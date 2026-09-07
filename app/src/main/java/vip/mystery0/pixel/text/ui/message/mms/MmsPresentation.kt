@@ -19,15 +19,16 @@ import vip.mystery0.pixel.text.domain.model.mms.*
 fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPartKey) -> Unit,
     controller: MmsPlaybackController) {
     var page by rememberSaveable(model.key.sourceId) { mutableIntStateOf(0) }
-    var playing by remember { mutableStateOf(false) }
+    var request by remember { mutableStateOf<MmsPlaybackController.PresentationRequest?>(null) }
+    val playing = request != null
     var visible by remember { mutableStateOf(true) }
     val presentationOwner by controller.presentation.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val pages = model.pages
     val currentPage = page.coerceIn(pages.indices)
     fun stop() {
-        playing = false
-        controller.endPresentation(model.key)
+        request?.let(controller::endPresentation)
+        request = null
         if (controller.state.value.partKey?.message == model.key) controller.stop()
     }
     DisposableEffect(lifecycle, model.key) {
@@ -35,24 +36,26 @@ fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPa
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); stop() }
     }
-    LaunchedEffect(presentationOwner) { if (presentationOwner != model.key) playing = false }
+    LaunchedEffect(presentationOwner) { if (presentationOwner != request) request = null }
     LaunchedEffect(enabled, visible, model.revision) { if (!enabled || !visible) stop() }
-    LaunchedEffect(playing, pages) {
-        if (!playing) return@LaunchedEffect
+    LaunchedEffect(request, pages) {
+        val activeRequest = request ?: return@LaunchedEffect
         for (index in currentPage..pages.lastIndex) {
-            if (controller.presentation.value != model.key) break
-            controller.stop()
+            if (!controller.ownsPresentation(activeRequest)) return@LaunchedEffect
+            controller.stopPresentationMedia(activeRequest)
             page = index
             val media = pages[index].partIds.mapNotNull { id -> model.parts.firstOrNull { it.key.partId == id } }
                 .filter { it.kind == MmsContentKind.AUDIO || it.kind == MmsContentKind.VIDEO }
             if (media.isEmpty()) delay(pages[index].durationMillis)
             else for (part in media) {
-                controller.play(part)
+                if (!controller.ownsPresentation(activeRequest)) return@LaunchedEffect
+                controller.playPresentation(activeRequest, part)
                 delay((pages[index].durationMillis / media.size).coerceAtLeast(100))
-                controller.stop()
+                controller.stopPresentationMedia(activeRequest)
             }
         }
-        stop()
+        controller.endPresentation(activeRequest)
+        if (request == activeRequest) request = null
     }
     Column(Modifier.onGloballyPositioned { val bounds = it.boundsInWindow(); visible = bounds.width > 0 && bounds.height > 0 },
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -70,6 +73,6 @@ fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPa
             TextButton(enabled = enabled && currentPage > 0, onClick = { stop(); page = currentPage - 1 }) { Text("上一页") }
             TextButton(enabled = enabled && currentPage < pages.lastIndex, onClick = { stop(); page = currentPage + 1 }) { Text("下一页") }
         }
-        Button(enabled = enabled, onClick = { if (playing) stop() else { controller.beginPresentation(model.key); playing = true } }) { Text(if (playing) "停止顺序播放" else "顺序播放") }
+        Button(enabled = enabled, onClick = { if (playing) stop() else { request = controller.beginPresentation(model.key) } }) { Text(if (playing) "停止顺序播放" else "顺序播放") }
     }
 }

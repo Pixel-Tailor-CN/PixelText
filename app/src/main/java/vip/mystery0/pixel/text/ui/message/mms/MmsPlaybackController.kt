@@ -61,12 +61,29 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
     private val main = Handler(Looper.getMainLooper())
     private val mutableState = MutableStateFlow(MmsPlaybackState())
     val state: StateFlow<MmsPlaybackState> = mutableState.asStateFlow()
-    private val mutablePresentation = MutableStateFlow<SourceMessageKey?>(null)
-    val presentation: StateFlow<SourceMessageKey?> = mutablePresentation.asStateFlow()
-    fun beginPresentation(key: SourceMessageKey) { checkMainThread(); stop(); mutablePresentation.value = key }
-    fun endPresentation(key: SourceMessageKey) {
+    data class PresentationRequest(val message: SourceMessageKey, val serial: Long)
+    private var requestSerial = 0L
+    private var mediaRequest = 0L
+    private val mutablePresentation = MutableStateFlow<PresentationRequest?>(null)
+    val presentation: StateFlow<PresentationRequest?> = mutablePresentation.asStateFlow()
+    fun beginPresentation(key: SourceMessageKey): PresentationRequest {
         checkMainThread()
-        if (mutablePresentation.value == key) { mutablePresentation.value = null; stop() }
+        stop()
+        return PresentationRequest(key, ++requestSerial).also { mutablePresentation.value = it }
+    }
+    fun ownsPresentation(request: PresentationRequest) = mutablePresentation.value == request
+    fun endPresentation(request: PresentationRequest) {
+        checkMainThread()
+        if (ownsPresentation(request)) stop()
+    }
+    /** 调度只提交仍持有身份的请求；用户操作会立即撤销身份。 */
+    fun playPresentation(request: PresentationRequest, part: MmsPartContent) {
+        checkMainThread()
+        if (ownsPresentation(request)) playCurrent(part)
+    }
+    fun stopPresentationMedia(request: PresentationRequest) {
+        checkMainThread()
+        if (ownsPresentation(request)) stopCurrent()
     }
     private val mutablePlayer = MutableStateFlow<ExoPlayer?>(null)
     val player: StateFlow<ExoPlayer?> = mutablePlayer.asStateFlow()
@@ -112,6 +129,12 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
 
     fun play(part: MmsPartContent) {
         checkMainThread()
+        mutablePresentation.value = null
+        playCurrent(part)
+    }
+
+    private fun playCurrent(part: MmsPartContent) {
+        checkMainThread()
         val player = mutablePlayer.value ?: return
         if (!foreground) return
         val uri = localMmsUri(part.localUri)
@@ -122,7 +145,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
             return
         }
         if (contentKey != part.mediaCacheKey() || player.playerError != null) {
-            stop()
+            stopCurrent()
             contentKey = part.mediaCacheKey()
             mutableState.value = MmsPlaybackState(partKey = part.key)
             // 仅使用渐进式本地媒体；不根据扩展名或 MIME 启用 HLS/DASH 等清单网络源。
@@ -130,9 +153,11 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
                 .createMediaSource(MediaItem.fromUri(uri))
             player.setMediaSource(source)
             player.prepare()
+            val request = mediaRequest
             sourceObservation = scope?.launch {
                 mirror.observeMessage(part.key.message).collect { message ->
                     val attachment = message?.parts?.firstOrNull { it.sourceId == part.key.partId }?.attachment
+                    if (request != mediaRequest) return@collect
                     if (attachment == null || attachment.state != MirrorAttachmentState.READY ||
                         attachment.localUri != part.localUri || attachment.sha256 != part.contentHash) {
                         stop()
@@ -141,13 +166,15 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
                 }
             }
         } else if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
+        if (contentKey != part.mediaCacheKey() || !foreground) return
         player.play()
         updateState()
     }
 
-    fun pause() { checkMainThread(); mutablePlayer.value?.pause(); updateState() }
+    fun pause() { checkMainThread(); mutablePresentation.value = null; mutablePlayer.value?.pause(); updateState() }
     fun seekTo(positionMillis: Long) {
         checkMainThread()
+        mutablePresentation.value = null
         mutablePlayer.value?.let { player ->
             if (player.isCurrentMediaItemSeekable) player.seekTo(positionMillis.coerceIn(0, player.duration.coerceAtLeast(0)))
         }
@@ -156,6 +183,13 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
 
     fun stop() {
         checkMainThread()
+        mutablePresentation.value = null
+        stopCurrent()
+    }
+
+    private fun stopCurrent() {
+        checkMainThread()
+        mediaRequest++
         sourceObservation?.cancel()
         sourceObservation = null
         mutablePlayer.value?.let { it.stop(); it.clearMediaItems() }
