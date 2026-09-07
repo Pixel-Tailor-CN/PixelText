@@ -39,11 +39,9 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
         currentCoroutineContext().ensureActive()
         part.text?.let { inline ->
             // Provider 已解码的字符串无需按声明再次编码；按 UTF-8 字节计费，避免巨型临时数组。
-            val count = inlineUtf8Size(inline, minOf(MAX_TEXT_BYTES, budget.remaining))
-            if (count == null) return@withContext TextResult(null, part.attachment?.byteCount, "too_large")
-            if (count < 0) return@withContext TextResult(null, part.attachment?.byteCount, "invalid_encoding")
-            budget.consume(count)
-            return@withContext TextResult(inline.removePrefix("\uFEFF"), part.attachment?.byteCount ?: count.toLong(), null)
+            val result = inlineUtf8Size(inline, budget)
+            if (result.issue != null) return@withContext TextResult(null, part.attachment?.byteCount, result.issue)
+            return@withContext TextResult(inline.removePrefix("\uFEFF"), part.attachment?.byteCount ?: result.byteCount.toLong(), null)
         }
         val attachment = part.attachment
         if (attachment?.state != MirrorAttachmentState.READY || attachment.localUri == null) {
@@ -127,22 +125,33 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
     private fun ByteArray.startsWith(vararg prefix: Int): Boolean = size >= prefix.size &&
         prefix.indices.all { (this[it].toInt() and 0xFF) == prefix[it] }
 
-    private suspend fun inlineUtf8Size(text: String, limit: Int): Int? {
+    private data class InlineSizeResult(val byteCount: Int, val issue: String?)
+
+    private suspend fun inlineUtf8Size(text: String, budget: Budget): InlineSizeResult {
         var count = 0
         var index = 0
         while (index < text.length) {
             if (index % 4096 == 0) currentCoroutineContext().ensureActive()
+            // 字符串长度已知，无需越界探测；耗尽预算后不再读取下一个字符。
+            val available = minOf(MAX_TEXT_BYTES - count, budget.remaining)
+            if (available == 0) return InlineSizeResult(count, "too_large")
             val char = text[index++]
-            count += when {
+            val pairedSurrogate = char.isHighSurrogate() && index < text.length && text[index].isLowSurrogate()
+            val width = when {
                 char.code < 0x80 -> 1
                 char.code < 0x800 -> 2
-                char.isHighSurrogate() && index < text.length && text[index].isLowSurrogate() -> { index++; 4 }
-                char.isSurrogate() -> return -1
+                pairedSurrogate -> 4
                 else -> 3
             }
-            if (count > limit) return null
+            // 失败路径同样扣费；损坏代理位按三字节处理预算计费，不生成替换正文。
+            val consumed = minOf(width, available)
+            budget.consume(consumed)
+            count += consumed
+            if (consumed < width) return InlineSizeResult(count, "too_large")
+            if (char.isSurrogate() && !pairedSurrogate) return InlineSizeResult(count, "invalid_encoding")
+            if (pairedSurrogate) index++
         }
-        return count
+        return InlineSizeResult(count, null)
     }
 
     fun issueFor(part: MirrorPartModel): String? = when (part.attachment?.state) {

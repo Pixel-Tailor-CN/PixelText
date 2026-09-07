@@ -108,6 +108,7 @@ val appModule = module {
     single { MmsDownloadCoordinator(androidContext(), get()) }
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
+            onMessageDeletionCommitted = { key -> get<MmsContentRepositoryImpl>().invalidate(key) }
             onMessageDeleted = { key ->
                 get<MmsContentRepositoryImpl>().invalidate(key)
                 val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
