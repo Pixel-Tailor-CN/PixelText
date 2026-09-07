@@ -51,6 +51,8 @@ data class MmsPlaybackState(
     val durationMillis: Long = 0,
     val error: String? = null,
     val isBuffering: Boolean = false,
+    /** 播放或缓冲中的播放意图；空闲、结束和出错时不提供暂停动作。 */
+    val playRequested: Boolean = false,
 )
 
 /** 全应用单播放器；查看页持有会话，列表卡片不创建或准备播放器。所有播放操作在主线程。 */
@@ -80,7 +82,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
             addListener(object : Player.Listener {
                 override fun onEvents(player: Player, events: Player.Events) = updateState()
                 override fun onPlayerError(error: PlaybackException) {
-                    mutableState.value = mutableState.value.copy(isPlaying = false, isBuffering = false,
+                    mutableState.value = mutableState.value.copy(isPlaying = false, isBuffering = false, playRequested = false,
                         error = "无法播放此附件：文件损坏或设备不支持其编码，可保存原件后使用其他应用打开")
                 }
             })
@@ -133,6 +135,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
             }
         } else if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
         player.play()
+        updateState()
     }
 
     fun pause() { checkMainThread(); mutablePlayer.value?.pause(); updateState() }
@@ -175,6 +178,8 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
             positionMillis = player.currentPosition.coerceAtLeast(0),
             durationMillis = player.duration.coerceAtLeast(0),
             isBuffering = player.playbackState == Player.STATE_BUFFERING,
+            playRequested = player.playWhenReady && player.playerError == null &&
+                (player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY),
         )
     }
 

@@ -58,6 +58,7 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
     val playback by controller.state.collectAsState()
     val player by controller.player.collectAsState()
     val selected = playback.partKey == part.key
+    val showPause = selected && playback.playRequested
     var dragPosition by remember(part.mediaCacheKey()) { mutableStateOf<Float?>(null) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (part.kind == MmsContentKind.VIDEO) {
@@ -82,8 +83,8 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
         Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(enabled = part.statusInfo().actionable, onClick = {
-                if (selected && (playback.isPlaying || playback.isBuffering)) controller.pause() else controller.play(part)
-            }) { Text(if (selected && (playback.isPlaying || playback.isBuffering)) "暂停" else "播放") }
+                if (showPause) controller.pause() else controller.play(part)
+            }) { Text(if (showPause) "暂停" else "播放") }
             TextButton(enabled = selected, onClick = controller::stop) { Text("停止") }
         }
     }
