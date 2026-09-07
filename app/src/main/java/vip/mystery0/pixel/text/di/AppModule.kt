@@ -13,6 +13,7 @@ import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorRepositoryImpl
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.data.repository.mms.MmsContentRepositoryImpl
+import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExporter
 import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
@@ -121,6 +122,7 @@ val appModule = module {
     }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
     single { MmsPartReader() }
+    single { MmsAttachmentExporter(androidContext(), get()) }
     single { MmsContentRepositoryImpl(get(), get()) }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
