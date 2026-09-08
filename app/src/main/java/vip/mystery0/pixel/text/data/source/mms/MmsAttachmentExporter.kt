@@ -329,9 +329,24 @@ fun safeMmsAttachmentName(
 }
 
 private fun truncateFileName(value: String): String {
-    if (value.length <= MAX_FILENAME_LENGTH) return value
-    val truncated = value.take(MAX_FILENAME_LENGTH)
-    return if (truncated.lastOrNull()?.isHighSurrogate() == true) truncated.dropLast(1) else truncated
+    if (value.toByteArray(Charsets.UTF_8).size <= MAX_FILENAME_BYTES) return value
+    // 系统文件名上限按 UTF-8 字节计算，保留常见扩展名，并在完整码点处截断。
+    val extension = value.substringAfterLast('.', "").takeIf {
+        it.isNotEmpty() && it.length <= 16 && it.all { character -> character.isLetterOrDigit() }
+    }?.let { ".$it" }.orEmpty()
+    val stem = if (extension.isEmpty()) value else value.dropLast(extension.length)
+    val budget = MAX_FILENAME_BYTES - extension.toByteArray(Charsets.UTF_8).size
+    var offset = 0
+    var bytes = 0
+    while (offset < stem.length) {
+        val codePoint = stem.codePointAt(offset)
+        val count = Character.charCount(codePoint)
+        val encodedSize = stem.substring(offset, offset + count).toByteArray(Charsets.UTF_8).size
+        if (bytes + encodedSize > budget) break
+        bytes += encodedSize
+        offset += count
+    }
+    return stem.substring(0, offset) + extension
 }
 
 private fun extensionForMimeType(mimeType: String): String = when (MmsMimeTypes.normalize(mimeType)) {
@@ -357,5 +372,5 @@ private fun extensionForMimeType(mimeType: String): String = when (MmsMimeTypes.
     else -> ".bin"
 }
 
-private const val MAX_FILENAME_LENGTH = 160
+private const val MAX_FILENAME_BYTES = 200
 private val INVALID_FILENAME_CHARACTERS = setOf(':', '*', '?', '\"', '<', '>', '|')

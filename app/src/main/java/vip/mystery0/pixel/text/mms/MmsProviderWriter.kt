@@ -43,7 +43,8 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             ?: error("mms addresses unavailable")
         // 先落日志；完成标记后的崩溃也能接续清理原占位地址。
         saveOriginalAddresses(originalAddresses)
-        val created = mutableListOf<Uri>()
+        val createdParts = mutableListOf<Uri>()
+        val createdAddressIds = mutableListOf<Long>()
         var committed = false
         try {
             fun address(value: EncodedStringValue?, addressType: Int) {
@@ -54,7 +55,9 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                     put("charset", encoded.characterSet)
                     put("type", addressType)
                 }
-                created += resolver.insert(addressesUri, values) ?: error("mms address insert failed")
+                val inserted = resolver.insert(addressesUri, values) ?: error("mms address insert failed")
+                createdAddressIds += inserted.lastPathSegment?.toLongOrNull()
+                    ?: error("mms address identity unavailable")
             }
             address(message.from, PduHeaders.FROM)
             message.to?.forEach { address(it, PduHeaders.TO) }
@@ -94,11 +97,21 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                         put("text", bytes.toString(charset))
                     }
                 }
-                val partUri = resolver.insert(partsUri, values) ?: error("mms part insert failed")
-                created += partUri
+                // 系统 Provider 会用 name/cl 生成磁盘文件名。先让它生成安全存储名，
+                // 再写回完整原标识，避免长名称或路径影响存储，也不破坏 SMIL/CID 匹配。
+                val insertValues = ContentValues(values).apply {
+                    if (!inlineText) {
+                        remove("name")
+                        remove("fn")
+                        remove("cl")
+                    }
+                }
+                val partUri = resolver.insert(partsUri, insertValues) ?: error("mms part insert failed")
+                createdParts += partUri
                 if (!inlineText) {
                     val output = resolver.openOutputStream(partUri) ?: error("mms part stream unavailable")
                     output.use { it.write(bytes) }
+                    check(resolver.update(partUri, values, null, null) == 1) { "mms part metadata update failed" }
                 }
             }
             check(exists(mmsId)) { "mms deleted" }
@@ -137,7 +150,13 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             }
         } catch (error: Exception) {
             // 只清理本请求确实插入的子记录；不删除其他消息。
-            if (!committed) created.asReversed().forEach { child -> runCatching { resolver.delete(child, null, null) } }
+            if (!committed) {
+                createdParts.asReversed().forEach { child -> runCatching { resolver.delete(child, null, null) } }
+                // addr 插入返回的 /mms/addr/<id> 不是可删除单地址路由，必须使用消息父路由。
+                createdAddressIds.asReversed().forEach { id ->
+                    runCatching { resolver.delete(addressesUri, "_id = ?", arrayOf(id.toString())) }
+                }
+            }
             throw error
         }
     }
