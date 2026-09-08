@@ -113,7 +113,10 @@ val appModule = module {
     single { MirrorAttachmentStore(androidContext()) }
     single { MirrorAttachmentCopier(get(), get()) }
     single { MessageMirrorScheduler(androidContext()) }
-    single { MmsDownloadCoordinator(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.mms.MmsReceptionResponseSender(androidContext()) }
+    single { vip.mystery0.pixel.text.mms.MmsReceptionNotifications(androidContext(), get()) }
+    single { MmsDownloadCoordinator(androidContext(), get(), get()) }
+    single { vip.mystery0.pixel.text.mms.MmsIncomingPduHandler(androidContext(), get(), get(), get()) }
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
             onMessageDeletionCommitted = { key ->

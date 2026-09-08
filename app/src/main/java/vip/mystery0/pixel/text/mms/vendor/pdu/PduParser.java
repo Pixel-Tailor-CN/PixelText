@@ -29,6 +29,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 public class PduParser {
+    // 接收日志保留原始到期语义，重复 Push 不延长寿命。
+    private boolean expiryRelative;
+    private long expiryValue = -1;
+    public boolean isExpiryRelative() { return expiryRelative; }
+    public long getExpiryValue() { return expiryValue; }
     /**
      *  The next are WAP values defined in WSP specification.
      */
@@ -516,6 +521,11 @@ public class PduParser {
                     } catch(RuntimeException e) {
                         log(headerField + "is not Long-Integer header field!");
                         return null;
+                    }
+                    if (token != PduHeaders.VALUE_RELATIVE_TOKEN && token != PduHeaders.VALUE_ABSOLUTE_TOKEN) return null;
+                    if (headerField == PduHeaders.EXPIRY) {
+                        expiryRelative = token == PduHeaders.VALUE_RELATIVE_TOKEN;
+                        expiryValue = timeValue;
                     }
                     if (PduHeaders.VALUE_RELATIVE_TOKEN == token) {
                         /* need to convert the Delta-seconds-value

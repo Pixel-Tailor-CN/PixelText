@@ -21,6 +21,7 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
     fun persist(
         mmsId: Long, message: RetrieveConf,
         previousAddresses: List<Long>, saveOriginalAddresses: (List<Long>) -> Unit,
+        threadId: Long? = null,
     ) {
         check(exists(mmsId)) { "mms deleted" }
         val uri = "content://mms/$mmsId".toUri()
@@ -49,7 +50,7 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                 val encoded = value ?: return
                 check(exists(mmsId)) { "mms deleted" }
                 val values = ContentValues().apply {
-                    put("address", encoded.string.substringBefore("/TYPE="))
+                    put("address", MmsAddresses.clean(encoded.string))
                     put("charset", encoded.characterSet)
                     put("type", addressType)
                 }
@@ -102,6 +103,7 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             }
             check(exists(mmsId)) { "mms deleted" }
             val values = ContentValues().apply {
+                threadId?.let { put("thread_id", it) }
                 put("m_type", PduHeaders.MESSAGE_TYPE_RETRIEVE_CONF)
                 put("v", message.mmsVersion)
                 put("st", 0)

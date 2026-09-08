@@ -18,6 +18,9 @@ class MessageMirrorAttachmentWorker(context: Context, params: WorkerParameters) 
     CoroutineWorker(context, params), KoinComponent {
     private val synchronizer: MessageMirrorSynchronizer by inject()
     private val downloads: MmsDownloadCoordinator by inject()
+    private val incoming: vip.mystery0.pixel.text.mms.MmsIncomingPduHandler by inject()
+    private val responses: vip.mystery0.pixel.text.mms.MmsReceptionResponseSender by inject()
+    private val notifications: vip.mystery0.pixel.text.mms.MmsReceptionNotifications by inject()
     private val database: MessageMirrorDatabase by inject()
     private val scheduler: MessageMirrorScheduler by inject()
 
@@ -26,9 +29,12 @@ class MessageMirrorAttachmentWorker(context: Context, params: WorkerParameters) 
             return Result.success()
         }
         return try {
+            val moreIncoming = incoming.recover()
             val moreDownloads = downloads.recover()
+            val moreResponses = responses.recover()
             val moreAttachments = synchronizer.copyPendingAttachments()
-            if (!moreDownloads && !moreAttachments) return Result.success()
+            notifications.refresh()
+            if (!moreIncoming && !moreDownloads && !moreResponses && !moreAttachments) return Result.success()
             if (database.mirrorDao().pendingAttachments(System.currentTimeMillis()).isNotEmpty()) {
                 // 仍有立即可处理的附件时续下一片；尚未到 retryAfter 的失败留在独立链中退避。
                 scheduler.enqueueAttachments()

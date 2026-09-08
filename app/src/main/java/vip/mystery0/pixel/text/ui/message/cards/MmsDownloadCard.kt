@@ -42,6 +42,12 @@ fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true) {
                 phase == "save_failed" -> "彩信已下载，保存失败，可重试保存"
                 phase == "parse_failed" -> "彩信已下载，暂时无法解析，原件已保留"
                 phase == "failed" -> "彩信下载失败"
+                phase == "expired" -> "彩信已过期，服务器副本无法下载"
+                phase == "invalid_subscription" -> "无法确定接收彩信的 SIM 卡"
+                phase == "sim_unavailable" -> "接收彩信的 SIM 卡不可用"
+                phase == "download_uncertain" -> "下载结果未确认，已有文件已保留，可重新下载"
+                phase == "retry_wait" -> "下载失败，等待自动重试"
+                phase == "state_invalid" -> "下载状态异常，请重新下载"
                 else -> "彩信尚未下载"
             })
             TextButton(enabled = interactionEnabled && !busy, onClick = {

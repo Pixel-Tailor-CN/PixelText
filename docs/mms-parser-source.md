@@ -20,3 +20,12 @@
 - SMIL 由独立本地解析器生成顺序页，拒绝 DOCTYPE/实体声明，限制 UTF-8 1 MiB、深度 32、128 页；非法结构回退叶子附件。SMIL 和内部容器永远不加入通用正文与搜索文本。
 
 2026-09-08 修复：递归解析边界将畸形数据解码异常转换为容器失败，允许外层有效兄弟继续；取消仍传播，共享预算不返还。完整下载后的解析拒绝由协调器保存为 `parse_failed` 并保留原PDU，用户可重试本地解析，不再走删除原件的下载失败分支。
+
+
+## 接收协议状态与最小响应
+
+`PduParser` 额外暴露原始Expiry数值与相对标记，接收包装层在首次接收日志固定截止，拒绝负数时间；重复Push不重新计算寿命。`WapPushPduParser`显式区分Notification、Delivery、ReadOrig、其他有效PDU与解析失败。
+
+最小NotifyResp/Acknowledge编码由 `MmsReceptionResponseSender` 实现，仅Message-Type、原始Transaction-ID、MMS1.2及NotifyResp必需Status，包含Text-string高位Quote。使用现有vendor解析器回读字段后，通过接收SIM的系统 `sendMultimediaMessage` 发送；不扩展用户主动MMS编辑/发送。实现先Provider完成地址/part/132提交，后独立确认队列，确认失败不重取正文。
+
+协议响应应通过真实网络载荷与对照客户端验证，不能只依据 Mock 服务端返回成功。相同响应事务/字节按退避重放，不承诺服务端恰好收到一次。

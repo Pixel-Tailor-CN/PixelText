@@ -128,6 +128,9 @@
 
         <!-- 6. BroadcastReceiver for MMS download completion callback -->
         <receiver
+            android:name=".mms.MmsReceptionResponseReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".mms.MmsDownloadReceiver"
             android:exported="false">
             <intent-filter>

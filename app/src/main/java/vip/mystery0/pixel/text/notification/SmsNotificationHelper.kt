@@ -75,6 +75,8 @@ object SmsNotificationHelper {
         messageUri: String? = null,
         displaySender: String = sender,
         avatarPath: String? = null,
+        notificationIdOverride: Int? = null,
+        silent: Boolean = false,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (
@@ -87,7 +89,7 @@ object SmsNotificationHelper {
             }
         }
 
-        val notificationId =
+        val notificationId = notificationIdOverride ?:
             if (threadId != 0L) threadId.toInt() else System.currentTimeMillis().toInt()
         val actionConfigs = readNotificationQuickActionConfigs(context)
         val actionConfigByType = actionConfigs.associateBy { it.type }
@@ -202,6 +204,9 @@ object SmsNotificationHelper {
             .setAllowSystemGeneratedContextualActions(false)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
+            .setOnlyAlertOnce(notificationIdOverride != null)
+            .setSilent(silent)
+            .addExtras(android.os.Bundle().apply { putLong("pixeltext_thread_id", threadId) })
             .setGroup("sms_group_$threadId")
 
         verificationCode
@@ -342,6 +347,9 @@ object SmsNotificationHelper {
     fun cancelThreadNotification(context: Context, threadId: Long) {
         if (threadId <= 0L) return
         NotificationManagerCompat.from(context).cancel(threadId.toInt())
+        context.getSystemService(NotificationManager::class.java).activeNotifications
+            .filter { it.notification.extras.getLong("pixeltext_thread_id") == threadId }
+            .forEach { NotificationManagerCompat.from(context).cancel(it.id) }
     }
 
     fun cancelThreadNotifications(context: Context, threadIds: Set<Long>) {

@@ -20,11 +20,12 @@ class MmsDownloadReceiver : BroadcastReceiver(), KoinComponent {
         val id = intent.getLongExtra("mms_id", -1)
         val token = intent.getStringExtra("token") ?: return
         if (id <= 0) return
-        val successful = resultCode == Activity.RESULT_OK
+        val result = resultCode
+        val httpStatus = intent.getIntExtra(android.telephony.SmsManager.EXTRA_MMS_HTTP_STATUS, 0)
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                downloads.complete(id, token, successful)
+                downloads.complete(id, token, result, httpStatus)
             } catch (error: Exception) {
                 Log.w("MmsDownloadReceiver", "mms completion failed error=${error.javaClass.simpleName}")
             } finally {
