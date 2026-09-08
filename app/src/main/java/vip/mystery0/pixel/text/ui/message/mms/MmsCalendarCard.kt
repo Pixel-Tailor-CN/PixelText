@@ -48,7 +48,10 @@ fun MmsCalendarCard(
             dismissButton = { TextButton(onClick = { confirmEvent = null }) { Text("取消") } })
     }
     Card(modifier.fillMaxWidth().clickable(enabled = interactionEnabled && selectionMode, onClick = onMessageClick),
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant)) {
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("日历事件 · ${part.displayName}", style = MaterialTheme.typography.labelLarge)
             MmsPartStatus(part)
@@ -61,7 +64,7 @@ fun MmsCalendarCard(
                 event.location?.let { Text("地点：$it") }
                 event.description?.let { Text(it) }
                 event.recurrence?.let { Text("重复规则：$it", style = MaterialTheme.typography.bodySmall) }
-                event.importWarning?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                event.importWarning?.let { Text(it, color = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 TextButton(enabled = enabled && event.canImport, onClick = {
                     if (event.importWarning != null) confirmEvent = event else insert(event)
                 }) { Text(if (event.recurrence == null) "添加日历事件" else "添加本次事件") }

@@ -31,7 +31,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -196,6 +199,47 @@ fun ConversationDetailScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    // 状态属于会话页面，而不是会被 Loading/Error 替换的列表分支。
+    val listState = rememberSaveable(threadId, address, effectiveContentFilter, saver = LazyListState.Saver) {
+        LazyListState()
+    }
+    var scrollAnchorId by rememberSaveable(threadId, address, effectiveContentFilter) { mutableStateOf<Long?>(null) }
+    var scrollAnchorOffset by rememberSaveable(threadId, address, effectiveContentFilter) { mutableIntStateOf(0) }
+    var scrollAnchorIndex by rememberSaveable(threadId, address, effectiveContentFilter) { mutableIntStateOf(0) }
+    var restoreScroll by rememberSaveable(threadId, address, effectiveContentFilter) { mutableStateOf(false) }
+    var resumeGeneration by remember { mutableIntStateOf(0) }
+    val positionMessages by rememberUpdatedState((uiState as? MessageUiState.Success)?.messages.orEmpty())
+    DisposableEffect(lifecycleOwner, listState) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE && !restoreScroll) {
+                positionMessages.getOrNull(listState.firstVisibleItemIndex)?.let { message ->
+                    scrollAnchorId = message.id
+                    scrollAnchorIndex = listState.firstVisibleItemIndex
+                    scrollAnchorOffset = listState.firstVisibleItemScrollOffset
+                    restoreScroll = true
+                }
+            }
+            if (event == Lifecycle.Event.ON_RESUME) resumeGeneration++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(restoreScroll, resumeGeneration, uiState is MessageUiState.Success) {
+        if (!restoreScroll || uiState !is MessageUiState.Success ||
+            !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
+        val anchor = scrollAnchorId ?: return@LaunchedEffect
+        // 按消息身份恢复，新增消息插入列表头部时也不会落到另一条消息。
+        val anchorIndex = viewModel.loadUntilMessage(anchor)
+        withFrameNanos { }
+        val messages = positionMessages
+        if (messages.isNotEmpty()) {
+            val index = messages.indexOfFirst { it.id == anchor }.takeIf { it >= 0 }
+                ?: (anchorIndex ?: scrollAnchorIndex).coerceIn(messages.indices)
+            listState.scrollToItem(index, scrollAnchorOffset)
+        }
+        restoreScroll = false
+    }
+
     val conversationTitle by viewModel.conversationTitle.collectAsState()
     val sending by viewModel.sending.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
@@ -205,7 +249,7 @@ fun ConversationDetailScreen(
     var highlightedMessageId by remember(threadId, targetMessageId) {
         mutableStateOf<Long?>(null)
     }
-    var locatedTargetMessageId by remember(threadId, targetMessageId) {
+    var locatedTargetMessageId by rememberSaveable(threadId, targetMessageId) {
         mutableStateOf<Long?>(null)
     }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -487,6 +531,23 @@ fun ConversationDetailScreen(
                                     onDismissRequest = { showMoreMenu = false }
                                 ) {
                                     DropdownMenuItem(
+                                        text = { Text("详情信息") },
+                                        enabled = selectedMessage != null,
+                                        onClick = {
+                                            val message = selectedMessage
+                                            showMoreMenu = false
+                                            selectedMessageIds.clear()
+                                            if (message != null) {
+                                                val transport = if (message.isMms)
+                                                    vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS
+                                                else vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.SMS
+                                                onOpenMmsPart(vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(
+                                                    vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                                                        transport, if (message.isMms) -message.id else message.id), -1))
+                                            }
+                                        },
+                                    )
+                                    DropdownMenuItem(
                                         text = { Text("识别骚扰内容") },
                                         enabled = canCheckSelectedSpam,
                                         onClick = {
@@ -717,7 +778,6 @@ fun ConversationDetailScreen(
             }
 
             is MessageUiState.Success -> {
-                val listState = rememberLazyListState()
                 val currentMessageKeys = state.messages.map { it.stableKey }
                 val entranceMessageKeys = currentMessageKeys.toSet() intersect newMessageKeys
                 val hasNewSentMessage = state.messages.any { message ->
@@ -725,6 +785,10 @@ fun ConversationDetailScreen(
                 }
                 LaunchedEffect(entranceMessageKeys, hasNewSentMessage) {
                     if (entranceMessageKeys.isEmpty()) return@LaunchedEffect
+                    if (restoreScroll || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        viewModel.consumeNewMessageKeys(entranceMessageKeys)
+                        return@LaunchedEffect
+                    }
                     if (hasNewSentMessage || listState.firstVisibleItemIndex <= 1) {
                         listState.animateScrollToItem(0)
                     }
@@ -747,7 +811,7 @@ fun ConversationDetailScreen(
                     highlightedMessageId = null
                 }
 
-                LaunchedEffect(listState) {
+                LaunchedEffect(listState, state.messages.size) {
                     snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
                         .collect { lastIndex ->
                             if (lastIndex != null && lastIndex >= state.messages.size - 5) {

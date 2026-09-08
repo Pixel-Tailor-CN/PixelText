@@ -18,6 +18,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,11 +47,10 @@ fun MmsMediaViewer(part: MmsPartContent, onBack: () -> Unit, controller: MmsPlay
     // 切换附件只停止，绝不自动启动新媒体。
     LaunchedEffect(part.mediaCacheKey(), part.state) { controller.onViewerSourceChanged(part) }
     Scaffold(topBar = { TopAppBar(title = { Text(if (part.kind == MmsContentKind.VIDEO) "视频" else "音频") },
-        navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }) }) { padding ->
+        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") } }, actions = { MmsAttachmentActions(part, menuOnly = true) }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(part.displayName)
             MmsMediaContent(part, controller)
-            MmsAttachmentActions(part)
         }
     }
 }

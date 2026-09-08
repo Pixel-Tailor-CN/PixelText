@@ -2,6 +2,8 @@ package vip.mystery0.pixel.text.ui.message.cards
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,7 +23,7 @@ import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 @Composable
-fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true) {
+fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true, isSelected: Boolean = false) {
     val downloads = koinInject<MmsDownloadCoordinator>()
     val scope = rememberCoroutineScope()
     var phase by remember(mmsId) { mutableStateOf(downloads.state(mmsId)) }
@@ -34,7 +36,10 @@ fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true) {
         }
     }
     val busy = submitting || phase == "downloading" || phase == "persisting"
-    Card {
+    Card(colors = if (isSelected) CardDefaults.cardColors(
+        containerColor = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+    ) else CardDefaults.cardColors()) {
         Column(Modifier.padding(12.dp)) {
             Text(error ?: when {
                 phase == "persisting" -> "正在保存彩信"

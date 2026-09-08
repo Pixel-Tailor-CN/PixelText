@@ -294,7 +294,7 @@ fun AppNavigation(
                     targetMessageId = targetMessageId,
                     requestedContentFilter = contentFilter,
                     onOpenMmsPart = { part -> navController.navigate(if (part.partId < 0)
-                        "mirror_message/MMS/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
+                        "mirror_message/${part.message.transport.name}/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = { content, sender, category ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {

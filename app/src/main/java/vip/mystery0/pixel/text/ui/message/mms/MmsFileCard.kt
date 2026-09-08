@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.*
+import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
+import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -60,18 +62,25 @@ fun MmsFileCard(
     val cardClickEnabled = interactionEnabled && (selectionMode || part.statusInfo().actionable)
     Surface(
         modifier = modifier
-            .widthIn(max = 360.dp)
+            .fillMaxWidth()
             .clickable(enabled = cardClickEnabled) {
                 if (selectionMode) onMessageClick() else onOpenPart(part.key)
             },
-        shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
+        shape = MaterialTheme.shapes.medium,
         color = containerColor,
         contentColor = contentColor,
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Rounded.Description,
+                    imageVector = when (part.kind) {
+                        MmsContentKind.IMAGE -> Icons.Rounded.Image
+                        MmsContentKind.AUDIO -> Icons.Rounded.AudioFile
+                        MmsContentKind.VIDEO -> Icons.Rounded.VideoFile
+                        MmsContentKind.CONTACT -> Icons.Rounded.Contacts
+                        MmsContentKind.CALENDAR -> Icons.Rounded.Event
+                        else -> Icons.Rounded.Description
+                    },
                     contentDescription = null,
                     modifier = Modifier.size(32.dp),
                 )
@@ -92,6 +101,8 @@ fun MmsFileCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                MmsAttachmentActions(part, enabled = interactionEnabled && !selectionMode,
+                    onFeedback = onFeedback, menuOnly = true)
             }
             if (htmlPreview) {
                 Text(
@@ -106,14 +117,9 @@ fun MmsFileCard(
                     onClick = { onOpenPart(part.key) },
                 ) { Text("查看完整内容") }
             }
-            MmsPartStatus(part, Modifier.padding(top = 8.dp))
-            MmsAttachmentActions(
-                part = part,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = interactionEnabled && !selectionMode,
-                onFeedback = onFeedback,
-                openLabel = if (htmlPreview) "外部打开" else "打开",
-            )
+            if (part.state != MirrorAttachmentState.READY || part.issue != null || part.inlineTextCopy) {
+                MmsPartStatus(part, Modifier.padding(top = 4.dp))
+            }
         }
     }
 }

@@ -7,7 +7,10 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.SaveAlt
@@ -47,7 +50,8 @@ fun MmsAttachmentActions(
     enabled: Boolean = true,
     exporter: MmsAttachmentExporter = koinInject(),
     onFeedback: ((String) -> Unit)? = null,
-    openLabel: String = "打开",
+    openLabel: String = "外部打开",
+    menuOnly: Boolean = false,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -103,54 +107,61 @@ fun MmsAttachmentActions(
     }
     val actionsEnabled = enabled && part.statusInfo().actionable && activeAction == null
 
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        TextButton(
-            enabled = actionsEnabled,
-            onClick = {
-                runAction(ActiveAttachmentAction.OPEN) {
-                    val shared = exporter.prepareShare(currentPart.key)
-                    context.startActivity(openIntent(shared))
-                }
-            },
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null)
-            Text(openLabel)
+    var expanded by remember(part.key) { mutableStateOf(false) }
+    fun open() = runAction(ActiveAttachmentAction.OPEN) {
+        val shared = exporter.prepareShare(currentPart.key)
+        context.startActivity(openIntent(shared))
+    }
+    fun share() = runAction(ActiveAttachmentAction.SHARE) {
+        val shared = exporter.prepareShare(currentPart.key)
+        context.startActivity(shareIntent(shared))
+    }
+    fun save() {
+        pendingSaveKey = encodePartKey(currentPart.key)
+        try {
+            saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
+        } catch (_: ActivityNotFoundException) {
+            pendingSaveKey = null
+            feedback("没有可保存附件的系统应用")
+        } catch (_: SecurityException) {
+            pendingSaveKey = null
+            feedback("没有权限打开系统保存界面，请重试")
+        } catch (_: Exception) {
+            pendingSaveKey = null
+            feedback("无法打开系统保存界面，请重试")
         }
-        TextButton(
-            enabled = actionsEnabled,
-            onClick = {
-                pendingSaveKey = encodePartKey(currentPart.key)
-                try {
-                    saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
-                } catch (_: ActivityNotFoundException) {
-                    pendingSaveKey = null
-                    feedback("没有可保存附件的系统应用")
-                } catch (_: SecurityException) {
-                    pendingSaveKey = null
-                    feedback("没有权限打开系统保存界面，请重试")
-                } catch (_: Exception) {
-                    pendingSaveKey = null
-                    feedback("无法打开系统保存界面，请重试")
-                }
-            },
-        ) {
-            Icon(Icons.Rounded.SaveAlt, contentDescription = null)
-            Text("保存")
+    }
+    if (menuOnly) {
+        Box(modifier) {
+            IconButton(enabled = actionsEnabled, onClick = { expanded = true }) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = "附件操作：${part.displayName}")
+            }
+            DropdownMenu(expanded = expanded && actionsEnabled, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(text = { Text(openLabel) }, leadingIcon = {
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, null)
+                }, onClick = { expanded = false; open() })
+                DropdownMenuItem(text = { Text("保存") }, leadingIcon = {
+                    Icon(Icons.Rounded.SaveAlt, null)
+                }, onClick = { expanded = false; save() })
+                DropdownMenuItem(text = { Text("分享") }, leadingIcon = {
+                    Icon(Icons.Rounded.Share, null)
+                }, onClick = { expanded = false; share() })
+            }
         }
-        TextButton(
-            enabled = actionsEnabled,
-            onClick = {
-                runAction(ActiveAttachmentAction.SHARE) {
-                    val shared = exporter.prepareShare(currentPart.key)
-                    context.startActivity(shareIntent(shared))
-                }
-            },
-        ) {
-            Icon(Icons.Rounded.Share, contentDescription = null)
-            Text("分享")
+    } else {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(enabled = actionsEnabled, onClick = ::open, contentPadding = PaddingValues(8.dp)) {
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp)); Text(openLabel, style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(enabled = actionsEnabled, onClick = ::save, contentPadding = PaddingValues(8.dp)) {
+                Icon(Icons.Rounded.SaveAlt, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp)); Text("保存", style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(enabled = actionsEnabled, onClick = ::share, contentPadding = PaddingValues(8.dp)) {
+                Icon(Icons.Rounded.Share, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp)); Text("分享", style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }

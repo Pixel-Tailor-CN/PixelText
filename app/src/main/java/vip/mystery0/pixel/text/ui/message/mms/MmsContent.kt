@@ -27,14 +27,17 @@ fun MmsContent(
     selectionMode: Boolean = false,
     onMessageClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    detailMode: Boolean = false,
 ) {
-    var originals by rememberSaveable(model.key.sourceId) { mutableStateOf(false) }
+    val linkGesture = remember { MmsLinkGestureState() }
     val controller: MmsPlaybackController = koinInject()
     val click by rememberUpdatedState(onMessageClick)
     val longClick by rememberUpdatedState(onLongClick)
     val color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(color = color, contentColor = textColor, shape = MaterialTheme.shapes.large,
+    Surface(color = if (detailMode) MaterialTheme.colorScheme.surface else color,
+        contentColor = if (detailMode) MaterialTheme.colorScheme.onSurface else textColor,
+        shape = if (detailMode) androidx.compose.ui.graphics.RectangleShape else MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().semantics {
             selected = isSelected
             if (interactionEnabled && longClick != null) onLongClick("选择彩信") { longClick?.invoke(); true }
@@ -55,20 +58,29 @@ fun MmsContent(
                     }
                     true
                 }
-                if (up == null && !moved && interactionEnabled && longClick != null) {
+                if (up == null && !moved && !linkGesture.active && interactionEnabled && longClick != null) {
                     longClick?.invoke()
                     do { val event = awaitPointerEvent(PointerEventPass.Initial); event.changes.forEach { it.consume() }
                     } while (event.changes.any { it.pressed })
                 } else if (up == true && !moved && selectionMode && interactionEnabled) click?.invoke()
             }
         }) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 选中态的控件默认色也需要反色，尤其是禁用按钮和分页箭头。
+        val scheme = MaterialTheme.colorScheme
+        MaterialTheme(colorScheme = if (isSelected) scheme.copy(
+            primary = scheme.inverseOnSurface,
+            onPrimary = scheme.inverseSurface,
+            onSurface = scheme.inverseOnSurface,
+            onSurfaceVariant = scheme.inverseOnSurface,
+        ) else scheme) {
+        CompositionLocalProvider(LocalMmsLinkGesture provides linkGesture) {
+        Column(Modifier.padding(if (detailMode) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             model.subject?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode)
-            if (model.issues.isNotEmpty()) Text("彩信结构或资源引用不完整，已按可用附件显示；全部原件仍可查看", style = MaterialTheme.typography.bodySmall)
+            if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode, isSelected = isSelected)
+            if (model.issues.isNotEmpty()) Text("彩信结构或资源引用不完整，已按可用附件显示；可在详情信息中查看附件", style = MaterialTheme.typography.bodySmall)
             if (model.preparing) Text(model.summary)
             else if (model.pages.isNotEmpty()) {
-                MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller)
+                MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller, isSelected = isSelected)
                 val unreferenced = model.parts.filter { it.key.partId in model.attachmentPartIds && it.key.partId in model.bodyPartIds }
                 if (unreferenced.isNotEmpty()) Text("未引用的附件", style = MaterialTheme.typography.titleSmall)
                 unreferenced.forEach { MmsContentPart(it, model.parts, isSelected, interactionEnabled && !selectionMode, onOpenPart) }
@@ -78,15 +90,16 @@ fun MmsContent(
                 }
                 if (model.parts.isEmpty() && model.subject.isNullOrBlank() && !model.pendingDownload) Text("彩信暂无可读内容")
             }
-            if (model.parts.isNotEmpty()) {
-                TextButton(enabled = interactionEnabled && !selectionMode, onClick = { originals = !originals }) {
-                    Text(if (originals) "收起原件" else "全部原件（${model.parts.size}）")
-                }
-                if (originals) model.parts.forEach { part ->
+            if (detailMode && model.parts.isNotEmpty()) {
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Text("附件（${model.parts.size}）", style = MaterialTheme.typography.titleSmall)
+                model.parts.forEach { part ->
                     MmsFileCard(part, isSelected = isSelected, interactionEnabled = interactionEnabled && !selectionMode, onOpenPart = onOpenPart)
                 }
             }
         }
+    }
+    }
     }
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -190,12 +195,17 @@ fun MessageItem(
                         contentViewModel.load(key)
                         onDispose { contentViewModel.stop() }
                     }
-                    model?.let {
-                        vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected, interactionEnabled,
-                            onOpenMmsPart, selectionMode, onClick, onLongClick)
-                        androidx.compose.material3.TextButton(enabled = interactionEnabled && !selectionMode,
-                            onClick = { onOpenMmsPart(vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(key, -1)) }) { Text("彩信详情") }
-                    } ?: Text("正在读取彩信", color = textColor)
+                    var contentHeight by rememberSaveable(key) { mutableIntStateOf(0) }
+                    val ready = model?.preparing == false
+                    val reservedHeight = with(LocalDensity.current) { contentHeight.toDp() }
+                    // 返回页面时先保留旧尺寸，避免解析占位内容缩小导致滚动偏移被夹断。
+                    Box(Modifier.fillMaxWidth().heightIn(min = if (ready) 0.dp else reservedHeight)
+                        .onSizeChanged { if (ready) contentHeight = it.height }) {
+                        model?.let {
+                            vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected, interactionEnabled,
+                                onOpenMmsPart, selectionMode, onClick, onLongClick)
+                        } ?: Text("正在读取彩信", color = textColor)
+                    }
                 } else {
                     val hasTextContent =
                         message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()

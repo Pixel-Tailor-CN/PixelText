@@ -1,9 +1,12 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,13 +31,17 @@ fun MmsPartScreen(key: MmsPartKey, onBack: () -> Unit) {
         MmsContentKind.HTML -> { MmsHtmlViewer(part, model!!.parts, onBack); return }
         else -> Unit
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("彩信附件") }, navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }) }) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState())) {
+    Scaffold(topBar = { TopAppBar(title = { Text("彩信附件") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") } }) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (part == null) Text(if (loaded) "附件已不存在或尚未同步" else "正在读取附件")
             else when (part.kind) {
                 MmsContentKind.CONTACT -> MmsContactCard(part, model!!.parts)
                 MmsContentKind.CALENDAR -> MmsCalendarCard(part)
-                else -> MmsFileCard(part)
+                else -> {
+                    MmsFileCard(part)
+                    part.text?.let { text -> SelectionContainer { Text(text, style = MaterialTheme.typography.bodyLarge) } }
+                }
             }
         }
     }

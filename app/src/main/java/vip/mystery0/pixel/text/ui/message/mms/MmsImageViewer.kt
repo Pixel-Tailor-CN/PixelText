@@ -13,6 +13,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -39,8 +43,8 @@ fun MmsImageViewer(part: MmsPartContent, onBack: () -> Unit, imageNumber: Int = 
     var size by remember { mutableStateOf(IntSize.Zero) }
     Scaffold(topBar = {
         TopAppBar(title = { Text("图片 $imageNumber") }, navigationIcon = {
-            TextButton(onClick = onBack) { Text("返回") }
-        }, actions = { TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text("重置") } })
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") }
+        }, actions = { TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text("重置") }; MmsAttachmentActions(part, menuOnly = true) })
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(part.displayName, Modifier.padding(horizontal = 16.dp))
@@ -67,7 +71,6 @@ fun MmsImageViewer(part: MmsPartContent, onBack: () -> Unit, imageNumber: Int = 
                     },
                 ) else MmsPartStatus(part)
             }
-            MmsAttachmentActions(part, Modifier.padding(horizontal = 12.dp))
         }
     }
 }

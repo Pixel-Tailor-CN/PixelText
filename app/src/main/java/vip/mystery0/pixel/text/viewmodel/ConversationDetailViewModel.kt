@@ -147,8 +147,11 @@ class ConversationDetailViewModel(
     fun startObservingTelephony(): Boolean {
         if (mirrorObservationJob?.isActive == true) return true
         mirrorObservationJob = viewModelScope.launch {
+            var initialSnapshot = true
             mirrorThreadId.flatMapLatest { mirror.observeThreadChanges(it) }.collect {
-                if (currentThreadId >= 0) refreshMessages(reportInsertions = true)
+                // 返回前后台期间的补同步不触发新消息自动滚动，保留离开前的阅读位置。
+                if (currentThreadId >= 0) refreshMessages(reportInsertions = !initialSnapshot)
+                initialSnapshot = false
             }
         }
         return true

@@ -26,6 +26,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -67,11 +71,10 @@ fun MmsHtmlViewer(
     val dark = isSystemInDarkTheme()
     val fontScale = LocalDensity.current.fontScale
     Scaffold(topBar = { TopAppBar(title = { Text("离线网页") }, navigationIcon = {
-        TextButton(onClick = onBack) { Text("返回") }
-    }, actions = { TextButton(onClick = { plainOnly = !plainOnly }) { Text(if (plainOnly) "网页" else "纯文本") } }) }) { padding ->
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") }
+    }, actions = { TextButton(onClick = { plainOnly = !plainOnly }) { Text(if (plainOnly) "网页" else "纯文本") }; MmsAttachmentActions(part, menuOnly = true) }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             MmsPartStatus(part)
-            MmsAttachmentActions(part)
             val prepared = document
             when {
                 prepared == null -> CircularProgressIndicator()
