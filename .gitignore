@@ -19,6 +19,19 @@ local.properties
 /app/release/
 .codex-remote-attachments/
 
+# 本地执行记录与验证产物，不进入版本历史
+/docs/.local/
+/docs/mms/evidence/
+/docs/mms/fixtures/
+/docs/mms/task7/
+/docs/mms/tools/
+/docs/plans/mms-reception-work/
+/docs/plans/2026-09-07-mms-reception-progress.md
+/docs/plans/2026-09-07-mms-reception-review.md
+/docs/plans/2026-09-07-mms-reception-validation.md
+/docs/plans/2026-09-08-mms-reception-delivery.md
+__pycache__/
+
 # 本地消息镜像交接、进度与评审记录
 /docs/plans/2026-09-06-message-mirror-core-brief.md
 /docs/plans/2026-09-06-message-mirror-core-report.md
