@@ -47,6 +47,7 @@ fun MmsAttachmentActions(
     enabled: Boolean = true,
     exporter: MmsAttachmentExporter = koinInject(),
     onFeedback: ((String) -> Unit)? = null,
+    openLabel: String = "打开",
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -116,13 +117,24 @@ fun MmsAttachmentActions(
             },
         ) {
             Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null)
-            Text("打开")
+            Text(openLabel)
         }
         TextButton(
             enabled = actionsEnabled,
             onClick = {
                 pendingSaveKey = encodePartKey(currentPart.key)
-                saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
+                try {
+                    saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
+                } catch (_: ActivityNotFoundException) {
+                    pendingSaveKey = null
+                    feedback("没有可保存附件的系统应用")
+                } catch (_: SecurityException) {
+                    pendingSaveKey = null
+                    feedback("没有权限打开系统保存界面，请重试")
+                } catch (_: Exception) {
+                    pendingSaveKey = null
+                    feedback("无法打开系统保存界面，请重试")
+                }
             },
         ) {
             Icon(Icons.Rounded.SaveAlt, contentDescription = null)

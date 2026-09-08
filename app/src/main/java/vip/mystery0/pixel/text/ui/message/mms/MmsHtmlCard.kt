@@ -16,4 +16,4 @@ fun MmsHtmlCard(
     onMessageClick: () -> Unit = {},
     onOpenPart: (MmsPartKey) -> Unit = {},
     onFeedback: ((String) -> Unit)? = null,
-) = MmsFileCard(part, modifier, isSelected, selectionMode, interactionEnabled, onMessageClick, onOpenPart, onFeedback)
+) = MmsFileCard(part, modifier, isSelected, selectionMode, interactionEnabled, onMessageClick, onOpenPart, onFeedback, htmlPreview = true)

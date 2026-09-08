@@ -80,7 +80,7 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                 val contentType = part.contentType?.toString(Charsets.ISO_8859_1)
                     ?: "application/octet-stream"
                 val bytes = part.data ?: byteArrayOf()
-                val inlineText = contentType in setOf("text/plain", "text/html", "application/smil")
+                val inlineText = contentType in setOf("text/plain", "application/smil")
                 val values = ContentValues().apply {
                     put("seq", if (contentType == "application/smil") -1 else index)
                     put("ct", contentType)

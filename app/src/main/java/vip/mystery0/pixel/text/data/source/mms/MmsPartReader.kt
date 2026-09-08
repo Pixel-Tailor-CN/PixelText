@@ -15,6 +15,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorPartModel
+import vip.mystery0.pixel.text.domain.model.mms.usesInlineTextCopy
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
 
@@ -37,11 +38,11 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
 
     suspend fun readText(part: MirrorPartModel, budget: Budget): TextResult = withContext(Dispatchers.IO) {
         currentCoroutineContext().ensureActive()
-        part.text?.let { inline ->
+        part.text?.takeIf { part.usesInlineTextCopy() }?.let { inline ->
             // Provider 已解码的字符串无需按声明再次编码；按 UTF-8 字节计费，避免巨型临时数组。
             val result = inlineUtf8Size(inline, budget)
-            if (result.issue != null) return@withContext TextResult(null, part.attachment?.byteCount, result.issue)
-            return@withContext TextResult(inline.removePrefix("\uFEFF"), part.attachment?.byteCount ?: result.byteCount.toLong(), null)
+            if (result.issue != null) return@withContext TextResult(null, null, result.issue)
+            return@withContext TextResult(inline.removePrefix("\uFEFF"), result.byteCount.toLong(), null)
         }
         val result = readBytes(part, budget)
         result.bytes?.let { decode(it, part) } ?: TextResult(null, result.byteCount, result.issue)

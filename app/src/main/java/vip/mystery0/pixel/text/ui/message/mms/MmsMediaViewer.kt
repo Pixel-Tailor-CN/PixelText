@@ -41,7 +41,7 @@ fun MmsMediaViewer(part: MmsPartContent, onBack: () -> Unit, controller: MmsPlay
     BackHandler(onBack = onBack)
     MmsPlaybackSession(controller)
     // 切换附件只停止，绝不自动启动新媒体。
-    LaunchedEffect(part.mediaCacheKey()) { controller.stop() }
+    LaunchedEffect(part.mediaCacheKey(), part.state) { controller.onViewerSourceChanged(part) }
     Scaffold(topBar = { TopAppBar(title = { Text(if (part.kind == MmsContentKind.VIDEO) "视频" else "音频") },
         navigationIcon = { TextButton(onClick = onBack) { Text("返回") } }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

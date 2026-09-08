@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +41,7 @@ fun MmsFileCard(
     onMessageClick: () -> Unit = {},
     onOpenPart: (MmsPartKey) -> Unit = {},
     onFeedback: ((String) -> Unit)? = null,
+    htmlPreview: Boolean = false,
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (isSelected) {
@@ -91,12 +93,26 @@ fun MmsFileCard(
                     )
                 }
             }
+            if (htmlPreview) {
+                Text(
+                    text = part.htmlSummary?.takeIf { it.isNotBlank() } ?: "暂无可读摘要",
+                    modifier = Modifier.padding(top = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                TextButton(
+                    enabled = interactionEnabled && !selectionMode && part.text != null,
+                    onClick = { onOpenPart(part.key) },
+                ) { Text("查看完整内容") }
+            }
             MmsPartStatus(part, Modifier.padding(top = 8.dp))
             MmsAttachmentActions(
                 part = part,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = interactionEnabled && !selectionMode,
                 onFeedback = onFeedback,
+                openLabel = if (htmlPreview) "外部打开" else "打开",
             )
         }
     }

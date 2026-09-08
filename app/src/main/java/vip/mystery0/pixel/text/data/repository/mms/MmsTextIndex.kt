@@ -10,7 +10,7 @@ import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 
-const val MMS_TEXT_INDEX_VERSION = 1
+const val MMS_TEXT_INDEX_VERSION = 2
 
 /** 版本及全部输入身份参与失效，附件 READY 内部更新也不能复用旧文本。 */
 suspend fun mmsContentFingerprint(snapshot: MirrorMessageModel): String {

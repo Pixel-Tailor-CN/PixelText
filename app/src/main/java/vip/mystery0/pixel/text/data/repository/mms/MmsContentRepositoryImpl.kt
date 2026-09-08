@@ -19,6 +19,7 @@ import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentModel
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.domain.model.mms.usesInlineTextCopy
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMultipartResolver
 import vip.mystery0.pixel.text.domain.parser.mms.MmsSmilParser
@@ -112,9 +113,16 @@ class MmsContentRepositoryImpl(
         }
         val restoredParts = restoreMultipart(snapshot, decodedParts, budget)
         val context = currentCoroutineContext()
+        val htmlText = restoredParts.filter { it.kind == MmsContentKind.HTML && it.text != null }.associate { part ->
+            context.ensureActive()
+            val document = htmlParser.prepare(part, restoredParts)
+            context.ensureActive()
+            part.key to document.plainText
+        }
         val parts = restoredParts.map { part ->
             context.ensureActive()
             when {
+                part.kind == MmsContentKind.HTML -> part.copy(htmlSummary = htmlText[part.key]?.take(320))
                 part.kind == MmsContentKind.CONTACT && part.text != null -> part.copy(
                     contacts = contactParser.parse(part.text) { context.ensureActive() }.map { contact ->
                         val reference = contact.photoReference
@@ -154,7 +162,7 @@ class MmsContentRepositoryImpl(
                 context.ensureActive()
                 val text = when (part.kind) {
                     MmsContentKind.TEXT -> part.text
-                    MmsContentKind.HTML -> if (part.text != null) htmlParser.prepare(part, parts).plainText else null
+                    MmsContentKind.HTML -> htmlText[part.key]
                     MmsContentKind.CONTACT -> part.contacts.joinToString("\n") { contact ->
                         (listOfNotNull(contact.name, contact.organization, contact.title, contact.notes) +
                             (contact.phones + contact.emails + contact.addresses).map { it.value }).joinToString("\n")
@@ -282,16 +290,17 @@ class MmsContentRepositoryImpl(
 
     private fun partContent(snapshot: MirrorMessageModel, part: MirrorPartModel): MmsPartContent {
         val kind = MmsMimeTypes.classify(part.mimeType)
-        val hasInlineText = part.text != null && MmsMimeTypes.canExportInlineText(part.mimeType)
+        val hasInlineText = part.usesInlineTextCopy()
         return MmsPartContent(
             key = MmsPartKey(snapshot.key, part.sourceId), revision = snapshot.revision,
             kind = kind, mimeType = MmsMimeTypes.normalize(part.mimeType),
             displayName = listOf(part.filename, part.name, part.contentLocation)
                 .firstOrNull { !it.isNullOrBlank() } ?: "附件 ${part.sourceId}",
-            byteCount = part.attachment?.byteCount,
-            contentHash = part.attachment?.sha256,
+            byteCount = if (hasInlineText) null else part.attachment?.byteCount,
+            contentHash = if (hasInlineText) null else part.attachment?.sha256,
+            inlineTextCopy = hasInlineText,
             state = if (hasInlineText) MirrorAttachmentState.READY else part.attachment?.state ?: MirrorAttachmentState.UNKNOWN,
-            localUri = part.attachment?.localUri, text = null,
+            localUri = if (hasInlineText) null else part.attachment?.localUri, text = null,
             contentId = part.contentId, contentLocation = part.contentLocation,
             issue = if (hasInlineText) null else reader.issueFor(part),
         )
@@ -310,7 +319,7 @@ class MmsContentRepositoryImpl(
             model.pages.sumOf { 64L + 24L * it.partIds.size } +
             model.parts.sumOf { part ->
                 256L + size(part.mimeType) + size(part.displayName) + size(part.localUri) +
-                    size(part.contentHash) + size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
+                    size(part.htmlSummary) + size(part.contentHash) + size(part.text) + size(part.contentId) + size(part.contentLocation) + size(part.issue) +
                     24L * part.childPartIds.size + part.contacts.sumOf { contact ->
                         256L + size(contact.name) + size(contact.organization) + size(contact.title) + size(contact.notes) +
                             size(contact.importWarning) + (contact.photoBytes?.size ?: 0) +

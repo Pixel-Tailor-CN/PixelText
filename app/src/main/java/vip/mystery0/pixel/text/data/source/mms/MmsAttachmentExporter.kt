@@ -28,6 +28,7 @@ import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.domain.model.mms.usesInlineTextCopy
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 
@@ -156,13 +157,13 @@ class MmsAttachmentExporter(
             mimeType = mimeType,
             partId = key.partId,
         )
+        if (part.usesInlineTextCopy()) {
+            return Source.InlineText(requireNotNull(part.text), mimeType, displayName)
+        }
         val localUri = part.attachment?.localUri
         if (part.attachment?.state == MirrorAttachmentState.READY && localUri != null) {
             val file = localMirrorFile(localUri)
             return Source.FileSource(file, mimeType, displayName)
-        }
-        if (part.text != null && MmsMimeTypes.canExportInlineText(part.mimeType)) {
-            return Source.InlineText(part.text, mimeType, displayName)
         }
         if (part.attachment?.state == MirrorAttachmentState.READY) {
             throw MmsAttachmentExportException(MmsAttachmentFailureReason.SOURCE_MISSING)

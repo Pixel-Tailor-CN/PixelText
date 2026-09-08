@@ -160,8 +160,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
                     if (request != mediaRequest) return@collect
                     if (attachment == null || attachment.state != MirrorAttachmentState.READY ||
                         attachment.localUri != part.localUri || attachment.sha256 != part.contentHash) {
-                        stop()
-                        mutableState.value = MmsPlaybackState(error = "附件已删除或更新，请重新打开")
+                        stopForSourceChange(part.key)
                     }
                 }
             }
@@ -185,6 +184,21 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
         checkMainThread()
         mutablePresentation.value = null
         stopCurrent()
+    }
+
+    /** 来源更新后保留受影响身份，后续模型刷新不能把原因清掉。 */
+    private fun stopForSourceChange(key: MmsPartKey) {
+        stop()
+        mutableState.value = MmsPlaybackState(partKey = key, error = "附件已删除或更新，请重新打开")
+    }
+
+    fun onViewerSourceChanged(part: MmsPartContent) {
+        checkMainThread()
+        if (state.value.partKey == part.key) {
+            if (contentKey != null && (contentKey != part.mediaCacheKey() || part.state != MirrorAttachmentState.READY)) {
+                stopForSourceChange(part.key)
+            }
+        } else stop()
     }
 
     private fun stopCurrent() {

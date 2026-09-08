@@ -20,7 +20,9 @@ fun MmsPartScreen(key: MmsPartKey, onBack: () -> Unit) {
     val loaded by viewModel.loaded.collectAsState()
     LaunchedEffect(key.message) { viewModel.load(key.message) }
     val part = model?.parts?.firstOrNull { it.key == key }
-    if (part != null && part.issue != "preparing") when (part.kind) {
+    // 媒体刷新准备态继续持有同一查看会话，避免销毁播放器时抹掉换源停止原因。
+    if (part != null && (part.issue != "preparing" ||
+            part.kind in setOf(MmsContentKind.AUDIO, MmsContentKind.VIDEO))) when (part.kind) {
         MmsContentKind.IMAGE -> { MmsImageViewer(part, onBack); return }
         MmsContentKind.AUDIO, MmsContentKind.VIDEO -> { MmsMediaViewer(part, onBack); return }
         MmsContentKind.HTML -> { MmsHtmlViewer(part, model!!.parts, onBack); return }

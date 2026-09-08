@@ -44,6 +44,10 @@ data class MmsPartContent(
     /** 后台派生的名片/事件；异常时保留带提示的模型和本 part 原件。 */
     val contacts: List<MmsContactModel> = emptyList(),
     val calendarEvents: List<MmsCalendarModel> = emptyList(),
+    /** 与读取/导出的共享来源选择一致；true 表示 UTF-8 重编码副本。 */
+    val inlineTextCopy: Boolean = false,
+    /** 后台从本 HTML 清洗提取的有界摘要，不混入其他 part 或消息主题。 */
+    val htmlSummary: String? = null,
 )
 
 /** SMIL 派生的顺序页；尚未解析展示结构时为空列表。 */
