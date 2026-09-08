@@ -11,11 +11,18 @@ import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
+import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
+import vip.mystery0.pixel.text.data.source.ContactDataSource
 
 /** 独立稳定通知 ID；重复接收/正文更新静音，已读或用户划掉后不重新弹出。 */
-class MmsReceptionNotifications(private val context: Context, private val content: MmsContentRepository) {
+class MmsReceptionNotifications(
+    private val context: Context,
+    private val content: MmsContentRepository,
+    private val profiles: SenderProfileRepository,
+    private val contacts: ContactDataSource,
+) {
     private val journal = MmsReceptionJournal(context, "mms_reception_notifications")
-    fun received(id: Long, identity: String, reception: JSONObject) {
+    suspend fun received(id: Long, identity: String, reception: JSONObject) {
         if (journal.get(id.toString()) != null) return
         val row = source(id) ?: return
         val record = JSONObject().put("identity", identity).put("sender", MmsAddresses.clean(reception.optString("from")))
@@ -47,9 +54,15 @@ class MmsReceptionNotifications(private val context: Context, private val conten
         }
     }
 
-    private fun show(id: Long, thread: Long, record: JSONObject, silent: Boolean) {
-        SmsNotificationHelper.showSmsNotification(context, record.optString("sender").ifBlank { "未知发件人" },
+    private suspend fun show(id: Long, thread: Long, record: JSONObject, silent: Boolean) {
+        val sender = record.optString("sender").ifBlank { "未知发件人" }
+        val profile = try { profiles.findByNumber(sender) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
+        val contact = runCatching { contacts.getDisplayName(sender) }.getOrNull()
+        SmsNotificationHelper.showSmsNotification(context, sender,
             record.getString("summary"), threadId = thread, messageUri = "content://mms/$id",
+            displaySender = contact ?: profile?.displayName ?: sender, avatarPath = profile?.avatarPath,
             notificationIdOverride = notificationId(id), silent = silent)
     }
     private data class Source(val thread: Long, val read: Boolean, val type: Int)

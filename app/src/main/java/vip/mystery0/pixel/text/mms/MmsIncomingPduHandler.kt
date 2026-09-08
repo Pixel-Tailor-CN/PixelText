@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.json.JSONArray
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 import vip.mystery0.pixel.text.util.SimInfoProvider
@@ -25,42 +26,72 @@ class MmsIncomingPduHandler(
     private val journal = MmsReceptionJournal(context, "mms_receptions")
     private val mutex = Mutex()
     private val reports = MmsReceptionReports(context)
+    private val queue = MmsIncomingPduQueue(context)
 
     fun reportStates(mmsId: Long): List<MmsReceptionReportState> = reports.states(mmsId)
 
-    suspend fun handleIncoming(data: ByteArray, subscriptionId: Int) = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            when (val event = WapPushPduParser.parse(data)) {
-                is MmsIncomingEvent.Notification -> {
-                    val value = event.value
-                    val identity = JSONObject().put("sub", subscriptionId)
-                        .put("transaction", MmsReceptionJournal.encode(value.transaction))
-                        .put("location", value.contentLocation).toString()
-                    val key = MmsReceptionJournal.hash(identity.toByteArray())
-                    val record = journal.get(key) ?: run {
-                        val now = System.currentTimeMillis()
-                        JSONObject().put("phase", "claimed").put("received", now)
-                            .put("sub", subscriptionId).put("transaction", MmsReceptionJournal.encode(value.transaction))
-                            .put("location", value.contentLocation).put("expiry", value.deadline(now))
-                            .put("expiry_relative", value.expiryRelative).put("expiry_value", value.expiryValue)
-                            .put("version", value.version).put("from", value.from.orEmpty())
-                            .put("subject", value.subject.orEmpty()).put("size", value.messageSize)
-                            .put("mode", if (settings.settings.value.autoDownloadMms) "auto" else "deferred")
-                            .also { journal.put(key, it) }
-                    }
-                    resume(key, record)
-                }
-                is MmsIncomingEvent.Report -> reports.receive(event, data, subscriptionId)
-                is MmsIncomingEvent.Unsupported -> Log.i(TAG, "mms unsupported type=${event.type}")
-                MmsIncomingEvent.Invalid -> Log.w(TAG, "mms invalid push")
-            }
+    suspend fun enqueue(data: ByteArray, subscriptionId: Int, received: Long) = withContext(Dispatchers.IO) {
+        if (data.size !in 1..MmsIncomingPduQueue.MAX_PUSH_BYTES) {
+            Log.w(TAG, "mms invalid push size")
+            return@withContext
         }
+        queue.enqueue(MmsIncomingPduQueue.Event(data, subscriptionId, received, settings.settings.value.autoDownloadMms))
+        Log.i(TAG, "mms incoming queued bytes=${data.size} sub_id=$subscriptionId")
+        // 原事件已经独立落盘；即使调度失败，启动/周期恢复仍能重新发现。
+        MessageMirrorScheduler(context).enqueueMetadata()
+    }
+
+    private fun consume(eventFile: java.io.File) {
+        val queued = try { queue.read(eventFile) }
+        catch (_: IllegalArgumentException) {
+            queue.quarantine(eventFile)
+            Log.w(TAG, "mms incoming quarantined")
+            return
+        }
+        catch (_: java.io.EOFException) {
+            queue.quarantine(eventFile)
+            Log.w(TAG, "mms incoming quarantined")
+            return
+        }
+        val data = queued.data
+        val subscriptionId = queued.sub
+        when (val event = WapPushPduParser.parse(data)) {
+            is MmsIncomingEvent.Notification -> {
+                val value = event.value
+                val identity = JSONObject().put("sub", subscriptionId)
+                    .put("transaction", MmsReceptionJournal.encode(value.transaction))
+                    .put("location", value.contentLocation).toString()
+                val key = MmsReceptionJournal.hash(identity.toByteArray())
+                if (journal.get(key) == null) run {
+                    val now = queued.received
+                    JSONObject().put("phase", "claimed").put("received", now)
+                        .put("sub", subscriptionId).put("transaction", MmsReceptionJournal.encode(value.transaction))
+                        .put("location", value.contentLocation).put("expiry", value.deadline(now))
+                        .put("expiry_relative", value.expiryRelative).put("expiry_value", value.expiryValue)
+                        .put("version", value.version).put("from", value.from.orEmpty())
+                        .put("subject", value.subject.orEmpty()).put("size", value.messageSize)
+                        .put("mode", if (queued.auto) "auto" else "deferred")
+                        .also { journal.put(key, it) }
+                }
+            }
+            is MmsIncomingEvent.Report -> reports.receive(event, data, subscriptionId)
+            is MmsIncomingEvent.Unsupported -> Log.i(TAG, "mms unsupported type=${event.type}")
+            MmsIncomingEvent.Invalid -> Log.w(TAG, "mms invalid push")
+        }
+        // 身份/报告日志已持久化，重复消费仍走逻辑事件去重。
+        queue.remove(eventFile)
     }
 
     suspend fun recover(): Boolean = withContext(Dispatchers.IO) {
         mutex.withLock {
             var retry = false
-            journal.entries().forEach { (key, record) ->
+            queue.pending().forEach { file ->
+                try { consume(file) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { retry = true; Log.w(TAG, "mms incoming consume unavailable") }
+            }
+            // 插入中断留下的身份优先恢复，不能被后来同 Provider 键的另一个源抢占。
+            journal.entries().sortedBy { if (it.second.has("insert_baseline")) 0 else 1 }.forEach { (key, record) ->
                 try {
                     if (record.optString("phase") != "deleted") resume(key, record)
                     else if (System.currentTimeMillis() - record.optLong("deleted_at") > TOMBSTONE_LIFETIME &&
@@ -69,6 +100,7 @@ class MmsIncomingPduHandler(
                 catch (_: Exception) { retry = true; Log.w(TAG, "mms reception recovery unavailable") }
             }
             reports.recover()
+            queue.cleanup()
             retry
         }
     }
@@ -97,13 +129,38 @@ class MmsIncomingPduHandler(
                 journal.put(key, record)
             }
             val transaction = MmsReceptionJournal.decode(record.getString("transaction")).toString(Charsets.ISO_8859_1)
-            val ids = resolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id"),
-                "tr_id = ? AND ct_l = ? AND sub_id = ?",
-                arrayOf(transaction, record.getString("location"), record.getInt("provider_sub").toString()), null)
-                ?.use { cursor -> buildList<Long> { while (cursor.moveToNext()) add(cursor.getLong(0)) } }
+            val claims = journal.entries().filter { it.first != key }
+            check(claims.none { (_, other) -> other.optLong("mms_id", -1) <= 0 && other.has("insert_baseline") &&
+                other.optInt("provider_sub", -1) == record.getInt("provider_sub") &&
+                other.optString("transaction") == record.getString("transaction") &&
+                other.optString("location") == record.getString("location") }) { "mms earlier claim pending" }
+            val owned = claims.map { it.second.optLong("mms_id", -1) }.filter { it > 0 }.toSet()
+            val candidates = resolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id", "date", "exp", "sub_id"),
+                "tr_id = ? AND ct_l = ? AND sub_id IN (?, ?) AND m_type = 130",
+                arrayOf(transaction, record.getString("location"), record.getInt("provider_sub").toString(), record.getInt("sub").toString()), null)
+                ?.use { cursor -> buildList<LegacyRow> { while (cursor.moveToNext()) add(LegacyRow(cursor.getLong(0), cursor.getLong(1), cursor.getLong(2), cursor.getInt(3))) } }
                 ?: error("mms claim query unavailable")
-            check(ids.size <= 1) { "mms ambiguous legacy notification" }
-            id = ids.singleOrNull() ?: resolver.insert(Telephony.Mms.CONTENT_URI, ContentValues().apply {
+            val baseline = record.optJSONArray("insert_baseline")
+            val beforeInsert = baseline?.let { (0 until it.length()).map(it::getLong).toSet() }
+            val available = candidates.filter { it.id !in owned && (beforeInsert == null || it.id !in beforeInsert) }
+            // 原卡暂不可用时，仍可认领保存了同一原sub的旧行；降级-1不能证明另一个源的身份。
+            val eligible = available.filter {
+                beforeInsert != null || it.sub == record.getInt("sub")
+            }
+            val recovered = eligible.singleOrNull()
+            check(eligible.size <= 1 || beforeInsert == null) { "mms ambiguous interrupted insert" }
+            if (recovered != null && beforeInsert == null) {
+                // 旧130行保留首次接收与截止证据。重推的相对Expiry不能延长原寿命。
+                if (recovered.date > 0) record.put("received", minOf(record.getLong("received"), recovered.date * 1000))
+                record.put("expiry", minOf(record.getLong("expiry"), recovered.expiry.coerceAtLeast(0)))
+                    .put("mode", "deferred").put("legacy_claim", true)
+                journal.put(key, record)
+            }
+            if (recovered == null && beforeInsert == null) {
+                record.put("insert_baseline", JSONArray(candidates.map { it.id }))
+                journal.put(key, record)
+            }
+            id = recovered?.id ?: resolver.insert(Telephony.Mms.CONTENT_URI, ContentValues().apply {
                 put("date", record.getLong("received") / 1000)
                 put("read", 0); put("seen", 0); put("msg_box", 1); put("m_type", 130)
                 put("ct_l", record.getString("location")); put("tr_id", transaction)
@@ -116,6 +173,7 @@ class MmsIncomingPduHandler(
                 }
             })?.lastPathSegment?.toLong() ?: error("mms placeholder insert failed")
             record.put("mms_id", id).put("phase", "address_pending")
+            record.remove("insert_baseline")
             journal.put(key, record)
         }
         if (record.optString("phase") != "ready") {
@@ -141,4 +199,5 @@ class MmsIncomingPduHandler(
         private const val TAG = "MmsIncoming"
         private const val TOMBSTONE_LIFETIME = 30L * 24 * 60 * 60 * 1000
     }
+    private data class LegacyRow(val id: Long, val date: Long, val expiry: Long, val sub: Int)
 }

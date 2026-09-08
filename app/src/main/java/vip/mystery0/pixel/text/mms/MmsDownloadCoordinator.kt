@@ -224,6 +224,7 @@ class MmsDownloadCoordinator(
                 check(isCommitted(key.toLong())) { "mms commit missing" }
             }
             record.put("phase", "complete").put("committed", true)
+            record.remove("reason")
             requests.put(key, record)
             revokeFile(token)
             Log.i(TAG, "mms content committed message_id=$key")

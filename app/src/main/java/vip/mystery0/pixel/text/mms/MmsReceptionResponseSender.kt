@@ -49,13 +49,8 @@ class MmsReceptionResponseSender(private val context: Context) {
         val encoded = encode(type, status, transaction)
         val sub = source.getInt("sub")
         val key = MmsReceptionJournal.hash("$mmsId:$sub:$type:$status:".toByteArray() + transaction)
+        if (status == DEFERRED && hasSuccess(mmsId)) return@withLock
         if (journal.get(key) != null) return@withLock
-        if (status != DEFERRED) {
-            // 尚未交给平台的旧延期响应失去意义；已发送或在途响应不能伪装撤回。
-            journal.entries().filter { it.second.optLong("mms_id") == mmsId &&
-                it.second.optInt("status") == DEFERRED && it.second.optString("phase") in setOf("pending", "retry_wait")
-            }.forEach { (oldKey, old) -> old.put("phase", "cancelled"); journal.put(oldKey, old); cleanup(old) }
-        }
         val now = System.currentTimeMillis()
         val useLocation = sub >= 0 && context.getSystemService(SmsManager::class.java).createForSubscriptionId(sub)
             .carrierConfigValues.getBoolean(SmsManager.MMS_CONFIG_NOTIFY_WAP_MMSC_ENABLED)
@@ -65,6 +60,10 @@ class MmsReceptionResponseSender(private val context: Context) {
             .put("location_policy", if (useLocation) "notification" else "apn")
             .put("created", now).put("deadline", now + RESPONSE_LIFETIME)
             .put("phase", "pending").put("attempts", 0).put("next", now))
+        // 成功事件先落盘；若之后中断，恢复可从此事件重建旧延期已被替代的事实。
+        if (status != DEFERRED) journal.entries().filter {
+            it.second.optLong("mms_id") == mmsId && it.second.optInt("status") == DEFERRED
+        }.forEach { (oldKey, old) -> supersede(oldKey, old) }
         schedule(0)
     }
 
@@ -77,6 +76,7 @@ class MmsReceptionResponseSender(private val context: Context) {
                 record.put("phase", "sent")
                 record.remove("reason")
             }
+            else if (isSuperseded(record)) record.put("phase", "cancelled").put("reason", "superseded")
             else retry(record, "platform_error")
             journal.put(key, record)
             cleanup(record)
@@ -89,8 +89,10 @@ class MmsReceptionResponseSender(private val context: Context) {
         mutex.withLock {
             val now = System.currentTimeMillis()
             var more = false
-            val busySources = mutableSetOf<Long>()
             val records = journal.entries()
+            // 全量在途集合先建立，不能依赖创建顺序碰巧先遍历到后创建的Ack。
+            val busySources = records.filter { it.second.optString("phase") == "sending" &&
+                now - it.second.optLong("started") < TIMEOUT }.map { it.second.optLong("mms_id") }.toMutableSet()
             records.sortedBy { it.second.optLong("created") }.forEach { (key, record) ->
                 try {
                     val id = record.optLong("mms_id", -1)
@@ -102,6 +104,10 @@ class MmsReceptionResponseSender(private val context: Context) {
                         cleanup(record); journal.remove(key); return@forEach
                     }
                     var phase = record.optString("phase")
+                    if (isSuperseded(record)) {
+                        supersede(key, record)
+                        phase = record.optString("phase")
+                    }
                     if (phase in TERMINAL) { cleanup(record); return@forEach }
                     if (!record.has("sub") || !record.has("deadline") || record.optString("pdu").isBlank()) {
                         record.put("phase", "terminal_failed").put("reason", "state_invalid")
@@ -109,10 +115,13 @@ class MmsReceptionResponseSender(private val context: Context) {
                     }
                     more = true
                     if (phase == "sending") {
-                        if (now - record.optLong("started") < TIMEOUT) { busySources.add(id); return@forEach }
-                        retry(record, "callback_timeout"); journal.put(key, record); cleanup(record)
+                        if (now - record.optLong("started") < TIMEOUT) return@forEach
+                        if (isSuperseded(record)) record.put("phase", "cancelled").put("reason", "superseded")
+                        else retry(record, "callback_timeout")
+                        journal.put(key, record); cleanup(record)
                         phase = record.optString("phase")
                     }
+                    if (phase in TERMINAL) return@forEach
                     if (now >= record.getLong("deadline") || record.optInt("attempts") >= MAX_ATTEMPTS) {
                         record.put("phase", "terminal_failed").put("reason", "retry_exhausted")
                         journal.put(key, record); cleanup(record); return@forEach
@@ -169,6 +178,24 @@ class MmsReceptionResponseSender(private val context: Context) {
             }?.forEach { file -> file.delete() }
             more
         }
+    }
+
+    private fun hasSuccess(id: Long): Boolean = journal.entries().any {
+        it.second.optLong("mms_id") == id && (it.second.optInt("type") == ACKNOWLEDGE ||
+            (it.second.optInt("type") == NOTIFY_RESP && it.second.optInt("status") == RETRIEVED))
+    }
+
+    private fun isSuperseded(record: JSONObject): Boolean = record.optInt("status") == DEFERRED &&
+        (record.optBoolean("superseded") || hasSuccess(record.optLong("mms_id")))
+
+    private fun supersede(key: String, record: JSONObject) {
+        record.put("superseded", true)
+        if (record.optString("phase") !in TERMINAL && record.optString("phase") != "sending") {
+            record.put("phase", "cancelled").put("reason", "superseded")
+        }
+        journal.put(key, record)
+        // 在途只禁止后续重试，不撤销平台仍在读取的文件，也保留真实回调结果。
+        if (record.optString("phase") != "sending") cleanup(record)
     }
 
     private fun retry(record: JSONObject, reason: String) {
