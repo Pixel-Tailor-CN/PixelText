@@ -8,6 +8,7 @@ import androidx.core.net.toUri
 import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
 import vip.mystery0.pixel.text.mms.vendor.pdu.EncodedStringValue
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduHeaders
+import vip.mystery0.pixel.text.mms.vendor.pdu.PduPart
 import vip.mystery0.pixel.text.mms.vendor.pdu.RetrieveConf
 import java.nio.charset.Charset
 
@@ -20,6 +21,7 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
     fun persist(
         mmsId: Long, message: RetrieveConf,
         previousAddresses: List<Long>, saveOriginalAddresses: (List<Long>) -> Unit,
+        threadId: Long? = null,
     ) {
         check(exists(mmsId)) { "mms deleted" }
         val uri = "content://mms/$mmsId".toUri()
@@ -41,31 +43,44 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             ?: error("mms addresses unavailable")
         // 先落日志；完成标记后的崩溃也能接续清理原占位地址。
         saveOriginalAddresses(originalAddresses)
-        val created = mutableListOf<Uri>()
+        val createdParts = mutableListOf<Uri>()
+        val createdAddressIds = mutableListOf<Long>()
         var committed = false
         try {
             fun address(value: EncodedStringValue?, addressType: Int) {
                 val encoded = value ?: return
                 check(exists(mmsId)) { "mms deleted" }
                 val values = ContentValues().apply {
-                    put("address", encoded.string.substringBefore("/TYPE="))
+                    put("address", MmsAddresses.clean(encoded.string))
                     put("charset", encoded.characterSet)
                     put("type", addressType)
                 }
-                created += resolver.insert(addressesUri, values) ?: error("mms address insert failed")
+                val inserted = resolver.insert(addressesUri, values) ?: error("mms address insert failed")
+                createdAddressIds += inserted.lastPathSegment?.toLongOrNull()
+                    ?: error("mms address identity unavailable")
             }
             address(message.from, PduHeaders.FROM)
             message.to?.forEach { address(it, PduHeaders.TO) }
             message.cc?.forEach { address(it, PduHeaders.CC) }
             message.pduHeaders.getEncodedStringValues(PduHeaders.BCC)?.forEach { address(it, PduHeaders.BCC) }
             val body = message.body
-            for (index in 0 until body.partsNum) {
+            // Provider 没有父子列：先保存容器原件，再按深度优先顺序保存实际子项。
+            // 展示层从容器原件和 CID/Content-Location 派生关系，不改写原始标识。
+            val flattened = buildList {
+                fun append(part: PduPart) {
+                    add(part)
+                    part.children?.let { children ->
+                        for (child in 0 until children.partsNum) append(children.getPart(child))
+                    }
+                }
+                for (index in 0 until body.partsNum) append(body.getPart(index))
+            }
+            for ((index, part) in flattened.withIndex()) {
                 check(exists(mmsId)) { "mms deleted" }
-                val part = body.getPart(index)
                 val contentType = part.contentType?.toString(Charsets.ISO_8859_1)
                     ?: "application/octet-stream"
                 val bytes = part.data ?: byteArrayOf()
-                val inlineText = contentType in setOf("text/plain", "text/html", "application/smil")
+                val inlineText = contentType in setOf("text/plain", "application/smil")
                 val values = ContentValues().apply {
                     put("seq", if (contentType == "application/smil") -1 else index)
                     put("ct", contentType)
@@ -82,15 +97,26 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                         put("text", bytes.toString(charset))
                     }
                 }
-                val partUri = resolver.insert(partsUri, values) ?: error("mms part insert failed")
-                created += partUri
+                // 系统 Provider 会用 name/cl 生成磁盘文件名。先让它生成安全存储名，
+                // 再写回完整原标识，避免长名称或路径影响存储，也不破坏 SMIL/CID 匹配。
+                val insertValues = ContentValues(values).apply {
+                    if (!inlineText) {
+                        remove("name")
+                        remove("fn")
+                        remove("cl")
+                    }
+                }
+                val partUri = resolver.insert(partsUri, insertValues) ?: error("mms part insert failed")
+                createdParts += partUri
                 if (!inlineText) {
                     val output = resolver.openOutputStream(partUri) ?: error("mms part stream unavailable")
                     output.use { it.write(bytes) }
+                    check(resolver.update(partUri, values, null, null) == 1) { "mms part metadata update failed" }
                 }
             }
             check(exists(mmsId)) { "mms deleted" }
             val values = ContentValues().apply {
+                threadId?.let { put("thread_id", it) }
                 put("m_type", PduHeaders.MESSAGE_TYPE_RETRIEVE_CONF)
                 put("v", message.mmsVersion)
                 put("st", 0)
@@ -124,7 +150,13 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
             }
         } catch (error: Exception) {
             // 只清理本请求确实插入的子记录；不删除其他消息。
-            if (!committed) created.asReversed().forEach { child -> runCatching { resolver.delete(child, null, null) } }
+            if (!committed) {
+                createdParts.asReversed().forEach { child -> runCatching { resolver.delete(child, null, null) } }
+                // addr 插入返回的 /mms/addr/<id> 不是可删除单地址路由，必须使用消息父路由。
+                createdAddressIds.asReversed().forEach { id ->
+                    runCatching { resolver.delete(addressesUri, "_id = ?", arrayOf(id.toString())) }
+                }
+            }
             throw error
         }
     }

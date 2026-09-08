@@ -224,7 +224,7 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                     onResultClick = { message ->
                         navController.navigate(
-                            if (message.threadId <= 0) {
+                            if (message.isMms || message.threadId <= 0) {
                                 "mirror_message/${if (message.isMms) "MMS" else "SMS"}/${if (message.isMms) -message.id else message.id}"
                             } else conversationDetailRoute(
                                 message.threadId,
@@ -240,6 +240,15 @@ fun AppNavigation(
                     }
                 )
             }
+            composable("mms_part/{sourceId}/{partId}") { entry ->
+                val sourceId = entry.arguments?.getString("sourceId")?.toLongOrNull()
+                val partId = entry.arguments?.getString("partId")?.toLongOrNull()
+                if (sourceId != null && partId != null) vip.mystery0.pixel.text.ui.screen.MmsPartScreen(
+                    vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(
+                        vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                            vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS, sourceId), partId),
+                    onBack = { navController.popBackStack() })
+            }
             composable("mirror_message/{transport}/{sourceId}") { entry ->
                 val transport = entry.arguments?.getString("transport")?.let {
                     runCatching { vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.valueOf(it) }.getOrNull()
@@ -249,6 +258,7 @@ fun AppNavigation(
                     vip.mystery0.pixel.text.ui.screen.MirrorMessageDetailScreen(
                         vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(transport, sourceId),
                         onBack = { navController.popBackStack() },
+                        onOpenPart = { navController.navigate("mms_part/${it.message.sourceId}/${it.partId}") },
                     )
                 }
             }
@@ -283,6 +293,8 @@ fun AppNavigation(
                     address = address,
                     targetMessageId = targetMessageId,
                     requestedContentFilter = contentFilter,
+                    onOpenMmsPart = { part -> navController.navigate(if (part.partId < 0)
+                        "mirror_message/MMS/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = { content, sender, category ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {

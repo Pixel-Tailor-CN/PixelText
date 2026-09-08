@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 只允许打开本次操作生成的缓存副本，不暴露镜像私有目录。 -->
+    <cache-path
+        name="mms_share"
+        path="mms-share/" />
+</paths>

@@ -18,3 +18,11 @@ local.properties
 /samples/
 /app/release/
 .codex-remote-attachments/
+
+# 本地消息镜像交接、进度与评审记录
+/docs/plans/2026-09-06-message-mirror-core-brief.md
+/docs/plans/2026-09-06-message-mirror-core-report.md
+/docs/plans/2026-09-06-message-mirror-core-review.md
+/docs/plans/2026-09-06-message-mirror-download-review.md
+/docs/plans/2026-09-06-message-mirror-final-review.md
+/docs/plans/2026-09-06-message-mirror-progress.md

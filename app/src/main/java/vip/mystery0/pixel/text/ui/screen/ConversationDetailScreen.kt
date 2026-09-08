@@ -135,6 +135,7 @@ fun ConversationDetailScreen(
         sender: String,
         category: String,
     ) -> Unit = { _, _, _ -> },
+    onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
     isTablet: Boolean = false,
     initialMessageText: String = "",
     viewModel: ConversationDetailViewModel = koinViewModel(),
@@ -143,6 +144,7 @@ fun ConversationDetailScreen(
     themeAssetRepository: ThemeAssetRepository = koinInject(),
     highTextContrastMonitor: HighTextContrastMonitor = koinInject(),
 ) {
+    vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackSession(org.koin.compose.koinInject())
     val appSettings by settingsRepository.settings.collectAsState()
     val themeConfiguration by themeRepository.configuration.collectAsState()
     val highTextContrast by highTextContrastMonitor.enabled.collectAsState()
@@ -783,6 +785,8 @@ fun ConversationDetailScreen(
                             val isTargetHighlighted = highlightedMessageId == message.id
                             MessageItem(
                                 message = message,
+                                selectionMode = selectedMessageIds.isNotEmpty(),
+                                onOpenMmsPart = onOpenMmsPart,
                                 isSelected = isSelected,
                                 isHighlighted = isTargetHighlighted,
                                 textScale = textScale,

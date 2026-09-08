@@ -4,6 +4,7 @@ import android.util.Log
 import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
@@ -22,6 +23,8 @@ class MessageMirrorSynchronizer(
     private val dao get() = database.mirrorDao()
     private val sync get() = database.syncDao()
     var onMessageDeleted: (suspend (SourceMessageKey) -> Unit)? = null
+    /** 镜像删除事务成功后同步失效，清除删除前回调挂起期间的新派生缓存。 */
+    var onMessageDeletionCommitted: ((SourceMessageKey) -> Unit)? = null
 
     /** 不等待扫描锁，确保扫描中的 Provider 事件可以立即持久化。 */
     suspend fun markDirty(key: SourceMessageKey?, verifyAttachments: Boolean = false) {
@@ -222,7 +225,13 @@ class MessageMirrorSynchronizer(
         // 派生缓存清理失败时保留源记录与 dirty，下一轮重试。
         try {
             onMessageDeleted?.invoke(key)
-            return dao.deleteConfirmed(record.localId, record.revision)
+            currentCoroutineContext().ensureActive()
+            // 将已确认的本地删除与同步失效作为短临界段完成，避免事务提交后因取消漏掉失效。
+            return withContext(NonCancellable) {
+                dao.deleteConfirmed(record.localId, record.revision).also { deleted ->
+                    if (deleted) onMessageDeletionCommitted?.invoke(key)
+                }
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {

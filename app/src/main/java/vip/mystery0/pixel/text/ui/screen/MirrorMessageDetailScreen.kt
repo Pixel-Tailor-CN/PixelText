@@ -22,7 +22,12 @@ import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel
 
 @Composable
-fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit) {
+fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit,
+    onOpenPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {}) {
+    val contentViewModel = koinViewModel<vip.mystery0.pixel.text.viewmodel.MmsContentViewModel>()
+    val content by contentViewModel.content.collectAsState()
+    LaunchedEffect(key) { if (key.transport == vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS) contentViewModel.load(key) }
+    vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackSession(org.koin.compose.koinInject())
     val viewModel = koinViewModel<MirrorMessageDetailViewModel>()
     val message by viewModel.message.collectAsState()
     val loaded by viewModel.loaded.collectAsState()
@@ -41,17 +46,13 @@ fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit) {
                 Column(Modifier.padding(16.dp)) {
                     Text(current.address.orEmpty())
                     current.addresses.forEach { Text(it.address.orEmpty()) }
-                    current.decodedSubject?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    current.body?.let { Text(it) }
-                    if (current.pduType == 130) MmsDownloadCard(current.key.sourceId)
-                    current.parts.forEach { part ->
-                        part.text?.let { Text(it) }
-                        if (part.mimeType?.startsWith("image/") == true) {
-                            part.attachment?.localUri?.let { MmsImageCard(listOf(it)) }
-                        } else if (part.attachment != null) {
-                            Text(part.filename ?: part.name ?: part.mimeType ?: "附件")
-                        }
-                    }
+                    Text(if (current.boxType == 1) "收到的消息" else "发出的消息")
+                    current.subscriptionId?.let { Text("SIM · $it") }
+                    if (key.transport == vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS) {
+                        content?.let { vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, false, true, onOpenPart) }
+                            ?: Text("正在读取彩信")
+                    } else current.body?.let { Text(it) }
+
                 }
             }
         }

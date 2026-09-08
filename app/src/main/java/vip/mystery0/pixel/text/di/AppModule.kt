@@ -1,5 +1,9 @@
 package vip.mystery0.pixel.text.di
 
+import coil3.ImageLoader
+import coil3.gif.AnimatedImageDecoder
+import vip.mystery0.pixel.text.data.source.mms.MmsMediaMetadataReader
+import vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackController
 import android.content.ContentResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +16,13 @@ import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorRepositoryImpl
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.data.repository.mms.MmsContentRepositoryImpl
+import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExporter
+import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
+import vip.mystery0.pixel.text.domain.parser.mms.MmsHtmlParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsContactParser
+import vip.mystery0.pixel.text.domain.parser.mms.MmsCalendarParser
+import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
@@ -102,10 +113,18 @@ val appModule = module {
     single { MirrorAttachmentStore(androidContext()) }
     single { MirrorAttachmentCopier(get(), get()) }
     single { MessageMirrorScheduler(androidContext()) }
-    single { MmsDownloadCoordinator(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.mms.MmsReceptionResponseSender(androidContext()) }
+    single { vip.mystery0.pixel.text.mms.MmsReceptionNotifications(androidContext(), get(), get(), get()) }
+    single { MmsDownloadCoordinator(androidContext(), get(), get()) }
+    single { vip.mystery0.pixel.text.mms.MmsIncomingPduHandler(androidContext(), get(), get(), get()) }
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
+            onMessageDeletionCommitted = { key ->
+                get<MmsContentRepositoryImpl>().invalidate(key)
+                get<MmsPlaybackController>().onMessageDeleted(key)
+            }
             onMessageDeleted = { key ->
+                get<MmsContentRepositoryImpl>().invalidate(key)
                 val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
                 get<SpamRepository>().delete(setOf(id))
                 if (key.transport == MessageTransport.SMS) {
@@ -115,6 +134,17 @@ val appModule = module {
         }
     }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
+    single { MmsPartReader() }
+    single { MmsHtmlParser() }
+    single { MmsContactParser() }
+    single { MmsCalendarParser() }
+    single { ImageLoader.Builder(androidContext()).components { add(AnimatedImageDecoder.Factory()) }.build() }
+    single { MmsMediaMetadataReader(androidContext()) }
+    single { MmsPlaybackController(androidContext(), get()) }
+    single { MmsAttachmentExporter(androidContext(), get()) }
+    single { MmsContentRepositoryImpl(get(), get(), get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer(get(), get(), get()) }
+    single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
         MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
             onDirty = { get<MessageMirrorScheduler>().schedule() }
@@ -137,10 +167,11 @@ val appModule = module {
         ConversationCacheRepository(androidContext(), get(), get(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
     }
     viewModel { MessageViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MmsContentViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }

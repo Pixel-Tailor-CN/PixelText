@@ -128,6 +128,9 @@
 
         <!-- 6. BroadcastReceiver for MMS download completion callback -->
         <receiver
+            android:name=".mms.MmsReceptionResponseReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".mms.MmsDownloadReceiver"
             android:exported="false">
             <intent-filter>
@@ -143,6 +146,16 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/mms_download_paths" />
+        </provider>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.mms.attachment"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/mms_attachment_paths" />
         </provider>
 
         <!-- 7. Smartspacer 验证码 Target -->

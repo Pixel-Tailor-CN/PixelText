@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.data.repository.mirror
 
+import vip.mystery0.pixel.text.data.repository.mms.mmsContentFingerprint
+import vip.mystery0.pixel.text.data.repository.mms.mmsAttachmentSummary
+import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import org.json.JSONArray
@@ -70,9 +73,9 @@ class MessageMirrorRepositoryImpl(
         }.distinctUntilChanged().flowOn(Dispatchers.IO)
     }
 
-    private fun MirrorMessageRecord.toModel(): MirrorMessageModel {
+    private suspend fun MirrorMessageRecord.toModel(): MirrorMessageModel {
         val attachmentMap = attachments.associateBy { it.partId }
-        return MirrorMessageModel(
+        val model = MirrorMessageModel(
             localId = message.localId, key = SourceMessageKey(MessageTransport.valueOf(message.transport), message.sourceId),
             revision = message.revision, threadId = message.threadId, timestamp = message.timestamp,
             originalDate = message.originalDate, dateUnit = message.dateUnit, subscriptionId = message.subscriptionId,
@@ -93,6 +96,8 @@ class MessageMirrorRepositoryImpl(
                         it.sourceUri, it.byteCount, it.sha256, it.error) })
             },
         )
+        val derived = mmsText?.takeIf { it.version == vip.mystery0.pixel.text.data.repository.mms.MMS_TEXT_INDEX_VERSION && it.fingerprint == mmsContentFingerprint(model) }
+        return model.copy(mmsSummary = derived?.summary, mmsSearchableText = derived?.searchableText)
     }
 }
 
@@ -104,12 +109,13 @@ fun MirrorMessageModel.toMessageModel(): MessageModel {
         ?: addresses.firstOrNull { it.address != "insert-address-token" }?.address.orEmpty()
     return MessageModel(
         id = if (mms) -key.sourceId else key.sourceId, threadId = threadId ?: -1,
-        sender = sender, content = if (mms) parts.filter { it.mimeType?.startsWith("text/") == true }
-            .mapNotNull { it.text }.joinToString("\n") else body.orEmpty(),
+        sender = sender, content = if (mms) mmsSearchableText ?: decodedSubject ?: subject ?: "" else body.orEmpty(),
         timestamp = timestamp ?: 0, subId = subscriptionId ?: -1,
         isRead = read == 1, isReceived = boxType == 1,
         imageUris = parts.filter { it.mimeType?.startsWith("image/") == true }.mapNotNull { it.attachment?.localUri },
         mmsSubject = decodedSubject ?: subject, isMms = mms,
         mmsDownloadPending = mms && pduType == 130,
+        mmsSummary = if (mms) mmsSummary ?: decodedSubject ?: subject ?: if (pduType == 130) "等待下载彩信"
+            else mmsAttachmentSummary(parts.map { MmsMimeTypes.classify(it.mimeType) }) else null,
     )
 }

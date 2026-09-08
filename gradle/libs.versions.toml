@@ -26,6 +26,11 @@ okhttp = "5.5.0"
 retrofit = "3.0.0"
 moshi = "1.15.2"
 smartspacer = "1.1.2"
+coil = "3.6.2"
+media3 = "1.11.0"
+jsoup = "1.23.2"
+webkit = "1.17.0"
+ezvcard = "0.12.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +59,15 @@ retrofit-converter-moshi = { group = "com.squareup.retrofit2", name = "converter
 moshi = { group = "com.squareup.moshi", name = "moshi", version.ref = "moshi" }
 moshi-kotlin-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
 smartspacer-sdk-plugin = { group = "com.kieronquinn.smartspacer", name = "sdk-plugin", version.ref = "smartspacer" }
+
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-gif = { group = "io.coil-kt.coil3", name = "coil-gif", version.ref = "coil" }
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "media3" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
+
+ezvcard = { group = "com.googlecode.ez-vcard", name = "ez-vcard", version.ref = "ezvcard" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

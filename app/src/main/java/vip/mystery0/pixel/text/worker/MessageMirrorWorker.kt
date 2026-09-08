@@ -16,6 +16,9 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params), KoinComponent {
     private val synchronizer: MessageMirrorSynchronizer by inject()
     private val downloads: MmsDownloadCoordinator by inject()
+    private val incoming: vip.mystery0.pixel.text.mms.MmsIncomingPduHandler by inject()
+    private val responses: vip.mystery0.pixel.text.mms.MmsReceptionResponseSender by inject()
+    private val notifications: vip.mystery0.pixel.text.mms.MmsReceptionNotifications by inject()
     private val scheduler: MessageMirrorScheduler by inject()
     private val database: vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase by inject()
 
@@ -25,11 +28,14 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
         }
         return try {
             // 新下载结果优先尝试持久化；后续失败恢复由独立附件任务退避。
+            incoming.recover()
             downloads.recover()
+            responses.recover()
             val sync = database.syncDao()
             val needsMetadata = inputData.getBoolean("force_reconcile", false) || sync.dirtyCount() > 0 ||
                 listOf("ROUND", "SMS", "MMS", "THREADS", "CANONICAL").any { sync.state(it)?.complete != true }
             if (needsMetadata) synchronizer.reconcile()
+            notifications.refresh()
             // reconcile 的总返回值也包含文件清理；清理失败由附件链退避，不阻塞元数据链。
             val moreMetadata = sync.dirtyCount() > 0 ||
                 listOf("ROUND", "SMS", "MMS").any { sync.state(it)?.complete != true }

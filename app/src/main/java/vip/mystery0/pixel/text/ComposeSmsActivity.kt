@@ -25,6 +25,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,20 +56,62 @@ class ComposeSmsActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var targetAddress by rememberSaveable { mutableStateOf(address) }
-                    val threadId = remember(targetAddress) {
-                        if (targetAddress.isBlank()) -1L else getThreadIdForAddress(targetAddress)
+                    var threadId by remember(targetAddress) { mutableStateOf<Long?>(null) }
+                    LaunchedEffect(targetAddress) {
+                        if (targetAddress.isNotBlank()) {
+                            threadId = try {
+                                withContext(Dispatchers.IO) { getThreadIdForAddress(targetAddress) }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                // 权限或 Provider 暂不可用时仍保留按号码编辑和发送的入口。
+                                -1L
+                            }
+                        }
                     }
 
-                    if (targetAddress.isBlank()) {
+                    var openedMmsId by rememberSaveable { mutableStateOf<Long?>(null) }
+                    var openedPartId by rememberSaveable { mutableStateOf<Long?>(null) }
+                    // 只保存身份与上一层来源，系统重建后仍可逐层返回。
+                    var partFromDetail by rememberSaveable { mutableStateOf(false) }
+                    val backFromMms: () -> Unit = {
+                        if (openedPartId != null && openedPartId!! >= 0 && partFromDetail) {
+                            openedPartId = -1L
+                            partFromDetail = false
+                        } else {
+                            openedMmsId = null
+                            openedPartId = null
+                            partFromDetail = false
+                        }
+                    }
+                    val mmsId = openedMmsId
+                    val partId = openedPartId
+                    if (mmsId != null && partId != null) {
+                        androidx.activity.compose.BackHandler(onBack = backFromMms)
+                        val key = vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                            vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS, mmsId)
+                        if (partId < 0) vip.mystery0.pixel.text.ui.screen.MirrorMessageDetailScreen(key,
+                            onBack = backFromMms,
+                            onOpenPart = { partFromDetail = true; openedPartId = it.partId })
+                        else vip.mystery0.pixel.text.ui.screen.MmsPartScreen(
+                            vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(key, partId),
+                            onBack = backFromMms)
+                    } else if (targetAddress.isBlank()) {
                         RecipientEntryScreen(
                             onNavigateBack = { finish() },
                             onRecipientConfirmed = { targetAddress = it }
                         )
+                    } else if (threadId == null) {
+                        // 身份未解析时先等待，避免稍后切换线程重置用户刚输入的草稿。
+                        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            androidx.compose.material3.CircularProgressIndicator()
+                        }
                     } else {
                         ConversationDetailScreen(
-                            threadId = threadId,
+                            threadId = threadId ?: -1L,
                             address = targetAddress,
                             initialMessageText = body,
+                            onOpenMmsPart = { partFromDetail = false; openedMmsId = it.message.sourceId; openedPartId = it.partId },
                             onNavigateBack = { finish() }
                         )
                     }
@@ -96,18 +142,8 @@ class ComposeSmsActivity : ComponentActivity() {
     }
 
     private fun getThreadIdForAddress(address: String): Long {
-        contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf(Telephony.Sms.THREAD_ID),
-            "${Telephony.Sms.ADDRESS} = ?",
-            arrayOf(address),
-            "${Telephony.Sms.DATE} DESC LIMIT 1"
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                return cursor.getLong(0)
-            }
-        }
-        return -1L
+        // 系统按完整收件人集合解析规范线程；纯 MMS 也可找到，不会借用包含该号码的群聊。
+        return Telephony.Threads.getOrCreateThreadId(this, setOf(address))
     }
 }
 

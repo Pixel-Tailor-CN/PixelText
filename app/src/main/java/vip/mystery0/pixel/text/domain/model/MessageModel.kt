@@ -93,7 +93,8 @@ data class MessageModel(
     val mmsSubject: String? = null,
     val isMms: Boolean = false,
     val mmsDownloadPending: Boolean = false,
-    val spamScore: Float = -1f
+    val spamScore: Float = -1f,
+    val mmsSummary: String? = null,
 ) {
     val stableKey: String
         get() = if (id < 0) "mms:${-id}" else "sms:$id"
