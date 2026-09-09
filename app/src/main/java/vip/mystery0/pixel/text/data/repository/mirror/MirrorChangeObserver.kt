@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.data.repository.mirror
 
+import androidx.core.net.toUri
+
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
@@ -34,9 +36,9 @@ class MirrorChangeObserver(
 
     fun start() {
         if (started) return
-        resolver.registerContentObserver(Uri.parse("content://sms"), true, observer)
-        resolver.registerContentObserver(Uri.parse("content://mms"), true, observer)
-        resolver.registerContentObserver(Uri.parse("content://mms-sms"), true, observer)
+        resolver.registerContentObserver("content://sms".toUri(), true, observer)
+        resolver.registerContentObserver("content://mms".toUri(), true, observer)
+        resolver.registerContentObserver("content://mms-sms".toUri(), true, observer)
         started = true
         scope.launch { synchronizer.markDirty(null); onDirty?.invoke() }
     }

@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.cards
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CardDefaults
@@ -32,7 +34,7 @@ fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true, isSelected:
     LaunchedEffect(mmsId) {
         while (true) {
             phase = downloads.state(mmsId)
-            delay(1000)
+            delay(1000.milliseconds)
         }
     }
     val busy = submitting || phase == "downloading" || phase == "persisting"

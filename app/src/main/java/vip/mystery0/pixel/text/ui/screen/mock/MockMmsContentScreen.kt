@@ -77,7 +77,7 @@ fun MockMmsContentScreen(onBack: () -> Unit, repository: MmsContentRepository = 
                         MmsContentKind.IMAGE -> MmsImageContent(part, onOpen = { openedPartId = part.key.partId })
                         MmsContentKind.AUDIO, MmsContentKind.VIDEO -> MmsMediaCard(part, onOpenPart = { openedPartId = it.partId })
                         MmsContentKind.HTML -> MmsHtmlCard(part, onOpenPart = { openedPartId = it.partId })
-                        MmsContentKind.CONTACT -> MmsContactCard(part, model?.parts.orEmpty())
+                        MmsContentKind.CONTACT -> MmsContactCard(part, parts = model?.parts.orEmpty())
                         MmsContentKind.CALENDAR -> MmsCalendarCard(part)
                         else -> MmsFileCard(part)
                     }

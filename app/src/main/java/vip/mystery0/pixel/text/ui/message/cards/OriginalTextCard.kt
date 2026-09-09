@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import vip.mystery0.pixel.text.ui.theme.readableLinkColor
 
-private val DefaultOriginalTextScale = 1f
+private const val DefaultOriginalTextScale = 1f
 
 @Composable
 fun OriginalTextCard(

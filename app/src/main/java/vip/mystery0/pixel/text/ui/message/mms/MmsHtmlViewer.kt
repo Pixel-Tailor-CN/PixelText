@@ -1,8 +1,10 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
+import androidx.core.net.toUri
+
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -117,30 +119,13 @@ fun MmsHtmlViewer(
                                 }
                                 webView.isLongClickable = false
                                 webView.setOnLongClickListener { true }
-                                webView.webViewClient = object : WebViewClient() {
-                                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse =
-                                        if (request.method == "GET") handler.intercept(request.url) else MmsHtmlResourceHandler.denied()
-
-                                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                                        val url = request.url.toString()
-                                        val target = themed.externalLinks[url]
-                                        if (request.isForMainFrame && request.hasGesture() && !request.isRedirect && target != null) {
-                                            pendingLink = target
-                                        }
-                                        return true
-                                    }
-
-                                    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                                        if (url != themed.documentUrl) view.stopLoading()
-                                    }
-
-                                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-                                        container.removeView(view)
-                                        view.destroy()
-                                        unavailable = true
-                                        return true
-                                    }
-                                }
+                                webView.webViewClient = MmsHtmlWebViewClient(
+                                    document = themed,
+                                    handler = handler,
+                                    container = container,
+                                    onExternalLink = { pendingLink = it },
+                                    onUnavailable = { unavailable = true },
+                                )
                                 webView.loadUrl(themed.documentUrl)
                             } catch (_: Exception) {
                                 releaseHtmlWebView(container)
@@ -159,7 +144,7 @@ fun MmsHtmlViewer(
         }
     }
     pendingLink?.let { link ->
-        val scheme = Uri.parse(link).scheme?.lowercase()
+        val scheme = link.toUri().scheme?.lowercase()
         val system = scheme == "tel" || scheme == "mailto"
         AlertDialog(onDismissRequest = { pendingLink = null }, title = { Text(if (system) "打开系统应用？" else "在浏览器中打开链接？") },
             text = { Text(if (system) "将打开拨号或邮件编辑界面：\n$link" else "此操作将离开彩信并访问网络：\n$link") },
@@ -167,7 +152,7 @@ fun MmsHtmlViewer(
                 pendingLink = null
                 try {
                     val action = when (scheme) { "tel" -> Intent.ACTION_DIAL; "mailto" -> Intent.ACTION_SENDTO; else -> Intent.ACTION_VIEW }
-                    context.startActivity(Intent(action, Uri.parse(link)).apply { if (!system) addCategory(Intent.CATEGORY_BROWSABLE) })
+                    context.startActivity(Intent(action, link.toUri()).apply { if (!system) addCategory(Intent.CATEGORY_BROWSABLE) })
                 } catch (_: Exception) { Toast.makeText(context, "没有可用的处理应用", Toast.LENGTH_SHORT).show() }
             }) { Text(if (system) "打开应用" else "打开浏览器") } },
             dismissButton = { TextButton(onClick = { pendingLink = null }) { Text("取消") } })
@@ -179,4 +164,37 @@ private fun releaseHtmlWebView(container: FrameLayout) {
     container.removeAllViews()
     view?.stopLoading()
     view?.destroy()
+}
+
+/** 将生命周期回调集中到具名客户端，便于检查渲染进程退出后的清理行为。 */
+// WebKit Lint 将 Kotlin 父类构造调用误报为未处理退出；下方已覆写回调并销毁视图、降级纯文本。
+@SuppressLint("MissingOnRenderProcessGone")
+private class MmsHtmlWebViewClient(
+    private val document: MmsHtmlDocument,
+    private val handler: MmsHtmlResourceHandler,
+    private val container: FrameLayout,
+    private val onExternalLink: (String) -> Unit,
+    private val onUnavailable: () -> Unit,
+) : WebViewClient() {
+    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse =
+        if (request.method == "GET") handler.intercept(request.url) else MmsHtmlResourceHandler.denied()
+
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        val target = document.externalLinks[request.url.toString()]
+        if (request.isForMainFrame && request.hasGesture() && !request.isRedirect && target != null) {
+            onExternalLink(target)
+        }
+        return true
+    }
+
+    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+        if (url != document.documentUrl) view.stopLoading()
+    }
+
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        container.removeView(view)
+        view.destroy()
+        onUnavailable()
+        return true
+    }
 }

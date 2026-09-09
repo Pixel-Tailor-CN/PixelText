@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.receiver
 
+import androidx.core.net.toUri
+
 import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
@@ -46,20 +48,20 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         private const val TAG = "NotificationActionReceiver"
 
         /** 将当前会话的所有未读短信 / 彩信标记为已读 */
-        val ACTION_MARK_READ = "${BuildConfig.APPLICATION_ID}.action.MARK_READ"
+        const val ACTION_MARK_READ = "${BuildConfig.APPLICATION_ID}.action.MARK_READ"
 
         /** 直接从通知栏回复短信（RemoteInput inline reply） */
-        val ACTION_REPLY_SMS = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS"
+        const val ACTION_REPLY_SMS = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS"
 
         /** 通知栏快捷回复的 SMS_SENT 回执 */
-        val ACTION_REPLY_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS_SENT"
+        const val ACTION_REPLY_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS_SENT"
 
         /** 通知栏快捷回复的 SMS_DELIVERED 回执 */
-        val ACTION_REPLY_SMS_DELIVERED =
+        const val ACTION_REPLY_SMS_DELIVERED =
             "${BuildConfig.APPLICATION_ID}.action.REPLY_SMS_DELIVERED"
 
         /** 复制验证码，并将对应消息标记为已读 */
-        val ACTION_COPY_VERIFICATION_CODE =
+        const val ACTION_COPY_VERIFICATION_CODE =
             "${BuildConfig.APPLICATION_ID}.action.COPY_VERIFICATION_CODE"
 
         /** Intent extra：通知 ID，用于 cancel / update */
@@ -191,7 +193,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
     }
 
     private fun messageIdFromUri(messageUri: String): Long? {
-        val uri = runCatching { Uri.parse(messageUri) }.getOrNull() ?: return null
+        val uri = runCatching { messageUri.toUri() }.getOrNull() ?: return null
         val id = uri.lastPathSegment?.toLongOrNull() ?: return null
         return if (uri.authority == "mms") -id else id
     }
@@ -449,7 +451,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
             }
         }
         try {
-            context.contentResolver.update(Uri.parse(messageUri), values, null, null)
+            context.contentResolver.update(messageUri.toUri(), values, null, null)
         } catch (e: Exception) {
             Log.e(TAG, "failed to update reply send result", e)
         }
@@ -468,7 +470,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
             )
         }
         try {
-            context.contentResolver.update(Uri.parse(messageUri), values, null, null)
+            context.contentResolver.update(messageUri.toUri(), values, null, null)
         } catch (e: Exception) {
             Log.e(TAG, "failed to update reply delivery result", e)
         }

@@ -35,8 +35,8 @@ fun SenderAvatar(
     avatarPath: String?,
     avatarSha256: String?,
     selected: Boolean,
-    size: Dp = 48.dp,
     modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
 ) {
     val cacheKey = avatarPath?.let { "$it:${avatarSha256.orEmpty()}" }
     var bitmap by remember(cacheKey) { mutableStateOf(cacheKey?.let(avatarCache::get)) }

@@ -75,10 +75,10 @@ fun CardHeader(
 @Composable
 fun DashedDivider(
     color: Color,
+    modifier: Modifier = Modifier,
     thickness: Float = 2f,
     dashLength: Float = 10f,
     gapLength: Float = 10f,
-    modifier: Modifier = Modifier
 ) {
     Box(
         modifier = modifier

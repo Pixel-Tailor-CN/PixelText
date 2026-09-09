@@ -36,7 +36,7 @@ fun MmsPartScreen(key: MmsPartKey, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (part == null) Text(if (loaded) "附件已不存在或尚未同步" else "正在读取附件")
             else when (part.kind) {
-                MmsContentKind.CONTACT -> MmsContactCard(part, model!!.parts)
+                MmsContentKind.CONTACT -> MmsContactCard(part, parts = model!!.parts)
                 MmsContentKind.CALENDAR -> MmsCalendarCard(part)
                 else -> {
                     MmsFileCard(part)

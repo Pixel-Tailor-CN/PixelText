@@ -34,6 +34,6 @@ class MmsDownloadReceiver : BroadcastReceiver(), KoinComponent {
         }
     }
     companion object {
-        val ACTION_MMS_DOWNLOADED = "${BuildConfig.APPLICATION_ID}.action.MMS_DOWNLOADED"
+        const val ACTION_MMS_DOWNLOADED = "${BuildConfig.APPLICATION_ID}.action.MMS_DOWNLOADED"
     }
 }

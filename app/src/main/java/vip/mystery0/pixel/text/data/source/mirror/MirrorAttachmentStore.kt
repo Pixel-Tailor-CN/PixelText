@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.data.source.mirror
 
+import androidx.core.net.toUri
+
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +59,7 @@ class MirrorAttachmentStore(context: Context) {
         try {
             val digest = MessageDigest.getInstance("SHA-256")
             var total = 0L
-            val input = resolver.openInputStream(Uri.parse("content://mms/part/$partId"))
+            val input = resolver.openInputStream("content://mms/part/$partId".toUri())
                 ?: throw FileNotFoundException("null_attachment_stream")
             input.use { source ->
                 FileOutputStream(temporary).use { output ->

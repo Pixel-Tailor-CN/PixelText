@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,11 +56,11 @@ fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPa
             page = index
             val media = pages[index].partIds.mapNotNull { id -> model.parts.firstOrNull { it.key.partId == id } }
                 .filter { it.kind == MmsContentKind.AUDIO || it.kind == MmsContentKind.VIDEO }
-            if (media.isEmpty()) delay(pages[index].durationMillis)
+            if (media.isEmpty()) delay(pages[index].durationMillis.milliseconds)
             else for (part in media) {
                 if (!controller.ownsPresentation(activeRequest)) return@LaunchedEffect
                 controller.playPresentation(activeRequest, part)
-                delay((pages[index].durationMillis / media.size).coerceAtLeast(100))
+                delay(((pages[index].durationMillis / media.size).coerceAtLeast(100)).milliseconds)
                 controller.stopPresentationMedia(activeRequest)
             }
         }

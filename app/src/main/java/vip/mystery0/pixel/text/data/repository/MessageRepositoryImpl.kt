@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.data.repository
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -87,7 +89,7 @@ class MessageRepositoryImpl(
             combine(
                 conversationCacheRepository.observeAllConversations(),
                 spamRepository.observeChanges()
-                    .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS)
+                    .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS.milliseconds)
                     .onStart { emit(Unit) },
                 settingsRepository.settings,
             ) { conversations, _, settings -> conversations to settings }

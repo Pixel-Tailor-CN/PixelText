@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import androidx.compose.runtime.mutableIntStateOf
+
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
@@ -94,7 +96,7 @@ fun VerificationCodeScreen(
     var showMenuSheet by remember { mutableStateOf(false) }
     val menuSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val context = LocalContext.current
-    var accessRefreshKey by remember { mutableStateOf(0) }
+    var accessRefreshKey by remember { mutableIntStateOf(0) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->

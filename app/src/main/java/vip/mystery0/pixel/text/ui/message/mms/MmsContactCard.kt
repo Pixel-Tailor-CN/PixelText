@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
+import androidx.core.net.toUri
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -41,8 +43,8 @@ import vip.mystery0.pixel.text.ui.message.cards.smartCardContainerColor
 @Composable
 fun MmsContactCard(
     part: MmsPartContent,
-    parts: List<MmsPartContent> = emptyList(),
     modifier: Modifier = Modifier,
+    parts: List<MmsPartContent> = emptyList(),
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
     interactionEnabled: Boolean = true,
@@ -66,7 +68,7 @@ fun MmsContactCard(
             var expanded by rememberSaveable(part.key.toString(), part.contentHash, index) { mutableStateOf(false) }
             val photo = contact.photoBytes ?: parts.singleOrNull {
                 it.key.message == part.key.message && it.key.partId == contact.photoPartId
-            }?.localUri?.takeIf { Uri.parse(it).scheme in setOf("file", "content") }
+            }?.localUri?.takeIf { it.toUri().scheme in setOf("file", "content") }
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable(enabled = interactionEnabled && selectionMode, onClick = onMessageClick),
                 shape = RoundedCornerShape(16.dp), color = container, contentColor = foreground,

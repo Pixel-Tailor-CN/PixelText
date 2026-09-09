@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.mutableLongStateOf
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -807,7 +810,7 @@ fun ConversationDetailScreen(
                     listState.animateScrollToItem(targetIndex)
                     locatedTargetMessageId = targetId
                     highlightedMessageId = targetId
-                    delay(TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS)
+                    delay(TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS.milliseconds)
                     highlightedMessageId = null
                 }
 
@@ -935,7 +938,7 @@ private fun SimSelectorButton(
     onSelected: (Int) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var lastDismissedAtMillis by remember { mutableStateOf(0L) }
+    var lastDismissedAtMillis by remember { mutableLongStateOf(0L) }
     val currentLabel = simList.firstOrNull { it.subscriptionId == selectedSubId }?.displayName
         ?: simList.firstOrNull()?.displayName.orEmpty()
     val popupGapPx = with(LocalDensity.current) { 32.dp.roundToPx() }

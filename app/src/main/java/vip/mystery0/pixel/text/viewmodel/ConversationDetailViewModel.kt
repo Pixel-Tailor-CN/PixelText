@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.viewmodel
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -223,7 +225,7 @@ class ConversationDetailViewModel(
 
             val previousSize = _messages.size
             if (!isLoadingMore) fetchMessages()
-            while (isLoadingMore) delay(MESSAGE_LOAD_POLL_INTERVAL_MILLIS)
+            while (isLoadingMore) delay(MESSAGE_LOAD_POLL_INTERVAL_MILLIS.milliseconds)
 
             if (_messages.size == previousSize) return null
         }
@@ -573,7 +575,7 @@ class ConversationDetailViewModel(
 
     companion object {
         private const val TAG = "ConversationDetailViewM"
-        private val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
+        private const val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
         private const val SPAM_THRESHOLD = 0.7f
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f

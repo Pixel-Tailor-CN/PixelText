@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.data.source.mms
 
+import androidx.core.net.toUri
+
 import android.content.Context
 import android.net.Uri
 import android.webkit.WebResourceResponse
@@ -19,7 +21,7 @@ import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 class MmsHtmlResourceHandler(context: Context, private val document: MmsHtmlDocument, private val mirror: MessageMirrorRepository) {
     private val mirrorRoot = File(context.applicationContext.noBackupFilesDir, "message-mirror").canonicalFile
     private val loader = WebViewAssetLoader.Builder()
-        .setDomain(Uri.parse(document.origin).host!!)
+        .setDomain(document.origin.toUri().host!!)
         .setHttpAllowed(false)
         .addPathHandler("/", WebViewAssetLoader.PathHandler { path -> registeredResponse("${document.origin}/$path") })
         .build()

@@ -2,6 +2,8 @@
 
 package vip.mystery0.pixel.text.ui.theme
 
+import androidx.core.graphics.scale
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -138,8 +140,7 @@ private fun scaleForQuantization(bitmap: Bitmap): Bitmap {
         return bitmap
     }
     val scale = MAX_QUANTIZED_IMAGE_DIMENSION.toFloat() / largestDimension
-    return Bitmap.createScaledBitmap(
-        bitmap,
+    return bitmap.scale(
         (bitmap.width * scale).toInt().coerceAtLeast(1),
         (bitmap.height * scale).toInt().coerceAtLeast(1),
         true,

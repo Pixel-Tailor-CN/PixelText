@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.mms
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.net.toUri
@@ -41,7 +43,7 @@ class MmsReceptionNotifications(
                 if (row == null) { manager.cancel(notificationId(id)); journal.remove(key); return@forEach }
                 if (row.read) { manager.cancel(notificationId(id)); return@forEach }
                 if (row.type != 132 || manager.activeNotifications.none { it.id == notificationId(id) }) return@forEach
-                val model = withTimeoutOrNull(1500) {
+                val model = withTimeoutOrNull(1500.milliseconds) {
                     content.observe(SourceMessageKey(MessageTransport.MMS, id)).first { it == null || (!it.preparing && !it.pendingDownload) }
                 } ?: return@forEach
                 if (record.optString("summary") == model.summary && record.optLong("thread") == row.thread) return@forEach

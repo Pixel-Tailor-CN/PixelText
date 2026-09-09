@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.viewmodel
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,7 +119,7 @@ class ConversationListViewModel(
                     isLoading = false
                 }
 
-                delay(retryDelayMillis)
+                delay(retryDelayMillis.milliseconds)
                 retryDelayMillis =
                     (retryDelayMillis * 2).coerceAtMost(MAX_SUBSCRIPTION_RETRY_DELAY_MILLIS)
             }

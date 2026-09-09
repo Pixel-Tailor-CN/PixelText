@@ -35,7 +35,7 @@ class SpamDetectionWorker(
         private const val SPAM_THRESHOLD = 0.7f
         private val classificationSemaphore = Semaphore(MAX_CONCURRENT_CLASSIFICATIONS)
 
-        val ACTION_SPAM_DETECTED = "${BuildConfig.APPLICATION_ID}.action.SPAM_DETECTED"
+        const val ACTION_SPAM_DETECTED = "${BuildConfig.APPLICATION_ID}.action.SPAM_DETECTED"
         const val KEY_MESSAGE_ID = "message_id"
         const val KEY_THREAD_ID = "thread_id"
         const val KEY_SENDER = "sender"

@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.data.source.mirror
 
+import androidx.core.net.toUri
+
 import android.content.Context
 import android.content.ContentResolver
 import android.net.Uri
@@ -39,11 +41,11 @@ class TelephonyMirrorSource(context: Context) {
         readPage("mms", afterId, limit)
 
     private suspend fun readPage(authority: String, afterId: Long?, limit: Int): SourceRead<List<ProviderRowSnapshot>> =
-        query(Uri.parse("content://$authority"), afterId?.let { "_id > ?" },
+        query("content://$authority".toUri(), afterId?.let { "_id > ?" },
             afterId?.let { arrayOf(it.toString()) }, "_id ASC", limit.coerceIn(1, 500))
 
     suspend fun readMessage(key: SourceMessageKey): SourceRead<MirrorStructure?> {
-        val result = query(Uri.parse("content://${key.transport.name.lowercase()}/${key.sourceId}"))
+        val result = query("content://${key.transport.name.lowercase()}/${key.sourceId}".toUri())
         return when (result) {
             is SourceRead.Failure -> result
             is SourceRead.Success -> {
@@ -62,9 +64,9 @@ class TelephonyMirrorSource(context: Context) {
     }
 
     suspend fun readMmsChildren(sourceId: Long): SourceRead<MmsChildren> {
-        val addresses = query(Uri.parse("content://mms/$sourceId/addr"))
+        val addresses = query("content://mms/$sourceId/addr".toUri())
         if (addresses is SourceRead.Failure) return addresses
-        val parts = query(Uri.parse("content://mms/$sourceId/part"))
+        val parts = query("content://mms/$sourceId/part".toUri())
         if (parts is SourceRead.Failure) return parts
         addresses as SourceRead.Success
         parts as SourceRead.Success
@@ -79,12 +81,12 @@ class TelephonyMirrorSource(context: Context) {
     }
 
     suspend fun readThreadSources(): ThreadSources = ThreadSources(
-        query(Uri.parse("content://mms-sms/conversations?simple=true")),
-        query(Uri.parse("content://mms-sms/canonical-addresses")),
+        query("content://mms-sms/conversations?simple=true".toUri()),
+        query("content://mms-sms/canonical-addresses".toUri()),
     )
 
     suspend fun messageKeyForPart(partId: Long): SourceRead<SourceMessageKey?> =
-        when (val result = query(Uri.parse("content://mms/part/$partId"))) {
+        when (val result = query("content://mms/part/$partId".toUri())) {
             is SourceRead.Failure -> result
             is SourceRead.Success -> SourceRead.Success(result.value.firstOrNull()?.long("mid")?.let {
                 SourceMessageKey(MessageTransport.MMS, it)

@@ -27,5 +27,5 @@ class MmsReceptionResponseReceiver : BroadcastReceiver(), KoinComponent {
             finally { pending.finish() }
         }
     }
-    companion object { val ACTION = "${BuildConfig.APPLICATION_ID}.action.MMS_RESPONSE_SENT" }
+    companion object { const val ACTION = "${BuildConfig.APPLICATION_ID}.action.MMS_RESPONSE_SENT" }
 }

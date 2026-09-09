@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -255,7 +257,7 @@ fun ArchivedConversationListScreen(
                         viewModel.hidePendingDelete(selected)
                         coroutineScope.launch {
                             val dismissJob = launch {
-                                delay(3000)
+                                delay(3000.milliseconds)
                                 snackbarHostState.currentSnackbarData?.dismiss()
                             }
                             val result = snackbarHostState.showSnackbar(

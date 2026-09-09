@@ -2,6 +2,8 @@
 
 package vip.mystery0.pixel.text.ui.message.mms
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.content.Context
 import android.net.Uri
 import android.os.Handler
@@ -111,7 +113,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
                 }
             })
         }
-        scope?.launch { while (true) { updateState(); delay(200) } }
+        scope?.launch { while (true) { updateState(); delay(200.milliseconds) } }
     }
 
     fun setForeground(session: Any, visible: Boolean) {

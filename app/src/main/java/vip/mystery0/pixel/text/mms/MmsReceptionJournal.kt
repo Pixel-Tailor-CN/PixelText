@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.mms
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Base64
 import org.json.JSONObject
@@ -16,9 +17,13 @@ internal class MmsReceptionJournal(context: Context, name: String) {
             (value as? String)?.let { runCatching { key to JSONObject(it) }.getOrNull() }
         }
     }
+    // 必须检查同步写入结果；KTX edit 不返回 commit 的成功状态。
+    @SuppressLint("UseKtx")
     fun put(key: String, value: JSONObject) = synchronized(lock) {
         check(preferences.edit().putString(key, value.put("schema", 1).toString()).commit()) { "mms journal unavailable" }
     }
+    // 删除日志同样必须确认已同步持久化。
+    @SuppressLint("UseKtx")
     fun remove(key: String) = synchronized(lock) {
         check(preferences.edit().remove(key).commit()) { "mms journal unavailable" }
     }

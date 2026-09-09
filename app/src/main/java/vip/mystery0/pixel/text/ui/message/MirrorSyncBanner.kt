@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.ui.message
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,7 +39,7 @@ fun MirrorSyncBanner() {
                 // 尚未读到状态及快速完成的同步均不展示；恢复正常后立即隐藏。
                 emit(null)
                 if (candidate != null) {
-                    delay(1_000)
+                    delay(1_000.milliseconds)
                     emit(candidate)
                 }
             }

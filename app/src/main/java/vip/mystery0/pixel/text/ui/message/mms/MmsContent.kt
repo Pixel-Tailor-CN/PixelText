@@ -113,7 +113,7 @@ internal fun MmsContentPart(part: MmsPartContent, parts: List<MmsPartContent>, s
         MmsContentKind.IMAGE -> MmsImageContent(part, onOpen = { onOpen(part.key) }, interactionEnabled = enabled)
         MmsContentKind.AUDIO, MmsContentKind.VIDEO -> MmsMediaCard(part, onOpen, isSelected = selected, interactionEnabled = enabled)
         MmsContentKind.HTML -> MmsHtmlCard(part, isSelected = selected, interactionEnabled = enabled, onOpenPart = onOpen)
-        MmsContentKind.CONTACT -> MmsContactCard(part, parts, isSelected = selected, interactionEnabled = enabled)
+        MmsContentKind.CONTACT -> MmsContactCard(part, parts = parts, isSelected = selected, interactionEnabled = enabled)
         MmsContentKind.CALENDAR -> MmsCalendarCard(part, isSelected = selected, interactionEnabled = enabled)
         else -> MmsFileCard(part, isSelected = selected, interactionEnabled = enabled, onOpenPart = onOpen)
     }
