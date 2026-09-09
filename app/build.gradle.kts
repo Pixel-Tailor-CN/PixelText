@@ -51,7 +51,6 @@ android {
         ndk {
             //noinspection ChromeOsAbiSupport
             abiFilters += "arm64-v8a"
-            abiFilters += "x86_64"
         }
     }
     packaging {
