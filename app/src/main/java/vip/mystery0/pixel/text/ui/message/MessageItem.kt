@@ -207,8 +207,7 @@ fun MessageItem(
                         } ?: Text("正在读取彩信", color = textColor)
                     }
                 } else {
-                    val hasTextContent =
-                        message.content.isNotBlank() || !message.mmsSubject.isNullOrBlank()
+                    val hasTextContent = message.content.isNotBlank()
                     if (hasTextContent) {
                         when {
                             isSpam && showOriginal -> {
@@ -216,7 +215,6 @@ fun MessageItem(
                                     content = message.content,
                                     isSelected = isSelected,
                                     isReceived = message.isReceived,
-                                    subject = message.mmsSubject,
                                     textScale = textScale,
                                     backgroundColor = bubbleColor,
                                     textColor = textColor,
@@ -232,7 +230,6 @@ fun MessageItem(
                                     content = message.content,
                                     isSelected = isSelected,
                                     isReceived = message.isReceived,
-                                    subject = message.mmsSubject,
                                     textScale = textScale,
                                     backgroundColor = bubbleColor,
                                     textColor = textColor,
@@ -253,7 +250,6 @@ fun MessageItem(
                                     content = message.content,
                                     isSelected = isSelected,
                                     isReceived = message.isReceived,
-                                    subject = message.mmsSubject,
                                     textScale = textScale,
                                     backgroundColor = bubbleColor,
                                     textColor = textColor,

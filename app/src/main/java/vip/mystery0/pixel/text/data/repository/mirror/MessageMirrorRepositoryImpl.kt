@@ -113,7 +113,7 @@ fun MirrorMessageModel.toMessageModel(): MessageModel {
         timestamp = timestamp ?: 0, subId = subscriptionId ?: -1,
         isRead = read == 1, isReceived = boxType == 1,
         imageUris = parts.filter { it.mimeType?.startsWith("image/") == true }.mapNotNull { it.attachment?.localUri },
-        mmsSubject = decodedSubject ?: subject, isMms = mms,
+        mmsSubject = if (mms) decodedSubject ?: subject else null, isMms = mms,
         mmsDownloadPending = mms && pduType == 130,
         mmsSummary = if (mms) mmsSummary ?: decodedSubject ?: subject ?: if (pduType == 130) "等待下载彩信"
             else mmsAttachmentSummary(parts.map { MmsMimeTypes.classify(it.mimeType) }) else null,
