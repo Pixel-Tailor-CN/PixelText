@@ -23,14 +23,15 @@ import vip.mystery0.pixel.text.domain.model.mms.*
 /** 播放会话由页面外壳持有；页内没有播放器或自动启动声音的独立生命周期。 */
 @Composable
 fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPartKey) -> Unit,
-    controller: MmsPlaybackController, isSelected: Boolean = false) {
+    controller: MmsPlaybackController, isSelected: Boolean = false,
+    pages: List<MmsPresentationPage> = model.pages) {
+    if (pages.isEmpty()) return
     var page by rememberSaveable(model.key.sourceId) { mutableIntStateOf(0) }
     var request by remember { mutableStateOf<MmsPlaybackController.PresentationRequest?>(null) }
     val playing = request != null
     var visible by remember { mutableStateOf(true) }
     val presentationOwner by controller.presentation.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val pages = model.pages
     val currentPage = page.coerceIn(pages.indices)
     val presentationPartIds = pages.flatMap { it.partIds }.toSet()
     val canAutoPlay = model.parts.count {

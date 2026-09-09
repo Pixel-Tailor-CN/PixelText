@@ -5,7 +5,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.unit.dp
@@ -30,6 +29,7 @@ fun MmsContent(
     detailMode: Boolean = false,
 ) {
     val linkGesture = remember { MmsLinkGestureState() }
+    val displayContent = remember(model) { model.toDisplayContent() }
     val controller: MmsPlaybackController = koinInject()
     val click by rememberUpdatedState(onMessageClick)
     val longClick by rememberUpdatedState(onLongClick)
@@ -75,17 +75,16 @@ fun MmsContent(
         ) else scheme) {
         CompositionLocalProvider(LocalMmsLinkGesture provides linkGesture) {
         Column(Modifier.padding(if (detailMode) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            model.subject?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
             if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode, isSelected = isSelected)
             if (model.issues.isNotEmpty()) Text("彩信结构或资源引用不完整，已按可用附件显示；可在详情信息中查看附件", style = MaterialTheme.typography.bodySmall)
+            if (!model.preparing && displayContent.attachmentPages.isNotEmpty()) {
+                MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller,
+                    isSelected = isSelected, pages = displayContent.attachmentPages)
+            }
+            model.subject?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
             if (model.preparing) Text(model.summary)
-            else if (model.pages.isNotEmpty()) {
-                MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller, isSelected = isSelected)
-                val unreferenced = model.parts.filter { it.key.partId in model.attachmentPartIds && it.key.partId in model.bodyPartIds }
-                if (unreferenced.isNotEmpty()) Text("未引用的附件", style = MaterialTheme.typography.titleSmall)
-                unreferenced.forEach { MmsContentPart(it, model.parts, isSelected, interactionEnabled && !selectionMode, onOpenPart) }
-            } else {
-                model.parts.filter { it.key.partId in model.bodyPartIds }.forEach {
+            else {
+                displayContent.bodyParts.forEach {
                     MmsContentPart(it, model.parts, isSelected, interactionEnabled && !selectionMode, onOpenPart)
                 }
                 if (model.parts.isEmpty() && model.subject.isNullOrBlank() && !model.pendingDownload) Text("彩信暂无可读内容")
