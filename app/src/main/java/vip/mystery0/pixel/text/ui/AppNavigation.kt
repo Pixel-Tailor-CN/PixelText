@@ -33,8 +33,8 @@ import vip.mystery0.pixel.text.ui.screen.ArchivedConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailCustomizationScreen
 import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.screen.HomeScreen
-import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.KeywordSpamSettingsScreen
+import vip.mystery0.pixel.text.ui.screen.NotificationActionSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CATEGORY
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
@@ -98,7 +98,10 @@ fun AppNavigation(
             enterTransition = { activityLikeEnterTransition() },
             exitTransition = { activityLikeExitTransition() },
             popEnterTransition = { activityLikePopEnterTransition() },
-            popExitTransition = { activityLikePopExitTransition() }
+            popExitTransition = { activityLikePopExitTransition() },
+            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与普通返回一致。
+            predictivePopEnterTransition = { _ -> activityLikePopEnterTransition() },
+            predictivePopExitTransition = { _ -> activityLikePopExitTransition() }
         ) {
             composable("home") {
                 HomeScreen(
