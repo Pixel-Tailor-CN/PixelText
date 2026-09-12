@@ -1,11 +1,12 @@
----
-name: pixeltext-validation
-description: 验证 Pixel Text Android 应用改动，按影响范围选择 Gradle、Mock 和真机检查。用于 Kotlin、Compose、短信解析、SMS/MMS 或系统集成修改后的验证；不用于纯文档、一般问答或 GitHub Actions 配置检查。
----
+# 编码与验证规范
 
-# Pixel Text 改动验证
+## 编码规范
 
-遵循根目录 `AGENTS.md` 的构建命令与测试约束。目标是提供与改动相关的证据，不固定执行全部检查。
+项目的架构分层、Compose 与 Material 3、Koin、命名和日志约定以根目录 [AGENTS.md](../../AGENTS.md) 为准。修改前核对相邻实现与调用方，保持现有包边界和状态管理方式；避免与任务无关的重构、格式化和新增抽象。
+
+## 验证原则
+
+遵循 [AGENTS.md](../../AGENTS.md) 的构建命令与测试约束，按改动范围选择验证，不固定执行全部检查。仅文档调整检查差异与引用；未经用户明确要求，不新增测试代码或依赖，也不运行单元测试任务。
 
 ## 选择验证范围
 
@@ -14,7 +15,7 @@ description: 验证 Pixel Text Android 应用改动，按影响范围选择 Grad
 | Kotlin、仓库、ViewModel 或依赖注入 | 编译 Debug Kotlin，核对调用方和 Koin 注册；涉及静态检查规则时运行 Lint |
 | Compose、主题或卡片 | 编译，并用现有 Mock 界面或目标页面检查内容、暗色模式、动态取色和交互；需要安装时构建 Debug APK |
 | 短信规则、词表或模型 | 检查资源格式与消费契约，用脱敏样本核对命中、误判和回退；仅编译不能证明解析正确 |
-| Manifest、权限、SMS/MMS、SIM、通知或后台任务 | 编译与 Lint，按改变的入口验证真机链路；MMS 专项资料按需查 `docs/mms/README.md` |
+| Manifest、权限、SMS/MMS、SIM、通知或后台任务 | 编译与 Lint，按改变的入口验证真机链路；MMS 专项资料按需查 [MMS 维护说明](../mms/README.md) |
 | Release、R8 或资源打包 | 有签名环境时运行相应 Release 构建；核对打包结果，不以 Debug 结果代替 |
 
 修改 SMS/MMS 或系统集成时，根据实际变化挑选接收、发送、回复、标记已读、删除、附件展示等受影响路径。涉及双卡时确认实际 SIM 选择；需要 Android 12 兼容证据时使用 API 31 设备。不要为每个小改动重跑所有路径。

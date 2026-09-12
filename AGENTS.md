@@ -45,9 +45,9 @@ Pixel Text（原点短信）是面向国内 Pixel 用户的 Android SMS/MMS 应�
 | Release APK / AAB（需要签名配置） | `./gradlew.bat :app:assembleRelease` / `./gradlew.bat :app:bundleRelease` |
 
 - 本项目不做单元测试。除非用户在当前任务明确要求，不新增 `app/src/test/`、`app/src/androidTest/`、测试依赖，也不运行 `test`、`testDebugUnitTest` 等单元测试任务。
-- 根据改动选择编译、Lint、Mock 或真机验证；仅文档调整检查差异与引用即可。Android 验证的具体选择见 `.agents/skills/pixeltext-validation/SKILL.md`，仅在验证应用改动时读取。
+- 根据改动选择编译、Lint、Mock 或真机验证；仅文档调整检查差异与引用即可。具体约定见[编码与验证规范](docs/development/coding-and-validation.md)，按改动范围读取相关章节。
 - 权限、默认短信角色、SIM、MMS 与通知操作需要真机确认；编译成功不能替代系统链路验证，没有设备时明确未验项。
 - `versionCode` 来自 Git 提交数，版本名与 Git 后缀由构建脚本生成。发布构建需要完整 Git 历史，不能手工维护计数。
-- 正式文档放在 `docs/`，设计与计划放在 `docs/plans/`；技能入口放在 `.agents/skills/<name>/SKILL.md`，工作流放在 `.github/workflows/`。不新建 `docs/superpowers/`。
+- 正式文档放在 `docs/`，开发规范与维护说明放在 `docs/development/`，设计与计划放在 `docs/plans/`；工作流放在 `.github/workflows/`。不新建 `docs/superpowers/`。
 - 进度、交接、评审记录、临时脚本、日志、抓包和截图放在已忽略的 `docs/.local/` 或仓库外；正式资料不依赖这些临时文件。
 - 提交前检查暂存清单，保留用户已有修改，不纳入构建产物、IDE/cache 文件和敏感数据。
