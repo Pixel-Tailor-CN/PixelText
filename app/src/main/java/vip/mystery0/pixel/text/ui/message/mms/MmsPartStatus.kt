@@ -48,7 +48,7 @@ private fun MmsPartContent.readyStatusText(): String {
     val availableText = if (inlineCopy) "仍可导出 UTF-8 文本副本" else "原件仍可导出"
     return when (issue) {
         null -> if (inlineCopy) "可导出 · UTF-8 文本副本" else "可打开、保存或分享"
-        "too_large" -> "内容过大，$availableText"
+        "too_large", "html_too_large" -> "内容过大，$availableText"
         "unsupported_charset", "invalid_encoding" -> "文本编码无法预览，$availableText"
         "read_failed", "source_unreadable", "unavailable" -> "内容无法预览，$availableText"
         "multipart_invalid" -> "复合附件结构异常，$availableText"

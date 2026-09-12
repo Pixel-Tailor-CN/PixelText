@@ -79,6 +79,10 @@ Release 构建需要本地签名配置：
 ./gradlew assembleRelease
 ```
 
+## 第三方来源与许可
+
+MMS 解析器的 AOSP 来源、本地修改及相关依赖的许可声明见 [第三方来源与许可](docs/licenses/README.md)。
+
 ## 开发者
 
 Pixel Text 属于 **Mystery00** 的 Pixel 工具矩阵成员。

@@ -15,7 +15,7 @@
 | Kotlin、仓库、ViewModel 或依赖注入 | 编译 Debug Kotlin，核对调用方和 Koin 注册；涉及静态检查规则时运行 Lint |
 | Compose、主题或卡片 | 编译，并用现有 Mock 界面或目标页面检查内容、暗色模式、动态取色和交互；需要安装时构建 Debug APK |
 | 短信规则、词表或模型 | 检查资源格式与消费契约，用脱敏样本核对命中、误判和回退；仅编译不能证明解析正确 |
-| Manifest、权限、SMS/MMS、SIM、通知或后台任务 | 编译与 Lint，按改变的入口验证真机链路；MMS 专项资料按需查 [MMS 维护说明](../mms/README.md) |
+| Manifest、权限、SMS/MMS、SIM、通知或后台任务 | 编译与 Lint，按改变的入口验证真机链路；MMS 解析器来源与第三方声明见[许可索引](../licenses/README.md) |
 | Release、R8 或资源打包 | 有签名环境时运行相应 Release 构建；核对打包结果，不以 Debug 结果代替 |
 
 修改 SMS/MMS 或系统集成时，根据实际变化挑选接收、发送、回复、标记已读、删除、附件展示等受影响路径。涉及双卡时确认实际 SIM 选择；需要 Android 12 兼容证据时使用 API 31 设备。不要为每个小改动重跑所有路径。

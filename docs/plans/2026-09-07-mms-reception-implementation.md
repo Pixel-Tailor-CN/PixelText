@@ -62,7 +62,5 @@
 
 ## 维护资料
 
-- [MMS 接收维护说明](../mms/README.md)
-- [解析器来源及协议边界](../mms-parser-source.md)
-- [HTML 依赖许可](../licenses/mms-html-dependencies.md)
-- [名片依赖许可](../licenses/mms-contact-dependencies.md)
+- [编码与验证规范](../development/coding-and-validation.md)
+- [第三方来源与许可索引](../licenses/README.md)

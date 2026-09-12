@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.telephony.SubscriptionManager
 import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -203,15 +204,22 @@ class MmsDownloadCoordinator(
             catch (_: RuntimeException) { retainParseFailure(key, record); return }
             record.put("retrieve_transaction", parsed.transactionId?.let(MmsReceptionJournal::encode) ?: "")
             requests.put(key, record)
-            val local = MmsAddresses.local(context)
+            val subscriptionId = record.optJSONObject("source")?.optInt("sub", -1) ?: -1
+            val local = if (SubscriptionManager.isValidSubscriptionId(subscriptionId)) {
+                MmsAddresses.local(context, subscriptionId)
+            } else MmsAddresses.LocalIdentity(emptySet(), "")
             val addresses = buildList {
                 parsed.from?.let { add(it.string) }
                 parsed.to.orEmpty().forEach { add(it.string) }
                 parsed.cc.orEmpty().forEach { add(it.string) }
                 parsed.pduHeaders.getEncodedStringValues(PduHeaders.BCC).orEmpty().forEach { add(it.string) }
             }.map(MmsAddresses::clean).filter { it.isNotBlank() && it != "insert-address-token" }
-            val participants = addresses.filter { MmsAddresses.normalized(it) !in local }.toSet()
-            val thread = participants.takeIf { it.isNotEmpty() }?.let { Telephony.Threads.getOrCreateThreadId(context, it) }
+            val (self, participants) = addresses.partition { address ->
+                local.numbers.any { MmsAddresses.equivalent(address, it, local.countryIso) }
+            }
+            // 未识别到本机收件人时保留通知占位的会话，不把可能的自己加入新群聊。
+            val thread = participants.toSet().takeIf { self.isNotEmpty() && it.isNotEmpty() }
+                ?.let { Telephony.Threads.getOrCreateThreadId(context, it) }
             vip.mystery0.pixel.text.data.repository.mirror.MirrorSynchronizationLock.mutex.withLock {
                 val original = record.optJSONArray("original_addresses")
                 val addressIds = if (original == null) emptyList() else (0 until original.length()).mapNotNull {

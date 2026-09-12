@@ -4,10 +4,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URI
-import java.nio.ByteBuffer
-import java.nio.charset.CharacterCodingException
-import java.nio.charset.Charset
-import java.nio.charset.CodingErrorAction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,8 +12,7 @@ import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorPartModel
 import vip.mystery0.pixel.text.domain.model.mms.usesInlineTextCopy
-import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
-import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
+import vip.mystery0.pixel.text.domain.parser.mms.MmsTextDecoder
 
 /** 仅打开镜像本地文件；可注入流工厂供合成样例验收使用。 */
 class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { File(URI(it)).inputStream() }) {
@@ -45,7 +40,10 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
             return@withContext TextResult(inline.removePrefix("\uFEFF"), result.byteCount.toLong(), null)
         }
         val result = readBytes(part, budget)
-        result.bytes?.let { decode(it, part) } ?: TextResult(null, result.byteCount, result.issue)
+        result.bytes?.let { bytes ->
+            val decoded = MmsTextDecoder.decode(bytes, part.mimeType, part.charset)
+            TextResult(decoded.text, decoded.byteCount, decoded.issue)
+        } ?: TextResult(null, result.byteCount, result.issue)
     }
 
     data class BytesResult(val bytes: ByteArray?, val byteCount: Long?, val issue: String?)
@@ -96,44 +94,6 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
             BytesResult(null, attachment.byteCount, "read_failed")
         }
     }
-
-    private fun decode(bytes: ByteArray, part: MirrorPartModel): TextResult {
-        val bom = when {
-            bytes.startsWith(0x00, 0x00, 0xFE, 0xFF) -> "UTF-32BE" to 4
-            bytes.startsWith(0xFF, 0xFE, 0x00, 0x00) -> "UTF-32LE" to 4
-            bytes.startsWith(0xEF, 0xBB, 0xBF) -> "UTF-8" to 3
-            bytes.startsWith(0xFE, 0xFF) -> "UTF-16BE" to 2
-            bytes.startsWith(0xFF, 0xFE) -> "UTF-16LE" to 2
-            else -> null
-        }
-        val declared = try {
-            val name = MmsMimeTypes.charsetName(part.mimeType) ?: part.charset?.takeIf { it != 0 }?.let {
-                if (it == CharacterSets.UCS2) "UTF-16BE" else CharacterSets.getMimeName(it)
-            }
-            name?.let(Charset::forName)
-        } catch (_: Exception) {
-            return TextResult(null, bytes.size.toLong(), "unsupported_charset")
-        }
-        val bomCharset = bom?.let { Charset.forName(it.first) }
-        if (declared != null && bomCharset != null && declared != bomCharset &&
-            !(declared.name() == "UTF-16" && bom.first.startsWith("UTF-16")) &&
-            !(declared.name() == "UTF-32" && bom.first.startsWith("UTF-32"))) {
-            return TextResult(null, bytes.size.toLong(), "invalid_encoding")
-        }
-        val charset = bomCharset ?: declared ?: Charsets.UTF_8
-        return try {
-            val offset = bom?.second ?: 0
-            val text = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(bytes, offset, bytes.size - offset)).toString()
-            TextResult(text, bytes.size.toLong(), null)
-        } catch (_: CharacterCodingException) {
-            TextResult(null, bytes.size.toLong(), "invalid_encoding")
-        }
-    }
-
-    private fun ByteArray.startsWith(vararg prefix: Int): Boolean = size >= prefix.size &&
-        prefix.indices.all { (this[it].toInt() and 0xFF) == prefix[it] }
 
     private data class InlineSizeResult(val byteCount: Int, val issue: String?)
 

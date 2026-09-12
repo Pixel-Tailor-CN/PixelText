@@ -113,16 +113,19 @@ class MmsContentRepositoryImpl(
         }
         val restoredParts = restoreMultipart(snapshot, decodedParts, budget)
         val context = currentCoroutineContext()
-        val htmlText = restoredParts.filter { it.kind == MmsContentKind.HTML && it.text != null }.associate { part ->
+        val htmlDocuments = restoredParts.filter { it.kind == MmsContentKind.HTML && it.text != null }.associate { part ->
             context.ensureActive()
             val document = htmlParser.prepare(part, restoredParts)
             context.ensureActive()
-            part.key to document.plainText
+            part.key to document
         }
         val parts = restoredParts.map { part ->
             context.ensureActive()
             when {
-                part.kind == MmsContentKind.HTML -> part.copy(htmlSummary = htmlText[part.key]?.take(320))
+                part.kind == MmsContentKind.HTML -> part.copy(
+                    htmlSummary = htmlDocuments[part.key]?.plainText?.take(320),
+                    issue = part.issue ?: htmlDocuments[part.key]?.issue,
+                )
                 part.kind == MmsContentKind.CONTACT && part.text != null -> part.copy(
                     contacts = contactParser.parse(part.text) { context.ensureActive() }.map { contact ->
                         val reference = contact.photoReference
@@ -162,7 +165,7 @@ class MmsContentRepositoryImpl(
                 context.ensureActive()
                 val text = when (part.kind) {
                     MmsContentKind.TEXT -> part.text
-                    MmsContentKind.HTML -> htmlText[part.key]
+                    MmsContentKind.HTML -> htmlDocuments[part.key]?.plainText
                     MmsContentKind.CONTACT -> part.contacts.joinToString("\n") { contact ->
                         (listOfNotNull(contact.name, contact.organization, contact.title, contact.notes) +
                             (contact.phones + contact.emails + contact.addresses).map { it.value }).joinToString("\n")

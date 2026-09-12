@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.mms.vendor.pdu.PduHeaders
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduPart
 import vip.mystery0.pixel.text.mms.vendor.pdu.RetrieveConf
 import java.nio.charset.Charset
+import vip.mystery0.pixel.text.domain.parser.mms.MmsTextDecoder
 
 /** 覆盖本次占位的内容；失败保留占位，重试重新写入，不创建第二条彩信。 */
 class MmsProviderWriter(private val resolver: ContentResolver) {
@@ -91,10 +92,12 @@ class MmsProviderWriter(private val resolver: ContentResolver) {
                     part.contentLocation?.let { put("cl", it.toString(Charsets.ISO_8859_1)) }
                     part.contentDisposition?.let { put("cd", it.toString(Charsets.ISO_8859_1)) }
                     if (inlineText) {
-                        val charset = runCatching {
+                        val decoded = MmsTextDecoder.decode(bytes, contentType, part.charset)
+                        // 合法 BOM 与声明按共用规则解码；损坏输入沿用 Provider 的替换字符兼容行为。
+                        val text = decoded.text ?: bytes.toString(runCatching {
                             Charset.forName(CharacterSets.getMimeName(part.charset))
-                        }.getOrDefault(Charsets.UTF_8)
-                        put("text", bytes.toString(charset))
+                        }.getOrDefault(Charsets.UTF_8))
+                        put("text", text)
                     }
                 }
                 // 系统 Provider 会用 name/cl 生成磁盘文件名。先让它生成安全存储名，
