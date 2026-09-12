@@ -1,6 +1,6 @@
 # 云端发件方资料 App 端实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 在 PixelText 中加入可手动安装的发件方资料，使用同一 Room 数据库联表匹配号码，在会话名称、头像、详情标题和通知中展示云端身份。
 

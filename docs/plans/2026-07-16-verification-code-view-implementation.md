@@ -1,6 +1,6 @@
 # 验证码视图 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 增加只索引 SMS 的验证码聚合视图，并把会话与验证码组织为带底部导航的首页子页面。
 

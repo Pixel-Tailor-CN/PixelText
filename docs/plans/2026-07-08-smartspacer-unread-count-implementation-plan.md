@@ -1,6 +1,6 @@
 # Smartspacer 未读数量统计范围实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为 Smartspacer 未读数量增加按正常短信、骚扰短信、归档短信配置统计范围的能力，并保持相关状态变化后实时刷新。
 

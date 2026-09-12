@@ -1,6 +1,6 @@
 # 底部导航未读消息徽标 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 在“会话”底部导航按钮显示可配置的未读 SMS 总数徽标，并与 Smartspacer 共用底层计数逻辑。
 

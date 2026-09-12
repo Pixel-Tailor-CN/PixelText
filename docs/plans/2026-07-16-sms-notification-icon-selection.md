@@ -1,6 +1,6 @@
 # 短信通知图标选择 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为短信通知增加四种可持久化选择的内置小图标，并保持 Smartspacer 等非短信场景不变。
 

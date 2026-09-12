@@ -1,6 +1,6 @@
 # 搜索页空状态插图与联系人筛选 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为搜索页新增空状态插图与单选联系人筛选，让用户可以直接按联系人范围搜索短信。
 

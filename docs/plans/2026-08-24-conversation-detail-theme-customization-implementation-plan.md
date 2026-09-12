@@ -1,6 +1,6 @@
 # 会话详情主题自定义 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为会话详情页增加可版本化的日间/暗黑主题配置、草稿预览、显式保存、背景图片和高对比度回退，并为未来全局主题管理与导入导出保留稳定扩展边界。
 

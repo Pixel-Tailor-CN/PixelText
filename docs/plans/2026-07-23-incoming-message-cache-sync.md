@@ -1,6 +1,6 @@
 # 新短信会话缓存同步实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 新短信到达后，无论应用进程是否存活，首页会话列表都能从 Room 缓存自动显示该消息，手动刷新能够执行 Telephony 对账。
 

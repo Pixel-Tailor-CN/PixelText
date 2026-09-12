@@ -1,6 +1,6 @@
 # 菜单 Bottom Sheet 容器色实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 让菜单列表项与 Bottom Sheet 使用一致的 Material 3 Expressive 容器色。
 

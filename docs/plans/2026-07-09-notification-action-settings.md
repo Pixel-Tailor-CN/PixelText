@@ -1,6 +1,6 @@
 # 通知快捷操作配置 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为短信通知新增一个可配置的快捷操作系统，允许用户在设置页自定义 `已阅`、`验证码复制`、`回复` 这三个按钮的顺序与文案。
 
