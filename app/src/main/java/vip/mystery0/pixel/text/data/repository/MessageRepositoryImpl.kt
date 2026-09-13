@@ -35,8 +35,9 @@ import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.data.repository.mirror.toMessageModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
-import vip.mystery0.pixel.text.domain.repository.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchBatch
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchRequest
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
@@ -228,17 +229,28 @@ class MessageRepositoryImpl(
         }
     }
 
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    override fun searchMessages(query: String, filter: MessageSearchFilter): Flow<List<MessageModel>> =
-        mirror.observeAllMessages().mapLatest { rows -> rows.map { currentCoroutineContext().ensureActive(); it.toMessageModel() }.filter { message ->
-            currentCoroutineContext().ensureActive()
-            (query.isBlank() || message.content.contains(query, true) || message.mmsSubject.orEmpty().contains(query, true) || message.mmsSummary.orEmpty().contains(query, true)) &&
-                (!filter.unreadOnly || !message.isRead) &&
-                (filter.simSubId == null || message.subId == filter.simSubId) &&
-                (!filter.mmsOnly || message.isMms) &&
-                (filter.contactAddress.isNullOrBlank() || contactDataSource.matchesAddress(filter.contactAddress, message.sender))
-        }.map { message -> message.copy(simName = telephonyDataSource.getSimName(message.subId)) }
-    }.distinctUntilChanged().flowOn(Dispatchers.IO)
+    @OptIn(FlowPreview::class)
+    override fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch> {
+        val spamChanges = spamRepository.observeChanges()
+            .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS.milliseconds)
+            .onStart { emit(Unit) }
+
+        return combine(mirror.searchMessages(request), spamChanges) { batch, _ ->
+            if (batch.messages.isEmpty()) {
+                batch
+            } else {
+                val messageIds = batch.messages.map { it.id }
+                val spamIds = spamRepository.getSpamMessageIds(messageIds, SPAM_THRESHOLD)
+                val enrichedMessages = batch.messages.map { message ->
+                    message.copy(
+                        simName = telephonyDataSource.getSimName(message.subId),
+                        spamScore = if (message.id in spamIds) SPAM_THRESHOLD else -1f,
+                    )
+                }
+                batch.copy(messages = enrichedMessages)
+            }
+        }.distinctUntilChanged().flowOn(Dispatchers.IO)
+    }
 
     override fun getMessagesByThread(
         threadId: Long, limit: Int, offset: Int, contentFilter: ConversationContentFilter,

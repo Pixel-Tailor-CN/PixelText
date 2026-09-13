@@ -16,6 +16,7 @@ data class MirrorSmsEntity(
     @PrimaryKey val localId: Long, val rawSnapshot: String, val body: String?, val address: String?,
     val subject: String?, val dateSent: Long?, val status: Int?, val errorCode: Int?, val locked: Int?,
     val protocol: Int?, val replyPathPresent: Int?, val serviceCenter: String?, val creator: String?,
+    @ColumnInfo(defaultValue = "''") val normalizedAddress: String = "",
 )
 
 @Entity(tableName = "mirror_mms", foreignKeys = [ForeignKey(entity = MirrorMessageEntity::class, parentColumns = ["localId"], childColumns = ["localId"], onDelete = ForeignKey.CASCADE)])
@@ -98,4 +99,8 @@ data class MirrorConversationRow(
 @Entity(tableName = "mms_text_index", foreignKeys = [ForeignKey(entity = MirrorMessageEntity::class,
     parentColumns = ["localId"], childColumns = ["localId"], onDelete = ForeignKey.CASCADE)])
 data class MmsTextIndexEntity(@PrimaryKey val localId: Long, val version: Int,
-    val fingerprint: String, val summary: String, val searchableText: String)
+    val fingerprint: String, val summary: String, val searchableText: String,
+    @ColumnInfo(defaultValue = "''") val searchBody: String = "",
+    @ColumnInfo(defaultValue = "0") val searchReady: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val sourceRevision: Long = 0,
+)

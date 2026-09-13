@@ -74,4 +74,7 @@ data class MmsContentModel(
     /** 稳定英文问题分类，不包含源文或异常信息。 */
     val issues: List<String> = emptyList(),
     val preparing: Boolean = false,
+    /** 搜索专用：全部纯文本与 HTML 可读文字，不包含名片、日历或控制代码。 */
+    val searchBody: String = "",
+    val searchReady: Boolean = false,
 )

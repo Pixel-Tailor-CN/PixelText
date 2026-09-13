@@ -183,6 +183,30 @@ class MmsContentRepositoryImpl(
             }
         }
         val pending = pendingDownload(snapshot)
+        val searchBody = buildString {
+            parts.forEach { part ->
+                context.ensureActive()
+                val text = when (part.kind) {
+                    MmsContentKind.TEXT -> part.text
+                    MmsContentKind.HTML -> htmlDocuments[part.key]?.plainText
+                    else -> null
+                }
+                text?.takeIf { it.isNotBlank() }?.let {
+                    if (isNotEmpty()) append('\n')
+                    append(it)
+                }
+            }
+        }
+        val textParts = parts.filter { it.kind == MmsContentKind.TEXT || it.kind == MmsContentKind.HTML }
+        val searchReady = (snapshot.structureComplete || pending) && textParts.all { part ->
+            if (pending && part.state == MirrorAttachmentState.PENDING_DOWNLOAD) {
+                true
+            } else when (part.kind) {
+                MmsContentKind.TEXT -> part.text != null && part.issue == null
+                MmsContentKind.HTML -> part.text != null && part.issue == null && htmlDocuments[part.key]?.issue == null
+                else -> true
+            }
+        }
         val model = MmsContentModel(
             key = snapshot.key, revision = snapshot.revision, subject = subject,
             parts = parts, pages = pages,
@@ -194,6 +218,8 @@ class MmsContentRepositoryImpl(
                 it.kind !in setOf(MmsContentKind.SMIL, MmsContentKind.MULTIPART) && it.key.partId !in referenced
             }.map { it.key.partId },
             issues = issues,
+            searchBody = searchBody,
+            searchReady = searchReady,
         )
         currentCoroutineContext().ensureActive()
         val bytes = estimateBytes(model)
@@ -317,7 +343,7 @@ class MmsContentRepositoryImpl(
     /** 按 UTF-16 字符及对象开销保守估算，包含搜索文本的副本，不只统计原始字节。 */
     private fun estimateBytes(model: MmsContentModel): Long {
         fun size(value: String?) = if (value == null) 0L else 48L + value.length.toLong() * 2
-        return 512L + size(model.subject) + size(model.summary) + size(model.searchableText) +
+        return 512L + size(model.subject) + size(model.summary) + size(model.searchableText) + size(model.searchBody) +
             24L * (model.bodyPartIds.size + model.attachmentPartIds.size) + model.issues.sumOf(::size) +
             model.pages.sumOf { 64L + 24L * it.partIds.size } +
             model.parts.sumOf { part ->

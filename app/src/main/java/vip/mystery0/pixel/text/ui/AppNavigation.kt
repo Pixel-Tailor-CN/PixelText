@@ -227,18 +227,20 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                     onResultClick = { message ->
                         navController.navigate(
-                            if (message.isMms || message.threadId <= 0) {
+                            if (message.threadId <= 0) {
                                 "mirror_message/${if (message.isMms) "MMS" else "SMS"}/${if (message.isMms) -message.id else message.id}"
-                            } else conversationDetailRoute(
-                                message.threadId,
-                                message.sender,
-                                messageId = message.id,
-                                contentFilter = if (message.spamScore >= 0.7f) {
-                                    ConversationContentFilter.SPAM
-                                } else {
-                                    ConversationContentFilter.NORMAL
-                                },
-                            )
+                            } else {
+                                conversationDetailRoute(
+                                    threadId = message.threadId,
+                                    address = message.sender,
+                                    messageId = message.id,
+                                    contentFilter = if (message.spamScore >= SPAM_THRESHOLD) {
+                                        ConversationContentFilter.SPAM
+                                    } else {
+                                        ConversationContentFilter.NORMAL
+                                    },
+                                )
+                            }
                         )
                     }
                 )
@@ -427,3 +429,5 @@ private fun activityForegroundFadeOut(): ExitTransition {
         )
     )
 }
+
+private const val SPAM_THRESHOLD = 0.7f

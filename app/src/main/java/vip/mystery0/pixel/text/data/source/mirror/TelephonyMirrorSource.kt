@@ -7,7 +7,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.os.CancellationSignal
 import android.os.Bundle
-import android.telephony.PhoneNumberUtils
+import vip.mystery0.pixel.text.domain.model.search.SearchPhoneNumbers
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +112,7 @@ class TelephonyMirrorSource(context: Context) {
             0, row.encode(), row.string("body"), row.string("address"), row.string("subject"),
             row.long("date_sent"), row.int("status"), row.int("error_code"), row.int("locked"),
             row.int("protocol"), row.int("reply_path_present"), row.string("service_center"), row.string("creator"),
+            normalizedAddress = SearchPhoneNumbers.digits(row.string("address")),
         )
         val mms = if (!isMms) null else MirrorMmsEntity(
             0, row.encode(), row.string("sub"), row.int("sub_cs"), decodeSubject(row.string("sub"), row.int("sub_cs")),
@@ -119,7 +120,7 @@ class TelephonyMirrorSource(context: Context) {
         )
         val addresses = childRows?.addresses.orEmpty().mapIndexed { index, addr ->
             MirrorAddressEntity(0, index, addr.long("_id"), addr.int("type"), addr.int("charset"),
-                addr.string("address"), addr.string("address")?.let { PhoneNumberUtils.normalizeNumber(it) }, addr.encode())
+                addr.string("address"), SearchPhoneNumbers.digits(addr.string("address")), addr.encode())
         }
         val parts = childRows?.parts.orEmpty().map { part ->
             MirrorPartEntity(0, requireNotNull(part.long("_id")) { "missing_part_id" }, part.int("seq"),

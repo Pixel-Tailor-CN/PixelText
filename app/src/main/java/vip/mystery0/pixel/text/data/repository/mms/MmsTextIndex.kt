@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.data.repository.mms
 
+import android.util.Log
 import java.security.MessageDigest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -10,7 +11,9 @@ import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
 
-const val MMS_TEXT_INDEX_VERSION = 2
+private const val TAG = "MmsTextIndexer"
+
+const val MMS_TEXT_INDEX_VERSION = 3
 
 /** 版本及全部输入身份参与失效，附件 READY 内部更新也不能复用旧文本。 */
 suspend fun mmsContentFingerprint(snapshot: MirrorMessageModel): String {
@@ -84,15 +87,31 @@ class MmsTextIndexer(
                 .collectLatest { rows ->
                     for ((snapshot, fingerprint) in rows) {
                         ensureActive()
-                        val dao = database.mirrorDao()
-                        if (dao.getMmsText(snapshot.localId)?.let { it.version == MMS_TEXT_INDEX_VERSION && it.fingerprint == fingerprint } == true) continue
-                        val model = contents.read(snapshot.key) ?: continue
-                        database.withTransaction {
-                            val latest = mirror.getMessage(snapshot.key)
-                            if (latest != null && mmsContentFingerprint(latest) == fingerprint) {
-                                dao.putMmsText(MmsTextIndexEntity(snapshot.localId, MMS_TEXT_INDEX_VERSION,
-                                    fingerprint, model.summary, model.searchableText))
+                        try {
+                            val dao = database.mirrorDao()
+                            if (dao.getMmsText(snapshot.localId)?.let { it.version == MMS_TEXT_INDEX_VERSION && it.fingerprint == fingerprint } == true) continue
+                            val model = contents.read(snapshot.key) ?: continue
+                            database.withTransaction {
+                                val latest = mirror.getMessage(snapshot.key)
+                                if (latest != null && mmsContentFingerprint(latest) == fingerprint) {
+                                    dao.putMmsText(
+                                        MmsTextIndexEntity(
+                                            localId = snapshot.localId,
+                                            version = MMS_TEXT_INDEX_VERSION,
+                                            fingerprint = fingerprint,
+                                            summary = model.summary,
+                                            searchableText = model.searchableText,
+                                            searchBody = model.searchBody,
+                                            searchReady = model.searchReady,
+                                            sourceRevision = latest.revision,
+                                        )
+                                    )
+                                }
                             }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            Log.w(TAG, "index mms text failed message_id=${snapshot.key.sourceId} error=${e.javaClass.simpleName}")
                         }
                     }
                 }

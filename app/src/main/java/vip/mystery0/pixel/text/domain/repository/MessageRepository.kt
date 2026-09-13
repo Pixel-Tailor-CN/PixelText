@@ -3,20 +3,14 @@ package vip.mystery0.pixel.text.domain.repository
 import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchBatch
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchRequest
 
 enum class ConversationContentFilter {
     ALL,
     NORMAL,
     SPAM,
 }
-
-data class MessageSearchFilter(
-    val unreadOnly: Boolean = false,
-    val simSubId: Int? = null,
-    val mmsOnly: Boolean = false,
-    val contactAddress: String? = null,
-    val contactDisplayName: String? = null,
-)
 
 interface MessageRepository {
     fun startCacheObserving()
@@ -26,10 +20,7 @@ interface MessageRepository {
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun searchConversations(query: String): Flow<List<ConversationModel>>
-    fun searchMessages(
-        query: String,
-        filter: MessageSearchFilter = MessageSearchFilter()
-    ): Flow<List<MessageModel>>
+    fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch>
     fun getMessagesByThread(
         threadId: Long,
         limit: Int,

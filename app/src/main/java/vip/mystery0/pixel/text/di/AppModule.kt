@@ -49,6 +49,8 @@ import vip.mystery0.pixel.text.data.resource.BundledResourceVersionProvider
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.resource.SenderProfileStore
 import vip.mystery0.pixel.text.data.source.ContactDataSource
+import vip.mystery0.pixel.text.data.source.PickedPhoneSource
+import vip.mystery0.pixel.text.data.source.PickedPhoneSourceImpl
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.parser.MessageParser
@@ -107,6 +109,7 @@ val appModule = module {
     single { SenderProfileRepository(get(), get(), get()) }
     single { VerificationCodeIndexDatabase.create(androidContext()) }
     single { ContactDataSource(androidContext(), get()) }
+    single<PickedPhoneSource> { PickedPhoneSourceImpl(androidContext()) }
     single { TelephonyDataSource(androidContext(), get()) }
     single { MessageMirrorDatabase.create(androidContext()) }
     single { TelephonyMirrorSource(androidContext()) }
@@ -180,7 +183,7 @@ val appModule = module {
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
     }
-    viewModel { SearchViewModel(get()) }
+    viewModel { SearchViewModel(get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get(), get()) }

@@ -3,7 +3,9 @@ package vip.mystery0.pixel.text.data.repository.mirror
 import vip.mystery0.pixel.text.data.repository.mms.mmsContentFingerprint
 import vip.mystery0.pixel.text.data.repository.mms.mmsAttachmentSummary
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
+import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import org.json.JSONArray
 import vip.mystery0.pixel.text.data.db.mirror.*
@@ -12,6 +14,8 @@ import vip.mystery0.pixel.text.data.source.mirror.ProviderRowSnapshot
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.mirror.*
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchBatch
+import vip.mystery0.pixel.text.domain.model.search.MessageSearchRequest
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 
 class MessageMirrorRepositoryImpl(
@@ -19,6 +23,7 @@ class MessageMirrorRepositoryImpl(
     private val store: MirrorAttachmentStore,
 ) : MessageMirrorRepository {
     private val dao get() = database.mirrorDao()
+    private val searchDao get() = database.searchDao()
 
     override suspend fun getMessage(key: SourceMessageKey): MirrorMessageModel? =
         dao.get(key.transport.name, key.sourceId)?.toModel()
@@ -71,6 +76,70 @@ class MessageMirrorRepositoryImpl(
                 },
             )
         }.distinctUntilChanged().flowOn(Dispatchers.IO)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch> {
+        val searchQuery = MirrorSearchQuery.buildSearchQuery(request)
+        val unreadyQuery = MirrorSearchQuery.buildUnreadyCountQuery(request)
+        val trigger = SimpleSQLiteQuery("SELECT 1")
+
+        val searchFlow = searchDao.observeTableChanges(trigger)
+            .mapLatest {
+                searchDao.searchBatch(searchQuery, unreadyQuery)
+            }
+
+        return combine(searchFlow, observeSyncState()) { searchResult, syncState ->
+            val syncIncomplete = when {
+                syncState.phase == MirrorInitializationPhase.NOT_STARTED -> true
+                !syncState.completedCollections.containsAll(setOf("SMS", "MMS")) -> true
+                syncState.incompleteStructureCount > 0 -> true
+                syncState.collections.any { it.collection in setOf("SMS", "MMS") && it.error != null } -> true
+                else -> false
+            }
+            val textIncomplete = request.hasEffectiveQuery && searchResult.unreadyCount > 0
+            val incomplete = syncIncomplete || textIncomplete
+
+            val messages = searchResult.rows.map { it.toSearchMessageModel(request) }
+            MessageSearchBatch(messages = messages, incomplete = incomplete)
+        }.distinctUntilChanged().flowOn(Dispatchers.IO)
+    }
+
+    private fun MirrorSearchRow.toSearchMessageModel(request: MessageSearchRequest): MessageModel {
+        val isMms = transport == "MMS"
+        val preferredSubject = mmsDecodedSubject ?: mmsSubject
+        val fallbackSummary = preferredSubject ?: if (pduType == 130) "等待下载彩信" else "彩信"
+        val summary = mmsSummary ?: fallbackSummary
+
+        val content = if (isMms) {
+            if (request.hasEffectiveQuery) {
+                mmsHitBody?.takeIf { it.isNotBlank() }
+                    ?: mmsHitSubject?.takeIf { it.isNotBlank() }
+                    ?: mmsEffectiveBody?.takeIf { it.isNotBlank() }
+                    ?: preferredSubject.orEmpty()
+            } else {
+                mmsEffectiveBody?.takeIf { it.isNotBlank() }
+                    ?: preferredSubject?.takeIf { it.isNotBlank() }
+                    ?: summary
+            }
+        } else {
+            smsBody.orEmpty()
+        }
+
+        return MessageModel(
+            id = if (isMms) -sourceId else sourceId,
+            threadId = threadId ?: -1,
+            sender = address.orEmpty(),
+            content = content,
+            timestamp = timestamp ?: 0,
+            subId = subscriptionId ?: -1,
+            isRead = read == 1,
+            isReceived = boxType == 1,
+            mmsSubject = if (isMms) preferredSubject else null,
+            isMms = isMms,
+            mmsDownloadPending = isMms && pduType == 130,
+            mmsSummary = if (isMms) summary else null,
+        )
     }
 
     private suspend fun MirrorMessageRecord.toModel(): MirrorMessageModel {
