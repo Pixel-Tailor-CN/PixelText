@@ -131,6 +131,7 @@ fun SettingsScreen(
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
+    onNavigateToSenderWhitelist: () -> Unit = {},
     onNavigateToConversationDetailCustomization: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
     onResourceUpdateCheckRequestConsumed: () -> Unit = {},
@@ -402,6 +403,14 @@ fun SettingsScreen(
                                 icon = {
                                     Icon(Icons.Rounded.Shield, contentDescription = null)
                                 }
+                            )
+                        }
+                        item(key = "sender_whitelist", contentType = "Preference") {
+                            Preference(
+                                title = { Text("骚扰识别白名单") },
+                                summary = { Text("指定号码或正则规则，命中消息始终按非骚扰处理") },
+                                icon = { Icon(Icons.Rounded.Shield, contentDescription = null) },
+                                onClick = onNavigateToSenderWhitelist,
                             )
                         }
                         item(key = "keyword_spam", contentType = "Preference") {

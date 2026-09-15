@@ -86,13 +86,14 @@ interface SpamResultDao {
     @Query(
         """
         SELECT thread_id FROM (
-            SELECT thread_id, checked_at AS matched_at
+            SELECT message_id, thread_id, checked_at AS matched_at
             FROM spam_result
             WHERE spam_score >= :threshold
             UNION ALL
-            SELECT thread_id, matched_at
+            SELECT message_id, thread_id, matched_at
             FROM keyword_spam_match
-        )
+        ) AS matches
+        WHERE NOT EXISTS (SELECT 1 FROM spam_allowed_message a WHERE a.message_id = matches.message_id)
         GROUP BY thread_id
         ORDER BY MAX(matched_at) DESC
         LIMIT :limit OFFSET :offset
@@ -100,11 +101,16 @@ interface SpamResultDao {
     )
     suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
 
+    @Query("SELECT message_id FROM spam_result WHERE spam_score >= :threshold UNION SELECT message_id FROM keyword_spam_match")
+    suspend fun getCandidateSpamMessageIds(threshold: Float): List<Long>
+
     @Query(
         """
         SELECT
             (SELECT COUNT(*) FROM spam_result) +
-            (SELECT COUNT(*) FROM keyword_spam_match)
+            (SELECT COUNT(*) FROM keyword_spam_match) +
+            (SELECT COUNT(*) FROM sender_whitelist_rule) +
+            (SELECT COUNT(*) FROM spam_allowed_message)
         """
     )
     fun observeCount(): Flow<Int>
@@ -166,13 +172,16 @@ interface BlockedKeywordDao {
         SpamResultEntity::class,
         BlockedKeywordEntity::class,
         KeywordSpamMatchEntity::class,
+        SenderWhitelistRuleEntity::class,
+        SpamAllowedMessageEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class SpamDatabase : RoomDatabase() {
     abstract fun spamResultDao(): SpamResultDao
     abstract fun blockedKeywordDao(): BlockedKeywordDao
+    abstract fun senderWhitelistDao(): SenderWhitelistDao
 
     companion object {
         fun create(context: Context): SpamDatabase {
@@ -181,8 +190,16 @@ abstract class SpamDatabase : RoomDatabase() {
                 SpamDatabase::class.java,
                 "spam.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS sender_whitelist_rule (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sender_whitelist_rule_type_value ON sender_whitelist_rule(type, value)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS spam_allowed_message (message_id INTEGER NOT NULL PRIMARY KEY, fingerprint TEXT NOT NULL, allowed_at INTEGER NOT NULL)")
+            }
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {

@@ -11,9 +11,13 @@ import vip.mystery0.pixel.text.domain.model.BlockedKeyword
 import vip.mystery0.pixel.text.domain.model.KeywordSaveResult
 import vip.mystery0.pixel.text.domain.model.KeywordSpamMessage
 import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
+import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 import java.util.Locale
 
-class KeywordSpamRepositoryImpl(db: SpamDatabase) : KeywordSpamRepository {
+class KeywordSpamRepositoryImpl(
+    db: SpamDatabase,
+    private val whitelist: SenderWhitelistRepository,
+) : KeywordSpamRepository {
     private val dao = db.blockedKeywordDao()
 
     override fun observeKeywords(): Flow<List<BlockedKeyword>> =
@@ -65,7 +69,11 @@ class KeywordSpamRepositoryImpl(db: SpamDatabase) : KeywordSpamRepository {
         messageId: Long,
         threadId: Long,
         content: String,
-    ): Boolean = withContext(Dispatchers.IO) {
+    ): Boolean = whitelist.withMessageDecision(messageId) { allowed ->
+        if (allowed) {
+            dao.deleteMatch(messageId)
+            return@withMessageDecision false
+        }
         val matchedKeyword = findMatch(content, dao.getAll())
         if (matchedKeyword == null) {
             dao.deleteMatch(messageId)
@@ -87,7 +95,9 @@ class KeywordSpamRepositoryImpl(db: SpamDatabase) : KeywordSpamRepository {
         withContext(Dispatchers.IO) {
             val keywords = dao.getAll()
             val now = System.currentTimeMillis()
+            val allowedIds = whitelist.allowedMessageIds(messages.map { it.messageId })
             val matches = messages.mapNotNull { message ->
+                if (message.messageId in allowedIds) return@mapNotNull null
                 val keyword = findMatch(message.content, keywords) ?: return@mapNotNull null
                 KeywordSpamMatchEntity(
                     messageId = message.messageId,

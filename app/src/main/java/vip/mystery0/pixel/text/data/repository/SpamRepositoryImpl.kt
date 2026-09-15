@@ -8,19 +8,22 @@ import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.SpamResultEntity
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 
 class SpamRepositoryImpl(
     db: SpamDatabase,
-    private val settingsRepository: AppSettingsRepository
+    private val settingsRepository: AppSettingsRepository,
+    private val whitelist: SenderWhitelistRepository,
 ) : SpamRepository {
     private val dao = db.spamResultDao()
     private val keywordDao = db.blockedKeywordDao()
 
     override suspend fun getScore(messageId: Long): Float? =
-        withContext(Dispatchers.IO) { dao.getScore(messageId) }
+        withContext(Dispatchers.IO) { if (whitelist.isAllowed(messageId)) 0f else dao.getScore(messageId) }
 
     override suspend fun save(messageId: Long, threadId: Long, score: Float) =
-        withContext(Dispatchers.IO) {
+        whitelist.withMessageDecision(messageId) { allowed ->
+            if (allowed) return@withMessageDecision
             dao.insert(
                 SpamResultEntity(
                     messageId = messageId,
@@ -37,7 +40,7 @@ class SpamRepositoryImpl(
                 emptySet()
             } else {
                 messageIds.chunked(MAX_QUERY_ARGS)
-                    .flatMap { dao.getExistingMessageIds(it) }
+                    .flatMap { dao.getExistingMessageIds(it) + whitelist.allowedMessageIds(it) }
                     .toSet()
             }
         }
@@ -48,13 +51,20 @@ class SpamRepositoryImpl(
                 emptySet()
             } else {
                 messageIds.chunked(MAX_QUERY_ARGS)
-                    .flatMap { dao.getSpamMessageIds(it, threshold) }
+                    .flatMap {
+                        val candidates = dao.getSpamMessageIds(it, threshold)
+                        candidates - whitelist.allowedMessageIds(candidates)
+                    }
                     .toSet()
             }
         }
 
     override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
-        withContext(Dispatchers.IO) { dao.getSpamThreadIds(threshold, limit, offset) }
+        withContext(Dispatchers.IO) {
+            // 先验证消息身份、持久化新命中的放行，再在 SQL 中过滤后分页，避免空页或数量错误。
+            whitelist.allowedMessageIds(dao.getCandidateSpamMessageIds(threshold))
+            dao.getSpamThreadIds(threshold, limit, offset)
+        }
 
     override suspend fun delete(messageIds: Set<Long>) {
         if (messageIds.isEmpty()) return
@@ -62,6 +72,7 @@ class SpamRepositoryImpl(
             messageIds.chunked(MAX_QUERY_ARGS).forEach {
                 dao.deleteByMessageIds(it)
                 keywordDao.deleteMatches(it)
+                whitelist.forget(it)
             }
         }
     }

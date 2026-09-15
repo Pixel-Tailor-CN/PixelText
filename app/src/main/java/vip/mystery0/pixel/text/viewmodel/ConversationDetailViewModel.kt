@@ -24,6 +24,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,7 +83,8 @@ class ConversationDetailViewModel(
     private val senderProfileRepository: vip.mystery0.pixel.text.data.repository.SenderProfileRepository,
     private val spamClassifierFactory: SpamClassifierFactory,
     private val spamRepository: SpamRepository,
-    private val mirror: vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+    private val mirror: vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository,
+    private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
@@ -145,15 +149,19 @@ class ConversationDetailViewModel(
     private val mirrorThreadId = MutableStateFlow(-1L)
     private var mirrorObservationJob: Job? = null
 
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
     fun startObservingTelephony(): Boolean {
         if (mirrorObservationJob?.isActive == true) return true
         mirrorObservationJob = viewModelScope.launch {
             var initialSnapshot = true
-            mirrorThreadId.flatMapLatest { mirror.observeThreadChanges(it) }.collect {
-                // 返回前后台期间的补同步不触发新消息自动滚动，保留离开前的阅读位置。
-                if (currentThreadId >= 0) refreshMessages(reportInsertions = !initialSnapshot)
-                initialSnapshot = false
+            merge(
+                mirrorThreadId.flatMapLatest { mirror.observeThreadChanges(it) }.map { true },
+                spamRepository.observeChanges().debounce(100.milliseconds).map { false },
+            ).collect { fromMirror ->
+                // 白名单和关键词变更也刷新详情，但不触发新消息入场或自动滚动。
+                if (!fromMirror) _manualSpamChecks.value = emptyMap()
+                if (currentThreadId >= 0) refreshMessages(reportInsertions = fromMirror && !initialSnapshot)
+                if (fromMirror) initialSnapshot = false
             }
         }
         return true
@@ -341,9 +349,10 @@ class ConversationDetailViewModel(
                 val score = if (markedAsSpam) MANUAL_SPAM_SCORE else MANUAL_NON_SPAM_SCORE
                 spamRepository.save(message.id, message.threadId, score)
                 SmartspacerIntegration.notifyChanged(context)
-                updateMessageSpamScore(message.id, score)
-                _manualSpamChecks.value += (message.id to ManualSpamCheckState.Result(score))
-                markedAsSpam
+                val effectiveScore = spamRepository.getScore(message.id) ?: score
+                updateMessageSpamScore(message.id, effectiveScore)
+                _manualSpamChecks.value += (message.id to ManualSpamCheckState.Result(effectiveScore))
+                effectiveScore >= SPAM_THRESHOLD
             }.onSuccess { isSpam ->
                 _markSpamResultEvents.trySend(MarkSpamResultEvent.Success(isSpam))
             }.onFailure { e ->
@@ -368,6 +377,7 @@ class ConversationDetailViewModel(
         _manualSpamChecks.value += (message.id to ManualSpamCheckState.Checking)
         viewModelScope.launch {
             val result = runCatching {
+                if (whitelist.isAllowed(message.id)) return@runCatching 0f
                 withContext(Dispatchers.Default) {
                     manualClassificationMutex.withLock {
                         spamClassifierFactory.create().use { classifier ->
@@ -381,8 +391,9 @@ class ConversationDetailViewModel(
                 if (score >= 0f) {
                     spamRepository.save(message.id, message.threadId, score)
                     SmartspacerIntegration.notifyChanged(context)
-                    updateMessageSpamScore(message.id, score)
-                    ManualSpamCheckState.Result(score)
+                    val effectiveScore = spamRepository.getScore(message.id) ?: score
+                    updateMessageSpamScore(message.id, effectiveScore)
+                    ManualSpamCheckState.Result(effectiveScore)
                 } else {
                     ManualSpamCheckState.Error("识别失败")
                 }

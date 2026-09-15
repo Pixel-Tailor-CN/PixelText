@@ -663,6 +663,7 @@ fun ConversationDetailScreen(
                         }
                     },
                     actions = {
+                        ConversationWhitelistAction(sender = address, snackbar = snackbarHostState)
                         IconButton(
                             onClick = {
                                 val dialIntent = Intent(Intent.ACTION_DIAL).apply {

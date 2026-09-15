@@ -46,6 +46,7 @@ class HistoricalSpamScanWorker(
 
     private val telephonyDataSource: TelephonyDataSource by inject()
     private val spamRepository: SpamRepository by inject()
+    private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository by inject()
     private val spamClassifierFactory: SpamClassifierFactory by inject()
 
     override suspend fun doWork(): Result {
@@ -65,10 +66,11 @@ class HistoricalSpamScanWorker(
                 spamClassifierFactory.create().use { classifier ->
                     pendingMessages.chunked(BATCH_SIZE).forEach { batch ->
                         batch.forEach { message ->
-                            val score = classifier.classify(message.content)
+                            val score = if (whitelist.isAllowed(message.messageId)) 0f
+                                else classifier.classify(message.content)
                             if (score >= 0f) {
                                 spamRepository.save(message.messageId, message.threadId, score)
-                                if (score >= SPAM_THRESHOLD) spamCount++
+                                if ((spamRepository.getScore(message.messageId) ?: -1f) >= SPAM_THRESHOLD) spamCount++
                             }
                             processed++
                             publishProgress(processed, pendingMessages.size, spamCount)

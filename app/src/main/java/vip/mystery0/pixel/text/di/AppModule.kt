@@ -27,6 +27,7 @@ import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 import org.koin.android.ext.koin.androidContext
+import org.koin.android.ext.koin.androidApplication
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
@@ -157,8 +158,12 @@ val appModule = module {
     single<SpamClassifierFactory> {
         SpamClassifierFactory { SpamClassifier(androidContext(), get()) }
     }
-    single<SpamRepository> { SpamRepositoryImpl(get(), get()) }
-    single<KeywordSpamRepository> { KeywordSpamRepositoryImpl(get()) }
+    single { vip.mystery0.pixel.text.data.source.WhitelistMessageSource(get()) }
+    single<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository> {
+        vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl(get(), get())
+    }
+    single<SpamRepository> { SpamRepositoryImpl(get(), get(), get()) }
+    single<KeywordSpamRepository> { KeywordSpamRepositoryImpl(get(), get()) }
     single { UnreadSmsCounter(get(), get(), get()) }
     single<VerificationCodeRepository> {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
@@ -176,10 +181,11 @@ val appModule = module {
     viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MmsContentViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.SenderWhitelistViewModel(get(), androidApplication()) }
     viewModel { ConversationListViewModel(get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
-    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get()) }
+    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
     }

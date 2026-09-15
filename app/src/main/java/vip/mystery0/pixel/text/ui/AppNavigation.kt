@@ -167,6 +167,7 @@ fun AppNavigation(
                     onNavigateToSmsNotificationIcons = {
                         navController.navigate("sms_notification_icons")
                     },
+                    onNavigateToSenderWhitelist = { navController.navigate("sender_whitelist") },
                     onNavigateToKeywordSpam = {
                         navController.navigate("keyword_spam")
                     },
@@ -192,6 +193,11 @@ fun AppNavigation(
             composable("sms_notification_icons") {
                 SmsNotificationIconSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("sender_whitelist") {
+                vip.mystery0.pixel.text.ui.screen.SenderWhitelistScreen(
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
             composable("keyword_spam") {

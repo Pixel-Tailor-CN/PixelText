@@ -69,6 +69,7 @@ class SpamDetectionWorker(
     }
 
     private val spamRepository: SpamRepository by inject()
+    private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository by inject()
     private val spamClassifier: SpamClassifier by inject()
     private val senderProfileRepository: SenderProfileRepository by inject()
     private val contactDataSource: ContactDataSource by inject()
@@ -85,14 +86,15 @@ class SpamDetectionWorker(
         val messageUri = inputData.getString(KEY_MESSAGE_URI).orEmpty().takeIf { it.isNotBlank() }
         if (messageId < 0 || threadId < 0) return Result.failure()
 
-        val keywordMatched = runCatching {
+        val allowedAtStart = whitelist.isAllowed(messageId)
+        val keywordMatched = if (allowedAtStart) false else runCatching {
             keywordSpamRepository.updateMessageMatch(messageId, threadId, content)
         }.getOrElse { error ->
             Log.e(TAG, "keyword spam match failed message_id=$messageId", error)
             false
         }
 
-        val score = if (spamRepository.isEnabled()) {
+        val score = if (!allowedAtStart && spamRepository.isEnabled()) {
             runCatching {
                 try {
                     classificationSemaphore.withPermit {
@@ -114,27 +116,30 @@ class SpamDetectionWorker(
             Log.d(TAG, "spam score message_id=$messageId score=$score")
         }
 
-        val isSpam = keywordMatched || (score != null && score >= SPAM_THRESHOLD)
-        applySpamAutoAction(
-            messageId = messageId,
-            isSpam = isSpam,
-            deferNotification = deferNotification,
-        )
-        updateNotification(
-            sender = sender,
-            threadId = threadId,
-            content = content,
-            isSpam = isSpam,
-            deferNotification = deferNotification,
-            messageUri = messageUri,
-        )
-        if (keywordMatched || (score != null && score >= 0f)) {
-            notifySpamResult(
+        // 模型执行期间可能新增白名单。最终自动操作和通知与规则修改串行化，不能使用过期判定。
+        whitelist.withMessageDecision(messageId) { allowed ->
+            val isSpam = !allowed && (keywordMatched || (score != null && score >= SPAM_THRESHOLD))
+            applySpamAutoAction(
                 messageId = messageId,
-                threadId = threadId,
-                score = if (keywordMatched) 1f else score ?: -1f,
+                isSpam = isSpam,
+                deferNotification = deferNotification,
             )
-            SmartspacerIntegration.notifyChanged(applicationContext)
+            updateNotification(
+                sender = sender,
+                threadId = threadId,
+                content = content,
+                isSpam = isSpam,
+                deferNotification = deferNotification,
+                messageUri = messageUri,
+            )
+            if (allowed || keywordMatched || (score != null && score >= 0f)) {
+                notifySpamResult(
+                    messageId = messageId,
+                    threadId = threadId,
+                    score = if (allowed) 0f else if (keywordMatched) 1f else score ?: -1f,
+                )
+                SmartspacerIntegration.notifyChanged(applicationContext)
+            }
         }
         return Result.success()
     }
