@@ -36,6 +36,8 @@ fun SearchResultList(
     listState: LazyListState,
     onRetry: () -> Unit,
     onResultClick: (MessageModel) -> Unit,
+    selectionState: SearchSelectionState,
+    onToggleSelection: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -119,7 +121,17 @@ fun SearchResultList(
                             SearchResultItem(
                                 message = message,
                                 query = uiState.actualQuery,
-                                onClick = { onResultClick(message) }
+                                selectionMode = selectionState.selectedIds.isNotEmpty(),
+                                selected = message.id in selectionState.selectedIds,
+                                enabled = !selectionState.isDeleting,
+                                onLongClick = { onToggleSelection(message.id) },
+                                onClick = {
+                                    if (selectionState.selectedIds.isNotEmpty()) {
+                                        onToggleSelection(message.id)
+                                    } else {
+                                        onResultClick(message)
+                                    }
+                                },
                             )
                         }
                     }

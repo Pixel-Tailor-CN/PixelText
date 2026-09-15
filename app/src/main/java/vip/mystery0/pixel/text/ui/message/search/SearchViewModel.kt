@@ -35,15 +35,97 @@ class SearchViewModel(
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
+    private val _selectionState = MutableStateFlow(SearchSelectionState())
+    val selectionState: StateFlow<SearchSelectionState> = _selectionState.asStateFlow()
+
+    fun toggleSelection(messageId: Long) {
+        val state = _selectionState.value
+        if (state.isDeleting || state.pendingDelete != null) return
+        val results = (_uiState.value as? SearchUiState.Success)?.results ?: return
+        if (results.none { it.id == messageId }) return
+        val selected = state.selectedIds
+        _selectionState.value = state.copy(
+            selectedIds = if (messageId in selected) selected - messageId else selected + messageId,
+        )
+    }
+
+    fun toggleSelectAll() {
+        val state = _selectionState.value
+        if (state.isDeleting || state.pendingDelete != null) return
+        val ids = (_uiState.value as? SearchUiState.Success)?.results
+            ?.mapTo(mutableSetOf()) { it.id } ?: return
+        // 只捕获当前结果，不将后续新增的匹配消息自动加入选择。
+        _selectionState.value = state.copy(
+            selectedIds = if (state.selectedIds.containsAll(ids)) emptySet() else ids,
+        )
+    }
+
+    fun clearSelection() {
+        if (_selectionState.value.isDeleting) return
+        _selectionState.value = _selectionState.value.copy(selectedIds = emptySet(), pendingDelete = null)
+    }
+
+    fun requestDelete() {
+        val state = _selectionState.value
+        val success = _uiState.value as? SearchUiState.Success ?: return
+        if (state.isDeleting || state.selectedIds.isEmpty() || state.pendingDelete != null) return
+        _selectionState.value = state.copy(
+            pendingDelete = SearchDeleteSnapshot(state.selectedIds.toSet(), success.incomplete),
+        )
+    }
+
+    fun dismissDelete() {
+        if (_selectionState.value.isDeleting) return
+        _selectionState.value = _selectionState.value.copy(pendingDelete = null)
+    }
+
+    fun consumeFeedback() {
+        _selectionState.value = _selectionState.value.copy(feedback = null)
+    }
+
+    fun confirmDelete() {
+        val state = _selectionState.value
+        val snapshot = state.pendingDelete ?: return
+        if (state.isDeleting) return
+        // 确认后仅使用对话框打开时捕获的 ID，避免实时搜索更新扩大删除范围。
+        _selectionState.value = state.copy(
+            isDeleting = true, pendingDelete = null, feedback = null,
+        )
+        viewModelScope.launch {
+            try {
+                val deletedCount = repository.deleteMessages(snapshot.messageIds)
+                val feedback = if (deletedCount == snapshot.messageIds.size) {
+                    "已删除 $deletedCount 条消息"
+                } else {
+                    "已删除 $deletedCount 条消息，其余消息未删除或已不存在，请检查搜索结果"
+                }
+                _selectionState.value = _selectionState.value.copy(feedback = feedback)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _selectionState.value = _selectionState.value.copy(
+                    feedback = "删除未完成，部分消息可能已删除，请检查搜索结果后重试",
+                )
+            } finally {
+                _selectionState.value = _selectionState.value.copy(
+                    isDeleting = false, selectedIds = emptySet(),
+                )
+            }
+            triggerSearch(debounce = false)
+        }
+    }
+
     private var searchJob: Job? = null
     private var requestGeneration = 0L
 
     fun updateQuery(query: String) {
+        if (_selectionState.value.isDeleting) return
         _searchQuery.value = query
         triggerSearch(debounce = true)
     }
 
     fun setDomainFilter(filter: MessageSearchFilter) {
+        if (_selectionState.value.isDeleting) return
         _domainFilter.value = filter
         triggerSearch(debounce = false)
     }
@@ -61,6 +143,8 @@ class SearchViewModel(
     }
 
     private fun triggerSearch(debounce: Boolean) {
+        if (_selectionState.value.isDeleting) return
+        clearSelection()
         // 同步取消前代 Job 并递增代次，取消边界严格在 delay 之前，且使清空回 Idle 也让旧代次失效
         searchJob?.cancel()
         val generation = ++requestGeneration
@@ -72,6 +156,8 @@ class SearchViewModel(
             return
         }
 
+        // 防抖期间也不允许继续选择上一轮结果。
+        _uiState.value = SearchUiState.Loading
         searchJob = viewModelScope.launch {
             if (debounce) {
                 delay(300.milliseconds)
@@ -96,6 +182,11 @@ class SearchViewModel(
             repository.searchMessages(request)
                 .collect { batch ->
                     if (generation != requestGeneration) return@collect
+                    val selection = _selectionState.value
+                    val resultIds = batch.messages.mapTo(mutableSetOf()) { it.id }
+                    _selectionState.value = selection.copy(
+                        selectedIds = selection.selectedIds.intersect(resultIds),
+                    )
                     _uiState.value = SearchUiState.Success(
                         results = batch.messages,
                         actualQuery = query,
@@ -148,6 +239,15 @@ class SearchViewModel(
         return pickedPhoneSource.resolvePickedPhone(uri)
     }
 }
+
+data class SearchDeleteSnapshot(val messageIds: Set<Long>, val incomplete: Boolean)
+
+data class SearchSelectionState(
+    val selectedIds: Set<Long> = emptySet(),
+    val pendingDelete: SearchDeleteSnapshot? = null,
+    val isDeleting: Boolean = false,
+    val feedback: String? = null,
+)
 
 sealed class SearchUiState {
     data object Idle : SearchUiState()

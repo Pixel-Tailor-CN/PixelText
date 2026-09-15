@@ -1,7 +1,7 @@
 package vip.mystery0.pixel.text.ui.message.search
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -38,15 +41,33 @@ import vip.mystery0.pixel.text.ui.screen.formatTimeShort
 fun SearchResultItem(
     message: MessageModel,
     query: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    selectionMode: Boolean,
+    selected: Boolean,
+    enabled: Boolean,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surface
+            )
+            .semantics { this.selected = selected }
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onClick,
+                onLongClickLabel = "选择消息",
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selectionMode) {
+            Checkbox(checked = selected, onCheckedChange = null, enabled = enabled)
+            Spacer(modifier = Modifier.width(16.dp))
+        }
         Box(
             modifier = Modifier
                 .size(48.dp)

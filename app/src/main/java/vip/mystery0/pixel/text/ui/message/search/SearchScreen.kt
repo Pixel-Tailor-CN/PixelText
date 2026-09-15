@@ -1,7 +1,6 @@
 package vip.mystery0.pixel.text.ui.message.search
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +23,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -41,6 +42,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -59,7 +62,29 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val domainFilter by viewModel.domainFilter.collectAsState()
+    val selectionState by viewModel.selectionState.collectAsState()
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(selectionState.feedback) {
+        selectionState.feedback?.let { feedback ->
+            snackbarHostState.showSnackbar(feedback)
+            viewModel.consumeFeedback()
+        }
+    }
+
+    LaunchedEffect(selectionState.selectedIds.isNotEmpty()) {
+        if (selectionState.selectedIds.isNotEmpty()) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
+
+    BackHandler(enabled = selectionState.isDeleting || selectionState.selectedIds.isNotEmpty()) {
+        viewModel.clearSelection()
+    }
 
     val focusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
@@ -94,7 +119,7 @@ fun SearchScreen(
     }
 
     LaunchedEffect(inPhoneSubScreen) {
-        if (!inPhoneSubScreen) {
+        if (!inPhoneSubScreen && selectionState.selectedIds.isEmpty() && !selectionState.isDeleting) {
             focusRequester.requestFocus()
         }
     }
@@ -119,6 +144,7 @@ fun SearchScreen(
                         ) {
                             BasicTextField(
                                 value = searchQuery,
+                                enabled = !selectionState.isDeleting,
                                 onValueChange = viewModel::updateQuery,
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                                     color = MaterialTheme.colorScheme.onSurface
@@ -141,7 +167,7 @@ fun SearchScreen(
                                 }
                             )
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.updateQuery("") }) {
+                                IconButton(onClick = { viewModel.updateQuery("") }, enabled = !selectionState.isDeleting) {
                                     Icon(
                                         imageVector = Icons.Rounded.Close,
                                         contentDescription = "清空搜索内容"
@@ -151,9 +177,13 @@ fun SearchScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            viewModel.updateQuery("")
-                            onNavigateBack()
+                        IconButton(enabled = !selectionState.isDeleting, onClick = {
+                            if (selectionState.selectedIds.isNotEmpty()) {
+                                viewModel.clearSelection()
+                            } else if (!selectionState.isDeleting) {
+                                viewModel.updateQuery("")
+                                onNavigateBack()
+                            }
                         }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -166,6 +196,7 @@ fun SearchScreen(
                     )
                 )
             },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0.dp),
         ) { paddingValues ->
@@ -176,16 +207,28 @@ fun SearchScreen(
                     .consumeWindowInsets(paddingValues)
                     .imePadding()
             ) {
+                if (selectionState.selectedIds.isNotEmpty() || selectionState.isDeleting) {
+                    val results = (uiState as? SearchUiState.Success)?.results.orEmpty()
+                    SearchSelectionBar(
+                        state = selectionState,
+                        allSelected = results.isNotEmpty() && results.all { it.id in selectionState.selectedIds },
+                        onClear = viewModel::clearSelection,
+                        onSelectAll = viewModel::toggleSelectAll,
+                        onDelete = viewModel::requestDelete,
+                    )
+                }
+
                 SearchFilterBar(
                     filter = domainFilter,
                     simDisplayNameMap = simDisplayNameMap,
-                    onPhoneClick = { inPhoneSubScreen = true },
+                    onPhoneClick = { if (!selectionState.isDeleting) inPhoneSubScreen = true },
                     onSimClick = {
+                        if (selectionState.isDeleting) return@SearchFilterBar
                         refreshActiveSims()
                         showSimSheet = true
                     },
-                    onTransportClick = { showTransportSheet = true },
-                    onDateClick = { showDateSheet = true },
+                    onTransportClick = { if (!selectionState.isDeleting) showTransportSheet = true },
+                    onDateClick = { if (!selectionState.isDeleting) showDateSheet = true },
                     onUnreadClick = viewModel::toggleUnreadFilter,
                 )
 
@@ -196,12 +239,22 @@ fun SearchScreen(
                     listState = listState,
                     onRetry = viewModel::retry,
                     onResultClick = onResultClick,
+                    selectionState = selectionState,
+                    onToggleSelection = viewModel::toggleSelection,
                     modifier = Modifier.weight(1f)
                 )
 
                 Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
+    }
+
+    selectionState.pendingDelete?.let { snapshot ->
+        SearchDeleteDialog(
+            snapshot = snapshot,
+            onDismiss = viewModel::dismissDelete,
+            onConfirm = viewModel::confirmDelete,
+        )
     }
 
     if (showSimSheet) {
