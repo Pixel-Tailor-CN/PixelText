@@ -38,6 +38,18 @@ class MessageMirrorIncrementalSynchronizer(
         val requiresFullReconcile: Boolean,
     )
 
+    /** Ordinary provider notifications use this as a wake signal without requesting a full scan. */
+    suspend fun markWake() {
+        sync.markDirty(
+            MirrorDirtyEntity(
+                key = INCREMENTAL_WAKE_KEY,
+                transport = null,
+                sourceId = null,
+                token = UUID.randomUUID().toString(),
+            )
+        )
+    }
+
     suspend fun syncRecent(timeBudgetMillis: Long = 10_000): Result = withContext(Dispatchers.IO) {
         val baseReady = listOf("ROUND", MessageTransport.SMS.name, MessageTransport.MMS.name)
             .all { sync.state(it)?.complete == true }
@@ -59,9 +71,7 @@ class MessageMirrorIncrementalSynchronizer(
 
                 val dirtyResult = refreshTargetedDirty(deadline)
                 if (appendedAll) {
-                    // In the fast path collection dirty is a wake signal. Full generation-based
-                    // integrity checking still runs periodically or when a targeted deletion is found.
-                    sync.dirty("collection")?.let { sync.acknowledge(it.key, it.token) }
+                    sync.dirty(INCREMENTAL_WAKE_KEY)?.let { sync.acknowledge(it.key, it.token) }
                 }
                 result = Result(
                     remaining = !appendedAll || sync.dirtyCount() > 0,
@@ -205,6 +215,7 @@ class MessageMirrorIncrementalSynchronizer(
 
     private companion object {
         const val TAG = "MessageMirrorFastSync"
+        const val INCREMENTAL_WAKE_KEY = "incremental"
         const val MAX_DIRTY_BATCHES = 10
     }
 }
