@@ -151,7 +151,7 @@ val appModule = module {
     single { vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer(get(), get(), get()) }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
-        MirrorChangeObserver(androidContext(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
+        MirrorChangeObserver(androidContext(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
             onDirty = { get<MessageMirrorScheduler>().schedule() }
         }
     }
