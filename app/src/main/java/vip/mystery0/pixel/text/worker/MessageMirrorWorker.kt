@@ -9,12 +9,14 @@ import androidx.work.WorkerParameters
 import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 class MessageMirrorWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params), KoinComponent {
     private val synchronizer: MessageMirrorSynchronizer by inject()
+    private val incrementalSynchronizer: MessageMirrorIncrementalSynchronizer by inject()
     private val downloads: MmsDownloadCoordinator by inject()
     private val incoming: vip.mystery0.pixel.text.mms.MmsIncomingPduHandler by inject()
     private val responses: vip.mystery0.pixel.text.mms.MmsReceptionResponseSender by inject()
@@ -32,9 +34,22 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
             downloads.recover()
             responses.recover()
             val sync = database.syncDao()
-            val needsMetadata = inputData.getBoolean("force_reconcile", false) || sync.dirtyCount() > 0 ||
-                listOf("ROUND", "SMS", "MMS", "THREADS", "CANONICAL").any { sync.state(it)?.complete != true }
-            if (needsMetadata) synchronizer.reconcile()
+            val forceReconcile = inputData.getBoolean("force_reconcile", false)
+            val collectionReconcile = sync.dirty("collection") != null
+            val metadataStateIncomplete = listOf("ROUND", "SMS", "MMS", "THREADS", "CANONICAL")
+                .any { sync.state(it)?.complete != true }
+            val needsMetadata = forceReconcile || collectionReconcile ||
+                sync.dirtyCount() > 0 || metadataStateIncomplete
+            if (needsMetadata) {
+                if (forceReconcile || collectionReconcile || metadataStateIncomplete) {
+                    synchronizer.reconcile()
+                } else {
+                    val incremental = incrementalSynchronizer.syncRecent()
+                    if (incremental.requiresFullReconcile) {
+                        synchronizer.reconcile()
+                    }
+                }
+            }
             notifications.refresh()
             // reconcile 的总返回值也包含文件清理；清理失败由附件链退避，不阻塞元数据链。
             val moreMetadata = sync.dirtyCount() > 0 ||
