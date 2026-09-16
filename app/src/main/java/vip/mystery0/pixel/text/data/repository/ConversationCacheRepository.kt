@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.data.repository
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.domain.model.ConversationModel
@@ -14,6 +15,7 @@ class ConversationCacheRepository(
     private val context: Context,
     private val mirror: MessageMirrorRepository,
     private val synchronizer: MessageMirrorSynchronizer,
+    private val incrementalSynchronizer: MessageMirrorIncrementalSynchronizer,
     private val observer: MirrorChangeObserver,
 ) {
     fun startObserving() {
@@ -28,6 +30,15 @@ class ConversationCacheRepository(
     suspend fun fullSync(archivedThreadIds: Set<Long>) {
         synchronizer.requestAttachmentVerification()
         synchronizer.reconcile()
+        MessageMirrorScheduler(context).schedule()
+    }
+    suspend fun refreshIncremental() {
+        if (!isCacheReady()) {
+            synchronizer.reconcile()
+        } else {
+            incrementalSynchronizer.syncRecent()
+        }
+        // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
     }
     suspend fun syncThreads(threadIds: List<Long>) {
