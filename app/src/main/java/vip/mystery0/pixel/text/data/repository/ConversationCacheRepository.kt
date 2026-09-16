@@ -36,7 +36,8 @@ class ConversationCacheRepository(
         if (!isCacheReady()) {
             synchronizer.reconcile()
         } else {
-            incrementalSynchronizer.syncRecent()
+            val result = incrementalSynchronizer.syncRecent()
+            if (result.remaining) incrementalSynchronizer.markWake()
         }
         // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
