@@ -139,7 +139,7 @@ class ConversationListViewModel(
         viewModelScope.launch {
             try {
                 if (forceSync) {
-                    repository.forceSyncConversations()
+                    repository.refreshConversations()
                 }
                 val newList = repository.getAllConversations().first()
                 replaceConversations(newList)
