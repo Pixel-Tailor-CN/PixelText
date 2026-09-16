@@ -16,6 +16,7 @@ import vip.mystery0.pixel.text.domain.model.mirror.*
 class MirrorChangeObserver(
     context: Context,
     private val synchronizer: MessageMirrorSynchronizer,
+    private val incrementalSynchronizer: MessageMirrorIncrementalSynchronizer,
     private val scope: CoroutineScope,
 ) {
     private val resolver = context.applicationContext.contentResolver
@@ -27,8 +28,15 @@ class MirrorChangeObserver(
         override fun onChange(selfChange: Boolean, uri: Uri?) {
             scope.launch {
                 val key = resolveKey(uri)
-                synchronizer.markDirty(key, verifyAttachments = key?.transport == MessageTransport.MMS &&
-                    uri?.pathSegments?.contains("part") == true)
+                if (key == null) {
+                    incrementalSynchronizer.markWake()
+                } else {
+                    synchronizer.markDirty(
+                        key,
+                        verifyAttachments = key.transport == MessageTransport.MMS &&
+                            uri?.pathSegments?.contains("part") == true,
+                    )
+                }
                 onDirty?.invoke()
             }
         }
@@ -40,7 +48,7 @@ class MirrorChangeObserver(
         resolver.registerContentObserver("content://mms".toUri(), true, observer)
         resolver.registerContentObserver("content://mms-sms".toUri(), true, observer)
         started = true
-        scope.launch { synchronizer.markDirty(null); onDirty?.invoke() }
+        scope.launch { incrementalSynchronizer.markWake(); onDirty?.invoke() }
     }
 
     fun stop() {
