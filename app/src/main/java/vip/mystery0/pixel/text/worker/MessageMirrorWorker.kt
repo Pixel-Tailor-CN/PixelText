@@ -35,11 +35,13 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
             responses.recover()
             val sync = database.syncDao()
             val forceReconcile = inputData.getBoolean("force_reconcile", false)
+            val collectionReconcile = sync.dirty("collection") != null
             val metadataStateIncomplete = listOf("ROUND", "SMS", "MMS", "THREADS", "CANONICAL")
                 .any { sync.state(it)?.complete != true }
-            val needsMetadata = forceReconcile || sync.dirtyCount() > 0 || metadataStateIncomplete
+            val needsMetadata = forceReconcile || collectionReconcile ||
+                sync.dirtyCount() > 0 || metadataStateIncomplete
             if (needsMetadata) {
-                if (forceReconcile || metadataStateIncomplete) {
+                if (forceReconcile || collectionReconcile || metadataStateIncomplete) {
                     synchronizer.reconcile()
                 } else {
                     val incremental = incrementalSynchronizer.syncRecent()
