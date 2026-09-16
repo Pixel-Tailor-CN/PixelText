@@ -61,6 +61,9 @@ class MessageMirrorIncrementalSynchronizer(
         var result = Result(remaining = false, requiresFullReconcile = false)
         try {
             MirrorSynchronizationLock.mutex.withLock {
+                // 只确认扫描开始前已经看到的 wake。扫描期间的新事件会写入新 token，
+                // acknowledge 的 token 条件会让它保留下来继续下一轮，避免丢更新。
+                val wakeToken = sync.dirty(INCREMENTAL_WAKE_KEY)?.token
                 var appendedAll = true
                 for (transport in MessageTransport.entries) {
                     if (SystemClock.elapsedRealtime() >= deadline || !appendNewMessages(transport, deadline)) {
@@ -70,8 +73,8 @@ class MessageMirrorIncrementalSynchronizer(
                 }
 
                 val dirtyResult = refreshTargetedDirty(deadline)
-                if (appendedAll) {
-                    sync.dirty(INCREMENTAL_WAKE_KEY)?.let { sync.acknowledge(it.key, it.token) }
+                if (appendedAll && wakeToken != null) {
+                    sync.acknowledge(INCREMENTAL_WAKE_KEY, wakeToken)
                 }
                 result = Result(
                     remaining = !appendedAll || sync.dirtyCount() > 0,
