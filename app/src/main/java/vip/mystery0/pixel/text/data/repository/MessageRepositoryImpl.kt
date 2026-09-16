@@ -73,6 +73,12 @@ class MessageRepositoryImpl(
 
     override suspend fun isCacheReady(): Boolean = conversationCacheRepository.isCacheReady()
 
+    override suspend fun refreshConversations() {
+        withContext(Dispatchers.IO) {
+            conversationCacheRepository.refreshIncremental()
+        }
+    }
+
     override suspend fun forceSyncConversations() {
         withContext(Dispatchers.IO) {
             val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
