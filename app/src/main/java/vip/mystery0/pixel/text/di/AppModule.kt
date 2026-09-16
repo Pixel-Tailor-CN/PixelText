@@ -137,6 +137,7 @@ val appModule = module {
             }
         }
     }
+    single { vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer(get(), get()) }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
     single { MmsPartReader() }
     single { MmsHtmlParser() }
@@ -172,7 +173,7 @@ val appModule = module {
     factory { MockMessageFactory(get()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
-        ConversationCacheRepository(androidContext(), get(), get(), get())
+        ConversationCacheRepository(androidContext(), get(), get(), get(), get())
     }
     single<MessageRepository> {
         MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
