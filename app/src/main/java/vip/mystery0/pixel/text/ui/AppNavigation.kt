@@ -41,6 +41,7 @@ import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_CONTENT
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_SUBMISSION_DRAFT_SENDER
 import vip.mystery0.pixel.text.ui.screen.SampleSubmissionScreen
 import vip.mystery0.pixel.text.ui.screen.SettingsScreen
+import vip.mystery0.pixel.text.ui.screen.OpenSourceScreen
 import vip.mystery0.pixel.text.ui.screen.SmsNotificationIconSettingsScreen
 import vip.mystery0.pixel.text.ui.screen.SpamConversationListScreen
 import vip.mystery0.pixel.text.ui.screen.SwipeActionSettingsScreen
@@ -171,9 +172,13 @@ fun AppNavigation(
             composable("backup_restore") {
                 vip.mystery0.pixel.text.ui.screen.BackupRestoreScreen(onNavigateBack = { navController.popBackStack() })
             }
+            composable("open_source") {
+                OpenSourceScreen(onNavigateBack = { navController.popBackStack() })
+            }
             composable("settings") {
                 SettingsScreen(
                     onNavigateToBackup = { navController.navigate("backup_restore") },
+                    onNavigateToOpenSource = { navController.navigate("open_source") },
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = {
                         navController.navigate("sample_submission")

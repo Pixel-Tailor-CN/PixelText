@@ -1,0 +1,12 @@
+[
+  {
+    "hash": "2895aeae23f1ae6eaa282fe471e528c6",
+    "name": "Go License",
+    "source": "app/src/main/assets/licenses/re2j-LICENSE.txt"
+  },
+  {
+    "hash": "4c02a1d2a854659d93becbe7fc2d469c",
+    "name": "FreeBSD License",
+    "source": "docs/licenses/ez-vcard-ezvcard-ez-vcard.license"
+  }
+]

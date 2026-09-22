@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
@@ -132,6 +133,7 @@ fun SettingsScreen(
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onNavigateToOpenSource: () -> Unit = {},
     onNavigateToSenderWhitelist: () -> Unit = {},
     onNavigateToConversationDetailCustomization: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
@@ -817,6 +819,14 @@ fun SettingsScreen(
                             key = "category_about",
                             title = { Text("关于") }
                         )
+                        item(key = "open_source", contentType = "Preference") {
+                            Preference(
+                                title = { Text("开源声明") },
+                                summary = { Text("查看开源组件、源码及许可信息") },
+                                icon = { Icon(Icons.Rounded.Code, contentDescription = null) },
+                                onClick = onNavigateToOpenSource,
+                            )
+                        }
                         item(key = "version_name", contentType = "Preference") {
                             Preference(
                                 title = { Text("版本名称") },

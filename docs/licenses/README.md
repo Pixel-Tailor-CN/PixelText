@@ -56,4 +56,4 @@ ez-vcard 请求的 jsoup `1.22.1` 被应用直接声明的 `1.23.2` 替代。`ja
 
 升级这些依赖时，在仓库根目录运行 `./gradlew.bat :app:dependencies --configuration debugRuntimeClasspath`，核对实际解析版本及传递依赖，再检查对应 JAR/AAR 中的全部许可与通知条目。同步更新本索引、原文和源码引入记录；实现细节以代码为准，设计历史留在 `docs/plans/`。
 
-本目录用于源码仓库中的溯源与声明。它不会自动成为 APK 内资源；发布时还需核对最终分发材料中的第三方声明是否与实际包含的代码一致。
+本目录继续作为原文来源与溯源索引。应用现通过 AboutLibraries 在设置 → 关于 → 开源声明中展示依赖；本页列出的许可原文由构建任务打包到相应组件的声明中。补充配置、离线阅读与发布核对方式见[开源声明维护](../development/open-source-notices.md)。

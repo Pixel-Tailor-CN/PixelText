@@ -1,0 +1,44 @@
+[
+  {
+    "uniqueId": "pixeltext.vendor:aosp-mms",
+    "name": "AOSP MMS Parser（源码引入）",
+    "artifactVersion": "1cdfff555f4a2",
+    "description": "来自 Android Open Source Project 的 MMS PDU 解析器。本地调整包名、移除平台注解与日志，并加固边界及嵌套解析；保留原始版权声明。",
+    "website": "https://android.googlesource.com/platform/frameworks/base/+/1cdfff555f4a21f71ccc978290e2e212e2f8b168/telephony/common/com/google/android/mms/",
+    "developers": [{"name": "The Android Open Source Project"}, {"name": "Esmertec AG"}],
+    "copyright": "Copyright (C) 2007 Esmertec AG.\nCopyright (C) 2007 The Android Open Source Project",
+    "noticeFiles": ["docs/licenses/aosp-mms-Apache-2.0.txt"]
+  },
+  {
+    "uniqueId": "com.google.re2j:re2j",
+    "noticeFiles": ["app/src/main/assets/licenses/re2j-LICENSE.txt"]
+  },
+  {
+    "uniqueId": "org.jsoup:jsoup",
+    "noticeFiles": ["docs/licenses/jsoup-MIT.txt"]
+  },
+  {
+    "uniqueId": "androidx.webkit:webkit",
+    "noticeFiles": ["docs/licenses/webkit-Apache-2.0.txt"]
+  },
+  {
+    "uniqueId": "com.googlecode.ez-vcard:ez-vcard",
+    "noticeFiles": ["docs/licenses/ez-vcard-ezvcard-ez-vcard.license", "docs/licenses/ez-vcard-ezvcard-commons-codec.license"]
+  },
+  {
+    "uniqueId": "com.github.mangstadt:vinnie",
+    "noticeFiles": ["docs/licenses/vinnie-LICENSES"]
+  },
+  {
+    "uniqueId": "org.freemarker:freemarker",
+    "noticeFiles": ["docs/licenses/freemarker-META-INF-LICENSE"]
+  },
+  {
+    "uniqueId": "com.fasterxml.jackson.core:jackson-core",
+    "noticeFiles": ["docs/licenses/jackson-core-META-INF-LICENSE", "docs/licenses/jackson-core-META-INF-NOTICE", "docs/licenses/jackson-core-META-INF-FastDoubleParser-LICENSE", "docs/licenses/jackson-core-META-INF-FastDoubleParser-NOTICE", "docs/licenses/jackson-core-META-INF-thirdparty-LICENSE"]
+  },
+  {
+    "uniqueId": "net.lingala.zip4j:zip4j",
+    "noticeFiles": ["docs/licenses/zip4j-Apache-2.0.txt"]
+  }
+]
