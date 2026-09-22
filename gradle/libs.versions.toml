@@ -1,5 +1,5 @@
 [versions]
-agp = "9.4.0"
+agp = "9.4.1"
 kotlin = "2.4.20"
 ksp = "2.3.11"
 
@@ -32,7 +32,7 @@ jsoup = "1.23.2"
 webkit = "1.17.0"
 ezvcard = "0.12.2"
 re2j = "1.8"
-zip4j = "2.11.5"
+zip4j = "2.11.6"
 aboutlibraries = "15.2.0"
 
 [libraries]
