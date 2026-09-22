@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,21 @@ fun AppNavigation(
     onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val backupRepository = org.koin.compose.koinInject<vip.mystery0.pixel.text.domain.backup.BackupRepository>()
+    val backupState by backupRepository.state.collectAsState()
+    var showRestoreNotice by remember { mutableStateOf(backupState.restoreProtected) }
+    if (showRestoreNotice) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRestoreNotice = false },
+            title = { androidx.compose.material3.Text("上次恢复尚未结束") },
+            text = { androidx.compose.material3.Text("已恢复的数据会保留，验证码自动清理仍受保护。请进入备份与恢复确认结果，或重新导入。") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                showRestoreNotice = false
+                navController.navigate("backup_restore")
+            }) { androidx.compose.material3.Text("查看恢复状态") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showRestoreNotice = false }) { androidx.compose.material3.Text("稍后处理") } },
+        )
+    }
     var resourceUpdateCheckRequestId by remember { mutableStateOf<Long?>(null) }
 
     // 收到外部 deep link 时，直接跳转到对应会话详情
@@ -152,8 +168,12 @@ fun AppNavigation(
                     }
                 )
             }
+            composable("backup_restore") {
+                vip.mystery0.pixel.text.ui.screen.BackupRestoreScreen(onNavigateBack = { navController.popBackStack() })
+            }
             composable("settings") {
                 SettingsScreen(
+                    onNavigateToBackup = { navController.navigate("backup_restore") },
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSampleSubmission = {
                         navController.navigate("sample_submission")

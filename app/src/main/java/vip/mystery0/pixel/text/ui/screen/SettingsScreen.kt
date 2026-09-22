@@ -131,6 +131,7 @@ fun SettingsScreen(
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
     onNavigateToSenderWhitelist: () -> Unit = {},
     onNavigateToConversationDetailCustomization: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
@@ -709,6 +710,14 @@ fun SettingsScreen(
                             key = "category_advanced_features",
                             title = { Text("高级功能") }
                         )
+                        item(key = "backup_restore", contentType = "Preference") {
+                            Preference(
+                                title = { Text("备份与恢复") },
+                                summary = { Text("备份设置、规则和短信，支持密码加密；暂不包含彩信") },
+                                icon = { Icon(Icons.Rounded.UploadFile, contentDescription = null) },
+                                onClick = onNavigateToBackup,
+                            )
+                        }
                         item(key = "force_sms_sync", contentType = "Preference") {
                             Preference(
                                 title = { Text("强制同步短信数据") },

@@ -87,7 +87,19 @@ import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
-    single<AppSettingsRepository> { AppSettingsRepositoryImpl(androidContext()) }
+    single { AppSettingsRepositoryImpl(androidContext()) }
+    single<AppSettingsRepository> { get<AppSettingsRepositoryImpl>() }
+    single { vip.mystery0.pixel.text.data.backup.RestoreSafetyCoordinator(androidContext()) }
+    single { vip.mystery0.pixel.text.data.backup.AppDatabaseSnapshotter(get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.backup.BackupDatabaseReader(get()) }
+    single { vip.mystery0.pixel.text.data.backup.BackupArchiveCodec(androidContext()) }
+    single { vip.mystery0.pixel.text.data.backup.BackupSettingsMapper(androidContext(), get(), get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.backup.BackupRuleStore(get<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository>() as vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl) }
+    single { vip.mystery0.pixel.text.data.backup.SmsRestoreDataSource(androidContext(), get(), get(), get(), get()) }
+    single<vip.mystery0.pixel.text.domain.backup.BackupRepository> {
+        vip.mystery0.pixel.text.data.repository.BackupRepositoryImpl(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
+    }
+    viewModel { vip.mystery0.pixel.text.viewmodel.BackupViewModel(get()) }
     single<ThemeConfigurationRepository> {
         ThemeConfigurationRepositoryImpl(androidContext())
     }

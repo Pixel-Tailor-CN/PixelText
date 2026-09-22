@@ -10,6 +10,7 @@ abstract class MirrorSyncDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putState(entity: MirrorSyncStateEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun markDirty(entity: MirrorDirtyEntity)
     @Query("SELECT * FROM mirror_sync_dirty LIMIT 200") abstract suspend fun dirtyBatch(): List<MirrorDirtyEntity>
+    @Query("SELECT * FROM mirror_sync_dirty WHERE transport='SMS' LIMIT 200") abstract suspend fun smsBackupDirtyBatch(): List<MirrorDirtyEntity>
     @Query("SELECT * FROM mirror_sync_dirty WHERE `key`=:key") abstract suspend fun dirty(key: String): MirrorDirtyEntity?
     @Query("DELETE FROM mirror_sync_dirty WHERE `key`=:key AND token=:token") abstract suspend fun acknowledge(key: String, token: String)
     @Query("SELECT COUNT(*) FROM mirror_sync_dirty") abstract suspend fun dirtyCount(): Int

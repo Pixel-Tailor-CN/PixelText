@@ -1,7 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
 import android.content.Context
-import android.provider.Telephony
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -18,6 +17,7 @@ class VerificationCodeCleanupWorker(
     context: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(context, params), KoinComponent {
+    private val restoreSafety: vip.mystery0.pixel.text.data.backup.RestoreSafetyCoordinator by inject()
     private val settingsRepository: AppSettingsRepository by inject()
     private val verificationCodeRepository: VerificationCodeRepository by inject()
     private val messageRepository: MessageRepository by inject()
@@ -27,7 +27,7 @@ class VerificationCodeCleanupWorker(
             Log.i(TAG, "verification cleanup skipped reason=disabled")
             return Result.success()
         }
-        if (Telephony.Sms.getDefaultSmsPackage(applicationContext) != applicationContext.packageName) {
+        if (!applicationContext.getSystemService(android.app.role.RoleManager::class.java).isRoleHeld(android.app.role.RoleManager.ROLE_SMS)) {
             Log.w(TAG, "verification cleanup unavailable reason=not_default_sms")
             return Result.retry()
         }
@@ -42,7 +42,7 @@ class VerificationCodeCleanupWorker(
             val expiredIds = verificationCodeRepository.getExpiredMessageIds(cutoffTimestamp)
             var deletedCount = 0
             expiredIds.chunked(DELETE_BATCH_SIZE).forEach { batch ->
-                deletedCount += messageRepository.deleteMessages(batch.toSet())
+                deletedCount += restoreSafety.cleanupBatch { messageRepository.deleteMessages(batch.toSet()) }
             }
             Log.i(
                 TAG,

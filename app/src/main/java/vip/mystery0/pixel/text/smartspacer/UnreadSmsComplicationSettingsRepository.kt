@@ -41,6 +41,12 @@ class UnreadSmsComplicationSettingsRepository(context: Context) {
         }
     }
 
+    fun restoreDefaultSettings(settings: UnreadSmsComplicationSettings): Boolean = prefs.edit()
+        .putBoolean(KEY_DEFAULT_INCLUDE_NORMAL_MESSAGES, settings.includeNormalMessages)
+        .putBoolean(KEY_DEFAULT_INCLUDE_SPAM_MESSAGES, settings.includeSpamMessages)
+        .putBoolean(KEY_DEFAULT_INCLUDE_ARCHIVED_MESSAGES, settings.includeArchivedMessages)
+        .commit()
+
     fun removeSettings(smartspacerId: String) {
         prefs.edit {
             remove(scopedKey(smartspacerId, KEY_INCLUDE_NORMAL_MESSAGES))

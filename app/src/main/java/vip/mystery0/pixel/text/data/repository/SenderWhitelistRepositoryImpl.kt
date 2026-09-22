@@ -95,6 +95,26 @@ class SenderWhitelistRepositoryImpl(
         }
     }
 
+    /** 合并备份只添加规则，不撤销已有规则；与收信决策共用锁。 */
+    suspend fun mergeBackupRules(
+        keywords: List<vip.mystery0.pixel.text.data.db.BlockedKeywordEntity>,
+        rules: List<SenderWhitelistRuleEntity>,
+    ) = withContext(Dispatchers.IO) {
+        decisionMutex.withLock {
+            rules.forEach { require(SenderWhitelistMatcher.validate(WhitelistRuleType.valueOf(it.type), it.value) == null) }
+            db.withTransaction {
+                val current = dao.getRules().map { it.type to it.value }.toSet()
+                val additions = rules.distinctBy { it.type to it.value }.filter { (it.type to it.value) !in current }
+                require(current.size + additions.size <= SenderWhitelistMatcher.MAX_RULES) { "合并后白名单超过 500 条" }
+                val keywordDao = db.blockedKeywordDao()
+                keywords.forEach { row ->
+                    if (keywordDao.getByNormalizedKeyword(row.normalizedKeyword) == null) keywordDao.insert(row.copy(id = 0))
+                }
+                if (additions.isNotEmpty()) dao.insertRules(additions.map { it.copy(id = 0) })
+            }
+        }
+    }
+
     private suspend fun allowedLocked(ids: Collection<Long>): Set<Long> {
         if (ids.isEmpty()) return emptySet()
         val existing = ids.chunked(800).flatMap { dao.getAllowed(it) }.associateBy { it.messageId }

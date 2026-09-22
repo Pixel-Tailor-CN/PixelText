@@ -404,6 +404,23 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         refreshSettings()
     }
 
+    /** 备份恢复使用同步提交，只有持久化成功才更新状态。 */
+    fun restorePortablePreferences(entries: List<vip.mystery0.pixel.text.data.backup.PortablePreference>): Boolean {
+        val editor = prefs.edit()
+        entries.forEach { entry ->
+            when (entry.type) {
+                "boolean" -> editor.putBoolean(entry.key, entry.value.toBooleanStrict())
+                "int" -> editor.putInt(entry.key, entry.value.toInt())
+                "long" -> editor.putLong(entry.key, entry.value.toLong())
+                "string" -> editor.putString(entry.key, entry.value)
+                else -> error("unsupported preference type")
+            }
+        }
+        if (!editor.commit()) return false
+        refreshSettings()
+        return true
+    }
+
     private fun refreshSettings() {
         _settings.value = readSettings()
     }

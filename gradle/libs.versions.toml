@@ -32,8 +32,10 @@ jsoup = "1.23.2"
 webkit = "1.17.0"
 ezvcard = "0.12.2"
 re2j = "1.8"
+zip4j = "2.11.5"
 
 [libraries]
+zip4j = { group = "net.lingala.zip4j", name = "zip4j", version.ref = "zip4j" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }

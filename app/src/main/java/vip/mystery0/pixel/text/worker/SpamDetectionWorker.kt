@@ -68,6 +68,7 @@ class SpamDetectionWorker(
         }
     }
 
+    private val restoreSafety: vip.mystery0.pixel.text.data.backup.RestoreSafetyCoordinator by inject()
     private val spamRepository: SpamRepository by inject()
     private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository by inject()
     private val spamClassifier: SpamClassifier by inject()
@@ -111,34 +112,37 @@ class SpamDetectionWorker(
             null
         }
 
-        if (score != null && score >= 0f) {
-            spamRepository.save(messageId, threadId, score)
-            Log.d(TAG, "spam score message_id=$messageId score=$score")
-        }
 
         // 模型执行期间可能新增白名单。最终自动操作和通知与规则修改串行化，不能使用过期判定。
-        whitelist.withMessageDecision(messageId) { allowed ->
-            val isSpam = !allowed && (keywordMatched || (score != null && score >= SPAM_THRESHOLD))
-            applySpamAutoAction(
-                messageId = messageId,
-                isSpam = isSpam,
-                deferNotification = deferNotification,
-            )
-            updateNotification(
-                sender = sender,
-                threadId = threadId,
-                content = content,
-                isSpam = isSpam,
-                deferNotification = deferNotification,
-                messageUri = messageUri,
-            )
-            if (allowed || keywordMatched || (score != null && score >= 0f)) {
-                notifySpamResult(
+        // save 自行获取白名单锁，必须位于后面的 withMessageDecision 临界区之外。
+        restoreSafety.liveMessageEffects(messageId) { allowAutoAction ->
+            if (score != null && score >= 0f) {
+                spamRepository.save(messageId, threadId, score)
+                Log.d(TAG, "spam score message_id=$messageId score=$score")
+            }
+            whitelist.withMessageDecision(messageId) { allowed ->
+                val isSpam = !allowed && (keywordMatched || (score != null && score >= SPAM_THRESHOLD))
+                if (allowAutoAction) applySpamAutoAction(
                     messageId = messageId,
-                    threadId = threadId,
-                    score = if (allowed) 0f else if (keywordMatched) 1f else score ?: -1f,
+                    isSpam = isSpam,
+                    deferNotification = deferNotification,
                 )
-                SmartspacerIntegration.notifyChanged(applicationContext)
+                updateNotification(
+                    sender = sender,
+                    threadId = threadId,
+                    content = content,
+                    isSpam = isSpam,
+                    deferNotification = deferNotification,
+                    messageUri = messageUri,
+                )
+                if (allowed || keywordMatched || (score != null && score >= 0f)) {
+                    notifySpamResult(
+                        messageId = messageId,
+                        threadId = threadId,
+                        score = if (allowed) 0f else if (keywordMatched) 1f else score ?: -1f,
+                    )
+                    SmartspacerIntegration.notifyChanged(applicationContext)
+                }
             }
         }
         return Result.success()

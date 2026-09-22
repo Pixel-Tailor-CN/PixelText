@@ -123,6 +123,31 @@ class MessageMirrorSynchronizer(
         dao.unfinishedAttachmentCount() > 0 || cleanupRemaining
     }
 
+    /** 备份只等待 SMS；同一锁内完成新对账和快照，避免普通同步删除备份源。 */
+    suspend fun <T> withSmsBackupSnapshot(snapshot: suspend (Long) -> T): T = withContext(Dispatchers.IO) {
+        MirrorSynchronizationLock.mutex.withLock {
+            val fresh = MirrorSyncStateEntity("SMS", generation = (sync.state("SMS")?.generation ?: 0) + 1, running = true)
+            check(scanPass(MessageTransport.SMS, fresh, canDelete = true, deadline = Long.MAX_VALUE)) {
+                "sms backup synchronization failed"
+            }
+            // 精确事件有独立 token，不能确认扫描期间新产生的不同事件。
+            var rounds = 0
+            while (true) {
+                val dirty = sync.smsBackupDirtyBatch()
+                if (dirty.isEmpty()) break
+                check(++rounds <= 100) { "sms backup source is busy" }
+                for (row in dirty) {
+                    currentCoroutineContext().ensureActive()
+                    check(refreshOne(SourceMessageKey(MessageTransport.SMS, requireNotNull(row.sourceId)))) {
+                        "sms backup targeted refresh failed"
+                    }
+                    sync.acknowledge(row.key, row.token)
+                }
+            }
+            snapshot(requireNotNull(sync.state("SMS")?.lastSuccessTime))
+        }
+    }
+
     private suspend fun scan(transport: MessageTransport, deadline: Long): Boolean {
         if (SystemClock.elapsedRealtime() >= deadline) return false
         val previous = sync.state(transport.name)
