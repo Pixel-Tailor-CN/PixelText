@@ -16,7 +16,6 @@ import vip.mystery0.pixel.text.notification.ResourceUpdateNotificationHelper
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
-import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 class PixelTextApp : Application() {
@@ -31,9 +30,9 @@ class PixelTextApp : Application() {
             modules(appModule)
         }
         getKoin().get<ResourceUpdateScheduler>().syncOnAppStart()
-        getKoin().get<VerificationCodeIndexScheduler>().scheduleReconcile()
+
         getKoin().get<VerificationCodeCleanupScheduler>().sync()
-        getKoin().get<MessageMirrorScheduler>().ensurePeriodic()
+        getKoin().get<MessageMirrorScheduler>().cancelLegacyPeriodic()
         startMirror()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) = startMirror()
@@ -47,8 +46,10 @@ class PixelTextApp : Application() {
     }
 
     private fun startMirror() {
+        getKoin().get<vip.mystery0.pixel.text.data.source.ContactDataSource>().warmUp()
+        getKoin().get<vip.mystery0.pixel.text.worker.DataInitializationScheduler>().checkOnLaunch()
         if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
         getKoin().get<MirrorChangeObserver>().start()
-        getKoin().get<MessageMirrorScheduler>().schedule(forceReconcile = true)
+
     }
 }

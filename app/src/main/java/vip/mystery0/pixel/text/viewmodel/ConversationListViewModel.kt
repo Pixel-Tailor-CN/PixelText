@@ -13,6 +13,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import vip.mystery0.pixel.text.domain.model.DataInitializationState
+import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository
+import vip.mystery0.pixel.text.worker.DataInitializationScheduler
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import vip.mystery0.pixel.text.domain.model.ConversationModel
@@ -23,15 +29,21 @@ private const val TAG = "ConversationListVM"
 
 class ConversationListViewModel(
     private val repository: MessageRepository,
-    settingsRepository: AppSettingsRepository
+    settingsRepository: AppSettingsRepository,
+    initializationRepository: DataInitializationRepository,
+    private val initializationScheduler: DataInitializationScheduler
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow<ConversationListUiState>(ConversationListUiState.Loading)
     val uiState: StateFlow<ConversationListUiState> = _uiState.asStateFlow()
     val settings = settingsRepository.settings
 
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+    val initializationState = initializationRepository.observe()
+        .map<DataInitializationState, DataInitializationState?> { it }.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5_000), null,
+    )
+
+    fun retryInitialization() = initializationScheduler.retry()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -56,7 +68,7 @@ class ConversationListViewModel(
         repository.startCacheObserving()
         if (conversationSubscriptionJob?.isActive == true) {
             if (force && !isRefreshingLoaded) {
-                refreshLoaded(forceSync = false, showRefreshIndicator = false)
+                refreshLoaded(showRefreshIndicator = false)
             }
             return
         }
@@ -81,7 +93,7 @@ class ConversationListViewModel(
 
     fun refreshConversations() {
         if (isLoading || isRefreshingLoaded) return
-        refreshLoaded(forceSync = true, showRefreshIndicator = true)
+        refreshLoaded(showRefreshIndicator = true)
     }
 
     private fun loadAllConversations() {
@@ -91,13 +103,9 @@ class ConversationListViewModel(
             while (true) {
                 try {
                     isLoading = allConversations.isEmpty()
-                    if (!repository.isCacheReady()) {
-                        _isSyncing.value = true
-                    }
                     repository.getAllConversations()
                         .collect { conversations ->
                             retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
-                            _isSyncing.value = false
                             replaceConversations(conversations)
                             isLoading = false
                         }
@@ -115,7 +123,6 @@ class ConversationListViewModel(
                             ConversationListUiState.Error(error.message ?: "Unknown error")
                     }
                 } finally {
-                    _isSyncing.value = false
                     isLoading = false
                 }
 
@@ -128,19 +135,16 @@ class ConversationListViewModel(
 
     fun refreshSilent() {
         if (isLoading || isRefreshingLoaded || allConversations.isEmpty()) return
-        refreshLoaded(forceSync = false, showRefreshIndicator = false)
+        refreshLoaded(showRefreshIndicator = false)
     }
 
-    private fun refreshLoaded(forceSync: Boolean, showRefreshIndicator: Boolean) {
+    private fun refreshLoaded(showRefreshIndicator: Boolean) {
         isRefreshingLoaded = true
         if (showRefreshIndicator) {
             _isRefreshing.value = true
         }
         viewModelScope.launch {
             try {
-                if (forceSync) {
-                    repository.refreshConversations()
-                }
                 val newList = repository.getAllConversations().first()
                 replaceConversations(newList)
             } catch (error: CancellationException) {

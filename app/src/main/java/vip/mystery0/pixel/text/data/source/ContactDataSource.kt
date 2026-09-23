@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import android.telephony.PhoneNumberUtils
 import android.util.Log
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 private const val CONTACT_TAG = "ContactDataSource"
 
@@ -14,8 +17,29 @@ class ContactDataSource(
     private val context: Context,
     private val contentResolver: ContentResolver
 ) {
-    private val contactNameCache = mutableMapOf<String, String?>()
+    private val contactNameCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cacheVersion = MutableStateFlow(0)
+    val changes = cacheVersion.asStateFlow()
+    private var warmUpJob: Job? = null
+    @Volatile
     private var contactNameCacheLoaded = false
+
+    /** 生命周期独立加载联系人；会话下拉只使用缓存，不触发 Provider 查询。 */
+    @Synchronized
+    fun warmUp() {
+        if (contactNameCacheLoaded || warmUpJob?.isActive == true) return
+        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return
+        warmUpJob = scope.launch {
+            ensureContactNameCacheLoaded()
+            cacheVersion.value += 1
+        }
+    }
+
+    fun getCachedDisplayName(address: String): String? {
+        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return null
+        return contactLookupKeys(address).firstNotNullOfOrNull { contactNameCache[it] }
+    }
 
     fun getDisplayName(address: String): String? {
         if (address.isBlank()) return null
@@ -38,6 +62,7 @@ class ContactDataSource(
         return selectedKeys.any(candidateKeys::contains)
     }
 
+    @Synchronized
     private fun ensureContactNameCacheLoaded() {
         if (contactNameCacheLoaded) return
 

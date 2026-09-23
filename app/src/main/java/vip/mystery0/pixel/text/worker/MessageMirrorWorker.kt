@@ -29,6 +29,24 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
             return Result.success()
         }
         return try {
+            val reason = inputData.getString("reason")
+            // 历史每日任务即使已被系统领取，也不能再要求周期全量对账。
+            if (reason == null && inputData.getBoolean(
+                    "force_reconcile",
+                    false
+                )
+            ) return Result.success()
+            val initialization =
+                getKoin().get<vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository>()
+                    .read()
+            if (!initialization.isCurrent && !initialization.isNewerVersion) {
+                getKoin().get<DataInitializationScheduler>().checkOnLaunch()
+                return Result.success()
+            }
+            if (initialization.isNewerVersion) return Result.success()
+            if (reason == null && database.syncDao().dirtyCount() == 0) return Result.success()
+            getKoin().get<vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer>().start()
+            Log.i("MessageMirrorWorker", "mirror wake reason=${reason ?: "legacy_pending"}")
             // 新下载结果优先尝试持久化；后续失败恢复由独立附件任务退避。
             incoming.recover()
             downloads.recover()

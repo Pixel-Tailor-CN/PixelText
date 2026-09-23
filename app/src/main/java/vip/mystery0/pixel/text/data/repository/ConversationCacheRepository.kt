@@ -20,7 +20,6 @@ class ConversationCacheRepository(
 ) {
     fun startObserving() {
         observer.start()
-        MessageMirrorScheduler(context).schedule()
     }
     fun stopObserving() = observer.stop()
     suspend fun isCacheReady(): Boolean {
@@ -30,7 +29,7 @@ class ConversationCacheRepository(
     suspend fun fullSync(archivedThreadIds: Set<Long>) {
         synchronizer.requestAttachmentVerification()
         synchronizer.reconcile()
-        MessageMirrorScheduler(context).schedule()
+        MessageMirrorScheduler(context).schedule(reason = "manual_repair")
     }
     suspend fun refreshIncremental() {
         if (!isCacheReady()) {
@@ -45,7 +44,7 @@ class ConversationCacheRepository(
     suspend fun syncThreads(threadIds: List<Long>) {
         synchronizer.markDirty(null)
         // 系统写入后的通知只持久排队，不让 Receiver 或用户操作等待整库扫描。
-        MessageMirrorScheduler(context).enqueueMetadata()
+        MessageMirrorScheduler(context).enqueueMetadata(reason = "local_write")
     }
     suspend fun getAllConversations(
         archivedThreadIds: Set<Long>, hiddenThreadIds: Set<Long> = emptySet(),

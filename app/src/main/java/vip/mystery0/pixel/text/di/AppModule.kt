@@ -97,7 +97,22 @@ val appModule = module {
     single { vip.mystery0.pixel.text.data.backup.BackupRuleStore(get<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository>() as vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl) }
     single { vip.mystery0.pixel.text.data.backup.SmsRestoreDataSource(androidContext(), get(), get(), get(), get()) }
     single<vip.mystery0.pixel.text.domain.backup.BackupRepository> {
-        vip.mystery0.pixel.text.data.repository.BackupRepositoryImpl(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
+        vip.mystery0.pixel.text.data.repository.BackupRepositoryImpl(
+            androidContext(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
     }
     viewModel { vip.mystery0.pixel.text.viewmodel.BackupViewModel(get()) }
     single<ThemeConfigurationRepository> {
@@ -110,7 +125,7 @@ val appModule = module {
     single { SenderProfileStore(androidContext()) }
     single { PixelTextHubClient("https://pixeltext.api.mystery0.vip") }
     single { MessageParser(androidContext(), get()) }
-    single { HubResourceRepository(get(), get(), get(), get(), get()) }
+    single { HubResourceRepository(get(), get(), get(), get(), get(), get()) }
     single { ResourceUpdateScheduler(androidContext(), get()) }
     single { KeywordSpamRebuildScheduler(androidContext()) }
     single { VerificationCodeIndexScheduler(androidContext()) }
@@ -125,6 +140,33 @@ val appModule = module {
     single<PickedPhoneSource> { PickedPhoneSourceImpl(androidContext()) }
     single { TelephonyDataSource(androidContext(), get()) }
     single { MessageMirrorDatabase.create(androidContext()) }
+    single { vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository(get()) }
+    single {
+        vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard(
+            get(),
+            get()
+        )
+    }
+    single {
+        vip.mystery0.pixel.text.data.repository.initialization.DataInitializationCoordinator(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
+    single { vip.mystery0.pixel.text.worker.DataInitializationScheduler(androidContext(), get()) }
+    single {
+        vip.mystery0.pixel.text.data.repository.initialization.InitializationSpamScanner(
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
     single { TelephonyMirrorSource(androidContext()) }
     single { MirrorAttachmentStore(androidContext()) }
     single { MirrorAttachmentCopier(get(), get()) }
@@ -151,6 +193,7 @@ val appModule = module {
     }
     single { vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer(get(), get()) }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
+    single { vip.mystery0.pixel.text.data.repository.mirror.LocalConversationSpamFilter(get()) }
     single { MmsPartReader() }
     single { MmsHtmlParser() }
     single { MmsContactParser() }
@@ -160,7 +203,15 @@ val appModule = module {
     single { MmsPlaybackController(androidContext(), get()) }
     single { MmsAttachmentExporter(androidContext(), get()) }
     single { MmsContentRepositoryImpl(get(), get(), get(), get(), get()) }
-    single { vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer(get(), get(), get()) }
+    single {
+        vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer(
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
+        )
+    }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
         MirrorChangeObserver(androidContext(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
@@ -188,14 +239,28 @@ val appModule = module {
         ConversationCacheRepository(androidContext(), get(), get(), get(), get())
     }
     single<MessageRepository> {
-        MessageRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext())
+        MessageRepositoryImpl(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            androidContext()
+        )
     }
     viewModel { MessageViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MmsContentViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.SenderWhitelistViewModel(get(), androidApplication()) }
-    viewModel { ConversationListViewModel(get(), get()) }
+    viewModel { ConversationListViewModel(get(), get(), get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get()) }

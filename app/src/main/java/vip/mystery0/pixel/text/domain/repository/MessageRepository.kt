@@ -15,7 +15,7 @@ enum class ConversationContentFilter {
 interface MessageRepository {
     fun startCacheObserving()
     suspend fun isCacheReady(): Boolean
-    suspend fun refreshConversations()
+
     suspend fun forceSyncConversations()
     fun getAllConversations(): Flow<List<ConversationModel>>
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>

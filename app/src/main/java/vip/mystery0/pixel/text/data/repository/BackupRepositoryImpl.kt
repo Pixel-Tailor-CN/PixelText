@@ -33,6 +33,7 @@ class BackupRepositoryImpl(
     private val verification: VerificationCodeRepository,
     private val messages: MessageRepository,
     private val keywords: KeywordSpamRepository,
+    private val initializationGuard: vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard,
 ) : BackupRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -117,39 +118,59 @@ class BackupRepositoryImpl(
     override fun restore(token: String, sections: Set<BackupSection>) {
         val preview = inspected
         start(BackupPhase.RESTORING) {
-            backupRequire(preview != null && preview.directory.name == token, "预览已过期，请重新选择文件")
-            val backup = requireNotNull(preview)
-            backupRequire(sections.isNotEmpty() && backup.manifest.sections.containsAll(sections), "恢复类别无效")
-            if (BackupSection.SMS in sections) sms.requireAccess()
-            // 所有包含历史数据/设置的恢复都建立保护，避免应用设置提前开启清理。
-            safety.begin()
-            var summary = BackupSummary(remaining = if (BackupSection.SMS in sections) backup.manifest.smsCount else 0)
-            publishSummary(summary)
-            try {
-                if (BackupSection.RULES in sections) {
-                    rules.restore(backup.directory)
-                    summary = summary.copy(completedSections = summary.completedSections + BackupSection.RULES)
-                    publishSummary(summary)
+            initializationGuard.withInputMutation {
+                backupRequire(
+                    preview != null && preview.directory.name == token,
+                    "预览已过期，请重新选择文件"
+                )
+                val backup = requireNotNull(preview)
+                backupRequire(
+                    sections.isNotEmpty() && backup.manifest.sections.containsAll(sections),
+                    "恢复类别无效"
+                )
+                if (BackupSection.SMS in sections) sms.requireAccess()
+                // 所有包含历史数据/设置的恢复都建立保护，避免应用设置提前开启清理。
+                safety.begin()
+                var summary =
+                    BackupSummary(remaining = if (BackupSection.SMS in sections) backup.manifest.smsCount else 0)
+                publishSummary(summary)
+                try {
+                    if (BackupSection.RULES in sections) {
+                        rules.restore(backup.directory)
+                        summary =
+                            summary.copy(completedSections = summary.completedSections + BackupSection.RULES)
+                        publishSummary(summary)
+                    }
+                    if (BackupSection.SMS in sections) {
+                        summary = sms.restore(backup.directory, summary, ::publishSummary)
+                        summary =
+                            summary.copy(completedSections = summary.completedSections + BackupSection.SMS)
+                        publishSummary(summary)
+                    }
+                    if (BackupSection.SETTINGS in sections) {
+                        settings.restore(backup.directory)
+                        summary =
+                            summary.copy(completedSections = summary.completedSections + BackupSection.SETTINGS)
+                        publishSummary(summary)
+                    }
+                    if (hasReadPermission()) {
+                        phase(BackupPhase.REBUILDING)
+                        if (BackupSection.SMS in sections) synchronizer.withSmsBackupSnapshot { Unit }
+                        rebuildKeywords()
+                        verification.rebuildAll()
+                        messages.forceSyncConversations()
+                    }
+                    mutable.update {
+                        it.copy(
+                            phase = BackupPhase.COMPLETED,
+                            preview = null,
+                            restoreProtected = true
+                        )
+                    }
+                } finally {
+                    discardPreview()
                 }
-                if (BackupSection.SMS in sections) {
-                    summary = sms.restore(backup.directory, summary, ::publishSummary)
-                    summary = summary.copy(completedSections = summary.completedSections + BackupSection.SMS)
-                    publishSummary(summary)
-                }
-                if (BackupSection.SETTINGS in sections) {
-                    settings.restore(backup.directory)
-                    summary = summary.copy(completedSections = summary.completedSections + BackupSection.SETTINGS)
-                    publishSummary(summary)
-                }
-                if (hasReadPermission()) {
-                    phase(BackupPhase.REBUILDING)
-                    if (BackupSection.SMS in sections) synchronizer.withSmsBackupSnapshot { Unit }
-                    rebuildKeywords()
-                    verification.rebuildAll()
-                    messages.forceSyncConversations()
-                }
-                mutable.update { it.copy(phase = BackupPhase.COMPLETED, preview = null, restoreProtected = true) }
-            } finally { discardPreview() }
+            }
         }
     }
 

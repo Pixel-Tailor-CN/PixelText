@@ -1,6 +1,9 @@
 package vip.mystery0.pixel.text.data.repository.mms
 
 import android.util.Log
+import java.io.IOException
+import vip.mystery0.pixel.text.domain.model.InitializationBatchResult
+import vip.mystery0.pixel.text.data.repository.mirror.MirrorAttachmentCopier
 import java.security.MessageDigest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -64,6 +67,8 @@ class MmsTextIndexer(
     private val mirror: MessageMirrorRepository,
     private val contents: MmsContentRepository,
     private val database: MessageMirrorDatabase,
+    private val copier: MirrorAttachmentCopier,
+    private val synchronizer: vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -88,33 +93,130 @@ class MmsTextIndexer(
                     for ((snapshot, fingerprint) in rows) {
                         ensureActive()
                         try {
-                            val dao = database.mirrorDao()
-                            if (dao.getMmsText(snapshot.localId)?.let { it.version == MMS_TEXT_INDEX_VERSION && it.fingerprint == fingerprint } == true) continue
-                            val model = contents.read(snapshot.key) ?: continue
-                            database.withTransaction {
-                                val latest = mirror.getMessage(snapshot.key)
-                                if (latest != null && mmsContentFingerprint(latest) == fingerprint) {
-                                    dao.putMmsText(
-                                        MmsTextIndexEntity(
-                                            localId = snapshot.localId,
-                                            version = MMS_TEXT_INDEX_VERSION,
-                                            fingerprint = fingerprint,
-                                            summary = model.summary,
-                                            searchableText = model.searchableText,
-                                            searchBody = model.searchBody,
-                                            searchReady = model.searchReady,
-                                            sourceRevision = latest.revision,
-                                        )
-                                    )
-                                }
-                            }
+                            indexSnapshot(snapshot, fingerprint, strict = false)
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Throwable) {
-                            Log.w(TAG, "index mms text failed message_id=${snapshot.key.sourceId} error=${e.javaClass.simpleName}")
+                            Log.w(
+                                TAG,
+                                "index mms text failed message_id=${snapshot.key.sourceId} error=${e.javaClass.simpleName}"
+                            )
                         }
                     }
                 }
+        }
+    }
+
+    /** 有限本地批次，可等待实际写入；不会触发网络下载或吞掉初始化失败。 */
+    suspend fun indexInitializationBatch(
+        afterLocalId: Long,
+        upperLocalId: Long,
+        limit: Int = 100,
+    ): InitializationBatchResult = withContext(Dispatchers.IO) {
+        require(limit > 0)
+        val dao = database.mirrorDao()
+        val rows = dao.initializationBatch("MMS", afterLocalId, upperLocalId, limit)
+        var checkpoint = afterLocalId
+        var unavailable = 0
+        for (row in rows) {
+            ensureActive()
+            if (!row.message.structureComplete) {
+                synchronizer.refreshInitializationMessage(
+                    SourceMessageKey(
+                        MessageTransport.MMS,
+                        row.message.sourceId
+                    )
+                )
+                // 新子结构可能新增附件，下一批必须重读后再复制。
+                return@withContext InitializationBatchResult(
+                    checkpoint,
+                    complete = false,
+                    unavailableCount = unavailable
+                )
+            }
+            // 取消/进程死亡后的 COPYING 由既有恢复逻辑释放；活跃复制不会被重置。
+            if (row.attachments.any { it.state == "COPYING" }) copier.recover()
+            for (attachment in row.attachments) {
+                if (attachment.state in setOf("SOURCE_PRESENT", "COPY_FAILED", "COPYING") ||
+                    attachment.state == "SOURCE_UNREADABLE" && attachment.error != "source_unreadable"
+                ) {
+                    copier.copyPart(row.message.localId, row.message.revision, attachment.partId)
+                }
+            }
+            val latestRecord = dao.getLocal(row.message.localId)
+            if (latestRecord != null) {
+                if (!latestRecord.message.structureComplete) throw IOException("mms_structure_incomplete")
+                latestRecord.attachments.forEach { attachment ->
+                    when {
+                        attachment.error == "permission_denied" -> throw SecurityException("mms_attachment_permission")
+                        attachment.state in setOf("SOURCE_PRESENT", "COPY_FAILED", "COPYING") ->
+                            throw IOException("mms_attachment_not_ready")
+
+                        attachment.state == "SOURCE_UNREADABLE" -> unavailable++
+                    }
+                }
+                val key = SourceMessageKey(MessageTransport.MMS, row.message.sourceId)
+                val snapshot = mirror.getMessage(key)
+                if (snapshot != null && !indexSnapshot(
+                        snapshot,
+                        mmsContentFingerprint(snapshot),
+                        strict = true
+                    )
+                ) {
+                    return@withContext InitializationBatchResult(
+                        checkpoint,
+                        complete = false,
+                        unavailableCount = unavailable
+                    )
+                }
+            }
+            checkpoint = row.message.localId
+        }
+        InitializationBatchResult(
+            checkpoint,
+            complete = rows.size < limit,
+            unavailableCount = unavailable
+        )
+    }
+
+    private suspend fun indexSnapshot(
+        snapshot: MirrorMessageModel,
+        fingerprint: String,
+        strict: Boolean
+    ): Boolean {
+        val dao = database.mirrorDao()
+        val existing = dao.getMmsText(snapshot.localId)
+        // 初始化必须确认旧的不可搜索索引不是曾被吞掉的临时解析失败。
+        if (existing?.let { it.version == MMS_TEXT_INDEX_VERSION && it.fingerprint == fingerprint && (!strict || it.searchReady) } == true) return true
+        val model = contents.read(snapshot.key) ?: return mirror.getMessage(snapshot.key) == null
+        if (strict && (model.preparing || model.parts.any {
+                it.issue in setOf(
+                    "read_failed",
+                    "copy_failed",
+                    "copying",
+                    "source_present"
+                )
+            })) {
+            (contents as? MmsContentRepositoryImpl)?.invalidate(snapshot.key)
+            throw IOException("mms_text_not_ready")
+        }
+        return database.withTransaction {
+            val latest = mirror.getMessage(snapshot.key)
+            if (latest == null) return@withTransaction true
+            if (mmsContentFingerprint(latest) != fingerprint) return@withTransaction false
+            dao.putMmsText(
+                MmsTextIndexEntity(
+                    localId = snapshot.localId,
+                    version = MMS_TEXT_INDEX_VERSION,
+                    fingerprint = fingerprint,
+                    summary = model.summary,
+                    searchableText = model.searchableText,
+                    searchBody = model.searchBody,
+                    searchReady = model.searchReady,
+                    sourceRevision = latest.revision,
+                )
+            )
+            true
         }
     }
 }

@@ -3,10 +3,8 @@ package vip.mystery0.pixel.text.worker
 import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
@@ -29,10 +27,10 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
     private val synchronizer: MessageMirrorSynchronizer by inject()
     private val database: MessageMirrorDatabase by inject()
 
-    fun schedule(forceReconcile: Boolean = false) {
+    fun schedule(forceReconcile: Boolean = false, reason: String = "provider_event") {
         schedulingScope.launch {
             try {
-                enqueueMetadata(forceReconcile)
+                enqueueMetadata(forceReconcile, reason)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -41,7 +39,10 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
         }
     }
 
-    suspend fun enqueueMetadata(forceReconcile: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun enqueueMetadata(
+        forceReconcile: Boolean = false,
+        reason: String = "provider_event"
+    ) = withContext(Dispatchers.IO) {
         // 强制对账也先持久化，合并到已排队任务时不会丢失调用者的刷新意图。
         if (forceReconcile) synchronizer.markDirty(null)
         schedulingMutex.withLock {
@@ -51,9 +52,11 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
             // 新源事件可以唤醒处于退避的元数据任务；不存在运行任务时才替换等待链。
             val wakeRetry = !running && pending.any { it.runAttemptCount > 0 }
             if (pending.isNotEmpty() && !wakeRetry) return@withLock
-            work.enqueueUniqueWork(METADATA_WORK,
+            work.enqueueUniqueWork(
+                METADATA_WORK,
                 if (wakeRetry) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE,
                 OneTimeWorkRequestBuilder<MessageMirrorWorker>()
+                    .setInputData(workDataOf("reason" to if (forceReconcile) "manual_repair" else reason))
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build(),
             ).result.get()
         }
@@ -76,14 +79,10 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
         }
     }
 
-    fun ensurePeriodic() {
-        work.enqueueUniquePeriodicWork(
-            "message-mirror-reconcile", ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<MessageMirrorWorker>(1, TimeUnit.DAYS)
-                .setInputData(workDataOf("force_reconcile" to true)).build(),
-        )
+    /** 升级旧安装时也撤销已持久化的周期任务，不影响真实事件队列。 */
+    fun cancelLegacyPeriodic() {
+        work.cancelUniqueWork("message-mirror-reconcile")
     }
-
     companion object {
         private const val METADATA_WORK = "message-mirror"
         private const val ATTACHMENT_WORK = "message-mirror-attachments"

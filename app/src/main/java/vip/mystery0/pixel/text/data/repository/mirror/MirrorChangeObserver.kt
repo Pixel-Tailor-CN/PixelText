@@ -48,7 +48,7 @@ class MirrorChangeObserver(
         resolver.registerContentObserver("content://mms".toUri(), true, observer)
         resolver.registerContentObserver("content://mms-sms".toUri(), true, observer)
         started = true
-        scope.launch { incrementalSynchronizer.markWake(); onDirty?.invoke() }
+
     }
 
     fun stop() {

@@ -5,6 +5,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class MirrorDao {
+    @Query("SELECT MAX(localId) FROM mirror_message")
+    abstract suspend fun maximumLocalId(): Long?
+
+    @Transaction
+    @Query("SELECT * FROM mirror_message WHERE transport=:transport AND localId > :afterLocalId AND localId <= :upperLocalId ORDER BY localId LIMIT :limit")
+    abstract suspend fun initializationBatch(
+        transport: String,
+        afterLocalId: Long,
+        upperLocalId: Long,
+        limit: Int
+    ): List<MirrorMessageRecord>
     @Query("SELECT * FROM mms_text_index WHERE localId=:localId")
     abstract suspend fun getMmsText(localId: Long): MmsTextIndexEntity?
     @Insert(onConflict = OnConflictStrategy.REPLACE)

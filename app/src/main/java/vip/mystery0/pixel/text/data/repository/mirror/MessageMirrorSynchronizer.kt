@@ -1,5 +1,9 @@
 package vip.mystery0.pixel.text.data.repository.mirror
 
+import androidx.room.withTransaction
+import vip.mystery0.pixel.text.domain.model.InitializationPhase
+import vip.mystery0.pixel.text.domain.model.InitializationStatus
+import vip.mystery0.pixel.text.domain.model.InitializationStepResult
 import android.util.Log
 import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
@@ -49,52 +53,151 @@ class MessageMirrorSynchronizer(
         val deadline = SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1)
         var remaining = false
         MirrorSynchronizationLock.mutex.withLock {
-            val previousRound = sync.state("ROUND")
-            var round = if (previousRound != null && !previousRound.complete) previousRound
-                else MirrorSyncStateEntity("ROUND", generation = (previousRound?.generation ?: 0) + 1,
-                    dirtyToken = sync.dirty("collection")?.token)
-            sync.putState(round)
-            val completedSources = parseColumns(round.completedSources).toMutableSet()
-            // 本轮成功集合单独持久化；预算续跑不能重新扫描已完成的源而饿死另一集合。
-            for (transport in MessageTransport.entries) {
-                if (transport.name in completedSources) continue
-                if (SystemClock.elapsedRealtime() >= deadline) break
-                if (scan(transport, deadline)) {
-                    completedSources += transport.name
-                    round = round.copy(completedSources = JSONArray(completedSources.sorted()).toString())
-                    sync.putState(round)
-                }
-            }
-            val smsComplete = "SMS" in completedSources
-            val mmsComplete = "MMS" in completedSources
-            if (smsComplete && mmsComplete && SystemClock.elapsedRealtime() < deadline) {
-                readAncillarySources()
-                round = round.copy(complete = true, lastSuccessTime = System.currentTimeMillis())
-                sync.putState(round)
-                round.dirtyToken?.let { sync.acknowledge("collection", it) }
-            }
-            // 有限批次防止高频写入让一次 Worker 永不结束；剩余任务持久保留。
-            repeat(10) {
-                if (SystemClock.elapsedRealtime() >= deadline) return@repeat
-                val batch = sync.dirtyBatch().filter { it.transport != null }
-                if (batch.isEmpty()) return@repeat
-                for (dirty in batch) {
-                    if (SystemClock.elapsedRealtime() >= deadline) break
-                    currentCoroutineContext().ensureActive()
-                    val key = SourceMessageKey(MessageTransport.valueOf(requireNotNull(dirty.transport)), requireNotNull(dirty.sourceId))
-                    if (refreshOne(key)) {
-                        if (dirty.key.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
-                            dao.invalidateAttachmentContent(key.sourceId)
-                        }
-                        sync.acknowledge(dirty.key, dirty.token)
-                    }
-                }
-            }
-            remaining = !round.complete || sync.dirtyCount() > 0
-            Log.i("MessageMirrorSync", "reconcile finished sms_complete=$smsComplete mms_complete=$mmsComplete dirty_count=${sync.dirtyCount()}")
+            remaining = reconcileMetadataLocked(deadline)
         }
         val cleanupRemaining = copier.drainCleanupQueue()
         remaining || cleanupRemaining
+    }
+
+    /** 初始化拥有明确轮次；同目标重试不把完成轮次再扫描一遍。 */
+    suspend fun reconcileForInitialization(
+        targetVersion: Int,
+        epoch: Long,
+        timeBudgetMillis: Long = 60_000L,
+    ): InitializationStepResult = withContext(Dispatchers.IO) {
+        MirrorSynchronizationLock.mutex.withLock {
+            val initialization = database.initializationDao()
+            var state = initialization.read() ?: return@withLock InitializationStepResult.More
+            if (state.epoch != epoch || state.targetVersion != targetVersion) return@withLock InitializationStepResult.More
+            if (state.nextPhase != InitializationPhase.MIRROR.name) return@withLock InitializationStepResult.Complete
+            val previous = sync.state("ROUND")
+            if (state.mirrorRound == null || state.mirrorRound != previous?.generation) {
+                val fresh = MirrorSyncStateEntity(
+                    collection = "ROUND", generation = (previous?.generation ?: 0) + 1,
+                    dirtyToken = sync.dirty("collection")?.token,
+                )
+                database.withTransaction {
+                    state = state.copy(
+                        mirrorRound = fresh.generation,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    check(initialization.save(epoch, state)) { "initialization inputs changed" }
+                    sync.putState(fresh)
+                    // 新目标版本需要新完整轮次，不能继承旧目标的半途检查点。
+                    for (transport in MessageTransport.entries) {
+                        val old = sync.state(transport.name)
+                        sync.putState(
+                            MirrorSyncStateEntity(
+                                transport.name,
+                                generation = old?.generation ?: 0,
+                                lastSuccessTime = old?.lastSuccessTime
+                            )
+                        )
+                    }
+                }
+            } else if (previous.complete) {
+                advanceInitializationMirror(previous.generation)
+                return@withLock InitializationStepResult.Complete
+            }
+            // 从真正获得扫描锁开始计算预算，排队时间不消耗扫描片段。
+            reconcileMetadataLocked(SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1))
+            val latest = initialization.read()
+            val complete =
+                latest?.epoch == epoch && latest.nextPhase != InitializationPhase.MIRROR.name
+            Log.i(
+                "DataInitialization",
+                "initialization mirror target=$targetVersion epoch=$epoch round=${state.mirrorRound} complete=$complete"
+            )
+            if (complete) InitializationStepResult.Complete else InitializationStepResult.More
+        }
+    }
+
+    /** 普通事件任务替初始化完成同一轮时，也在锁内保存证据，避免下一轮覆盖。 */
+    private suspend fun advanceInitializationMirror(round: Long) {
+        database.withTransaction {
+            val initialization = database.initializationDao()
+            val state = initialization.read() ?: return@withTransaction
+            if (state.nextPhase != InitializationPhase.MIRROR.name || state.mirrorRound != round) return@withTransaction
+            initialization.save(
+                state.epoch, state.copy(
+                    nextPhase = InitializationPhase.MMS_TEXT.name,
+                    status = InitializationStatus.RUNNING.name,
+                    afterLocalId = 0,
+                    upperLocalId = dao.maximumLocalId() ?: 0,
+                    errorCategory = null,
+                    updatedAt = System.currentTimeMillis(),
+                )
+            )
+        }
+    }
+
+    /** 初始化重试不完整子结构，不额外开启全库轮次。 */
+    suspend fun refreshInitializationMessage(key: SourceMessageKey): Boolean =
+        withContext(Dispatchers.IO) {
+            MirrorSynchronizationLock.mutex.withLock { refreshOne(key) }
+        }
+
+    /** 调用方已持有镜像锁，避免初始化阶段递归加锁。 */
+    private suspend fun reconcileMetadataLocked(deadline: Long): Boolean {
+        val previousRound = sync.state("ROUND")
+        var round = if (previousRound != null && !previousRound.complete) previousRound
+        else MirrorSyncStateEntity(
+            "ROUND", generation = (previousRound?.generation ?: 0) + 1,
+            dirtyToken = sync.dirty("collection")?.token
+        )
+        sync.putState(round)
+        val completedSources = parseColumns(round.completedSources).toMutableSet()
+        // 本轮成功集合单独持久化；预算续跑不能重新扫描已完成的源而饿死另一集合。
+        for (transport in MessageTransport.entries) {
+            if (transport.name in completedSources) continue
+            if (SystemClock.elapsedRealtime() >= deadline) break
+            if (scan(transport, deadline)) {
+                completedSources += transport.name
+                round =
+                    round.copy(completedSources = JSONArray(completedSources.sorted()).toString())
+                sync.putState(round)
+            }
+        }
+        val smsComplete = "SMS" in completedSources
+        val mmsComplete = "MMS" in completedSources
+        if (smsComplete && mmsComplete && SystemClock.elapsedRealtime() < deadline) {
+            readAncillarySources()
+            val ancillaryComplete =
+                listOf("THREADS", "CANONICAL").all { sync.state(it)?.complete == true }
+            round = round.copy(
+                complete = ancillaryComplete,
+                lastSuccessTime = if (ancillaryComplete) System.currentTimeMillis() else null
+            )
+            sync.putState(round)
+            if (round.complete) round.dirtyToken?.let { sync.acknowledge("collection", it) }
+        }
+        // 有限批次防止高频写入让一次 Worker 永不结束；剩余任务持久保留。
+        repeat(10) {
+            if (SystemClock.elapsedRealtime() >= deadline) return@repeat
+            val batch = sync.dirtyBatch().filter { it.transport != null }
+            if (batch.isEmpty()) return@repeat
+            for (dirty in batch) {
+                if (SystemClock.elapsedRealtime() >= deadline) break
+                currentCoroutineContext().ensureActive()
+                val key = SourceMessageKey(
+                    MessageTransport.valueOf(requireNotNull(dirty.transport)),
+                    requireNotNull(dirty.sourceId)
+                )
+                if (refreshOne(key)) {
+                    if (dirty.key.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
+                        dao.invalidateAttachmentContent(key.sourceId)
+                    }
+                    sync.acknowledge(dirty.key, dirty.token)
+                }
+            }
+        }
+        if (round.complete) advanceInitializationMirror(round.generation)
+        val remaining = !round.complete || sync.dirtyCount() > 0
+        Log.i(
+            "MessageMirrorSync",
+            "reconcile finished sms_complete=$smsComplete mms_complete=$mmsComplete dirty_count=${sync.dirtyCount()}"
+        )
+        return remaining
     }
 
     /** 附件任务与基础元数据扫描分开调度，不触发网络下载。 */

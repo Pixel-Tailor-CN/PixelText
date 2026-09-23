@@ -40,9 +40,7 @@ class WhitelistMessageSource(private val resolver: ContentResolver) {
                     val date = it.getLong(it.getColumnIndexOrThrow("date"))
                     val sent = it.getLong(it.getColumnIndexOrThrow("date_sent"))
                     // 同一 Provider ID 被删除后复用时，不能继承上一条消息的放行状态。
-                    val raw = "$id:${sender.length}:$sender:$date:$sent"
-                    val fingerprint = MessageDigest.getInstance("SHA-256")
-                        .digest(raw.toByteArray(Charsets.UTF_8)).joinToString("") { byte -> "%02x".format(byte) }
+                    val fingerprint = whitelistMessageFingerprint(id, sender, date, sent)
                     result += WhitelistMessageIdentity(id, sender, fingerprint)
                 }
             }
@@ -65,4 +63,11 @@ class WhitelistMessageSource(private val resolver: ContentResolver) {
             return fallback
         }
     }
+}
+
+/** Provider 决策和镜像只读筛选共享同一身份算法。 */
+fun whitelistMessageFingerprint(id: Long, sender: String, date: Long, sent: Long): String {
+    val raw = "$id:${sender.length}:$sender:$date:$sent"
+    return MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte) }
 }

@@ -60,10 +60,11 @@ class MessageRepositoryImpl(
     private val verificationCodeRepository: VerificationCodeRepository,
     private val mirror: MessageMirrorRepository,
     private val mmsTextIndexer: vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer,
+    private val localSpamFilter: vip.mystery0.pixel.text.data.repository.mirror.LocalConversationSpamFilter,
     private val context: Context
 ) : MessageRepository {
 
-    init { mmsTextIndexer.start() }
+
 
     private val archiveDao = archiveDatabase.archivedConversationDao()
 
@@ -72,12 +73,6 @@ class MessageRepositoryImpl(
     }
 
     override suspend fun isCacheReady(): Boolean = conversationCacheRepository.isCacheReady()
-
-    override suspend fun refreshConversations() {
-        withContext(Dispatchers.IO) {
-            conversationCacheRepository.refreshIncremental()
-        }
-    }
 
     override suspend fun forceSyncConversations() {
         withContext(Dispatchers.IO) {
@@ -88,10 +83,6 @@ class MessageRepositoryImpl(
 
     @OptIn(FlowPreview::class)
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
-        if (!conversationCacheRepository.isCacheReady()) {
-            conversationCacheRepository.startObserving()
-        }
-
         emitAll(
             combine(
                 conversationCacheRepository.observeAllConversations(),
@@ -99,7 +90,8 @@ class MessageRepositoryImpl(
                     .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS.milliseconds)
                     .onStart { emit(Unit) },
                 settingsRepository.settings,
-            ) { conversations, _, settings -> conversations to settings }
+                contactDataSource.changes,
+            ) { conversations, _, settings, _ -> conversations to settings }
                 .map { (conversations, settings) ->
                     val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
                     val activeConversations = conversations.filter {
@@ -117,7 +109,7 @@ class MessageRepositoryImpl(
                     }
                     visibleConversations.map {
                         it.copy(
-                            displayName = contactDataSource.getDisplayName(it.address)
+                            displayName = contactDataSource.getCachedDisplayName(it.address)
                                 ?: it.displayName,
                         )
                     }
@@ -320,7 +312,7 @@ class MessageRepositoryImpl(
         return conversations.map { conversation ->
             val profile = profiles[conversation.address]
             conversation.copy(
-                displayName = contactDataSource.getDisplayName(conversation.address)
+                displayName = contactDataSource.getCachedDisplayName(conversation.address)
                     ?: profile?.displayName
                     ?: conversation.displayName,
                 avatarPath = profile?.avatarPath,
@@ -333,9 +325,10 @@ class MessageRepositoryImpl(
         threadIds: List<Long>, contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
     ): List<ConversationModel> {
         val selected = threadIds.toSet()
-        val messages = localMessages().filter { it.threadId in selected }
+        val snapshots = mirror.observeAllMessages().first().filter { it.threadId in selected }
+        val messages = snapshots.map { it.toMessageModel() }.sortedByDescending { it.timestamp }
         val spamIds = if (contentFilter == ConversationContentFilter.ALL) emptySet() else
-            messages.map { it.id }.chunked(500).flatMap { spamRepository.getSpamMessageIds(it, SPAM_THRESHOLD) }.toSet()
+            localSpamFilter.spamIds(snapshots, SPAM_THRESHOLD)
         return messages.filter { contentFilter.includes(it.id in spamIds) }.groupBy { it.threadId }.map { (thread, rows) ->
             val latest = rows.first()
             ConversationModel(

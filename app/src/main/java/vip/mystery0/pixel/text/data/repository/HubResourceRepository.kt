@@ -23,6 +23,7 @@ class HubResourceRepository(
     private val settings: AppSettingsRepository,
     private val messageParser: MessageParser,
     private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
+    private val initializationGuard: vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard,
 ) {
     suspend fun checkManifest(): HubResourceManifest = client.fetchManifest()
 
@@ -86,10 +87,12 @@ class HubResourceRepository(
                 store.verifySha256(temp, rules.sha256)
                 onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
                 verifyRulesJson(temp.readText(Charsets.UTF_8))
-                store.activateRules(temp)
-                settings.setRuleResourceVersion(rules.version)
-                messageParser.reloadRules()
-                verificationCodeIndexScheduler.scheduleFullRebuild()
+                initializationGuard.withInputMutation {
+                    store.activateRules(temp)
+                    settings.setRuleResourceVersion(rules.version)
+                    messageParser.reloadRules()
+                    verificationCodeIndexScheduler.scheduleFullRebuild()
+                }
             }
 
             manifest.spamModel?.let { spamModel ->
@@ -103,9 +106,11 @@ class HubResourceRepository(
                 store.verifySha256(modelTemp, spamModel.model.sha256)
                 store.verifySha256(vocabTemp, spamModel.vocab.sha256)
                 onProgress("正在校验并启用离线模型", completedBytes.toProgress(totalBytes))
-                store.activateModelAndVocab(modelTemp, vocabTemp)
-                settings.setSpamModelResourceVersion(spamModel.version)
-                settings.setVocabResourceVersion(spamModel.version)
+                initializationGuard.withInputMutation {
+                    store.activateModelAndVocab(modelTemp, vocabTemp)
+                    settings.setSpamModelResourceVersion(spamModel.version)
+                    settings.setVocabResourceVersion(spamModel.version)
+                }
             }
 
             settings.setResourceUpdatedAt(System.currentTimeMillis())
@@ -118,11 +123,13 @@ class HubResourceRepository(
 
     suspend fun deleteDownloadedRules(): HubOperationResult = withContext(Dispatchers.IO) {
         runCatching {
-            store.deleteActiveRules()
-            settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-            settings.setResourceUpdatedAt(System.currentTimeMillis())
-            messageParser.reloadRules()
-            verificationCodeIndexScheduler.scheduleFullRebuild()
+            initializationGuard.withInputMutation {
+                store.deleteActiveRules()
+                settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                settings.setResourceUpdatedAt(System.currentTimeMillis())
+                messageParser.reloadRules()
+                verificationCodeIndexScheduler.scheduleFullRebuild()
+            }
             HubOperationResult.Success
         }.getOrElse { error ->
             HubOperationResult.Failure(error.message ?: "delete rules failed")
@@ -131,10 +138,12 @@ class HubResourceRepository(
 
     suspend fun deleteDownloadedModel(): HubOperationResult = withContext(Dispatchers.IO) {
         runCatching {
-            store.deleteActiveModelAndVocab()
-            settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-            settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-            settings.setResourceUpdatedAt(System.currentTimeMillis())
+            initializationGuard.withInputMutation {
+                store.deleteActiveModelAndVocab()
+                settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                settings.setResourceUpdatedAt(System.currentTimeMillis())
+            }
             HubOperationResult.Success
         }.getOrElse { error ->
             HubOperationResult.Failure(error.message ?: "delete model failed")
