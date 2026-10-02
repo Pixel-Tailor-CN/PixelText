@@ -1,7 +1,9 @@
 package vip.mystery0.pixel.text.domain.backup
 
+import com.squareup.moshi.JsonClass
 import kotlinx.coroutines.flow.StateFlow
 
+@JsonClass(generateAdapter = false)
 enum class BackupSection(val label: String) { SETTINGS("设置与主题"), RULES("关键词与白名单"), SMS("短信及归档、放行状态") }
 enum class BackupPhase {
     IDLE, SYNCING_MIRROR, SNAPSHOTTING, EXPORTING, VALIDATING, PREVIEW,
