@@ -1,0 +1,94 @@
+name: Release runtime regression
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-35-release:
+    name: Minified ARM64 release on Android 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_SERIAL: emulator-5554
+      SIGN_KEY_STORE_FILE: ${{ github.workspace }}/artifacts/ci-signing.jks
+      SIGN_KEY_STORE_PASSWORD: android
+      SIGN_KEY_ALIAS: ci
+      SIGN_KEY_PASSWORD: android
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Record source and prepare disposable CI signing
+        run: |
+          mkdir -p artifacts
+          { git rev-parse HEAD; git rev-parse HEAD^{tree}; uname -a; java -version; } > artifacts/source-and-runner.txt 2>&1
+          keytool -genkeypair -keystore "$SIGN_KEY_STORE_FILE" -storepass android -keypass android -alias ci -dname 'CN=PixelText CI Only' -keyalg RSA -keysize 2048 -validity 2
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
+      - name: Install official SDK and ARM-translating Android 15 image
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          sdkmanager 'platform-tools' 'emulator' 'platforms;android-37.0' 'build-tools;36.0.0' 'system-images;android-35;google_apis;x86_64' 2>&1 | tee artifacts/sdk-install.log
+      - name: Build actual minified release without app changes
+        timeout-minutes: 23
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain :app:assembleRelease 2>&1 | tee artifacts/gradle.log
+          APK=app/build/outputs/apk/release/app-release.apk
+          sha256sum "$APK" > artifacts/apk-sha256.txt
+          unzip -l "$APK" > artifacts/apk-contents.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" > artifacts/apk-badging.txt
+          grep -q "native-code: 'arm64-v8a'" artifacts/apk-badging.txt
+          test -s app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt
+          git diff --exit-code -- app gradle build.gradle.kts settings.gradle.kts signing.gradle
+      - name: Build separate runtime probe from final R8 mapping
+        run: bash .github/runtime/build_probe.sh "$GITHUB_WORKSPACE/artifacts/probe"
+      - name: Boot KVM emulator and verify official ARM64 translation
+        timeout-minutes: 7
+        run: bash .github/runtime/start_emulator.sh
+      - name: Exercise cold starts, permissions, backup and vCard runtime
+        timeout-minutes: 12
+        run: |
+          set -o pipefail
+          python3 .github/runtime/runtime_smoke.py --apk app/build/outputs/apk/release/app-release.apk --probe artifacts/probe/probe.apk 2>&1 | tee artifacts/runtime-smoke.log
+      - name: Collect final diagnostics
+        if: always()
+        timeout-minutes: 2
+        run: |
+          timeout 15 adb devices -l > artifacts/adb-devices.txt 2>&1 || true
+          timeout 15 adb logcat -b crash -d > artifacts/logcat-crash-final.txt 2>&1 || true
+          timeout 15 adb emu kill || true
+          rm -f "$SIGN_KEY_STORE_FILE"
+      - name: Upload synthetic-data validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-runtime-api35-${{ github.run_id }}
+          path: |
+            artifacts/
+            app/build/outputs/apk/release/*.apk
+            app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt
+          if-no-files-found: error
+          retention-days: 7
