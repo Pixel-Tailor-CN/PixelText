@@ -50,7 +50,8 @@ public final class MmsRuntimeProbe extends Instrumentation {
     @Override public void onStart(){Bundle out=new Bundle();try{
         check(getTargetContext().checkSelfPermission(android.Manifest.permission.SEND_SMS)==android.content.pm.PackageManager.PERMISSION_DENIED,"SEND_SMS must remain denied in synthetic probe");
         android.app.AppOpsManager ops=getTargetContext().getSystemService(android.app.AppOpsManager.class);
-        check(ops.unsafeCheckOpNoThrow(android.app.AppOpsManager.OPSTR_SEND_SMS,android.os.Process.myUid(),PKG)!=android.app.AppOpsManager.MODE_ALLOWED,"SEND_SMS app-op must remain blocked");
+        int sendMode=ops.unsafeCheckOpNoThrow(android.app.AppOpsManager.OPSTR_SEND_SMS,android.os.Process.myUid(),PKG);
+        check(sendMode==android.app.AppOpsManager.MODE_IGNORED||sendMode==android.app.AppOpsManager.MODE_ERRORED,"SEND_SMS effective app-op must remain blocked, mode="+sendMode);
         passed.add("send_sms_permission_and_appop_blocked");
         File path=getTargetContext().getDatabasePath("outgoing_mms.db");await(()->path.isFile(),"outgoing Room database did not initialize");
         db=SQLiteDatabase.openDatabase(path.getPath(),null,SQLiteDatabase.OPEN_READWRITE);

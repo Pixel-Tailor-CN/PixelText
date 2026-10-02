@@ -90,10 +90,10 @@
 
 - [x] 对照设计逐项审查，独立whole-branch review，修复高风险问题
 - [x] `./gradlew :app:compileDebugKotlin :app:lintDebug :app:assembleDebug` 成功
-- [ ] 完整 `:app:assembleRelease` 与R8产物验证；不裁native库、不全局keep
+- [x] 完整 `:app:assembleRelease` 与R8产物验证；不裁native库、不全局keep
 - [ ] mock/platform boundary与现有接收/备份/vCard回归；记录实际设备/API/ABI、跑过与未跑项
 - [x] `git diff --check`、暂存清单/隐私/Manifest/Room schema检查，本地提交与draft PR说明
-- [ ] 获发布授权后才push与draft PR，核对远端SHA与该SHA的CI；真实运营商验收另需明确许可
+- [x] 获发布授权后才push与draft PR，核对远端SHA并启动该SHA的CI；运行时结果见 PR #18，真实运营商验收另需明确许可
 
 ## 验证限制与开启门槛
 
@@ -110,3 +110,5 @@
 - 无 KVM 的 API35 软件模拟器尝试一次：ADB和ARM64转译可见，但启动未确认完成、APK安装超时；已停止，不声称设备/UI通过
 - CI 保留默认关闭版的既有冷启动/备份/vCard回归，再构建受控开启版运行独立 MMS probe。probe 先确认虚拟机身份、SEND_SMS被拒绝及AppOps阻断，只插入 `sourceId=null` 的提交后合成状态，不构造可提交队列，不调用发信 API。它验证 Room→Receiver→Worker 和编辑入口，不能证明 SmsManager 网络提交、实际 TelephonyProvider 写入、MMSC互通或运营商接受
 - 未验门槛继续保留：API31、实际 ARM64 Pixel、真实双卡/角色切换/APN/漫游、完整发送→独立接收端互通与计费链路。生产默认入口仍关闭
+
+- PR #18 首次 CI 的两种完整 R8 构建与既有运行时回归通过；新增 MMS probe 在前置 AppOps 断言处停止。Android 15 权限同步显示 UID ignore、包 allow，需按有效 UID 优先语义判断；修正为仅接受明确 deny/ignore，并在 instrumentation 中再次验证实际模式，未放宽发送权限限制

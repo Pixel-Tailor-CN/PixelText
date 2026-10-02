@@ -52,6 +52,14 @@ def healthy():
     crash = adb('logcat', '-b', 'crash', '-d')
     assert PKG not in crash, crash
 
+def blocked_send_mode(appops):
+    # Android 15 的权限同步可能把 UID mode 写为 ignore，并将包级 mode 还原 allow。
+    # UID 非 default 时优先；ignore 与 deny 都禁止发信，绝不因文本中某处含 deny 就放行。
+    uid = re.search(r'^Uid mode: SEND_SMS: (\w+)', appops, re.MULTILINE)
+    package = re.search(r'^SEND_SMS: (\w+)', appops, re.MULTILINE)
+    effective = uid.group(1) if uid and uid.group(1) != 'default' else (package.group(1) if package else None)
+    assert effective in ('ignore', 'deny'), 'SEND_SMS effective AppOp not blocked: '+appops
+
 def launch(action, uri=None, body=None):
     args = ['am', 'start', '-W', '-n', PKG+'/.ComposeSmsActivity', '-a', action]
     if uri: args += ['-d', uri]
@@ -77,11 +85,12 @@ try:
     adb('install', '-r', a.apk, timeout=120)
     shell('am', 'force-stop', PKG); shell('pm', 'clear', PKG)
     shell('pm', 'revoke', PKG, 'android.permission.SEND_SMS', check=False)
+    shell('appops', 'set', '--uid', PKG, 'SEND_SMS', 'deny')
     shell('appops', 'set', PKG, 'SEND_SMS', 'deny')
     permissions = shell('dumpsys', 'package', PKG)
     assert not re.search(r'android.permission.SEND_SMS: granted=true', permissions), 'SEND_SMS unexpectedly granted'
     appops = shell('appops', 'get', PKG, 'SEND_SMS')
-    assert 'deny' in appops, appops
+    blocked_send_mode(appops)
     (out/'send-prevention-before.txt').write_text(appops)
     adb('logcat', '-c')
     adb('install', '-r', a.probe, timeout=90)
@@ -146,7 +155,7 @@ try:
         healthy()
     case('attachment_body_transfer_rotation_and_discard', text_transfer)
     final_ops = shell('appops', 'get', PKG, 'SEND_SMS')
-    assert 'deny' in final_ops, final_ops
+    blocked_send_mode(final_ops)
     assert not re.search(r'(?:^|\s)(?:time|rejectTime)=', final_ops), 'unexpected SMS app-op attempt'
     (out/'send-prevention-after.txt').write_text(final_ops)
 finally:
