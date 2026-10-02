@@ -46,10 +46,12 @@ public final class RuntimeProbe extends Instrumentation {
         check(roundtrip.getJSONArray("sections").toString().equals("[\"SETTINGS\",\"RULES\",\"SMS\"]"), "backup section names changed");
         passed.add("backup_adapter_all_enum_values_json_roundtrip");
         Object context = singleton("emptyContext", "emptyContextInstance");
-        Object continuation = Proxy.newProxyInstance(loader, new Class[]{c("continuation")}, (p,m,a) -> {
-            if (m.getParameterTypes().length == 0) return context;
-            throw new AssertionError("unexpected asynchronous suspension in archive codec");
-        });
+        // R8 会把 Continuation 参数收窄成实际的 ContinuationImpl，使用产物已有的状态类。
+        Constructor<?> continuationCtor = c("exportContinuation").getDeclaredConstructors()[0];
+        continuationCtor.setAccessible(true);
+        Object continuation = continuationCtor.newInstance(codec, null);
+        Field contextField = c("continuationImpl").getDeclaredField(n("continuationContext"));
+        contextField.setAccessible(true); contextField.set(continuation, context);
         File root = new File(getTargetContext().getCacheDir(), "runtime-regression"); root.mkdirs();
         for (boolean encrypted : new boolean[]{false, true}) {
             File exportDir = new File(root, "export-" + encrypted); exportDir.mkdirs();
@@ -67,8 +69,18 @@ public final class RuntimeProbe extends Instrumentation {
     }
     private void contact(String label, String text, String name, String phone, String email, String type, boolean photo) throws Exception {
         Object unit = singleton("unit", "unitInstance");
-        Object noop = Proxy.newProxyInstance(loader, new Class[]{c("function")}, (p,m,a) -> unit);
         Method parse = method(c("parser"), n("parse"), 2);
+        Class<?> callbackClass = parse.getParameterTypes()[1];
+        Object noop;
+        if (callbackClass.isInterface()) {
+            noop = Proxy.newProxyInstance(loader, new Class[]{callbackClass}, (p,m,a) -> unit);
+        } else {
+            // 生产调用方的取消检查 lambda 已被 R8 收窄；用空协程上下文构造同一个 lambda。
+            Constructor<?> callbackCtor = callbackClass.getDeclaredConstructors()[0]; callbackCtor.setAccessible(true);
+            Class<?>[] types = callbackCtor.getParameterTypes();
+            check(types.length == 2 && types[1] == byte.class, "unexpected optimized callback signature");
+            noop = callbackCtor.newInstance(singleton("emptyContext", "emptyContextInstance"), (byte)0);
+        }
         Object parser = Modifier.isStatic(parse.getModifiers()) ? null : c("parser").getDeclaredConstructor().newInstance();
         List<?> cards = (List<?>) call(parse, parser, text.replace("\n", "\r\n"), noop);
         check(cards.size() == 1, label + " wrong card count"); Object card = cards.get(0);
@@ -80,6 +92,12 @@ public final class RuntimeProbe extends Instrumentation {
             check(type.equalsIgnoreCase((String)field(values.get(0),"value_label")), label + " type mismatch");
         }
         if (email != null) { List<?> values=(List<?>)field(card,"contact_emails"); check(values.size()==1 && email.equals(field(values.get(0),"value_value")), label+" email mismatch"); }
+        if (type.equals("x-ci")) {
+            for (String listKey : new String[]{"contact_emails", "contact_addresses"}) {
+                List<?> values = (List<?>)field(card, listKey);
+                check(values.size() == 1 && type.equalsIgnoreCase((String)field(values.get(0), "value_label")), label + " unknown parameter mismatch " + listKey);
+            }
+        }
         if (photo) check(Arrays.equals((byte[])field(card,"contact_photoBytes"),new byte[]{1,2,3}),label+" photo mismatch");
         passed.add(label);
     }

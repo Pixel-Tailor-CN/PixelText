@@ -73,7 +73,7 @@ try:
     adb('logcat','-c')
     def first():
         tree=launch()
-        assert '设为默认短信应用' in texts(tree), 'default SMS onboarding not rendered'
+        assert '需要读取短信权限' in texts(tree), 'no-permission home screen not rendered'
         perms=adb('shell','dumpsys','package',PKG)
         (out/'fresh-package.txt').write_text(perms)
         for permission in ['READ_SMS','READ_CONTACTS','READ_PHONE_STATE']:
@@ -82,11 +82,15 @@ try:
     for i in range(1,6):
         run_case(f'repeated_cold_start_{i}',lambda: launch())
     def role_cancel():
-        tree=snapshot('before-role'); click_text(tree,'去设置')
+        tree=snapshot('before-role'); click_text(tree,'More options')
+        tree=snapshot('home-menu'); click_text(tree,'设置默认短信应用')
         tree=snapshot('system-sms-role')
         assert any('permissioncontroller' in n.attrib.get('package','') for n in tree.iter('node')), 'system role sheet missing'
         adb('shell','input','keyevent','KEYCODE_BACK');time.sleep(3);healthy()
-        tree=snapshot('role-cancel-return'); click_text(tree,'稍后');healthy()
+        tree=snapshot('role-cancel-return')
+        assert '需要读取短信权限' in texts(tree), 'home screen missing after role cancellation'
+        click_text(tree,'授予权限');tree=snapshot('sms-permission-rationale')
+        click_text(tree,'稍后');healthy()
     run_case('default_sms_system_prompt_cancel_resume',role_cancel)
     def backup_ui():
         adb('shell','am','start','-W','-n',PKG+'/.MainActivity','--ez','extra_open_settings','true');time.sleep(3)

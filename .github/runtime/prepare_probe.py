@@ -38,10 +38,13 @@ for key, name in {
     'function': 'kotlin.jvm.functions.Function0',
     'unit': 'kotlin.Unit',
     'continuation': 'kotlin.coroutines.Continuation',
+    'continuationImpl': 'kotlin.coroutines.jvm.internal.ContinuationImpl',
+    'exportContinuation': root + 'data.backup.BackupArchiveCodec$export$1',
     'emptyContext': 'kotlin.coroutines.EmptyCoroutineContext',
     'tflite': 'org.tensorflow.lite.TensorFlowLite',
 }.items():
     config[key] = cls(name)
+config['continuationContext'] = member('kotlin.coroutines.jvm.internal.ContinuationImpl', 'kotlin.coroutines.CoroutineContext _context')
 config['codecAdapter'] = member(root + 'data.backup.BackupArchiveCodec', 'com.squareup.moshi.JsonAdapter adapter')
 config['fromJson'] = member('com.squareup.moshi.JsonAdapter', 'java.lang.Object fromJson(java.lang.String)')
 config['toJson'] = member('com.squareup.moshi.JsonAdapter', 'java.lang.String toJson(java.lang.Object)')
