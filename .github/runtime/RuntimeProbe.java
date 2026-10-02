@@ -8,7 +8,9 @@ import org.json.JSONObject;
 import java.io.File;
 import java.lang.reflect.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.io.InputStream;
+import java.io.FileInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.*;
 
 /** 独立测试 APK：只加载最终 Release 的类，不给应用添加 keep 或测试入口。 */
@@ -17,6 +19,13 @@ public final class RuntimeProbe extends Instrumentation {
     private ClassLoader loader;
     private final List<String> passed = new ArrayList<>();
     @Override public void onCreate(Bundle args) { super.onCreate(args); start(); }
+    private String readText(InputStream input) throws Exception {
+        try (InputStream stream = input; ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096]; int count;
+            while ((count = stream.read(buffer)) != -1) bytes.write(buffer, 0, count);
+            return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
     private String n(String key) throws Exception { return config.getString(key); }
     private Class<?> c(String key) throws Exception { return Class.forName(n(key), true, loader); }
     private Object field(Object target, String name) throws Exception {
@@ -62,7 +71,7 @@ public final class RuntimeProbe extends Instrumentation {
             check(archive.length() > 0, "archive export empty");
             Object validated = call(method(c("codec"), n("inspect"), 4), codec, archive.toURI().toString(), password, inspectDir, continuation);
             check(validated != null, "archive inspect null");
-            JSONObject inspected = new JSONObject(Files.readString(new File(inspectDir, "manifest.json").toPath()));
+            JSONObject inspected = new JSONObject(readText(new FileInputStream(new File(inspectDir, "manifest.json"))));
             check(inspected.getJSONArray("sections").length() == 3, "archive enum roundtrip failed");
             passed.add(encrypted ? "backup_aes_archive_export_inspect" : "backup_plain_archive_export_inspect");
         }
@@ -105,7 +114,7 @@ public final class RuntimeProbe extends Instrumentation {
         Bundle result = new Bundle();
         try {
             loader = getTargetContext().getClassLoader();
-            config = new JSONObject(new String(getContext().getAssets().open("mapping.json").readAllBytes(), StandardCharsets.UTF_8));
+            config = new JSONObject(readText(getContext().getAssets().open("mapping.json")));
             backup();
             contact("vcard21_quoted_printable", "BEGIN:VCARD\nVERSION:2.1\nFN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=E6=B5=8B=E8=AF=95=\n=E8=81=94=E7=B3=BB=E4=BA=BA\nTEL;CELL:10000000001\nEND:VCARD\n", "测试联系人", "10000000001", null, "cell", false);
             contact("vcard30_standard_fields_photo", "BEGIN:VCARD\nVERSION:3.0\nFN:CI Contact\nTEL;TYPE=CELL:10000000002\nEMAIL;TYPE=WORK:ci@example.invalid\nPHOTO;ENCODING=b;TYPE=JPEG:AQID\nEND:VCARD\n", "CI Contact", "10000000002", "ci@example.invalid", "cell", true);

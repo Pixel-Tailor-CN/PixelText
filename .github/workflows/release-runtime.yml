@@ -2,7 +2,7 @@ name: Release runtime regression
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   android-35-release:
+    if: github.event.action != 'closed'
     name: Minified ARM64 release on Android 15
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -92,3 +93,53 @@ jobs:
             app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt
           if-no-files-found: error
           retention-days: 7
+
+  cleanup-pr17-branch:
+    # 用户仅授权本修复分支合并后的清理；不能把范围扩大到其他 PR。
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.number == 17 && github.event.pull_request.merged == true &&
+      github.repository == 'Pixel-Tailor-CN/PixelText' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'fix/r8-backup-vcard-reflection'
+    name: Delete only merged PR17 temporary branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: Pixel-Tailor-CN/PixelText
+      BRANCH: fix/r8-backup-vcard-reflection
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_MERGE: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - name: Verify merge and exact branch before deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="repos/$REPO"
+          DEFAULT_BRANCH=$(gh api "$API" --jq .default_branch)
+          test "$BRANCH" != "$DEFAULT_BRANCH"
+          test "$BRANCH" != main
+          test "$BRANCH" != master
+          PR=$(gh api "$API/pulls/17")
+          jq -e --arg repo "$REPO" --arg branch "$BRANCH" --arg head "$EXPECTED_HEAD" --arg merge "$EXPECTED_MERGE" '
+            .number == 17 and .merged == true and .state == "closed" and
+            .head.repo.full_name == $repo and .head.ref == $branch and
+            .head.sha == $head and .merge_commit_sha == $merge
+          ' <<< "$PR"
+          # 只允许删除 refs/heads 下这个明确的临时分支，保留默认分支及全部标签。
+          REF="$(gh api "$API/git/ref/heads/$BRANCH")"
+          jq -e --arg ref "refs/heads/$BRANCH" --arg head "$EXPECTED_HEAD" '
+            .ref == $ref and .object.type == "commit" and .object.sha == $head
+          ' <<< "$REF"
+          gh api --method DELETE "$API/git/refs/heads/$BRANCH"
+          set +e
+          gh api --include "$API/git/ref/heads/$BRANCH" > "$RUNNER_TEMP/pr17-ref-after.txt" 2>&1
+          STATUS=$?
+          set -e
+          test "$STATUS" -ne 0
+          grep -Eq '^HTTP[^ ]* 404|\(HTTP 404\)' "$RUNNER_TEMP/pr17-ref-after.txt"
+          echo "deleted only refs/heads/$BRANCH at merged head $EXPECTED_HEAD" >> "$GITHUB_STEP_SUMMARY"
