@@ -65,7 +65,13 @@ def launch():
     output=adb('shell','am','start','-W','-n',PKG+'/.MainActivity')
     assert 'Status: ok' in output, output
     time.sleep(8); healthy()
-    return snapshot('cold-'+str(len(cases)))
+    tree = snapshot('cold-'+str(len(cases)))
+    if '需要短信读取权限' in texts(tree):
+        click_text(tree, '稍后')
+        healthy()
+        tree = snapshot('cold-home-'+str(len(cases)))
+    assert '需要读取短信权限' in texts(tree), 'no-permission home screen not rendered'
+    return tree
 
 try:
     adb('install','-r',a.apk,timeout=120)
