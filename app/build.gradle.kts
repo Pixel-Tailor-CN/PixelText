@@ -53,6 +53,8 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = gitVersionCode
         versionName = appVersionName
+        // 目标运营商验收前不公开发送入口；恢复已提交任务与回调不受此开关影响。
+        buildConfigField("boolean", "MMS_SENDING_ENABLED", providers.gradleProperty("pixeltext.enableMmsSending").orElse("false").map { it.toBoolean().toString() }.get())
         ndk {
             //noinspection ChromeOsAbiSupport
             abiFilters += "arm64-v8a"

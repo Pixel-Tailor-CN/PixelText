@@ -29,7 +29,7 @@ Pixel Text（原点短信）是面向国内 Pixel 用户的 Android SMS/MMS 应�
 - UI 负责渲染和交互，业务解析放在 Domain，系统与数据访问放在 Data。ViewModel 用 `StateFlow` 暴露状态，异步任务使用 `viewModelScope`；新增依赖接入现有 Koin 模块。
 - 优先明确的模型字段；只有现有动态卡片 `details` 模式需要时使用 Map。
 - 只开发传统 SMS/MMS，不开发 RCS。短信解析与分类保持端侧，不引入远程解析、分类、埋点或统计上传。
-- `INTERNET` 权限的项目约束仍为 MMS 下载、解析、展示及必要请求。现有 Hub、资源更新等网络功能与该约束存在历史差异；修改相关功能时核对其既有设计和当前请求，不以此差异自行扩大短信上传范围或删除既有功能。
+- `INTERNET` 权限的项目约束为 MMS 下载、解析、展示、用户明确确认的单人 MMS 发送及必要请求。现有 Hub、资源更新等网络功能与该约束存在历史差异；修改相关功能时核对其既有设计和当前请求，不以此差异自行扩大短信上传范围或删除既有功能。
 - 短信样本按敏感数据处理，优先使用 `samples-desensitized/`；目录不存在时使用合成脱敏样本。不要把原始短信写入日志、文档或提交。
 - 修改 `app/src/main/AndroidManifest.xml` 的权限、intent filter、`exported` 或组件名称时，核对默认短信资格与系统入口：`SmsReceiver`、`MmsReceiver`、`NotificationActionReceiver`、`HeadlessSmsSendService`、`MainActivity`、`ComposeSmsActivity`。
 

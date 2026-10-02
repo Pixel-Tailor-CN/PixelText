@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="database" path="outgoing_mms.db" />
+        <exclude domain="database" path="outgoing_mms.db-wal" />
+        <exclude domain="database" path="outgoing_mms.db-shm" />
+        <exclude domain="file" path="mms-send-pdu/" />
         <exclude domain="database" path="message_mirror.db" />
         <exclude domain="database" path="message_mirror.db-wal" />
         <exclude domain="database" path="message_mirror.db-shm" />
@@ -10,6 +14,10 @@
         <exclude domain="root" path="." />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="database" path="outgoing_mms.db" />
+        <exclude domain="database" path="outgoing_mms.db-wal" />
+        <exclude domain="database" path="outgoing_mms.db-shm" />
+        <exclude domain="file" path="mms-send-pdu/" />
         <exclude domain="database" path="message_mirror.db" />
         <exclude domain="database" path="message_mirror.db-wal" />
         <exclude domain="database" path="message_mirror.db-shm" />

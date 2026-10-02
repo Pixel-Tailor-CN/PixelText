@@ -11,7 +11,9 @@
 - 项目：Android Open Source Project，`platform/frameworks/base`。
 - 固定提交：`1cdfff555f4a21f71ccc978290e2e212e2f8b168`。
 - [上游源码目录](https://android.googlesource.com/platform/frameworks/base/+/1cdfff555f4a21f71ccc978290e2e212e2f8b168/telephony/common/com/google/android/mms/)：`telephony/common/com/google/android/mms/`。
-- 引入范围：PDU 解析器、消息头、消息体及相关数据类型；未引入 `PduPersister`、`PduComposer`。应用直接编译这些源码，不调用系统隐藏 API；Provider 持久化由项目自己的 `ContentResolver` 实现负责。
+- 引入范围：PDU 解析器、消息头、消息体、单人发送使用的 `PduComposer` 及相关数据类型；未引入 `PduPersister` 或旧网络事务栈。应用直接编译这些源码，不调用系统隐藏 API；Provider 持久化由项目自己的 `ContentResolver` 实现负责。
+
+发送 Composer 取自同一固定提交的 [`pdu/PduComposer.java`](https://github.com/aosp-mirror/platform_frameworks_base/blob/1cdfff555f4a21f71ccc978290e2e212e2f8b168/telephony/common/com/google/android/mms/pdu/PduComposer.java)，原始 Git blob 为 `7af0d1b09eed0585ea3718ba51176bc94f8844d3`。
 
 ### 本地修改摘要
 
@@ -21,6 +23,8 @@
 - 加固声明长度、实际读取长度、uintvar、字符串终止和字段边界校验；递归层共用深度、累计 part 数和字节预算。
 - `PduPart.children` 保留 multipart 层级及子项载荷顺序，支持 mixed、related、alternative 的 WAP MIME 与标准 MIME 名称；保存原容器及全部子 part，不按全消息 start/type 重排子项。
 - 嵌套格式或解码错误保留不透明容器和外层有效兄弟项；预算超限使整个 PDU 解析失败。容器遇到不支持的传输编码时保留原载荷，不猜测解码关系。
+
+- Composer 仅接纳单 TO、无 CC/BCC 的平面 SendReq；拒绝 URI 数据源、空标识、未验证字符集及嵌套 part。加入完整 PDU/活动缓冲区字节预算、缓冲栈深度与空字符串边界校验；mixed 不写 related 的 start/type 参数，related 要求首项为本地生成 SMIL。调用层统一使用 UTF-8 和安全协议文件名，并通过现有有界 parser 回读自检。
 
 后续修改 vendor 源码时，应保留原始声明，并在本节同步有助于回溯的差异；接收流程与内容展示的行为以对应实现为准。
 

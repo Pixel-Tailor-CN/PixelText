@@ -46,8 +46,9 @@ class ComposeSmsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val address = parseAddress(intent)
-        val body = parseBody(intent)
+        val externalInput = vip.mystery0.pixel.text.mms.outgoing.MmsExternalInput.parse(intent)
+        val address = externalInput.recipient
+        val body = externalInput.body
 
         setContent {
             PixelTextTheme {
@@ -55,6 +56,21 @@ class ComposeSmsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    if (externalInput.requestsMms) {
+                        if (BuildConfig.MMS_SENDING_ENABLED) {
+                            vip.mystery0.pixel.text.ui.message.mms.MmsComposerDialog(
+                                sessionId = "external", onClose = { finish() }, initialRecipient = externalInput.recipient,
+                                initialBody = externalInput.body, initialSubject = externalInput.subject,
+                                initialUris = externalInput.attachments, inputError = externalInput.error, isExternalInput = true,
+                            )
+                        } else {
+                            Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+                                Text("此构建尚未开启彩信发送，请完成运营商验收后使用")
+                                Button(onClick = { finish() }) { Text("返回") }
+                            }
+                        }
+                        return@Surface
+                    }
                     var targetAddress by rememberSaveable { mutableStateOf(address) }
                     var threadId by remember(targetAddress) { mutableStateOf<Long?>(null) }
                     LaunchedEffect(targetAddress) {
@@ -99,7 +115,8 @@ class ComposeSmsActivity : ComponentActivity() {
                     } else if (targetAddress.isBlank()) {
                         RecipientEntryScreen(
                             onNavigateBack = { finish() },
-                            onRecipientConfirmed = { targetAddress = it }
+                            onRecipientConfirmed = { targetAddress = it },
+                            inputError = externalInput.error
                         )
                     } else if (threadId == null) {
                         // 身份未解析时先等待，避免稍后切换线程重置用户刚输入的草稿。
@@ -120,27 +137,6 @@ class ComposeSmsActivity : ComponentActivity() {
         }
     }
 
-    private fun parseAddress(intent: Intent): String {
-        return intent.data
-            ?.schemeSpecificPart
-            ?.substringBefore('?')
-            ?.trim()
-            .orEmpty()
-    }
-
-    private fun parseBody(intent: Intent): String {
-        intent.getStringExtra(Intent.EXTRA_TEXT)
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return it }
-        intent.getStringExtra("sms_body")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return it }
-
-        return runCatching {
-            intent.data?.getQueryParameter("body").orEmpty()
-        }.getOrDefault("")
-    }
-
     private fun getThreadIdForAddress(address: String): Long {
         // 系统按完整收件人集合解析规范线程；纯 MMS 也可找到，不会借用包含该号码的群聊。
         return Telephony.Threads.getOrCreateThreadId(this, setOf(address))
@@ -151,9 +147,10 @@ class ComposeSmsActivity : ComponentActivity() {
 private fun RecipientEntryScreen(
     onNavigateBack: () -> Unit,
     onRecipientConfirmed: (String) -> Unit,
+    inputError: String? = null,
 ) {
     var recipient by rememberSaveable { mutableStateOf("") }
-    val isValidRecipient = recipient.isNotBlank() && recipient.matches(Regex("^[0-9+\\s-]+$"))
+    val isValidRecipient = vip.mystery0.pixel.text.mms.outgoing.MmsRecipient.normalize(recipient) != null
 
     Scaffold(
         topBar = {
@@ -178,6 +175,7 @@ private fun RecipientEntryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            inputError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             TextField(
                 value = recipient,
                 onValueChange = { recipient = it },
@@ -196,7 +194,7 @@ private fun RecipientEntryScreen(
                 )
             )
             Button(
-                onClick = { onRecipientConfirmed(recipient.trim()) },
+                onClick = { onRecipientConfirmed(vip.mystery0.pixel.text.mms.outgoing.MmsRecipient.normalize(recipient) ?: return@Button) },
                 enabled = isValidRecipient,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)

@@ -43,6 +43,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -248,6 +249,13 @@ fun ConversationDetailScreen(
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val newMessageKeys by viewModel.newMessageKeys.collectAsState()
     val context = LocalContext.current
+    val outgoingRepository: vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository = koinInject()
+    val outgoing by remember(outgoingRepository) { outgoingRepository.observeMessages() }.collectAsState(emptyList())
+    var mmsSession by rememberSaveable(threadId, address) { mutableStateOf<String?>(null) }
+    var mmsRecipient by rememberSaveable(threadId, address) { mutableStateOf("") }
+    var mmsOriginalSmsHash by rememberSaveable(threadId, address) { mutableStateOf<String?>(null) }
+    var smsInputRevision by rememberSaveable(threadId, address) { mutableLongStateOf(0L) }
+    var mmsSmsInputRevision by rememberSaveable(threadId, address) { mutableLongStateOf(-1L) }
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var highlightedMessageId by remember(threadId, targetMessageId) {
         mutableStateOf<Long?>(null)
@@ -259,6 +267,17 @@ fun ConversationDetailScreen(
     var messageText by remember(threadId, address, initialMessageText) {
         mutableStateOf(initialMessageText)
     }
+    if (mmsSession != null) vip.mystery0.pixel.text.ui.message.mms.MmsComposerDialog(
+        sessionId = mmsSession!!, onClose = { mmsSession = null }, initialRecipient = mmsRecipient,
+        // SavedState仅留会话身份与轻量版本/摘要，正文由彩信草稿数据库恢复。
+        initialBody = if (mmsOriginalSmsHash != null) messageText else "", startFresh = mmsOriginalSmsHash != null,
+        onAccepted = {
+            // 只清空被本次彩信持久接纳的原输入；返回/删除草稿及后来新输入均保留。
+            if (mmsOriginalSmsHash != null && smsInputRevision == mmsSmsInputRevision && smsInputDigest(messageText) == mmsOriginalSmsHash) {
+                messageText = ""; smsInputRevision++
+            }
+        },
+    )
     var showAddressInTitle by remember(threadId, address) {
         mutableStateOf(false)
     }
@@ -690,6 +709,13 @@ fun ConversationDetailScreen(
         },
         bottomBar = {
             Column {
+                if (vip.mystery0.pixel.text.BuildConfig.MMS_SENDING_ENABLED) {
+                    vip.mystery0.pixel.text.ui.message.mms.MmsDraftHint(address, onOpen = {
+                        mmsOriginalSmsHash = null; mmsRecipient = address; mmsSession = java.util.UUID.randomUUID().toString()
+                    })
+                }
+                outgoing.filter { !it.deleted && it.sourceId == null && it.snapshot.recipientAddress == vip.mystery0.pixel.text.mms.outgoing.MmsRecipient.normalize(address) }
+                    .forEach { vip.mystery0.pixel.text.ui.message.mms.OutgoingMmsStatus(it) }
                 Surface(
                     color = detailStyle.inputArea.backgroundColor,
                     modifier = Modifier
@@ -709,9 +735,15 @@ fun ConversationDetailScreen(
                                 onSelected = { selectedSubId = it },
                             )
                         }
+                        if (vip.mystery0.pixel.text.BuildConfig.MMS_SENDING_ENABLED) {
+                            IconButton(onClick = {
+                                // 会话分组可能包含多地址历史；新的彩信目标由用户明确填写。
+                                mmsOriginalSmsHash = smsInputDigest(messageText); mmsSmsInputRevision = smsInputRevision; mmsRecipient = ""; mmsSession = java.util.UUID.randomUUID().toString()
+                            }) { Icon(Icons.Rounded.AttachFile, "编辑单人彩信") }
+                        }
                         BasicTextField(
                             value = messageText,
-                            onValueChange = { messageText = it },
+                            onValueChange = { messageText = it; smsInputRevision++ },
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -851,6 +883,7 @@ fun ConversationDetailScreen(
                         ) { message ->
                             val isSelected = selectedMessageIds.contains(message.id)
                             val isTargetHighlighted = highlightedMessageId == message.id
+                            Column {
                             MessageItem(
                                 message = message,
                                 selectionMode = selectedMessageIds.isNotEmpty(),
@@ -892,6 +925,10 @@ fun ConversationDetailScreen(
                                     appSettings.showVerificationCodeContentByDefault,
                                 animateEntrance = message.stableKey in entranceMessageKeys,
                             )
+                            if (message.isMms) outgoing.firstOrNull { !it.deleted && it.providerReady && it.sourceId == -message.id }?.let {
+                                vip.mystery0.pixel.text.ui.message.mms.OutgoingMmsStatus(it)
+                            }
+                            }
                         }
                     }
                 }
@@ -903,7 +940,7 @@ fun ConversationDetailScreen(
         AlertDialog(
             onDismissRequest = { deleteCandidateMessageIds = emptySet() },
             title = { Text("删除消息？") },
-            text = { Text("将删除所选 ${deleteCandidateMessageIds.size} 条短信或彩信。") },
+            text = { Text("将删除所选 ${deleteCandidateMessageIds.size} 条短信或彩信。已提交的彩信可能仍然发出，删除记录无法撤回。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1049,3 +1086,8 @@ private class AboveAnchorPositionProvider(
         return IntOffset(x, y)
     }
 }
+
+
+/** 只用于对应本次彩信接纳的编辑版本，不写入日志，也不保存正文到 SavedState。 */
+private fun smsInputDigest(value: String): String = java.security.MessageDigest.getInstance("SHA-256")
+    .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
