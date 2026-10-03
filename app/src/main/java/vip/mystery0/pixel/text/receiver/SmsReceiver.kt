@@ -87,17 +87,6 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
             val messageId = insertedUri?.lastPathSegment?.toLongOrNull()
             val deferNotification = shouldDeferNotificationForSpamCheck(context)
             val canScheduleSpamCheck = messageId != null && threadId > 0
-            if (canScheduleSpamCheck) {
-                SpamDetectionWorker.schedule(
-                    context = context,
-                    messageId = messageId,
-                    threadId = threadId,
-                    sender = sender,
-                    content = body,
-                    deferNotification = deferNotification,
-                    messageUri = insertedUri.toString()
-                )
-            }
 
             val shouldShowNotification = !deferNotification || !canScheduleSpamCheck
             val pendingResult = goAsync()
@@ -142,22 +131,34 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
                             }
                         }
 
-                        if (shouldShowNotification) {
-                            launch {
-                                val profile = runCatching {
-                                    senderProfileRepository.findByNumber(sender)
-                                }.getOrNull()
-                                SmsNotificationHelper.showSmsNotification(
-                                    context = context,
-                                    sender = sender,
-                                    body = body,
-                                    threadId = threadId,
-                                    messageUri = insertedUri?.toString(),
-                                    displaySender = contactDataSource.getDisplayName(sender)
-                                        ?: profile?.displayName
-                                        ?: sender,
-                                    avatarPath = profile?.avatarPath,
-                                )
+                        launch {
+                            try {
+                                if (shouldShowNotification) {
+                                    val profile = runCatching { senderProfileRepository.findByNumber(sender) }.getOrNull()
+                                    SmsNotificationHelper.showSmsNotification(
+                                        context = context, sender = sender, body = body, threadId = threadId,
+                                        messageUri = insertedUri?.toString(),
+                                        displaySender = contactDataSource.getDisplayName(sender) ?: profile?.displayName ?: sender,
+                                        avatarPath = profile?.avatarPath,
+                                    )
+                                }
+                            } catch (error: Exception) {
+                                Log.e(TAG, "initial sms notification failed message_id=$messageId", error)
+                            } finally {
+                                // 只等待即时通知，不等待可能被历史重建占用的验证码索引锁。
+                                if (canScheduleSpamCheck) {
+                                    try {
+                                        SpamDetectionWorker.schedule(
+                                            context, requireNotNull(messageId), threadId, timestamp,
+                                            deferNotification, insertedUri.toString(),
+                                        )
+                                    } catch (error: Exception) {
+                                        Log.e(TAG, "spam scheduling failed message_id=$messageId", error)
+                                        if (deferNotification) runCatching {
+                                            SmsNotificationHelper.showSmsNotification(context, sender, body, threadId, insertedUri?.toString())
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

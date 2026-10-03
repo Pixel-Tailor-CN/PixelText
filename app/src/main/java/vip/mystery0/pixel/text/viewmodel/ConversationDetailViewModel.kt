@@ -2,19 +2,12 @@ package vip.mystery0.pixel.text.viewmodel
 
 import kotlin.time.Duration.Companion.milliseconds
 
-import android.app.Activity
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.database.ContentObserver
-import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.provider.Telephony
-import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -31,15 +24,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -49,13 +39,12 @@ import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 单次性的发送结果事件，供 UI 用 Snackbar 等方式提示用户。
  */
 sealed interface SendResultEvent {
-    data object Success : SendResultEvent
+    data class Submitted(val text: String) : SendResultEvent
     data class Failure(val reason: String) : SendResultEvent
 }
 
@@ -85,6 +74,7 @@ class ConversationDetailViewModel(
     private val spamRepository: SpamRepository,
     private val mirror: vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository,
     private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository,
+    private val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
@@ -148,9 +138,13 @@ class ConversationDetailViewModel(
 
     private val mirrorThreadId = MutableStateFlow(-1L)
     private var mirrorObservationJob: Job? = null
+    private var reading = false
+    private val readRequested = mutableSetOf<Long>()
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
     fun startObservingTelephony(): Boolean {
+        reading = true
+        markDisplayedMessagesRead(_messages)
         if (mirrorObservationJob?.isActive == true) return true
         mirrorObservationJob = viewModelScope.launch {
             var initialSnapshot = true
@@ -168,6 +162,7 @@ class ConversationDetailViewModel(
     }
 
     fun stopObservingTelephony(): Boolean {
+        reading = false
         mirrorObservationJob?.cancel()
         mirrorObservationJob = null
         return true
@@ -193,6 +188,7 @@ class ConversationDetailViewModel(
         mirrorThreadId.value = threadId
         currentContentFilter = contentFilter
         _messages.clear()
+        readRequested.clear()
         _newMessageKeys.value = emptySet()
         offset = 0
         isLoadingMore = false
@@ -205,9 +201,6 @@ class ConversationDetailViewModel(
         } else {
             _uiState.value = MessageUiState.Loading
             fetchMessages()
-            viewModelScope.launch {
-                repository.markThreadAsRead(threadId)
-            }
         }
     }
 
@@ -274,6 +267,7 @@ class ConversationDetailViewModel(
                             offset += newMessages.size
                         }
                         _uiState.value = MessageUiState.Success(_messages.toList())
+                        markDisplayedMessagesRead(_messages)
                     }
                     isLoadingMore = false
                 }
@@ -293,28 +287,15 @@ class ConversationDetailViewModel(
 
         viewModelScope.launch {
             try {
-                // 1. 写入"发件箱"占位（pending），先把 UI 显示出来；获取 thread_id
-                val pendingUri = telephonyDataSource.insertOutboxPlaceholder(
-                    address = address,
-                    message = message,
-                    threadId = currentThreadId,
-                    subId = subId
-                )
-                val resolvedThreadId =
-                    telephonyDataSource.queryThreadIdFromUri(pendingUri) ?: currentThreadId
+                val id = smsSender.send(address, message, subId, currentThreadId)
+                val pendingUri = android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id)
+                val resolvedThreadId = runCatching { telephonyDataSource.queryThreadIdFromUri(pendingUri) }.getOrNull() ?: currentThreadId
                 if (currentThreadId == -1L && resolvedThreadId != -1L) {
                     currentThreadId = resolvedThreadId
                     mirrorThreadId.value = resolvedThreadId
                 }
 
-                // 2. 立刻把占位插入到 UI 头部，给用户即时反馈
-                refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
-
-                // 3. 用 PendingIntent 发短信，监听系统返回的发送结果
-                val resultCode = sendSmsAndAwaitResult(address, message, subId)
-
-                // 4. 根据结果更新数据库中的那条占位记录
-                handleSendResult(pendingUri, resultCode)
+                _sendResultEvents.trySend(SendResultEvent.Submitted(message))
                 refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
             } catch (e: Exception) {
                 _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
@@ -423,107 +404,6 @@ class ConversationDetailViewModel(
         ConversationContentFilter.SPAM -> isSpam
     }
 
-    /**
-     * 通过 PendingIntent 发短信并挂起等待 SMS_SENT 广播。
-     *
-     * @return SmsManager 的发送结果码（RESULT_OK 或其它错误码）
-     */
-    private suspend fun sendSmsAndAwaitResult(address: String, message: String, subId: Int): Int {
-        val requestId = sendRequestCounter.incrementAndGet()
-        val sentAction = "$ACTION_SMS_SENT.$requestId"
-
-        return suspendCancellableCoroutine { cont ->
-            val baseSmsManager = context.getSystemService(SmsManager::class.java)
-            val smsManager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                baseSmsManager.createForSubscriptionId(subId)
-            } else {
-                baseSmsManager
-            }
-            val parts = smsManager.divideMessage(message)
-            val expectedCount = parts.size.coerceAtLeast(1)
-            var receivedCount = 0
-            var firstError = Activity.RESULT_OK
-
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(c: Context?, intent: Intent?) {
-                    receivedCount++
-                    if (resultCode != Activity.RESULT_OK
-                        && firstError == Activity.RESULT_OK
-                    ) {
-                        firstError = resultCode
-                    }
-                    // 多段短信收齐所有段后再 resume；单段直接 resume
-                    if (receivedCount >= expectedCount) {
-                        runCatching { context.unregisterReceiver(this) }
-                        if (cont.isActive) cont.resumeWith(Result.success(firstError))
-                    }
-                }
-            }
-            val filter = IntentFilter(sentAction)
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            } else {
-                0
-            }
-            ContextCompat.registerReceiver(context, receiver, filter, flags)
-
-            cont.invokeOnCancellation { runCatching { context.unregisterReceiver(receiver) } }
-
-            try {
-                if (parts.size > 1) {
-                    val sentIntents = ArrayList<PendingIntent>(parts.size).apply {
-                        repeat(parts.size) {
-                            add(buildSentPendingIntent(sentAction, requestId * 100 + it))
-                        }
-                    }
-                    smsManager.sendMultipartTextMessage(
-                        address, null, parts, sentIntents, null
-                    )
-                } else {
-                    smsManager.sendTextMessage(
-                        address, null, message,
-                        buildSentPendingIntent(sentAction, requestId), null
-                    )
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "sendSmsAndAwaitResult: failed to send sms", e)
-                runCatching { context.unregisterReceiver(receiver) }
-                if (cont.isActive) cont.resumeWith(Result.success(SmsManager.RESULT_ERROR_GENERIC_FAILURE))
-            }
-        }
-    }
-
-    private fun buildSentPendingIntent(action: String, requestCode: Int): PendingIntent {
-        val intent = Intent(action).setPackage(context.packageName)
-        return PendingIntent.getBroadcast(
-            context,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
-
-    /**
-     * 根据发送结果，将占位记录从 outbox 升级为 sent，失败则改为 failed。
-     */
-    private fun handleSendResult(uri: Uri?, resultCode: Int) {
-        if (uri == null) return
-        val success = resultCode == Activity.RESULT_OK
-        telephonyDataSource.updateSmsSendResult(uri, resultCode, success)
-
-        _sendResultEvents.trySend(
-            if (success) SendResultEvent.Success
-            else SendResultEvent.Failure(mapErrorMessage(resultCode))
-        )
-    }
-
-    private fun mapErrorMessage(resultCode: Int): String = when (resultCode) {
-        SmsManager.RESULT_ERROR_NO_SERVICE -> "无服务，发送失败"
-        SmsManager.RESULT_ERROR_RADIO_OFF -> "射频已关闭"
-        SmsManager.RESULT_ERROR_NULL_PDU -> "短信内容异常"
-        else -> "发送失败"
-    }
-
     private fun refreshMessages(
         preserveLoadedHistory: Boolean = false,
         reportInsertions: Boolean = false,
@@ -573,8 +453,24 @@ class ConversationDetailViewModel(
                         refreshedMessages.size >= requestedLimit
                     }
                     _uiState.value = MessageUiState.Success(_messages.toList())
+                    markDisplayedMessagesRead(_messages)
                     isLoadingMore = false
                 }
+        }
+    }
+
+    private fun markDisplayedMessagesRead(messages: List<MessageModel>) {
+        if (!reading) return
+        readRequested.removeAll(messages.filter { it.isRead }.mapTo(mutableSetOf()) { it.id })
+        val ids = messages.filter { it.isReceived && !it.isRead && it.id !in readRequested }
+            .mapTo(mutableSetOf()) { it.id }
+        if (ids.isEmpty()) return
+        readRequested += ids
+        viewModelScope.launch {
+            runCatching { repository.markMessagesAsRead(ids) }.onFailure {
+                readRequested -= ids
+                Log.w(TAG, "mark displayed messages read failed", it)
+            }
         }
     }
 
@@ -586,13 +482,10 @@ class ConversationDetailViewModel(
 
     companion object {
         private const val TAG = "ConversationDetailViewM"
-        private const val ACTION_SMS_SENT = "${BuildConfig.APPLICATION_ID}.action.SMS_SENT"
         private const val SPAM_THRESHOLD = 0.7f
         private const val MANUAL_SPAM_SCORE = 1f
         private const val MANUAL_NON_SPAM_SCORE = 0f
         private const val MESSAGE_PAGE_SIZE = 20
         private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L
-        private const val TELEPHONY_REFRESH_DEBOUNCE_MILLIS = 120L
-        private val sendRequestCounter = AtomicInteger(0)
     }
 }

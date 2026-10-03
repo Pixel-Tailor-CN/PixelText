@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -19,7 +20,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import vip.mystery0.pixel.text.MainActivity
 import vip.mystery0.pixel.text.R
-import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
@@ -41,7 +41,6 @@ object SmsNotificationHelper {
     private const val CHANNEL_DESC = "收到新短信时的通知"
     private const val TAG = "SmsNotificationHelper"
 
-    private var messageParser: MessageParser? = null
 
     /**
      * 在 Application.onCreate() 中调用，注册通知渠道。
@@ -67,7 +66,7 @@ object SmsNotificationHelper {
      * 普通短信显示“已阅”和“回复”，验证码短信会额外显示“复制验证码”操作。
      * 三个操作的顺序和文案都由设置决定。
      */
-    fun showSmsNotification(
+    @Synchronized fun showSmsNotification(
         context: Context,
         sender: String,
         body: String,
@@ -77,6 +76,7 @@ object SmsNotificationHelper {
         avatarPath: String? = null,
         notificationIdOverride: Int? = null,
         silent: Boolean = false,
+        updateExistingOnly: Boolean = false,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (
@@ -91,6 +91,18 @@ object SmsNotificationHelper {
 
         val notificationId = notificationIdOverride ?:
             if (threadId != 0L) threadId.toInt() else System.currentTimeMillis().toInt()
+        // 后台检测只能更新仍存在的同一条通知，不能复活已划掉的通知或覆盖新消息。
+        if (messageUri?.startsWith("content://sms/") == true) {
+            val unread = context.contentResolver.query(
+                android.net.Uri.parse(messageUri), arrayOf(Telephony.Sms.READ), null, null, null,
+            )?.use { it.moveToFirst() && it.getInt(0) == 0 } == true
+            if (!unread) return
+        }
+        if (updateExistingOnly) {
+            val current = context.getSystemService(NotificationManager::class.java)
+                .activeNotifications.firstOrNull { it.id == notificationId }
+            if (current == null || current.notification.extras.getString("pixeltext_message_uri") != messageUri) return
+        }
         val actionConfigs = readNotificationQuickActionConfigs(context)
         val actionConfigByType = actionConfigs.associateBy { it.type }
 
@@ -204,9 +216,12 @@ object SmsNotificationHelper {
             .setAllowSystemGeneratedContextualActions(false)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
-            .setOnlyAlertOnce(notificationIdOverride != null)
-            .setSilent(silent)
-            .addExtras(android.os.Bundle().apply { putLong("pixeltext_thread_id", threadId) })
+            .setOnlyAlertOnce(notificationIdOverride != null || updateExistingOnly)
+            .setSilent(silent || updateExistingOnly)
+            .addExtras(android.os.Bundle().apply {
+                putLong("pixeltext_thread_id", threadId)
+                putString("pixeltext_message_uri", messageUri)
+            })
             .setGroup("sms_group_$threadId")
 
         verificationCode
@@ -250,7 +265,7 @@ object SmsNotificationHelper {
         if (!isActionEnabled) return null
 
         return try {
-            val result = getMessageParser(context).parse(sender, body)
+            val result = getMessageParser().parse(sender, body)
             (result as? ParsedResult.VerificationCode)?.code
         } catch (e: Exception) {
             Log.e(TAG, "failed to parse verification code for notification", e)
@@ -305,11 +320,8 @@ object SmsNotificationHelper {
         return body.replace(verificationCode, mask)
     }
 
-    private fun getMessageParser(context: Context): MessageParser {
-        val appContext = context.applicationContext
-        return messageParser ?: MessageParser(appContext, HubResourceStore(appContext)).also {
-            messageParser = it
-        }
+    private fun getMessageParser(): MessageParser {
+        return org.koin.core.context.GlobalContext.get().get<MessageParser>()
     }
 
     private fun readNotificationQuickActionConfigs(context: Context): List<NotificationQuickActionConfig> {

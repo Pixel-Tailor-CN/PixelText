@@ -152,6 +152,7 @@ val appModule = module {
     single { ContactDataSource(androidContext(), get()) }
     single<PickedPhoneSource> { PickedPhoneSourceImpl(androidContext()) }
     single { TelephonyDataSource(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.sms.SmsSendCoordinator(androidContext(), get(), get()) }
     single { MessageMirrorDatabase.create(androidContext()) }
     single { vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository(get()) }
     single {
@@ -283,7 +284,7 @@ val appModule = module {
     viewModel { ConversationListViewModel(get(), get(), get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
-    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get()) }
+    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
     }

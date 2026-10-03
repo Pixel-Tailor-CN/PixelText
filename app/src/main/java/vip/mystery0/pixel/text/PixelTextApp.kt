@@ -47,6 +47,7 @@ class PixelTextApp : Application() {
 
     private fun startMirror() {
         // 不依赖镜像 dirty 队列；角色暂时丢失也要持久处理迟到发送回调。
+        getKoin().get<vip.mystery0.pixel.text.sms.SmsSendCoordinator>().scheduleRecovery()
         getKoin().get<vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator>().scheduleRecovery()
         getKoin().get<vip.mystery0.pixel.text.data.source.ContactDataSource>().warmUp()
         getKoin().get<vip.mystery0.pixel.text.worker.DataInitializationScheduler>().checkOnLaunch()

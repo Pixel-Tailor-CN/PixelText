@@ -131,6 +131,7 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name=".sms.SmsSentReceiver" android:exported="false" />
         <receiver android:name=".mms.outgoing.MmsSentReceiver" android:exported="false" />
         <provider
             android:name="androidx.core.content.FileProvider"

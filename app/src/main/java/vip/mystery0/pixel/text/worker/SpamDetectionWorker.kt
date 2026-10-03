@@ -40,6 +40,7 @@ class SpamDetectionWorker(
         const val KEY_THREAD_ID = "thread_id"
         const val KEY_SENDER = "sender"
         const val KEY_CONTENT = "content"
+        private const val KEY_MESSAGE_DATE = "message_date"
         const val KEY_SCORE = "score"
         private const val KEY_DEFER_NOTIFICATION = "defer_notification"
         private const val KEY_MESSAGE_URI = "message_uri"
@@ -48,16 +49,14 @@ class SpamDetectionWorker(
             context: Context,
             messageId: Long,
             threadId: Long,
-            sender: String,
-            content: String,
+            timestamp: Long,
             deferNotification: Boolean = false,
             messageUri: String? = null
         ) {
             val data = workDataOf(
                 KEY_MESSAGE_ID to messageId,
                 KEY_THREAD_ID to threadId,
-                KEY_SENDER to sender,
-                KEY_CONTENT to content,
+                KEY_MESSAGE_DATE to timestamp,
                 KEY_DEFER_NOTIFICATION to deferNotification,
                 KEY_MESSAGE_URI to messageUri.orEmpty()
             )
@@ -80,12 +79,24 @@ class SpamDetectionWorker(
 
     override suspend fun doWork(): Result {
         val messageId = inputData.getLong(KEY_MESSAGE_ID, -1L)
-        val threadId = inputData.getLong(KEY_THREAD_ID, -1L)
-        val sender = inputData.getString(KEY_SENDER).orEmpty()
-        val content = inputData.getString(KEY_CONTENT) ?: return Result.failure()
+        if (messageId < 0) return Result.failure()
+        val messageUri = android.content.ContentUris.withAppendedId(android.provider.Telephony.Sms.CONTENT_URI, messageId).toString()
+        // 正文保留在 Provider；既避免 Data 的 10KB 限制，也不使用已删除或替换的旧正文。
+        val row = applicationContext.contentResolver.query(
+            android.net.Uri.parse(messageUri), arrayOf("thread_id", "address", "body", "date", "type"), null, null, null,
+        )?.use { cursor ->
+            if (!cursor.moveToFirst() || cursor.getInt(4) != android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX) null
+            else IncomingSms(cursor.getLong(0), cursor.getString(1).orEmpty(), cursor.getString(2).orEmpty(), cursor.getLong(3))
+        } ?: return Result.success()
+        if (row.threadId != inputData.getLong(KEY_THREAD_ID, -1L)) return Result.success()
+        val expectedDate = inputData.getLong(KEY_MESSAGE_DATE, -1L)
+        if (expectedDate >= 0 && row.date != expectedDate) return Result.success()
+        // 兼容升级前排队的任务，但不把其快照当作当前消息。
+        inputData.getString(KEY_CONTENT)?.let { if (it != row.content) return Result.success() }
+        val threadId = row.threadId
+        val sender = row.sender
+        val content = row.content
         val deferNotification = inputData.getBoolean(KEY_DEFER_NOTIFICATION, false)
-        val messageUri = inputData.getString(KEY_MESSAGE_URI).orEmpty().takeIf { it.isNotBlank() }
-        if (messageId < 0 || threadId < 0) return Result.failure()
 
         val allowedAtStart = whitelist.isAllowed(messageId)
         val keywordMatched = if (allowedAtStart) false else runCatching {
@@ -207,8 +218,11 @@ class SpamDetectionWorker(
                 ?: profile?.displayName
                 ?: sender,
             avatarPath = profile?.avatarPath,
+            updateExistingOnly = !deferNotification,
         )
     }
+
+    private data class IncomingSms(val threadId: Long, val sender: String, val content: String, val date: Long)
 
     private fun notifySpamResult(messageId: Long, threadId: Long, score: Float) {
         val intent = Intent(ACTION_SPAM_DETECTED).apply {

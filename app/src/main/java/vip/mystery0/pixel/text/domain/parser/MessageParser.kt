@@ -24,71 +24,53 @@ class MessageParser(
     private val context: Context,
     private val resourceStore: HubResourceStore,
 ) {
-    private val rules = mutableListOf<ParseRule>()
+    private data class RuleSnapshot(
+        val senderIndex: Map<String, List<ParseRule>>,
+        val signatureIndex: Map<String, List<ParseRule>>,
+        val keywordRules: List<ParseRule>,
+        val genericRules: List<ParseRule>,
+    )
 
-    // L1 Index
-    private val senderIndex = mutableMapOf<String, MutableList<ParseRule>>()
-
-    // L2 Index
-    private val signatureIndex = mutableMapOf<String, MutableList<ParseRule>>()
-
-    // L3/L4 Index
-    private val keywordRules = mutableListOf<ParseRule>()
-    private val genericRules = mutableListOf<ParseRule>()
-
-    init {
-        loadRules()
-    }
-
-    private fun loadRules() {
-        try {
-            val jsonString = readRulesJson()
-            val jsonRules = rulesFileAdapter.fromJson(jsonString)?.rules.orEmpty()
-
-            val tempRules = mutableListOf<ParseRule>()
-
-            for (ruleObj in jsonRules) {
-                val fastFail = ruleObj.fastFail
-                val senderEquals = fastFail?.senderEquals?.takeIf { it.isNotBlank() }
-                val signatureEquals = fastFail?.signatureEquals?.takeIf { it.isNotBlank() }
-                val keywords = fastFail?.keywords.orEmpty()
-                val contentRegex = Regex(ruleObj.conditions.contentRegex)
-
-                tempRules.add(
-                    ParseRule(
-                        id = ruleObj.id,
-                        targetCard = ruleObj.targetCard,
-                        priority = ruleObj.priority,
-                        fastFailSenderEquals = senderEquals,
-                        fastFailSignatureEquals = signatureEquals,
-                        fastFailKeywords = keywords.takeIf { it.isNotEmpty() },
-                        dataUsageStatus = ruleObj.dataUsageStatus?.let { status ->
-                            runCatching { DataUsageStatus.valueOf(status) }.getOrNull()
-                        },
-                        contentRegex = contentRegex
-                    )
-                )
-            }
-
-            tempRules.sortByDescending { it.priority }
-            this.rules.addAll(tempRules)
-
-            for (rule in this.rules) {
-                if (rule.fastFailSenderEquals != null) {
-                    senderIndex.getOrPut(rule.fastFailSenderEquals) { mutableListOf() }.add(rule)
-                } else if (rule.fastFailSignatureEquals != null) {
-                    signatureIndex.getOrPut(rule.fastFailSignatureEquals) { mutableListOf() }
-                        .add(rule)
-                } else if (rule.fastFailKeywords != null) {
-                    keywordRules.add(rule)
-                } else {
-                    genericRules.add(rule)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("MessageParser", "failed to load rules.json", e)
+    // 每次解析仅使用一个完整快照；更新失败不能清空正在使用的规则。
+    @Volatile private var snapshot = runCatching { compileRules(readRulesJson()) }
+        .getOrElse {
+            Log.w("MessageParser", "active rules unavailable, using bundled rules")
+            compileRules(readBundledRules())
         }
+
+    private fun compileRules(json: String): RuleSnapshot {
+        val source = requireNotNull(rulesFileAdapter.fromJson(json)) { "rules file empty" }
+        require(source.rules.isNotEmpty()) { "rules file empty" }
+        val rules = source.rules.map { rule ->
+            ParseRule(
+                id = rule.id, targetCard = rule.targetCard, priority = rule.priority,
+                fastFailSenderEquals = rule.fastFail?.senderEquals?.takeIf(String::isNotBlank),
+                fastFailSignatureEquals = rule.fastFail?.signatureEquals?.takeIf(String::isNotBlank),
+                fastFailKeywords = rule.fastFail?.keywords?.takeIf { it.isNotEmpty() },
+                dataUsageStatus = rule.dataUsageStatus?.let(DataUsageStatus::valueOf),
+                contentRegex = Regex(rule.conditions.contentRegex),
+            )
+        }.sortedByDescending { it.priority }
+        return RuleSnapshot(
+            rules.filter { it.fastFailSenderEquals != null }.groupBy { requireNotNull(it.fastFailSenderEquals) },
+            rules.filter { it.fastFailSenderEquals == null && it.fastFailSignatureEquals != null }
+                .groupBy { requireNotNull(it.fastFailSignatureEquals) },
+            rules.filter { it.fastFailSenderEquals == null && it.fastFailSignatureEquals == null && it.fastFailKeywords != null },
+            rules.filter { it.fastFailSenderEquals == null && it.fastFailSignatureEquals == null && it.fastFailKeywords == null },
+        )
     }
+
+    /** 完整编译成功后才允许持久化；持久化失败时继续使用旧快照。 */
+    @Synchronized fun replaceRules(json: String, persist: () -> Unit) {
+        val prepared = compileRules(json)
+        persist()
+        snapshot = prepared
+    }
+
+    fun useBundledRules(persist: () -> Unit) = replaceRules(readBundledRules(), persist)
+
+    private fun readBundledRules(): String =
+        context.assets.open("rules.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
 
     private fun readRulesJson(): String {
         val activeRules = resourceStore.activeRulesFile()
@@ -100,13 +82,8 @@ class MessageParser(
         }
     }
 
-    fun reloadRules() {
-        rules.clear()
-        senderIndex.clear()
-        signatureIndex.clear()
-        keywordRules.clear()
-        genericRules.clear()
-        loadRules()
+    @Synchronized fun reloadRules() {
+        snapshot = compileRules(readRulesJson())
     }
 
     fun extractSignature(content: String): String? {
@@ -120,6 +97,7 @@ class MessageParser(
 
     fun parse(sender: String, content: String): ParsedResult {
         val signature = extractSignature(content)
+        val (senderIndex, signatureIndex, keywordRules, genericRules) = snapshot
 
         // Level 1: Sender Filter
         senderIndex[sender]?.let { rules ->
@@ -164,7 +142,7 @@ class MessageParser(
     }
 
     private fun executeRule(rule: ParseRule, content: String, signature: String?): ParsedResult? {
-        val pattern = java.util.regex.Pattern.compile(rule.contentRegex.pattern)
+        val pattern = rule.contentRegex.toPattern()
         val matcher = pattern.matcher(content)
         if (!matcher.find()) return null
 

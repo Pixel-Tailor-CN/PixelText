@@ -20,7 +20,18 @@ class HubResourceStore(
         activeModelFile().isFile && activeVocabFile().isFile
 
     fun activateRules(tempFile: File) {
-        moveIntoPlace(tempFile, activeRulesFile())
+        val target = activeRulesFile()
+        target.parentFile?.mkdirs()
+        val atomic = android.util.AtomicFile(target)
+        val output = atomic.startWrite()
+        try {
+            tempFile.inputStream().use { it.copyTo(output) }
+            atomic.finishWrite(output)
+        } catch (error: Throwable) {
+            atomic.failWrite(output)
+            throw error
+        }
+        tempFile.delete()
     }
 
     fun activateModelAndVocab(modelTemp: File, vocabTemp: File) {

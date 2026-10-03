@@ -1,8 +1,5 @@
 package vip.mystery0.pixel.text.data.repository
 
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
-import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
@@ -86,11 +83,12 @@ class HubResourceRepository(
                 store.verifySize(temp, rules.sizeBytes)
                 store.verifySha256(temp, rules.sha256)
                 onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
-                verifyRulesJson(temp.readText(Charsets.UTF_8))
+                val rulesJson = temp.readText(Charsets.UTF_8)
                 initializationGuard.withInputMutation {
-                    store.activateRules(temp)
-                    settings.setRuleResourceVersion(rules.version)
-                    messageParser.reloadRules()
+                    messageParser.replaceRules(rulesJson) {
+                        store.activateRules(temp)
+                        settings.setRuleResourceVersion(rules.version)
+                    }
                     verificationCodeIndexScheduler.scheduleFullRebuild()
                 }
             }
@@ -124,10 +122,11 @@ class HubResourceRepository(
     suspend fun deleteDownloadedRules(): HubOperationResult = withContext(Dispatchers.IO) {
         runCatching {
             initializationGuard.withInputMutation {
-                store.deleteActiveRules()
-                settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-                settings.setResourceUpdatedAt(System.currentTimeMillis())
-                messageParser.reloadRules()
+                messageParser.useBundledRules {
+                    store.deleteActiveRules()
+                    settings.setRuleResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                    settings.setResourceUpdatedAt(System.currentTimeMillis())
+                }
                 verificationCodeIndexScheduler.scheduleFullRebuild()
             }
             HubOperationResult.Success
@@ -152,10 +151,6 @@ class HubResourceRepository(
 
     private fun safeVersion(version: String): String {
         return version.replace(unsafeFileNameChars, "_")
-    }
-
-    private fun verifyRulesJson(json: String) {
-        rulesFileAdapter.fromJson(json) ?: throw IllegalStateException("rules file empty")
     }
 
     private fun HubResourceManifest.toResourceUpdateDetail(): ResourceUpdateDetail {
@@ -193,27 +188,5 @@ class HubResourceRepository(
 
     private companion object {
         private val unsafeFileNameChars = Regex("[^A-Za-z0-9._-]")
-        private val rulesFileAdapter = Moshi.Builder()
-            .build()
-            .adapter(HubRulesFile::class.java)
     }
 }
-
-@JsonClass(generateAdapter = true)
-internal data class HubRulesFile(
-    val rules: List<HubRule>,
-)
-
-@JsonClass(generateAdapter = true)
-internal data class HubRule(
-    val id: String,
-    @Json(name = "target_card")
-    val targetCard: String,
-    val conditions: HubRuleConditions,
-)
-
-@JsonClass(generateAdapter = true)
-internal data class HubRuleConditions(
-    @Json(name = "content_regex")
-    val contentRegex: String,
-)

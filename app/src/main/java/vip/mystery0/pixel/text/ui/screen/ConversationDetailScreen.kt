@@ -187,13 +187,13 @@ fun ConversationDetailScreen(
         val lifecycle = lifecycleOwner.lifecycle
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> viewModel.startObservingTelephony()
-                Lifecycle.Event.ON_STOP -> viewModel.stopObservingTelephony()
+                Lifecycle.Event.ON_RESUME -> viewModel.startObservingTelephony()
+                Lifecycle.Event.ON_PAUSE -> viewModel.stopObservingTelephony()
                 else -> Unit
             }
         }
         lifecycle.addObserver(observer)
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             viewModel.startObservingTelephony()
         }
         onDispose {
@@ -246,6 +246,8 @@ fun ConversationDetailScreen(
 
     val conversationTitle by viewModel.conversationTitle.collectAsState()
     val sending by viewModel.sending.collectAsState()
+    val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator = koinInject()
+    val smsSendStates by smsSender.states.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val newMessageKeys by viewModel.newMessageKeys.collectAsState()
     val context = LocalContext.current
@@ -264,7 +266,7 @@ fun ConversationDetailScreen(
         mutableStateOf<Long?>(null)
     }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var messageText by remember(threadId, address, initialMessageText) {
+    var messageText by rememberSaveable(threadId, address, initialMessageText) {
         mutableStateOf(initialMessageText)
     }
     if (mmsSession != null) vip.mystery0.pixel.text.ui.message.mms.MmsComposerDialog(
@@ -428,7 +430,10 @@ fun ConversationDetailScreen(
     LaunchedEffect(Unit) {
         viewModel.sendResultEvents.collect { event ->
             when (event) {
-                is SendResultEvent.Success -> snackbarHostState.showSnackbar("已发送")
+                is SendResultEvent.Submitted -> {
+                    if (messageText.trim() == event.text) messageText = ""
+                    snackbarHostState.showSnackbar("已提交发送，请查看消息状态")
+                }
                 is SendResultEvent.Failure -> snackbarHostState.showSnackbar(event.reason)
             }
         }
@@ -775,7 +780,6 @@ fun ConversationDetailScreen(
                                         messageText.trim(),
                                         selectedSubId
                                     )
-                                    messageText = ""
                                 }
                             },
                             enabled = messageText.isNotBlank() && !sending
@@ -884,6 +888,12 @@ fun ConversationDetailScreen(
                             val isSelected = selectedMessageIds.contains(message.id)
                             val isTargetHighlighted = highlightedMessageId == message.id
                             Column {
+                            if (!message.isMms) smsSendStates[message.id]?.let { status ->
+                                Text(status.label, style = MaterialTheme.typography.labelMedium,
+                                    color = if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.UNKNOWN ||
+                                        status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.FAILED)
+                                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             MessageItem(
                                 message = message,
                                 selectionMode = selectedMessageIds.isNotEmpty(),
