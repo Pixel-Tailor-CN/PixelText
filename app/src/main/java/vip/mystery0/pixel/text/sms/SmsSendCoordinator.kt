@@ -46,9 +46,15 @@ class SmsSendCoordinator(
     private val mutableStates = MutableStateFlow<Map<Long, State>>(emptyMap())
     val states = mutableStates.asStateFlow()
 
-    suspend fun send(address: String, body: String, subId: Int, threadId: Long = -1L): Long =
+    suspend fun send(address: String, body: String, subId: Int, threadId: Long = -1L, draftKey: String? = null): Long =
         withContext(NonCancellable + Dispatchers.IO) {
             lock.withLock {
+                // 接纳后进程死亡或草稿清理失败，再次提交同一版本只返回原记录，不重复调用平台。
+                if (draftKey != null) {
+                    val accepted = directory.listFiles().orEmpty().asSequence().filter { validToken(it.name) }
+                        .mapNotNull { read(it.name) }.firstOrNull { it.optString("draftKey") == draftKey }
+                    if (accepted != null) return@withLock accepted.getLong("id")
+                }
                 check(context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_SMS)) {
                     "请先设置为默认短信应用"
                 }
@@ -64,6 +70,7 @@ class SmsSendCoordinator(
                     .put("thread", source.queryThreadIdFromUri(uri) ?: threadId)
                     .put("identity", identity(uri) ?: error("待发送短信不可用"))
                     .put("started", System.currentTimeMillis()).put("count", parts.size)
+                    .put("draftKey", draftKey)
                     .put("state", State.SENDING.name).put("results", JSONObject())
                 try {
                     save(token, record)

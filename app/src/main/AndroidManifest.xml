@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- 用户主动录制彩信音频附件，仅前台使用 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
@@ -134,7 +136,7 @@
         <receiver android:name=".sms.SmsSentReceiver" android:exported="false" />
         <receiver android:name=".mms.outgoing.MmsSentReceiver" android:exported="false" />
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".mms.MmsSendFileProvider"
             android:authorities="${applicationId}.mms.send"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -154,7 +156,7 @@
         </receiver>
 
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".mms.MmsDownloadFileProvider"
             android:authorities="${applicationId}.mms.download"
             android:exported="false"
             android:grantUriPermissions="true">
@@ -164,7 +166,7 @@
         </provider>
 
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".mms.MmsAttachmentFileProvider"
             android:authorities="${applicationId}.mms.attachment"
             android:exported="false"
             android:grantUriPermissions="true">

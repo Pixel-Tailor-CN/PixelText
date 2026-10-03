@@ -245,7 +245,6 @@ fun ConversationDetailScreen(
     }
 
     val conversationTitle by viewModel.conversationTitle.collectAsState()
-    val sending by viewModel.sending.collectAsState()
     val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator = koinInject()
     val smsSendStates by smsSender.states.collectAsState()
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
@@ -253,11 +252,6 @@ fun ConversationDetailScreen(
     val context = LocalContext.current
     val outgoingRepository: vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository = koinInject()
     val outgoing by remember(outgoingRepository) { outgoingRepository.observeMessages() }.collectAsState(emptyList())
-    var mmsSession by rememberSaveable(threadId, address) { mutableStateOf<String?>(null) }
-    var mmsRecipient by rememberSaveable(threadId, address) { mutableStateOf("") }
-    var mmsOriginalSmsHash by rememberSaveable(threadId, address) { mutableStateOf<String?>(null) }
-    var smsInputRevision by rememberSaveable(threadId, address) { mutableLongStateOf(0L) }
-    var mmsSmsInputRevision by rememberSaveable(threadId, address) { mutableLongStateOf(-1L) }
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
     var highlightedMessageId by remember(threadId, targetMessageId) {
         mutableStateOf<Long?>(null)
@@ -266,20 +260,6 @@ fun ConversationDetailScreen(
         mutableStateOf<Long?>(null)
     }
     var deleteCandidateMessageIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var messageText by rememberSaveable(threadId, address, initialMessageText) {
-        mutableStateOf(initialMessageText)
-    }
-    if (mmsSession != null) vip.mystery0.pixel.text.ui.message.mms.MmsComposerDialog(
-        sessionId = mmsSession!!, onClose = { mmsSession = null }, initialRecipient = mmsRecipient,
-        // SavedState仅留会话身份与轻量版本/摘要，正文由彩信草稿数据库恢复。
-        initialBody = if (mmsOriginalSmsHash != null) messageText else "", startFresh = mmsOriginalSmsHash != null,
-        onAccepted = {
-            // 只清空被本次彩信持久接纳的原输入；返回/删除草稿及后来新输入均保留。
-            if (mmsOriginalSmsHash != null && smsInputRevision == mmsSmsInputRevision && smsInputDigest(messageText) == mmsOriginalSmsHash) {
-                messageText = ""; smsInputRevision++
-            }
-        },
-    )
     var showAddressInTitle by remember(threadId, address) {
         mutableStateOf(false)
     }
@@ -415,29 +395,6 @@ fun ConversationDetailScreen(
     val spamMarkMenuText =
         if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
     val canReportSelectedSample = selectedMessage?.content?.isNotBlank() == true
-
-    // 双卡场景：加载当前激活的 SIM 列表，单卡 / 无权限时为空列表
-    val simList = remember { SimInfoProvider.getActiveSimList(context) }
-    var selectedSubId by remember(simList) {
-        val default = SimInfoProvider.getDefaultSmsSubscriptionId()
-        val resolved = simList.firstOrNull { it.subscriptionId == default }?.subscriptionId
-            ?: simList.firstOrNull()?.subscriptionId
-            ?: SubscriptionManager.INVALID_SUBSCRIPTION_ID
-        mutableIntStateOf(resolved)
-    }
-
-    // 监听发送结果事件，统一通过 Snackbar 提示
-    LaunchedEffect(Unit) {
-        viewModel.sendResultEvents.collect { event ->
-            when (event) {
-                is SendResultEvent.Submitted -> {
-                    if (messageText.trim() == event.text) messageText = ""
-                    snackbarHostState.showSnackbar("已提交发送，请查看消息状态")
-                }
-                is SendResultEvent.Failure -> snackbarHostState.showSnackbar(event.reason)
-            }
-        }
-    }
 
     LaunchedEffect(Unit) {
         viewModel.deleteMessageResultEvents.collect { event ->
@@ -714,87 +671,21 @@ fun ConversationDetailScreen(
         },
         bottomBar = {
             Column {
-                if (vip.mystery0.pixel.text.BuildConfig.MMS_SENDING_ENABLED) {
-                    vip.mystery0.pixel.text.ui.message.mms.MmsDraftHint(address, onOpen = {
-                        mmsOriginalSmsHash = null; mmsRecipient = address; mmsSession = java.util.UUID.randomUUID().toString()
-                    })
-                }
                 outgoing.filter { !it.deleted && it.sourceId == null && it.snapshot.recipientAddress == vip.mystery0.pixel.text.mms.outgoing.MmsRecipient.normalize(address) }
                     .forEach { vip.mystery0.pixel.text.ui.message.mms.OutgoingMmsStatus(it) }
-                Surface(
-                    color = detailStyle.inputArea.backgroundColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 双卡时显示 SIM 切换；单卡 / 无权限时不展示，保持原有布局
-                        if (simList.size >= 2) {
-                            SimSelectorButton(
-                                simList = simList,
-                                selectedSubId = selectedSubId,
-                                onSelected = { selectedSubId = it },
-                            )
-                        }
-                        if (vip.mystery0.pixel.text.BuildConfig.MMS_SENDING_ENABLED) {
-                            IconButton(onClick = {
-                                // 会话分组可能包含多地址历史；新的彩信目标由用户明确填写。
-                                mmsOriginalSmsHash = smsInputDigest(messageText); mmsSmsInputRevision = smsInputRevision; mmsRecipient = ""; mmsSession = java.util.UUID.randomUUID().toString()
-                            }) { Icon(Icons.Rounded.AttachFile, "编辑单人彩信") }
-                        }
-                        BasicTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it; smsInputRevision++ },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            maxLines = 4,
-                            decorationBox = { innerTextField ->
-                                Box(
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    if (messageText.isEmpty()) {
-                                        Text(
-                                            text = detailStyle.inputPlaceholder,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-                        IconButton(
-                            onClick = {
-                                if (messageText.isNotBlank()) {
-                                    viewModel.sendMessage(
-                                        address,
-                                        messageText.trim(),
-                                        selectedSubId
-                                    )
-                                }
-                            },
-                            enabled = messageText.isNotBlank() && !sending
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Rounded.Send,
-                                contentDescription = "Send",
-                                tint = if (messageText.isNotBlank() && !sending)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+                vip.mystery0.pixel.text.ui.message.mms.MessageComposer(
+                    recipient = address,
+                    initialBody = initialMessageText,
+                    isExternalInput = initialMessageText.isNotEmpty(),
+                    sessionKey = "$threadId-$address",
+                    containerColor = detailStyle.inputArea.backgroundColor,
+                    placeholder = detailStyle.inputPlaceholder,
+                    onSubmitted = {
+                        // 发送是新的定位意图，不再恢复从附件选择器返回时的旧锚点。
+                        restoreScroll = false
+                        coroutineScope.launch { listState.animateScrollToItem(0) }
+                    },
+                )
                 Spacer(
                     modifier = Modifier.windowInsetsBottomHeight(
                         WindowInsets.navigationBars.union(WindowInsets.ime)
@@ -887,13 +778,7 @@ fun ConversationDetailScreen(
                         ) { message ->
                             val isSelected = selectedMessageIds.contains(message.id)
                             val isTargetHighlighted = highlightedMessageId == message.id
-                            Column {
-                            if (!message.isMms) smsSendStates[message.id]?.let { status ->
-                                Text(status.label, style = MaterialTheme.typography.labelMedium,
-                                    color = if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.UNKNOWN ||
-                                        status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.FAILED)
-                                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
                             MessageItem(
                                 message = message,
                                 selectionMode = selectedMessageIds.isNotEmpty(),
@@ -935,6 +820,14 @@ fun ConversationDetailScreen(
                                     appSettings.showVerificationCodeContentByDefault,
                                 animateEntrance = message.stableKey in entranceMessageKeys,
                             )
+                            if (!message.isMms) smsSendStates[message.id]?.let { status ->
+                                Text(if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.SENT) "已发送" else status.label,
+                                    modifier = Modifier.padding(top = 4.dp, end = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.UNKNOWN ||
+                                        status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.FAILED)
+                                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             if (message.isMms) outgoing.firstOrNull { !it.deleted && it.providerReady && it.sourceId == -message.id }?.let {
                                 vip.mystery0.pixel.text.ui.message.mms.OutgoingMmsStatus(it)
                             }
@@ -974,130 +867,5 @@ fun ConversationDetailScreen(
 }
 
 
-/**
- * 输入栏中的 SIM 卡选择按钮：点击弹出菜单切换发送使用的 SIM。
- *
- * 仅在双卡（含以上）时由调用方决定是否显示。
- */
-@Composable
-private fun SimSelectorButton(
-    simList: List<SimInfo>,
-    selectedSubId: Int,
-    onSelected: (Int) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var lastDismissedAtMillis by remember { mutableLongStateOf(0L) }
-    val currentLabel = simList.firstOrNull { it.subscriptionId == selectedSubId }?.displayName
-        ?: simList.firstOrNull()?.displayName.orEmpty()
-    val popupGapPx = with(LocalDensity.current) { 32.dp.roundToPx() }
-
-    Box {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier
-                .padding(horizontal = 4.dp)
-                .clickable {
-                    val now = SystemClock.uptimeMillis()
-                    if (expanded) {
-                        expanded = false
-                        lastDismissedAtMillis = now
-                    } else if (now - lastDismissedAtMillis > SIM_MENU_REOPEN_SUPPRESS_MILLIS) {
-                        expanded = true
-                    }
-                }
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painter = painterResource(
-                        id = R.drawable.ic_sim
-                    ),
-                    contentDescription = "Select SIM",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = currentLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (expanded) {
-            Popup(
-                popupPositionProvider = remember(popupGapPx) {
-                    AboveAnchorPositionProvider(verticalGapPx = popupGapPx)
-                },
-                onDismissRequest = {
-                    expanded = false
-                    lastDismissedAtMillis = SystemClock.uptimeMillis()
-                },
-                properties = PopupProperties(focusable = false)
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .widthIn(min = 168.dp)
-                        .padding(horizontal = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    tonalElevation = 6.dp
-                ) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        simList.forEach { sim ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(text = sim.displayName)
-                                },
-                                trailingIcon = {
-                                    if (sim.subscriptionId == selectedSubId) {
-                                        Icon(
-                                            Icons.Rounded.Check,
-                                            contentDescription = "Selected",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    expanded = false
-                                    onSelected(sim.subscriptionId)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 private const val SPAM_THRESHOLD = 0.7f
 private const val TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS = 1_100L
-private const val SIM_MENU_REOPEN_SUPPRESS_MILLIS = 250L
-
-private class AboveAnchorPositionProvider(
-    private val verticalGapPx: Int
-) : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize
-    ): IntOffset {
-        val x = when (layoutDirection) {
-            LayoutDirection.Ltr -> anchorBounds.left
-            LayoutDirection.Rtl -> anchorBounds.right - popupContentSize.width
-        }.coerceIn(0, windowSize.width - popupContentSize.width)
-        val y = (anchorBounds.top - popupContentSize.height - verticalGapPx)
-            .coerceAtLeast(0)
-        return IntOffset(x, y)
-    }
-}
-
-
-/** 只用于对应本次彩信接纳的编辑版本，不写入日志，也不保存正文到 SavedState。 */
-private fun smsInputDigest(value: String): String = java.security.MessageDigest.getInstance("SHA-256")
-    .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }

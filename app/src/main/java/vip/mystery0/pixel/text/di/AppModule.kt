@@ -98,7 +98,7 @@ val appModule = module {
     single { vip.mystery0.pixel.text.mms.outgoing.MmsOutgoingProviderWriter(androidContext()) }
     single<vip.mystery0.pixel.text.mms.outgoing.MmsPlatformTransport> { vip.mystery0.pixel.text.mms.outgoing.AndroidMmsPlatformTransport() }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel(androidContext(), get(), get(), get(), get(), get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel(androidContext(), get(), get(), get(), get(), get(), get()) }
 
     single { AppSettingsRepositoryImpl(androidContext()) }
     single<AppSettingsRepository> { get<AppSettingsRepositoryImpl>() }

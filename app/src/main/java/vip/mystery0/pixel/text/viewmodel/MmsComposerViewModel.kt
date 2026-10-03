@@ -27,6 +27,7 @@ class MmsComposerViewModel(
     private val preparer: MmsAttachmentPreparer,
     private val payloads: MmsPayloadStore,
     private val coordinator: MmsSendCoordinator,
+    private val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator,
 ) : ViewModel() {
     data class State(val draft: MmsDraft? = null, val busy: Boolean = false, val error: String? = null,
         val prepared: MmsSendSnapshot? = null, val pduBytes: Int? = null, val accepted: Boolean = false,
@@ -37,7 +38,7 @@ class MmsComposerViewModel(
     private var work: Job? = null
     private var opened = false
     private var editGeneration = 0L
-    fun open(recipient: String, body: String = "", subject: String = "", uris: List<Uri> = emptyList(), inputError: String? = null, resendRequestId: String? = null, existingDraftId: String? = null, isExternalInput: Boolean = false) {
+    fun open(recipient: String, body: String = "", subject: String = "", uris: List<Uri> = emptyList(), inputError: String? = null, resendRequestId: String? = null, existingDraftId: String? = null, isExternalInput: Boolean = false, preferredSubId: Int? = null) {
         if (opened) return
         opened = true
         work = viewModelScope.launch {
@@ -55,8 +56,8 @@ class MmsComposerViewModel(
                 // 已存的无效订阅绝不换卡；仅全新草稿应用有效系统默认或唯一激活卡。
                 if (draft.revision == 0L && draft.subscriptionId < 0) {
                     val default = SimInfoProvider.getDefaultSmsSubscriptionId()
-                    val subId = sims.firstOrNull { it.subscriptionId == default }?.subscriptionId
-                        ?: sims.singleOrNull()?.subscriptionId ?: -1
+                    val subId = preferredSubId ?: (sims.firstOrNull { it.subscriptionId == default }?.subscriptionId
+                        ?: sims.singleOrNull()?.subscriptionId ?: -1)
                     draft = repository.saveDraft(draft.copy(body = body, subject = subject, subscriptionId = subId, importError = inputError?.takeIf { it.contains("附件") }), draft.revision) ?: draft
                 }
                 mutableState.value = State(draft = draft, sims = sims, error = inputError,
@@ -99,12 +100,18 @@ class MmsComposerViewModel(
             }
         }
     }
-    fun importAttachments(uris: List<Uri>) {
-        if (uris.isEmpty() || mutableState.value.busy) return
+    fun importAttachments(uris: List<Uri>, onComplete: () -> Unit = {}) {
+        if (uris.isEmpty() || mutableState.value.busy) { onComplete(); return }
         work = viewModelScope.launch {
+            try {
             edits.withLock {
                 var draft = mutableState.value.draft ?: return@withLock
-                if (uris.size + draft.attachments.size > 10) { mutableState.value = mutableState.value.copy(error = "每条彩信最多 10 个附件，请重新选择"); return@withLock }
+                if (uris.size + draft.attachments.size > 10) {
+                    val error = "每条彩信最多 10 个附件，请重新选择或明确移除未导入项"
+                    val blocked = repository.saveDraft(draft.copy(importError = error), draft.revision) ?: draft
+                    mutableState.value = mutableState.value.copy(draft = blocked, error = error, importBlocked = true)
+                    return@withLock
+                }
                 draft = repository.saveDraft(draft.copy(importError = "附件导入未完成，请重新选择或明确移除"), draft.revision)
                     ?: return@withLock
                 mutableState.value = mutableState.value.copy(draft = draft, busy = true, prepared = null, pduBytes = null, error = null, importBlocked = true)
@@ -129,14 +136,20 @@ class MmsComposerViewModel(
                     mutableState.value = mutableState.value.copy(busy = false)
                 }
             }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                mutableState.value = mutableState.value.copy(busy = false, importBlocked = true,
+                    error = "附件尚未保存，请检查存储空间后重新选择；已有内容已保留")
+            }
         }
+        work?.invokeOnCompletion { onComplete() }
     }
     fun removeAttachment(id: String) {
         val old = mutableState.value.draft?.attachments?.firstOrNull { it.id == id } ?: return
         edit { it.copy(attachments = it.attachments.filterNot { item -> item.id == id }) }
         viewModelScope.launch { repository.enqueueCleanup(old.originalPath); old.preparedPath?.let { repository.enqueueCleanup(it) }; coordinator.scheduleRecovery() }
     }
-    fun prepare() {
+    fun prepare(sendWhenReady: Boolean = false) {
         if (mutableState.value.busy || mutableState.value.importBlocked || mutableState.value.unsaved) return
         work = viewModelScope.launch {
             edits.withLock {
@@ -165,13 +178,57 @@ class MmsComposerViewModel(
                     mutableState.value = mutableState.value.copy(busy = false)
                 }
             }
+            if (sendWhenReady && mutableState.value.prepared != null) send()
         }
     }
+
+    /** 用户只点击一次发送；附件准备仍经过原有版本和接纳栅栏。 */
+    fun submit() {
+        val current = mutableState.value
+        if (current.busy || current.unsaved || current.importBlocked || current.accepted) return
+        val draft = current.draft ?: return
+        if (draft.attachments.isNotEmpty() || draft.subject.isNotBlank()) {
+            prepare(sendWhenReady = true)
+            return
+        }
+        if (draft.body.isBlank()) return
+        work = viewModelScope.launch {
+            edits.withLock {
+                val latest = mutableState.value.draft ?: return@withLock
+                if (latest.attachments.isNotEmpty() || latest.subject.isNotBlank() || mutableState.value.accepted) return@withLock
+                mutableState.value = mutableState.value.copy(busy = true, error = null)
+                try {
+                    val recipient = MmsRecipient.normalize(latest.recipientAddress) ?: throw MmsSendException("请确认一个有效电话号码")
+                    val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(context) }
+                    if (sims.none { it.subscriptionId == latest.subscriptionId }) throw MmsSendException("所选 SIM 已失效，请重新选卡")
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        smsSender.send(recipient, latest.body.trim(), latest.subscriptionId, draftKey = "${latest.id}:${latest.revision}")
+                        // 接纳和草稿清理跨库，通过同版本发送键保证恢复时不重复发信。
+                        runCatching { repository.discardDraft(latest.id, latest.revision) }
+                        savedState.remove<String>("mmsDraftId")
+                        mutableState.value = mutableState.value.copy(accepted = true)
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { mutableState.value = mutableState.value.copy(error = (error as? MmsSendException)?.userMessage ?: "短信未能提交，请检查默认短信资格和 SIM，输入已保留") }
+                finally { mutableState.value = mutableState.value.copy(busy = false) }
+            }
+        }
+    }
+
+    fun startNextMessage() {
+        val previous = mutableState.value.draft ?: return
+        if (!mutableState.value.accepted) return
+        opened = false
+        mutableState.value = State(sims = mutableState.value.sims, busy = true)
+        open(previous.recipientAddress, isExternalInput = true, preferredSubId = previous.subscriptionId)
+    }
+
     fun send() {
         if (mutableState.value.busy) return
         work = viewModelScope.launch {
             edits.withLock {
                 val state = mutableState.value; val draft = state.draft ?: return@withLock
+                if (state.accepted || state.unsaved || state.importBlocked) return@withLock
                 val snapshot = state.prepared ?: return@withLock
                 mutableState.value = state.copy(busy = true, error = null)
                 try {
