@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.mms.outgoing
 
 import android.Manifest
 import android.app.PendingIntent
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -253,7 +254,12 @@ class MmsSendCoordinator(
         }
     }
     private fun checkPrerequisites() {
-        if (Telephony.Sms.getDefaultSmsPackage(context) != context.packageName) throw MmsSendException("请先将 PixelText 设为默认短信应用")
+        val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(context)
+        val holdsSmsRole = context.getSystemService(RoleManager::class.java)
+            ?.isRoleHeld(RoleManager.ROLE_SMS) == true
+        if (defaultSmsPackage != context.packageName && !holdsSmsRole) {
+            throw MmsSendException("请先将 PixelText 设为默认短信应用")
+        }
         if (context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) throw MmsSendException("请先授予短信权限")
         if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) throw MmsSendException("请先授予电话状态权限以确认 SIM")
