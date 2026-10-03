@@ -17,7 +17,7 @@ jobs:
     if: github.event.action != 'closed'
     name: Minified ARM64 release on Android 15
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       ANDROID_SERIAL: emulator-5554
       SIGN_KEY_STORE_FILE: ${{ github.workspace }}/artifacts/ci-signing.jks
@@ -74,6 +74,29 @@ jobs:
         run: |
           set -o pipefail
           python3 .github/runtime/runtime_smoke.py --apk app/build/outputs/apk/release/app-release.apk --probe artifacts/probe/probe.apk 2>&1 | tee artifacts/runtime-smoke.log
+      - name: Preserve default-disabled release and build controlled MMS release
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/default-release artifacts/mms-enabled
+          cp app/build/outputs/apk/release/app-release.apk artifacts/default-release/
+          cp app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt artifacts/default-release/
+          ./gradlew --no-daemon --console=plain --max-workers=1 -Ppixeltext.enableMmsSending=true :app:assembleRelease 2>&1 | tee artifacts/mms-enabled/gradle.log
+          APK=app/build/outputs/apk/release/app-release.apk
+          cp "$APK" artifacts/mms-enabled/
+          cp app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt artifacts/mms-enabled/
+          sha256sum "$APK" > artifacts/mms-enabled/apk-sha256.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$APK" > artifacts/mms-enabled/apk-badging.txt
+          grep -q "native-code: 'arm64-v8a'" artifacts/mms-enabled/apk-badging.txt
+          grep -q 'MMS_SENDING_ENABLED = true' app/build/generated/source/buildConfig/release/vip/mystery0/pixel/text/BuildConfig.java
+          git diff --exit-code -- app gradle build.gradle.kts settings.gradle.kts signing.gradle
+      - name: Build independent synthetic MMS callback probe
+        run: bash .github/runtime/build_mms_probe.sh "$GITHUB_WORKSPACE/artifacts/mms-probe"
+      - name: Verify post-dispatch MMS recovery and composer without send permission
+        timeout-minutes: 8
+        run: |
+          set -o pipefail
+          python3 .github/runtime/mms_smoke.py --apk artifacts/mms-enabled/app-release.apk --probe artifacts/mms-probe/probe.apk 2>&1 | tee artifacts/mms-runtime-smoke.log
       - name: Collect final diagnostics
         if: always()
         timeout-minutes: 2
@@ -82,6 +105,20 @@ jobs:
           timeout 15 adb logcat -b crash -d > artifacts/logcat-crash-final.txt 2>&1 || true
           timeout 15 adb emu kill || true
           rm -f "$SIGN_KEY_STORE_FILE"
+      - name: Upload lightweight runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-diagnostics-api35-${{ github.run_id }}
+          path: |
+            artifacts/mms-runtime/
+            artifacts/runtime/
+            artifacts/*runtime-smoke.log
+            artifacts/source-and-runner.txt
+            artifacts/adb-devices.txt
+            artifacts/logcat-crash-final.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload synthetic-data validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -11,3 +11,14 @@ API 35 Google APIs x86_64 官方镜像必须报告 ARM64 ABI 和原生转译桥�
 边界：没有验证真实 SIM、运营商 SMS/MMS 收发、SAF 云端提供商、包含真实短信的恢复，或线上发布签名。容器测试使用应用私有缓存中的合成文件；不等同于完整用户备份恢复测试。
 
 合并清理仅作用于 PR #17 的 `fix/r8-backup-vcard-reflection`：必须已合并、来自本仓库且当前分支 SHA 仍等于合并 head，才通过临时 GITHUB_TOKEN 删除此 refs/heads 引用并确认 404。不启用仓库全局自动删分支，不处理其他分支或标签。
+
+
+## 单人 MMS 回调与编辑回归
+
+现有默认关闭版先运行原冷启动、权限取消、备份、vCard和ARM64 JNI回归。之后以 `-Ppixeltext.enableMmsSending=true` 构建同一提交的受控混淆包，调用 `build_mms_probe.sh` 与 `mms_smoke.py`。两种APK和mapping分别保存，不能混用。
+
+新增probe是独立、同临时签名的 instrumentation APK，不改变生产DEX、keep或应用权限，不添加app测试依赖。驱动拒绝真实设备，确认 `emulator-` serial、`ro.boot.qemu=1` 和ARM64转译；发送权限撤销且 `SEND_SMS` 有效 UID/包 AppOp 保持 deny 或 ignore（两者均阻断，UID 非 default 优先），probe内再次确认。所有合成请求直接从提交后状态开始且 `sourceId=null`，不会创建PREPARING/READY任务，也不调用SmsManager发送。测试完成后再次检查AppOps未出现访问/拒绝事件。
+
+覆盖：真实mutable PendingIntent填入extra且不能覆盖固定身份→Manifest回调→独立Room→Worker、重复/未知/不同迟到回调、真实强停重启后迟到回调、提交栅栏恢复、删除后超时释放、有效MMSC拒绝与部分成功、异常Parcelable、纯文字SMS分流、多号码拒绝、正文转入彩信、旋转及删除草稿后保留SMS输入。
+
+边界：这是离线结果处理和编辑UI验证，不测试真实SmsManager网络提交、运营商、计费、物理SIM、API31或实际MMS Provider持久化。Provider中断路径另有仓库外替身验证，生产入口仍以运营商验收为开启门槛。CI失败必须按具体原因调查，不能把默认版旧回归绿灯当成新MMS通过。

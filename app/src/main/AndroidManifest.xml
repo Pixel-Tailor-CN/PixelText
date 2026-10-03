@@ -105,7 +105,6 @@
             android:name=".ComposeSmsActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
                 <action android:name="android.intent.action.SENDTO" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -113,6 +112,12 @@
                 <data android:scheme="smsto" />
                 <data android:scheme="mms" />
                 <data android:scheme="mmsto" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
 
@@ -125,6 +130,15 @@
                 <action android:name="${applicationId}.action.REPLY_SMS" />
             </intent-filter>
         </receiver>
+
+        <receiver android:name=".mms.outgoing.MmsSentReceiver" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.mms.send"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/mms_send_paths" />
+        </provider>
 
         <!-- 6. BroadcastReceiver for MMS download completion callback -->
         <receiver

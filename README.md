@@ -86,3 +86,9 @@ MMS 解析器的 AOSP 来源、本地修改及相关依赖的许可声明见 [�
 ## 开发者
 
 Pixel Text 属于 **Mystery00** 的 Pixel 工具矩阵成员。
+
+### 单人彩信发送（验收中）
+
+发送链路使用独立本地草稿与执行日志，经 Android `SmsManager` 和运营商网络传输，复用现有 MMS 消息展示。当前默认构建暂不公开发送入口，等待完整系统链路及目标运营商验收；受控验证可使用 `-Ppixeltext.enableMmsSending=true` 构建。此开关不关闭既有任务回调和记录恢复。
+
+只接受一个明确电话号码；支持正文、主题和经本地检查的附件。静态图片可本地适配，音视频与文件只发送体积合规原件。系统接管后无法撤回；结果未知不会自动重发，手动另发会提示重复送达和费用风险。完整约束见[设计](docs/plans/2026-10-02-mms-sending-design.md)与[实施计划](docs/plans/2026-10-02-mms-sending-implementation-plan.md)。

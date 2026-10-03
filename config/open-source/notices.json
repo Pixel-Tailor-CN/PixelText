@@ -1,9 +1,9 @@
 [
   {
     "uniqueId": "pixeltext.vendor:aosp-mms",
-    "name": "AOSP MMS Parser（源码引入）",
+    "name": "AOSP MMS Parser / Composer（源码引入）",
     "artifactVersion": "1cdfff555f4a2",
-    "description": "来自 Android Open Source Project 的 MMS PDU 解析器。本地调整包名、移除平台注解与日志，并加固边界及嵌套解析；保留原始版权声明。",
+    "description": "来自 Android Open Source Project 的 MMS PDU 解析器与单人发送编码器。本地调整包名、移除平台注解与日志，加固解析和编码边界、嵌套及字节预算；保留原始版权声明。",
     "website": "https://android.googlesource.com/platform/frameworks/base/+/1cdfff555f4a21f71ccc978290e2e212e2f8b168/telephony/common/com/google/android/mms/",
     "developers": [{"name": "The Android Open Source Project"}, {"name": "Esmertec AG"}],
     "copyright": "Copyright (C) 2007 Esmertec AG.\nCopyright (C) 2007 The Android Open Source Project",

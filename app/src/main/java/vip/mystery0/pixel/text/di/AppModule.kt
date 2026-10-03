@@ -1,5 +1,7 @@
 package vip.mystery0.pixel.text.di
 
+import kotlinx.coroutines.launch
+
 import coil3.ImageLoader
 import coil3.gif.AnimatedImageDecoder
 import vip.mystery0.pixel.text.data.source.mms.MmsMediaMetadataReader
@@ -87,6 +89,17 @@ import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 val appModule = module {
     single<ContentResolver> { androidContext().contentResolver }
+    single { vip.mystery0.pixel.text.data.db.outgoing.OutgoingMmsDatabase.create(androidContext()) }
+    single { vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository(get()) }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsPayloadStore(androidContext()) }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsAttachmentPreparer(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsSendPolicyResolver(androidContext()) }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsSendPduComposer(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsOutgoingProviderWriter(androidContext()) }
+    single<vip.mystery0.pixel.text.mms.outgoing.MmsPlatformTransport> { vip.mystery0.pixel.text.mms.outgoing.AndroidMmsPlatformTransport() }
+    single { vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel(androidContext(), get(), get(), get(), get(), get()) }
+
     single { AppSettingsRepositoryImpl(androidContext()) }
     single<AppSettingsRepository> { get<AppSettingsRepositoryImpl>() }
     single { vip.mystery0.pixel.text.data.backup.RestoreSafetyCoordinator(androidContext()) }
@@ -178,6 +191,13 @@ val appModule = module {
     single {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
             onMessageDeletionCommitted = { key ->
+                if (key.transport == MessageTransport.MMS) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        val outgoing = get<vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository>()
+                        outgoing.all().filter { it.sourceId == key.sourceId }.forEach { outgoing.markDeleted(it.requestId) }
+                        get<vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator>().scheduleRecovery()
+                    }
+                }
                 get<MmsContentRepositoryImpl>().invalidate(key)
                 get<MmsPlaybackController>().onMessageDeleted(key)
             }
