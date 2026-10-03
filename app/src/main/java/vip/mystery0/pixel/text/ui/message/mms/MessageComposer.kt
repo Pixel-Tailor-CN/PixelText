@@ -90,6 +90,15 @@ fun MessageComposer(
         onCaptured = { uri, cleanup -> viewModel.importAttachments(listOf(uri), cleanup) },
         onError = { localError = it },
     )
+    val contactPicker = rememberComposerContactPicker(
+        onAttachment = { uri, cleanup ->
+            if (viewModel.state.value.busy || viewModel.state.value.draft == null) {
+                cleanup()
+                localError = "草稿正在处理，请稍后重新选择联系人"
+            } else viewModel.importAttachments(listOf(uri), cleanup)
+        },
+        onError = { localError = it },
+    )
     val media = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> viewModel.importAttachments(uris) }
     LaunchedEffect(viewModel) {
         viewModel.open(recipient, initialBody, initialSubject, initialUris, inputError, retryOfRequestId, existingDraftId, isExternalInput)
@@ -115,7 +124,7 @@ fun MessageComposer(
     }
     val draft = state.draft
     val isMms = draft?.let { it.attachments.isNotEmpty() || it.subject.isNotBlank() } == true
-    val enabled = draft != null && !state.busy && !state.accepted && !capture.recording
+    val enabled = draft != null && !state.busy && !state.accepted && !capture.recording && !contactPicker.busy
     val canSend = enabled && !state.unsaved && !state.importBlocked &&
         MmsRecipient.normalize(draft.recipientAddress) != null && draft.subscriptionId in state.sims.map { it.subscriptionId } &&
         (draft.body.isNotBlank() || draft.attachments.isNotEmpty())
@@ -224,7 +233,7 @@ fun MessageComposer(
                 }
             }
         }
-        if (state.busy && !state.accepted) {
+        if ((state.busy || contactPicker.busy) && !state.accepted) {
             Text("正在处理，请稍候…", Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val error = localError ?: state.error
@@ -249,7 +258,7 @@ fun MessageComposer(
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 AttachmentAction("音频", Icons.Default.AudioFile) { menu = false; media.launch(arrayOf("audio/*")) }
                 AttachmentAction("录音", Icons.Default.Mic) { menu = false; localError = null; capture.record() }
-                Spacer(Modifier.width(88.dp))
+                AttachmentAction("联系人", Icons.Default.Person) { menu = false; localError = null; contactPicker.launch() }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
@@ -334,7 +343,8 @@ private fun ComposerAttachment(attachment: MmsAttachment, enabled: Boolean, onRe
                         }.onFailure { playbackError = true; stop() }
                     }
                 }, enabled = enabled && file != null) { Icon(if (playing) Icons.Default.StopCircle else Icons.Default.PlayCircle, if (playing) "停止试听" else "试听音频") }
-                else Icon(Icons.AutoMirrored.Filled.InsertDriveFile, null, Modifier.size(32.dp))
+                else Icon(if (attachment.originalMime in setOf("text/vcard", "text/x-vcard", "application/vcard", "application/x-vcard")) Icons.Default.ContactPage else Icons.AutoMirrored.Filled.InsertDriveFile,
+                    null, Modifier.size(32.dp))
                 Column(Modifier.padding(start = 6.dp)) {
                     Text(attachment.displayName, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
                     Text(if (playbackError) "无法试听" else attachmentSize(attachment.originalSize), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

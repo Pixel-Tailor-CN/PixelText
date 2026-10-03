@@ -93,6 +93,7 @@ val appModule = module {
     single { vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository(get()) }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsPayloadStore(androidContext()) }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsAttachmentPreparer(androidContext(), get()) }
+    single { vip.mystery0.pixel.text.data.source.mms.MmsContactExporter(androidContext()) }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsSendPolicyResolver(androidContext()) }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsSendPduComposer(androidContext(), get()) }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsOutgoingProviderWriter(androidContext()) }
