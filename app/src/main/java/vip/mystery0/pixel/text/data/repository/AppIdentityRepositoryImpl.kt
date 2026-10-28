@@ -76,7 +76,7 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
             displayName = AppDisplayName.entries.firstOrNull {
                 it.storageValue == values[KEY_NAME]
             } ?: AppDisplayName.CHISU_FULL,
-            iconStyle = AppIconStyle.entries.firstOrNull {
+            iconStyle = AppIconStyle.selectableEntries.firstOrNull {
                 it.storageValue == values[KEY_ICON]
             } ?: AppIconStyle.VIOLET,
         )

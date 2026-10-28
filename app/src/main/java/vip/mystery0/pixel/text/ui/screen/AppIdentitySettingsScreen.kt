@@ -99,7 +99,7 @@ fun AppIdentitySettingsScreen(
     var iconValue by rememberSaveable { mutableStateOf(identity.iconStyle.storageValue) }
     val displayName = AppDisplayName.entries.firstOrNull { it.storageValue == nameValue }
         ?: AppDisplayName.CHISU_FULL
-    val iconStyle = AppIconStyle.entries.firstOrNull { it.storageValue == iconValue }
+    val iconStyle = AppIconStyle.selectableEntries.firstOrNull { it.storageValue == iconValue }
         ?: AppIconStyle.VIOLET
     val draft = AppIdentity(displayName, iconStyle)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -200,7 +200,7 @@ fun AppIdentitySettingsScreen(
             item(key = "icon_heading", span = { GridItemSpan(maxLineSpan) }) {
                 Text("应用图标", style = MaterialTheme.typography.titleSmall)
             }
-            items(AppIconStyle.entries, key = AppIconStyle::storageValue) { style ->
+            items(AppIconStyle.selectableEntries, key = AppIconStyle::storageValue) { style ->
                 AppIconStyleCard(
                     style = style,
                     selected = style == iconStyle,

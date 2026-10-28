@@ -10,11 +10,16 @@ enum class AppDisplayName(val storageValue: String, val label: String) {
 }
 
 enum class AppIconStyle(val storageValue: String, val label: String) {
-    VIOLET("violet", "紫罗兰"),
-    BLUE("blue", "晴空蓝"),
-    GREEN("green", "青松绿"),
-    APRICOT("apricot", "暖杏橙"),
-    CLASSIC("classic", "经典"),
+    VIOLET("violet", "叠语"),
+    BLUE("blue", "原点"),
+    GREEN("green", "小零"),
+    // 保留旧标识以关闭升级前启用的启动器别名，不再提供该选项。
+    APRICOT("apricot", "叠语"),
+    CLASSIC("classic", "经典");
+
+    companion object {
+        val selectableEntries: List<AppIconStyle> = entries.filter { it != APRICOT }
+    }
 }
 
 data class AppIdentity(

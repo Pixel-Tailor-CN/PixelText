@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 单色版以短信气泡为主体，零形发夹保留小零的识别特征。 -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M37,43 H71 Q81,43 81,53 V68 Q81,78 71,78 H45 L30,85 L33,77 Q27,74 27,67 V53 Q27,43 37,43 Z M39,53 H68 A2.5,2.5 0,0 1,68,58 H39 A2.5,2.5 0,0 1,39,53 Z M39,64 H60 A2.5,2.5 0,0 1,60,69 H39 A2.5,2.5 0,0 1,39,64 Z" />
+    <group android:rotation="-20" android:pivotX="62" android:pivotY="30">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+            android:pathData="M60,20 H64 Q69,20 69,25 V35 Q69,40 64,40 H60 Q55,40 55,35 V25 Q55,20 60,20 Z M60,25 V35 H64 V25 Z" />
+    </group>
+</vector>
