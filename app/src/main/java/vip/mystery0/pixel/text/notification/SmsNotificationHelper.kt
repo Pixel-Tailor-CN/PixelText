@@ -77,6 +77,7 @@ object SmsNotificationHelper {
         notificationIdOverride: Int? = null,
         silent: Boolean = false,
         updateExistingOnly: Boolean = false,
+        isSpam: Boolean = false,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (
@@ -110,6 +111,7 @@ object SmsNotificationHelper {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(MainActivity.EXTRA_THREAD_ID, threadId)
             putExtra(MainActivity.EXTRA_ADDRESS, sender)
+            putExtra(MainActivity.EXTRA_IS_SPAM, isSpam)
         }
         val contentPendingIntent = PendingIntent.getActivity(
             context,

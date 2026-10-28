@@ -41,6 +41,16 @@ class ConversationCacheRepository(
         // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
     }
+    suspend fun syncIncomingSms(messageId: Long) {
+        // 新收短信已有确切身份，按消息排队即可；全量对账会让新消息等待历史扫描。
+        synchronizer.markDirty(
+            vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.SMS,
+                messageId,
+            )
+        )
+        MessageMirrorScheduler(context).enqueueMetadata(reason = "incoming_sms")
+    }
     suspend fun syncThreads(threadIds: List<Long>) {
         synchronizer.markDirty(null)
         // 系统写入后的通知只持久排队，不让 Receiver 或用户操作等待整库扫描。

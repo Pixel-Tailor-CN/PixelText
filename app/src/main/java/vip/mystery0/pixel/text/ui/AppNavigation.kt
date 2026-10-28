@@ -53,6 +53,7 @@ import vip.mystery0.pixel.text.ui.screen.SwipeActionSettingsScreen
 data class ConversationDeepLink(
     val threadId: Long,
     val address: String,
+    val isSpam: Boolean = false,
 )
 
 data class SettingsDeepLink(
@@ -88,7 +89,17 @@ fun AppNavigation(
     // 收到外部 deep link 时，直接跳转到对应会话详情
     LaunchedEffect(pendingDeepLink) {
         val link = pendingDeepLink ?: return@LaunchedEffect
-        navController.navigate(conversationDetailRoute(link.threadId, link.address))
+        navController.navigate(
+            conversationDetailRoute(
+                link.threadId,
+                link.address,
+                contentFilter = if (link.isSpam) {
+                    ConversationContentFilter.SPAM
+                } else {
+                    ConversationContentFilter.NORMAL
+                },
+            )
+        )
         onDeepLinkConsumed()
     }
 

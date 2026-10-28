@@ -67,14 +67,19 @@ fun SpamConversationListScreen(
     var showHistoryDialog by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadSpamConversations(force = true, showLoading = false)
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.startObserving()
+                Lifecycle.Event.ON_PAUSE -> viewModel.stopObserving()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopObserving()
+        }
     }
 
     Scaffold(
@@ -156,6 +161,18 @@ fun SpamConversationListScreen(
                     is SpamConversationListUiState.Success -> {
                         val listState = rememberLazyListState()
                         var isRefreshing by remember { mutableStateOf(false) }
+                        var previousFirstThreadId by remember { mutableStateOf<Long?>(null) }
+                        val firstThreadId = state.conversations.firstOrNull()?.threadId
+
+                        LaunchedEffect(firstThreadId) {
+                            // LazyColumn 默认锚定旧条目的 key；原本在顶部时应跟随新消息，翻阅历史时保持位置。
+                            val wasAtTop = listState.firstVisibleItemScrollOffset == 0 &&
+                                listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key == previousFirstThreadId
+                            if (previousFirstThreadId != null && firstThreadId != previousFirstThreadId && wasAtTop) {
+                                listState.requestScrollToItem(0)
+                            }
+                            previousFirstThreadId = firstThreadId
+                        }
 
                         if (state.conversations.isEmpty()) {
                             ConversationEmptyState(

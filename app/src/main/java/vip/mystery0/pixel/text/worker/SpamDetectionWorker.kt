@@ -219,6 +219,7 @@ class SpamDetectionWorker(
                 ?: sender,
             avatarPath = profile?.avatarPath,
             updateExistingOnly = !deferNotification,
+            isSpam = isSpam,
         )
     }
 

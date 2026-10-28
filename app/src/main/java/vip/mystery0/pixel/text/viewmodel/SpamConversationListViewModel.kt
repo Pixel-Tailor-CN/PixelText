@@ -12,12 +12,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.worker.HistoricalSpamScanWorker
 import java.util.UUID
@@ -27,6 +31,7 @@ class SpamConversationListViewModel(
     private val repository: MessageRepository,
     private val telephonyDataSource: TelephonyDataSource,
     private val spamRepository: SpamRepository,
+    private val mirror: MessageMirrorRepository,
     context: Context
 ) : ViewModel() {
     private val _uiState =
@@ -50,7 +55,9 @@ class SpamConversationListViewModel(
     private val workManager = WorkManager.getInstance(appContext)
     private var offset = 0
     private var isLoadingMore = false
-    private var isSilentRefreshActive = false
+    private var listJob: Job? = null
+    private var silentRefreshPending = false
+    private var observationJob: Job? = null
     private var hasMore = true
     private var listRequestVersion = 0
     private var scanProgressJob: Job? = null
@@ -59,34 +66,60 @@ class SpamConversationListViewModel(
         resumeActiveHistoricalScan()
     }
 
+    @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun startObserving() {
+        if (observationJob?.isActive == true) return
+        observationJob = viewModelScope.launch {
+            // 镜像入库和骚扰判定可先后完成，两者均需触发刷新，不能只等页面重新进入。
+            merge(
+                mirror.observeConversationSummaries().map { },
+                spamRepository.observeChanges(),
+            ).debounce(100.milliseconds).collect {
+                loadSpamConversations(force = true, showLoading = false)
+            }
+        }
+    }
+
+    fun stopObserving() {
+        observationJob?.cancel()
+        observationJob = null
+    }
+
     fun loadSpamConversations(
         force: Boolean = false,
         showLoading: Boolean = true,
     ) {
+        // 持续同步时不能反复取消较慢的查询；合并为完成后再刷新一次，既不饿死查询也不丢事件。
+        if (force && !showLoading && isLoadingMore) {
+            silentRefreshPending = true
+            return
+        }
         val keepCurrentContent = force &&
             !showLoading &&
             _uiState.value is SpamConversationListUiState.Success
-        if (keepCurrentContent && isSilentRefreshActive) return
+        val visibleConversations = (_uiState.value as? SpamConversationListUiState.Success)?.conversations
         val fallbackSnapshot = if (keepCurrentContent) {
-            SpamConversationListSnapshot(conversations.toList(), offset, hasMore)
+            SpamConversationListSnapshot(visibleConversations.orEmpty(), visibleConversations.orEmpty().size, hasMore)
         } else {
             null
         }
-        if (keepCurrentContent) isSilentRefreshActive = true
+        val refreshLimit = maxOf(100, visibleConversations?.size ?: 0)
         if (force) {
             listRequestVersion += 1
+            silentRefreshPending = false
+            listJob?.cancel()
             offset = 0
             conversations.clear()
             hasMore = true
             if (!keepCurrentContent) {
                 _uiState.value = SpamConversationListUiState.Loading
             }
-        } else if (conversations.isNotEmpty()) {
+        } else if (isLoadingMore || conversations.isNotEmpty()) {
             return
         }
 
         fetchNextBatch(
-            limit = 100,
+            limit = refreshLimit,
             showError = !keepCurrentContent,
             fallbackSnapshot = fallbackSnapshot,
         )
@@ -143,7 +176,7 @@ class SpamConversationListViewModel(
     ) {
         val requestVersion = listRequestVersion
         isLoadingMore = true
-        viewModelScope.launch {
+        listJob = viewModelScope.launch {
             try {
                 repository.getSpamConversations(limit, offset)
                     .catch { e ->
@@ -177,20 +210,21 @@ class SpamConversationListViewModel(
                         isLoadingMore = false
                     }
             } finally {
-                if (fallbackSnapshot != null) isSilentRefreshActive = false
+                if (requestVersion == listRequestVersion) {
+                    isLoadingMore = false
+                    if (silentRefreshPending) {
+                        silentRefreshPending = false
+                        loadSpamConversations(force = true, showLoading = false)
+                    }
+                }
             }
         }
     }
 
     private fun mergeConversations(newList: List<ConversationModel>) {
-        val currentByThreadId = conversations.associateBy { it.threadId }
         val merged = (conversations + newList)
-            .distinctBy { it.threadId }
-            .map { conversation ->
-                currentByThreadId[conversation.threadId]?.let { existing ->
-                    if (conversation.timestamp >= existing.timestamp) conversation else existing
-                } ?: conversation
-            }
+            .associateBy { it.threadId }
+            .values
             .sortedByDescending { it.timestamp }
 
         conversations.clear()

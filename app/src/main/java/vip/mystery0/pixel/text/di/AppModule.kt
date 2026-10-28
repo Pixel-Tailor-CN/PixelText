@@ -288,7 +288,7 @@ val appModule = module {
     viewModel { vip.mystery0.pixel.text.viewmodel.SenderWhitelistViewModel(get(), androidApplication()) }
     viewModel { ConversationListViewModel(get(), get(), get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
-    viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
+    viewModel { SpamConversationListViewModel(get(), get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
