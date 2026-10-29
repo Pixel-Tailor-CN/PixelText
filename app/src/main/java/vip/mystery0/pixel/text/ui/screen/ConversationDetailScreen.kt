@@ -253,6 +253,15 @@ fun ConversationDetailScreen(
     val outgoingRepository: vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository = koinInject()
     val outgoing by remember(outgoingRepository) { outgoingRepository.observeMessages() }.collectAsState(emptyList())
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
+    // 详情信息复用彩信附件路由，partId 为 -1 时进入消息详情页。
+    val openMessageDetail: (vip.mystery0.pixel.text.domain.model.MessageModel) -> Unit = { message ->
+        val transport = if (message.isMms)
+            vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS
+        else vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.SMS
+        onOpenMmsPart(vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(
+            vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
+                transport, if (message.isMms) -message.id else message.id), -1))
+    }
     var highlightedMessageId by remember(threadId, targetMessageId) {
         mutableStateOf<Long?>(null)
     }
@@ -521,14 +530,7 @@ fun ConversationDetailScreen(
                                             val message = selectedMessage
                                             showMoreMenu = false
                                             selectedMessageIds.clear()
-                                            if (message != null) {
-                                                val transport = if (message.isMms)
-                                                    vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS
-                                                else vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.SMS
-                                                onOpenMmsPart(vip.mystery0.pixel.text.domain.model.mms.MmsPartKey(
-                                                    vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
-                                                        transport, if (message.isMms) -message.id else message.id), -1))
-                                            }
+                                            if (message != null) openMessageDetail(message)
                                         },
                                     )
                                     DropdownMenuItem(
@@ -812,6 +814,7 @@ fun ConversationDetailScreen(
                                         }
                                     }
                                 },
+                                onDoubleClick = { openMessageDetail(message) },
                                 interactionEnabled = !isZoomGestureActive,
                                 timeDisplayFormat = appSettings.messageTimeDisplayFormat,
                                 showSpamContentByDefault =
