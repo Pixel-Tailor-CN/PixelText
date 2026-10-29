@@ -14,6 +14,19 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import vip.mystery0.pixel.text.domain.hub.isValidSampleReportId
+import vip.mystery0.pixel.text.ui.screen.SampleReportListScreen
+import vip.mystery0.pixel.text.ui.screen.SampleReportDetailScreen
+import vip.mystery0.pixel.text.ui.screen.SAMPLE_REPORT_REFRESH_REQUESTED
+import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
+import org.koin.androidx.compose.koinViewModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -69,6 +83,16 @@ fun AppNavigation(
     onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val reportSnackbarHost = remember { SnackbarHostState() }
+    var submittedReportId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(submittedReportId) {
+        val id = submittedReportId ?: return@LaunchedEffect
+        val result = reportSnackbarHost.showSnackbar("样本已上报", actionLabel = "查看", withDismissAction = true)
+        submittedReportId = null
+        if (result == SnackbarResult.ActionPerformed && isValidSampleReportId(id)) {
+            navController.navigate("sample_report/$id")
+        }
+    }
     val backupRepository = org.koin.compose.koinInject<vip.mystery0.pixel.text.domain.backup.BackupRepository>()
     val backupState by backupRepository.state.collectAsState()
     var showRestoreNotice by remember { mutableStateOf(backupState.restoreProtected) }
@@ -192,8 +216,8 @@ fun AppNavigation(
                     onNavigateToBackup = { navController.navigate("backup_restore") },
                     onNavigateToOpenSource = { navController.navigate("open_source") },
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToSampleSubmission = {
-                        navController.navigate("sample_submission")
+                    onNavigateToSampleReports = {
+                        navController.navigate("sample_reports")
                     },
                     onNavigateToSwipeActions = {
                         navController.navigate("swipe_actions")
@@ -251,6 +275,33 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
+            composable("sample_reports") { listEntry ->
+                val refreshRequested by listEntry.savedStateHandle
+                    .getStateFlow(SAMPLE_REPORT_REFRESH_REQUESTED, false).collectAsState()
+                SampleReportListScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNewReport = {
+                        if (navController.previousBackStackEntry?.destination?.route == "sample_submission") {
+                            navController.popBackStack()
+                        } else navController.navigate("sample_submission")
+                    },
+                    onOpenReport = { id ->
+                        if (isValidSampleReportId(id)) navController.navigate("sample_report/$id")
+                    },
+                    refreshRequested = refreshRequested,
+                    onRefreshRequestConsumed = { listEntry.savedStateHandle[SAMPLE_REPORT_REFRESH_REQUESTED] = false },
+                )
+            }
+            composable("sample_report/{reportId}", arguments = listOf(navArgument("reportId") { type = NavType.StringType })) { detailEntry ->
+                val listOwner = remember(detailEntry) {
+                    navController.previousBackStackEntry?.takeIf { it.destination.route == "sample_reports" }
+                }
+                val sourceListViewModel = listOwner?.let { koinViewModel<SampleReportListViewModel>(viewModelStoreOwner = it) }
+                SampleReportDetailScreen(detailEntry.arguments?.getString("reportId").orEmpty(),
+                    onNavigateBack = { navController.popBackStack() },
+                    onReportLoaded = { sourceListViewModel?.updateReport(it) },
+                    onReportNotFound = { sourceListViewModel?.markReportUnavailable(it) })
+            }
             composable("sample_submission") {
                 val draftHandle = navController.previousBackStackEntry?.savedStateHandle
                 val initialContent = remember(it) {
@@ -264,6 +315,13 @@ fun AppNavigation(
                 }
                 SampleSubmissionScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onSubmitted = { id ->
+                        navController.previousBackStackEntry?.takeIf { it.destination.route == "sample_reports" }
+                            ?.savedStateHandle?.set(SAMPLE_REPORT_REFRESH_REQUESTED, true)
+                        navController.popBackStack()
+                        submittedReportId = id
+                    },
+                    onViewReports = { navController.navigate("sample_reports") },
                     initialContent = initialContent,
                     initialSender = initialSender,
                     initialCategory = initialCategory,
@@ -362,6 +420,7 @@ fun AppNavigation(
                 vip.mystery0.pixel.text.ui.screen.mock.MockMessageScreen()
             }
         }
+        SnackbarHost(reportSnackbarHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp))
     }
 }
 

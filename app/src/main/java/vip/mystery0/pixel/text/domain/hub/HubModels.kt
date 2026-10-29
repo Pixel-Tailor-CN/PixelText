@@ -45,16 +45,6 @@ sealed interface ResourceUpdateAvailability {
     ) : ResourceUpdateAvailability
 }
 
-data class SampleSubmissionRequest(
-    val deviceId: String,
-    val content: String,
-    val sender: String?,
-    val category: String,
-    val appVersion: String,
-    val ruleVersion: String,
-    val modelVersion: String,
-)
-
 sealed interface HubOperationResult {
     data object Success : HubOperationResult
     data class Failure(val message: String) : HubOperationResult

@@ -42,6 +42,7 @@ import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.repository.KeywordSpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.MessageRepositoryImpl
+import vip.mystery0.pixel.text.data.repository.SampleReportLocalStore
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.data.repository.SpamRepositoryImpl
 import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
@@ -80,6 +81,8 @@ import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.MessageViewModel
 import vip.mystery0.pixel.text.viewmodel.KeywordSpamViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
+import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
+import vip.mystery0.pixel.text.viewmodel.SampleReportDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.VerificationCodeViewModel
@@ -148,7 +151,8 @@ val appModule = module {
     single { KeywordSpamRebuildScheduler(androidContext()) }
     single { VerificationCodeIndexScheduler(androidContext()) }
     single { VerificationCodeCleanupScheduler(androidContext(), get()) }
-    single { SampleSubmissionRepository(androidContext(), get(), get()) }
+    single { SampleReportLocalStore(androidContext()) }
+    single { SampleSubmissionRepository(androidContext(), get(), get(), get()) }
     single { SpamDatabase.create(androidContext()) }
     single { ConversationArchiveDatabase.create(androidContext()) }
     single { ConversationCacheDatabase.create(androidContext()) }
@@ -296,6 +300,8 @@ val appModule = module {
     viewModel { SearchViewModel(get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
+    viewModel { SampleReportListViewModel(get()) }
+    viewModel { SampleReportDetailViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get(), get()) }
     viewModel { UnreadBadgeViewModel(androidContext(), get(), get()) }
 }

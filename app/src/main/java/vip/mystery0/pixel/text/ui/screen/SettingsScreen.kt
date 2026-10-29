@@ -157,7 +157,7 @@ fun SettingsScreen(
     backupViewModel: BackupViewModel = koinViewModel(),
     whitelistViewModel: SenderWhitelistViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToSampleSubmission: () -> Unit = {},
+    onNavigateToSampleReports: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
@@ -794,16 +794,16 @@ fun SettingsScreen(
                 },
             )))
             add(SettingsSection("about_community", "社区与帮助改进", listOf(
-                SettingsEntry("sample_submission") {
+                SettingsEntry("sample_reports") {
                     Preference(
-                        title = { Text("上报脱敏短信样本") },
+                        title = { Text("我的上报") },
                         summary = {
-                            Text("手动提交已脱敏的短信样本，也可在短信详情页长按单条短信后快速带入")
+                            Text("查看上报记录与审核结果，主动提交脱敏短信样本")
                         },
                         icon = {
                             Icon(Icons.Rounded.UploadFile, contentDescription = null)
                         },
-                        onClick = onNavigateToSampleSubmission
+                        onClick = onNavigateToSampleReports
                     )
                 },
                 SettingsEntry("pixel_tailor") {

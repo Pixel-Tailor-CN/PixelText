@@ -18,7 +18,7 @@ import vip.mystery0.pixel.text.domain.hub.HubArtifact
 import vip.mystery0.pixel.text.domain.hub.HubFileArtifact
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.hub.HubSpamModelArtifact
-import vip.mystery0.pixel.text.domain.hub.SampleSubmissionRequest
+import vip.mystery0.pixel.text.domain.hub.*
 import vip.mystery0.pixel.text.domain.model.SenderProfileManifest
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -39,8 +39,52 @@ class PixelTextHubClient(
         bodyOrThrow(service.fetchManifest(), "request failed").toDomain()
     }
 
-    suspend fun submitSample(request: SampleSubmissionRequest) = withContext(Dispatchers.IO) {
-        ensureSuccessful(service.submitSample(request.toBody()), "request failed")
+    suspend fun submitReport(request: SampleReportRequest): SampleReportSubmission = withContext(Dispatchers.IO) {
+        val result = reportBody(service.submitReport(request.toBody()), ReportOperation.SUBMIT)
+        SampleReportSubmission(result.report.detail(), result.created)
+    }
+
+    suspend fun listReports(identity: SampleReportIdentity, cursor: String?, limit: Int = 20): SampleReportPage =
+        withContext(Dispatchers.IO) {
+            val result = reportBody(service.listReports(SampleReportQuery(identity.androidId,
+                identity.installationId, cursor, limit)), ReportOperation.LIST)
+            SampleReportPage(result.items.map { it.summary() }, result.nextCursor)
+        }
+
+    suspend fun getReport(identity: SampleReportIdentity, reportId: String): SampleReportDetail =
+        withContext(Dispatchers.IO) {
+            require(isValidSampleReportId(reportId))
+            reportBody(service.getReport(SampleReportDetailQuery(identity.androidId,
+                identity.installationId, reportId)), ReportOperation.DETAIL).report.detail()
+        }
+
+    private enum class ReportOperation { SUBMIT, LIST, DETAIL }
+
+    private fun <T : Any> reportBody(response: Response<T>, operation: ReportOperation): T {
+        if (response.isSuccessful) return response.body()
+            ?: throw SampleReportException("INVALID_RESPONSE", "服务响应不完整，请稍后重试")
+        val code = response.errorBody()?.use { body ->
+            runCatching { moshi.adapter(SampleReportErrorDto::class.java).fromJson(body.string())?.code }.getOrNull()
+        }.orEmpty()
+        val retryAfter = if (response.code() == 429) {
+            (response.headers()["Retry-After"]?.toLongOrNull() ?: 60L).coerceIn(1, 86400)
+        } else null
+        val message = when (response.code()) {
+            400 -> when {
+                operation == ReportOperation.LIST && code == "INVALID_CURSOR" -> "记录分页已失效，请下拉刷新后重试"
+                operation == ReportOperation.SUBMIT -> "提交信息不符合要求，请检查后重试"
+                else -> "查询信息不符合要求，请刷新后重试"
+            }
+            404 -> if (operation == ReportOperation.DETAIL) "无法查看这条上报记录" else "上报服务暂不可用，请稍后重试"
+            409 -> "本次请求存在冲突，已保留原请求，请稍后重试或反馈问题"
+            413 -> "提交内容超出大小限制，请减少内容后重试"
+            429 -> "请求过于频繁，请在稍后重试"
+            503 -> "上报服务暂不可用，请稍后重试"
+            else -> "服务暂未确认结果，请稍后重试"
+        }
+        throw SampleReportException(code.ifBlank { "HTTP_${response.code()}" }, message, retryAfter,
+            operation == ReportOperation.SUBMIT && ((response.code() == 400 && code == "INVALID_REQUEST") ||
+                (response.code() == 413 && code == "PAYLOAD_TOO_LARGE")))
     }
 
     suspend fun fetchSenderProfileManifest(): SenderProfileManifest? =
@@ -138,14 +182,6 @@ class PixelTextHubClient(
         target.length()
     }
 
-    private fun ensureSuccessful(response: Response<ResponseBody>, prefix: String) {
-        response.body()?.close()
-        response.errorBody()?.close()
-        if (!response.isSuccessful) {
-            throw IllegalStateException("$prefix status=${response.code()}")
-        }
-    }
-
     private fun <T : Any> bodyOrThrow(response: Response<T>, prefix: String): T {
         response.errorBody()?.close()
         if (!response.isSuccessful) {
@@ -174,8 +210,14 @@ private interface PixelTextHubService {
     @GET("api/v1/sender-profiles/manifest")
     suspend fun fetchSenderProfileManifest(): Response<SenderProfileManifestResponse>
 
-    @POST("api/v1/samples")
-    suspend fun submitSample(@Body body: SampleSubmissionBody): Response<ResponseBody>
+    @POST("api/v2/sample-reports")
+    suspend fun submitReport(@Body body: SampleReportBody): Response<SampleReportSubmissionDto>
+
+    @POST("api/v2/sample-reports/list")
+    suspend fun listReports(@Body body: SampleReportQuery): Response<SampleReportPageDto>
+
+    @POST("api/v2/sample-reports/detail")
+    suspend fun getReport(@Body body: SampleReportDetailQuery): Response<SampleReportDetailDto>
 
     @Streaming
     @GET
@@ -263,24 +305,3 @@ internal data class SenderProfileManifestResponse(
 
 class SenderProfileDownloadException(val statusCode: Int) :
     IllegalStateException("sender profile download failed status=$statusCode")
-
-@JsonClass(generateAdapter = true)
-internal data class SampleSubmissionBody(
-    val deviceId: String,
-    val content: String,
-    val sender: String?,
-    val category: String,
-    val appVersion: String,
-    val ruleVersion: String,
-    val modelVersion: String,
-)
-
-private fun SampleSubmissionRequest.toBody(): SampleSubmissionBody = SampleSubmissionBody(
-    deviceId = deviceId,
-    content = content,
-    sender = sender,
-    category = category,
-    appVersion = appVersion,
-    ruleVersion = ruleVersion,
-    modelVersion = modelVersion
-)
