@@ -7,6 +7,7 @@ import android.text.format.DateFormat
 import java.util.Date
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,6 +59,8 @@ fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit,
                     val incoming = current.boxType == 1
                     val primary = current.address?.takeIf { it.isNotBlank() }
                         ?: current.addresses.firstOrNull { it.type == if (incoming) 137 else 151 }?.address
+                    // 号码、时间和正文支持长按自由选择复制；彩信正文含附件手势，不包裹选择容器。
+                    SelectionContainer {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(primary ?: "未知号码", style = MaterialTheme.typography.titleLarge)
                         Text(listOfNotNull(
@@ -78,11 +81,12 @@ fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit,
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     if (key.transport == vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS) {
                         content?.let { vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, false, true, onOpenPart, detailMode = true) }
                             ?: Text("正在读取彩信")
-                    } else current.body?.let { Text(it) }
+                    } else current.body?.let { SelectionContainer { Text(it) } }
 
                 }
             }
