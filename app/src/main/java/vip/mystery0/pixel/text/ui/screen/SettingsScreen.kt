@@ -3,10 +3,10 @@ package vip.mystery0.pixel.text.ui.screen
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import vip.mystery0.pixel.text.ui.activityLikeEnterTransition
-import vip.mystery0.pixel.text.ui.activityLikeExitTransition
-import vip.mystery0.pixel.text.ui.activityLikePopEnterTransition
-import vip.mystery0.pixel.text.ui.activityLikePopExitTransition
+import vip.mystery0.pixel.text.ui.navigationEnterTransition
+import vip.mystery0.pixel.text.ui.navigationExitTransition
+import vip.mystery0.pixel.text.ui.navigationPopEnterTransition
+import vip.mystery0.pixel.text.ui.navigationPopExitTransition
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import vip.mystery0.pixel.text.ui.screen.settings.SettingsCategory
@@ -43,6 +43,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -202,6 +206,7 @@ fun SettingsScreen(
     var confirmSpamDeletion by remember { mutableStateOf(false) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
+    var showNavigationTransitionDialog by remember { mutableStateOf(false) }
     var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
     var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
     var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
@@ -367,6 +372,14 @@ fun SettingsScreen(
             add(SettingsSection("display_app", "应用与主界面", listOf(
                 SettingsEntry("app_identity") {
                     AppIdentitySettingsPreference(onClick = onNavigateToAppIdentity)
+                },
+                SettingsEntry("navigation_transition_style") {
+                    Preference(
+                        title = { Text("页面转场动画") },
+                        summary = { Text(settings.navigationTransitionStyle.title()) },
+                        icon = { Icon(Icons.Rounded.SwapHoriz, contentDescription = null) },
+                        onClick = { showNavigationTransitionDialog = true },
+                    )
                 },
                 SettingsEntry("unread_badge") {
                     SwitchPreference(
@@ -941,10 +954,12 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
                     if (navigatingBack) {
-                        (activityLikePopEnterTransition() togetherWith activityLikePopExitTransition())
+                        (navigationPopEnterTransition(settings.navigationTransitionStyle) togetherWith
+                            navigationPopExitTransition(settings.navigationTransitionStyle))
                             .apply { targetContentZIndex = -1f }
                     } else {
-                        (activityLikeEnterTransition() togetherWith activityLikeExitTransition())
+                        (navigationEnterTransition(settings.navigationTransitionStyle) togetherWith
+                            navigationExitTransition(settings.navigationTransitionStyle))
                             .apply { targetContentZIndex = 1f }
                     }.using(null)
                 },
@@ -1057,6 +1072,62 @@ fun SettingsScreen(
                     Text("稍后")
                 }
             }
+        )
+    }
+
+    if (showNavigationTransitionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNavigationTransitionDialog = false },
+            title = { Text("页面转场动画") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "用于页面进入与返回，不影响底部标签和组件动画",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Column(Modifier.selectableGroup()) {
+                        NavigationTransitionStyle.entries.forEach { style ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = settings.navigationTransitionStyle == style,
+                                        role = Role.RadioButton,
+                                        onClick = {
+                                            viewModel.setNavigationTransitionStyle(style)
+                                            showNavigationTransitionDialog = false
+                                        },
+                                    )
+                                    .padding(vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(
+                                    selected = settings.navigationTransitionStyle == style,
+                                    onClick = null,
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(style.title(), style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        style.description(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNavigationTransitionDialog = false }) {
+                    Text("取消")
+                }
+            },
         )
     }
 
@@ -1623,6 +1694,20 @@ private fun SpamAutoActionOption(
             )
         }
     }
+}
+
+private fun NavigationTransitionStyle.title(): String = when (this) {
+    NavigationTransitionStyle.DEFAULT -> "默认"
+    NavigationTransitionStyle.SLIDE -> "横向滑动"
+    NavigationTransitionStyle.FADE -> "淡入淡出"
+    NavigationTransitionStyle.NONE -> "无动画"
+}
+
+private fun NavigationTransitionStyle.description(): String = when (this) {
+    NavigationTransitionStyle.DEFAULT -> "滑动、缩放与淡入淡出"
+    NavigationTransitionStyle.SLIDE -> "左右滑动，返回时反向"
+    NavigationTransitionStyle.FADE -> "渐变切换，不移动页面"
+    NavigationTransitionStyle.NONE -> "直接切换页面"
 }
 
 private fun MessageTimeDisplayFormat.title(): String {

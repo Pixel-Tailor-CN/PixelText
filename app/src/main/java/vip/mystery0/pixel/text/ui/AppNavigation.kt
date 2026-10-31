@@ -1,16 +1,6 @@
 package vip.mystery0.pixel.text.ui
 
 import android.net.Uri
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +17,8 @@ import vip.mystery0.pixel.text.ui.screen.SampleReportDetailScreen
 import vip.mystery0.pixel.text.ui.screen.SAMPLE_REPORT_REFRESH_REQUESTED
 import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -83,6 +75,8 @@ fun AppNavigation(
     onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val settingsRepository = koinInject<AppSettingsRepository>()
+    val settings by settingsRepository.settings.collectAsState()
     val reportSnackbarHost = remember { SnackbarHostState() }
     var submittedReportId by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(submittedReportId) {
@@ -148,13 +142,13 @@ fun AppNavigation(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.fillMaxSize(),
-            enterTransition = { activityLikeEnterTransition() },
-            exitTransition = { activityLikeExitTransition() },
-            popEnterTransition = { activityLikePopEnterTransition() },
-            popExitTransition = { activityLikePopExitTransition() },
-            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与普通返回一致。
-            predictivePopEnterTransition = { _ -> activityLikePopEnterTransition() },
-            predictivePopExitTransition = { _ -> activityLikePopExitTransition() }
+            enterTransition = { navigationEnterTransition(settings.navigationTransitionStyle) },
+            exitTransition = { navigationExitTransition(settings.navigationTransitionStyle) },
+            popEnterTransition = { navigationPopEnterTransition(settings.navigationTransitionStyle) },
+            popExitTransition = { navigationPopExitTransition(settings.navigationTransitionStyle) },
+            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与所选风格一致。
+            predictivePopEnterTransition = { _ -> navigationPopEnterTransition(settings.navigationTransitionStyle) },
+            predictivePopExitTransition = { _ -> navigationPopExitTransition(settings.navigationTransitionStyle) }
         ) {
             composable("home") {
                 HomeScreen(
@@ -433,107 +427,6 @@ private fun conversationDetailRoute(
     val baseRoute = "conversation_detail/$threadId/${Uri.encode(address)}"
     val messageParameter = messageId?.let { "&messageId=$it" }.orEmpty()
     return "$baseRoute?contentFilter=${contentFilter.name}$messageParameter"
-}
-
-internal fun activityLikeEnterTransition(): EnterTransition {
-    return slideInHorizontally(
-        initialOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
-            scaleIn(
-                initialScale = ACTIVITY_FOREGROUND_INITIAL_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikeExitTransition(): ExitTransition {
-    return slideOutHorizontally(
-        targetOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            activityBackgroundFadeOut() +
-            scaleOut(
-                targetScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikePopEnterTransition(): EnterTransition {
-    return slideInHorizontally(
-        initialOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
-            scaleIn(
-                initialScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikePopExitTransition(): ExitTransition {
-    return slideOutHorizontally(
-        targetOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            activityForegroundFadeOut() +
-            scaleOut(
-                targetScale = ACTIVITY_FOREGROUND_POP_EXIT_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-private const val ACTIVITY_FOREGROUND_DURATION_MS = 300
-private const val ACTIVITY_BACKGROUND_DURATION_MS = 260
-private const val ACTIVITY_BACKGROUND_OFFSET_DIVISOR = 4
-private const val ACTIVITY_FOREGROUND_INITIAL_SCALE = 0.96f
-private const val ACTIVITY_FOREGROUND_POP_EXIT_SCALE = 0.90f
-private const val ACTIVITY_BACKGROUND_TARGET_SCALE = 0.92f
-private const val NAV_ENTER_FADE_DURATION_MS = 90
-private const val NAV_EXIT_FADE_DURATION_MS = 90
-private const val NAV_EXIT_FADE_DELAY_MS = 120
-private const val NAV_FOREGROUND_EXIT_FADE_DELAY_MS = 210
-
-private fun activityBackgroundFadeOut(): ExitTransition {
-    return fadeOut(
-        animationSpec = tween(
-            durationMillis = NAV_EXIT_FADE_DURATION_MS,
-            delayMillis = NAV_EXIT_FADE_DELAY_MS
-        )
-    )
-}
-
-private fun activityForegroundFadeOut(): ExitTransition {
-    return fadeOut(
-        animationSpec = tween(
-            durationMillis = NAV_EXIT_FADE_DURATION_MS,
-            delayMillis = NAV_FOREGROUND_EXIT_FADE_DELAY_MS
-        )
-    )
 }
 
 private const val SPAM_THRESHOLD = 0.7f

@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
@@ -104,6 +105,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
 
     override fun setUnreadBadgeEnabled(enabled: Boolean) {
         updatePrefs { putBoolean(AppSettingsKeys.KEY_UNREAD_BADGE_ENABLED, enabled) }
+    }
+
+    override fun setNavigationTransitionStyle(style: NavigationTransitionStyle) {
+        updatePrefs {
+            putString(AppSettingsKeys.KEY_NAVIGATION_TRANSITION_STYLE, style.storageValue)
+        }
     }
 
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
@@ -257,6 +264,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_UNREAD_BADGE_ENABLED,
         )
 
+    override fun getNavigationTransitionStyle(): NavigationTransitionStyle =
+        NavigationTransitionStyle.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_NAVIGATION_TRANSITION_STYLE,
+                AppSettingsKeys.DEFAULT_NAVIGATION_TRANSITION_STYLE.storageValue,
+            )
+        )
+
     override fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat =
         MessageTimeDisplayFormat.fromStorageValue(
             prefs.getString(
@@ -369,6 +384,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             verificationCodeAutoDeleteEnabled = isVerificationCodeAutoDeleteEnabled(),
             verificationCodeRetentionDays = getVerificationCodeRetentionDays(),
             unreadBadgeEnabled = isUnreadBadgeEnabled(),
+            navigationTransitionStyle = getNavigationTransitionStyle(),
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),
