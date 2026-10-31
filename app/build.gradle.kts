@@ -144,20 +144,22 @@ dependencies {
 }
 
 // 将仓库中已有原文转换成插件配置，避免再维护一份转义后的许可证正文。
-val noticeRoot = rootProject.layout.projectDirectory.asFile
-val noticeMetadata = rootProject.file("config/open-source/notices.json")
-val licenseOverrides = rootProject.file("config/open-source/license-overrides.json")
 val generatedNotices = layout.buildDirectory.dir("generated/openSourceNotices")
 val generateOpenSourceNotices = tasks.register("generateOpenSourceNotices") {
+    // doLast 只能捕获局部值；引用脚本顶层属性会让配置缓存序列化脚本对象。
+    val noticeRoot = rootProject.layout.projectDirectory.asFile
+    val noticeMetadata = rootProject.file("config/open-source/notices.json")
+    val licenseOverrides = rootProject.file("config/open-source/license-overrides.json")
+    val outputDir = generatedNotices
     inputs.file(noticeMetadata)
     inputs.file(licenseOverrides)
     inputs.files(rootProject.fileTree("docs/licenses") { exclude("*.md") })
     inputs.file(rootProject.file("app/src/main/assets/licenses/re2j-LICENSE.txt"))
-    outputs.dir(generatedNotices)
+    outputs.dir(outputDir)
     doLast {
         @Suppress("UNCHECKED_CAST")
         val entries = JsonSlurper().parse(noticeMetadata, "UTF-8") as List<Map<String, Any>>
-        val output = generatedNotices.get().asFile
+        val output = outputDir.get().asFile
         output.deleteRecursively()
         val libraries = output.resolve("libraries").apply { mkdirs() }
         val licenses = output.resolve("licenses").apply { mkdirs() }
