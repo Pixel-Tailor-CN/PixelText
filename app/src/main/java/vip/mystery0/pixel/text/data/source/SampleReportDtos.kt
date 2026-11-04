@@ -15,13 +15,14 @@ internal data class SampleReportBody(
     val appVersion: String,
     val ruleVersion: String,
     val modelVersion: String,
+    val learningFeedback: LearningFeedbackDto? = null,
 ) {
     fun toDomain() = SampleReportRequest(androidId, installationId, clientRequestId, content,
-        sender, category, appVersion, ruleVersion, modelVersion)
+        sender, category, appVersion, ruleVersion, modelVersion, learningFeedback?.toDomain())
 }
 
 internal fun SampleReportRequest.toBody() = SampleReportBody(androidId, installationId,
-    clientRequestId, content, sender, category, appVersion, ruleVersion, modelVersion)
+    clientRequestId, content, sender, category, appVersion, ruleVersion, modelVersion, learningFeedback?.toDto())
 
 @JsonClass(generateAdapter = true)
 internal data class SampleReportQuery(
@@ -86,4 +87,16 @@ internal data class SampleReportSubmissionDto(val report: SampleReportDto, val c
 internal data class SampleReportErrorDto(val code: String = "")
 
 @JsonClass(generateAdapter = true)
-internal data class SampleReportDraftDto(val content: String, val sender: String, val category: String)
+internal data class SampleReportDraftDto(val content: String, val sender: String, val category: String, val learningFeedback: LearningFeedbackDto? = null)
+
+@JsonClass(generateAdapter = true)
+internal data class LearningFeedbackDto(
+    val origin: String = "on_device_learning",
+    val baseModelVersion: String,
+    val personalGeneration: Long? = null,
+    val originalLabel: String,
+) {
+    fun toDomain() = LearningFeedback(origin, baseModelVersion, personalGeneration, originalLabel)
+}
+
+internal fun LearningFeedback.toDto() = LearningFeedbackDto(origin, baseModelVersion, personalGeneration, originalLabel)

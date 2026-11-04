@@ -8,7 +8,8 @@ import vip.mystery0.pixel.text.domain.spam.SenderWhitelistMatcher
 import vip.mystery0.pixel.text.domain.spam.WhitelistRuleType
 
 /** 列表只读筛选：身份来自镜像，不查询 Provider，也不顺便持久化白名单。 */
-class LocalConversationSpamFilter(private val database: SpamDatabase) {
+class LocalConversationSpamFilter(private val database: SpamDatabase,
+    private val decisions: vip.mystery0.pixel.text.domain.spam.SpamRepository) {
     suspend fun spamIds(messages: List<MirrorMessageModel>, threshold: Float): Set<Long> {
         val whitelist = database.senderWhitelistDao()
         val matchers = whitelist.getRules().map {
@@ -20,11 +21,10 @@ class LocalConversationSpamFilter(private val database: SpamDatabase) {
                 if (message.key.transport == MessageTransport.MMS) -message.key.sourceId else message.key.sourceId
 
             val ids = batch.map(::id)
-            val candidates = database.spamResultDao().getSpamMessageIds(ids, threshold).toSet()
             val allowed = whitelist.getAllowed(ids).associateBy { it.messageId }
+            val keys = mutableListOf<vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey>()
             for (message in batch) {
                 val messageId = id(message)
-                if (messageId !in candidates) continue
                 val addresses = message.addresses.filter {
                     it.type in setOf(
                         137,
@@ -49,8 +49,12 @@ class LocalConversationSpamFilter(private val database: SpamDatabase) {
                             sender
                         )
                     }) continue
-                result += messageId
+                val visibleMessage = message.toMessageModel()
+                val key = vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
+                    message.key.transport.name, messageId, visibleMessage.sender, visibleMessage.timestamp, visibleMessage.content)
+                keys += key
             }
+            result += decisions.scoresForKeys(keys).filterValues { it >= threshold }.keys
         }
         return result
     }

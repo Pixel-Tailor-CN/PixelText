@@ -53,11 +53,6 @@ sealed interface DeleteMessageResultEvent {
     data class Failure(val reason: String) : DeleteMessageResultEvent
 }
 
-sealed interface MarkSpamResultEvent {
-    data class Success(val markedAsSpam: Boolean) : MarkSpamResultEvent
-    data class Failure(val reason: String) : MarkSpamResultEvent
-}
-
 sealed interface ManualSpamCheckState {
     data object Checking : ManualSpamCheckState
     data class Result(val score: Float) : ManualSpamCheckState
@@ -93,9 +88,6 @@ class ConversationDetailViewModel(
     private val _deleteMessageResultEvents =
         Channel<DeleteMessageResultEvent>(Channel.BUFFERED)
     val deleteMessageResultEvents = _deleteMessageResultEvents.receiveAsFlow()
-
-    private val _markSpamResultEvents = Channel<MarkSpamResultEvent>(Channel.BUFFERED)
-    val markSpamResultEvents = _markSpamResultEvents.receiveAsFlow()
 
     private val _manualSpamChecks = MutableStateFlow<Map<Long, ManualSpamCheckState>>(emptyMap())
     val manualSpamChecks: StateFlow<Map<Long, ManualSpamCheckState>> =
@@ -324,26 +316,6 @@ class ConversationDetailViewModel(
         }
     }
 
-    fun markMessageSpam(message: MessageModel, markedAsSpam: Boolean) {
-        viewModelScope.launch {
-            runCatching {
-                val score = if (markedAsSpam) MANUAL_SPAM_SCORE else MANUAL_NON_SPAM_SCORE
-                spamRepository.save(message.id, message.threadId, score)
-                SmartspacerIntegration.notifyChanged(context)
-                val effectiveScore = spamRepository.getScore(message.id) ?: score
-                updateMessageSpamScore(message.id, effectiveScore)
-                _manualSpamChecks.value += (message.id to ManualSpamCheckState.Result(effectiveScore))
-                effectiveScore >= SPAM_THRESHOLD
-            }.onSuccess { isSpam ->
-                _markSpamResultEvents.trySend(MarkSpamResultEvent.Success(isSpam))
-            }.onFailure { e ->
-                _markSpamResultEvents.trySend(
-                    MarkSpamResultEvent.Failure(e.message ?: "标记失败")
-                )
-            }
-        }
-    }
-
     fun checkSpamOnce(message: MessageModel) {
         if (message.content.isBlank()) {
             _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
@@ -362,7 +334,10 @@ class ConversationDetailViewModel(
                 withContext(Dispatchers.Default) {
                     manualClassificationMutex.withLock {
                         spamClassifierFactory.create().use { classifier ->
-                            classifier.classify(message.content)
+                            val prediction = classifier.predict(message.content)
+                            check(spamRepository.savePrediction(message.id, message.threadId, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
+                                if (message.isMms) "MMS" else "SMS", message.id, message.sender, message.timestamp, message.content), allowDisabled = true)) { "模型已更新，请重新检测" }
+                            prediction.score
                         }
                     }
                 }
@@ -370,7 +345,6 @@ class ConversationDetailViewModel(
             val state = if (result.isSuccess) {
                 val score = result.getOrThrow()
                 if (score >= 0f) {
-                    spamRepository.save(message.id, message.threadId, score)
                     SmartspacerIntegration.notifyChanged(context)
                     val effectiveScore = spamRepository.getScore(message.id) ?: score
                     updateMessageSpamScore(message.id, effectiveScore)
@@ -483,8 +457,6 @@ class ConversationDetailViewModel(
     companion object {
         private const val TAG = "ConversationDetailViewM"
         private const val SPAM_THRESHOLD = 0.7f
-        private const val MANUAL_SPAM_SCORE = 1f
-        private const val MANUAL_NON_SPAM_SCORE = 0f
         private const val MESSAGE_PAGE_SIZE = 20
         private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L
     }

@@ -3,6 +3,8 @@ package vip.mystery0.pixel.text.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -17,6 +19,7 @@ data class SampleSubmissionDraftChoice(
 )
 
 data class SampleSubmissionState(
+    val learningFeedback: LearningFeedback? = null,
     val content: String = "",
     val sender: String = "",
     val category: String = SampleCategory.NORMAL.value,
@@ -49,19 +52,24 @@ class SampleSubmissionViewModel(
     private var initialized = false
     private var initialInput: SampleReportDraft? = null
 
-    fun initialize(content: String, sender: String, category: String) {
+    fun initialize(content: String, sender: String, category: String, learningFeedback: LearningFeedback? = null) {
         if (initialized) return
         initialized = true
-        if (initialInput == null) initialInput = SampleReportDraft(content, sender, category)
+        if (initialInput == null) initialInput = SampleReportDraft(content, sender, category, learningFeedback)
         mutableState.update { it.copy(loading = true, localError = false) }
         viewModelScope.launch {
             try {
                 val pending = repository.pending()
                 val draft = if (pending == null) repository.draft() else null
-                val currentMessage = SampleReportDraft(content, sender,
-                    SampleCategory.fromValue(category)?.value ?: SampleCategory.NORMAL.value)
+                val prepared = withContext(Dispatchers.Default) {
+                    if (repository.automaticDesensitizationEnabled()) AutomaticSampleDesensitizer().prepare(content, sender)
+                    else DesensitizedDraft(content, sender)
+                }
+                val currentMessage = SampleReportDraft(prepared.text, prepared.sender,
+                    SampleCategory.fromValue(category)?.value ?: SampleCategory.NORMAL.value, learningFeedback)
                 mutableState.value = if (pending != null) SampleSubmissionState(
                     content = pending.content, sender = pending.sender, category = pending.category,
+                    learningFeedback = pending.learningFeedback,
                     agreed = true, pending = true, loading = false,
                     resultMessage = "暂未确认提交结果。已恢复本次确认的内容和请求编号；查看记录不会自动结束本次提交",
                 ) else if (draft != null && (content.isNotBlank() || sender.isNotBlank())) {
@@ -69,7 +77,8 @@ class SampleSubmissionViewModel(
                     SampleSubmissionState(loading = false, hasRetainedDraft = true,
                         draftChoice = SampleSubmissionDraftChoice(currentMessage, draft))
                 } else SampleSubmissionState(
-                    content = draft?.content ?: content, sender = draft?.sender ?: sender,
+                    content = draft?.content ?: currentMessage.content, sender = draft?.sender ?: currentMessage.sender,
+                    learningFeedback = draft?.learningFeedback ?: learningFeedback,
                     category = SampleCategory.fromValue(draft?.category ?: category)?.value ?: SampleCategory.NORMAL.value,
                     loading = false, dirty = draft != null, hasRetainedDraft = draft != null,
                 )
@@ -87,7 +96,7 @@ class SampleSubmissionViewModel(
         if (!before.localError || before.loading || before.submitting || before.saving) return
         if (!initialized) {
             val input = initialInput ?: return
-            initialize(input.content, input.sender, input.category)
+            initialize(input.content, input.sender, input.category, input.learningFeedback)
             return
         }
         mutableState.update { it.copy(loading = true) }
@@ -95,7 +104,7 @@ class SampleSubmissionViewModel(
             try {
                 val pending = repository.pending()
                 mutableState.value = if (pending != null) before.copy(content = pending.content,
-                    sender = pending.sender, category = pending.category, agreed = true, pending = true,
+                    sender = pending.sender, category = pending.category, learningFeedback = pending.learningFeedback, agreed = true, pending = true,
                     loading = false, preparing = false, localError = false, draftChoice = null,
                     resultMessage = "已恢复本次待确认提交，将继续使用原请求编号和全部内容")
                 else before.copy(loading = false, preparing = false, localError = false, pending = false,
@@ -118,6 +127,7 @@ class SampleSubmissionViewModel(
         val draft = if (useCurrentMessage) choice.currentMessage else choice.retainedDraft
         // 选择只改变本页内容；原保留草稿直到显式保存、放弃或提交成功才按流程清理。
         mutableState.value = SampleSubmissionState(content = draft.content, sender = draft.sender,
+            learningFeedback = draft.learningFeedback,
             category = SampleCategory.fromValue(draft.category)?.value ?: SampleCategory.NORMAL.value,
             loading = false, dirty = !useCurrentMessage, hasRetainedDraft = true)
     }
@@ -179,10 +189,10 @@ class SampleSubmissionViewModel(
             try {
                 val onPersisted: (SampleReportRequest) -> Unit = { request ->
                     mutableState.update { it.copy(content = request.content, sender = request.sender,
-                        category = request.category, agreed = true, pending = true, preparing = false, resultMessage = null) }
+                        category = request.category, learningFeedback = request.learningFeedback, agreed = true, pending = true, preparing = false, resultMessage = null) }
                 }
                 val result = if (before.pending) repository.retryPending(onPersisted)
-                    else repository.submit(before.content, before.sender, before.category, onPersisted)
+                    else repository.submit(before.content, before.sender, before.category, onPersisted, before.learningFeedback)
                 mutableState.update { it.copy(submitting = false, preparing = false, pending = false, dirty = false,
                     successReportId = result.report.summary.id) }
             } catch (error: CancellationException) { throw error
@@ -193,6 +203,7 @@ class SampleSubmissionViewModel(
                     mutableState.update { it.copy(submitting = false, preparing = false, pending = pending != null,
                         content = pending?.content ?: it.content, sender = pending?.sender ?: it.sender,
                         category = pending?.category ?: it.category,
+                        learningFeedback = if (pending != null) pending.learningFeedback else it.learningFeedback,
                         resultMessage = if (pending != null) "暂未确认提交结果。${error.reportMessage()}" else error.reportMessage(),
                         retryAt = error.reportRetryAt()) }
                 } catch (cancelled: CancellationException) { throw cancelled
@@ -211,7 +222,7 @@ class SampleSubmissionViewModel(
         val current = state.value
         // 即使请求读取仍异常，用户也可显式另存编辑草稿；不会更改任何待确认请求。
         if (current.loading || current.submitting || current.saving || current.pending || current.draftChoice != null) return
-        val draft = SampleReportDraft(state.value.content, state.value.sender, state.value.category)
+        val draft = SampleReportDraft(state.value.content, state.value.sender, state.value.category, state.value.learningFeedback)
         mutableState.update { it.copy(saving = true) }
         viewModelScope.launch {
             try {

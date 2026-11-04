@@ -25,7 +25,12 @@ data class SpamResultEntity(
     val messageId: Long,
     @ColumnInfo(name = "thread_id") val threadId: Long,
     @ColumnInfo(name = "spam_score") val spamScore: Float,
-    @ColumnInfo(name = "checked_at") val checkedAt: Long
+    @ColumnInfo(name = "checked_at") val checkedAt: Long,
+    @ColumnInfo(name = "source", defaultValue = "'legacy'") val source: String = "legacy",
+    @ColumnInfo(name = "model_identity", defaultValue = "''") val modelIdentity: String = "",
+    @ColumnInfo(name = "personal_generation") val personalGeneration: Long? = null,
+    @ColumnInfo(name = "message_fingerprint", defaultValue = "''") val messageFingerprint: String = "",
+    @ColumnInfo(name = "decision_revision", defaultValue = "-1") val decisionRevision: Long = -1,
 )
 
 @Entity(
@@ -55,6 +60,18 @@ data class KeywordSpamMatchEntity(
 
 @Dao
 interface SpamResultDao {
+    @Query("SELECT * FROM spam_result WHERE message_id IN (:messageIds)")
+    suspend fun results(messageIds: List<Long>): List<SpamResultEntity>
+
+    @Query("SELECT message_id FROM keyword_spam_match WHERE message_id IN (:messageIds)")
+    suspend fun keywordIds(messageIds: List<Long>): List<Long>
+
+    @Query("SELECT message_id FROM spam_result UNION SELECT message_id FROM keyword_spam_match")
+    suspend fun allDecisionIds(): List<Long>
+
+    @Query("DELETE FROM spam_result")
+    suspend fun invalidatePredictions()
+
     @Query(
         """
         SELECT CASE
@@ -175,7 +192,7 @@ interface BlockedKeywordDao {
         SenderWhitelistRuleEntity::class,
         SpamAllowedMessageEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class SpamDatabase : RoomDatabase() {
@@ -190,8 +207,20 @@ abstract class SpamDatabase : RoomDatabase() {
                 SpamDatabase::class.java,
                 "spam.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE spam_result ADD COLUMN source TEXT NOT NULL DEFAULT 'legacy'")
+                db.execSQL("ALTER TABLE spam_result ADD COLUMN model_identity TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE spam_result ADD COLUMN personal_generation INTEGER")
+                db.execSQL("ALTER TABLE spam_result ADD COLUMN message_fingerprint TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE spam_result ADD COLUMN decision_revision INTEGER NOT NULL DEFAULT -1")
+                // 旧分数没有来源，不能当作人工标注或新版模型预测。
+                db.execSQL("DELETE FROM spam_result")
+            }
         }
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {

@@ -12,18 +12,21 @@ import vip.mystery0.pixel.text.domain.model.KeywordSaveResult
 import vip.mystery0.pixel.text.domain.model.KeywordSpamMessage
 import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
+import vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository
 import java.util.Locale
 
 class KeywordSpamRepositoryImpl(
     db: SpamDatabase,
     private val whitelist: SenderWhitelistRepository,
+    private val learning: PersonalLearningRepository,
 ) : KeywordSpamRepository {
     private val dao = db.blockedKeywordDao()
 
     override fun observeKeywords(): Flow<List<BlockedKeyword>> =
         dao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
-    override suspend fun save(id: Long?, keyword: String): KeywordSaveResult =
+    // 与收信最终副作用共用决策锁，防止已撤销的关键词继续触发自动操作。
+    override suspend fun save(id: Long?, keyword: String): KeywordSaveResult = learning.withDecision {
         withContext(Dispatchers.IO) {
             val trimmed = keyword.trim()
             if (trimmed.isEmpty()) return@withContext KeywordSaveResult.Empty
@@ -58,11 +61,14 @@ class KeywordSpamRepositoryImpl(
                 KeywordSaveResult.Success(updated.toDomain())
             }
         }
+    }
 
-    override suspend fun delete(id: Long): Boolean = withContext(Dispatchers.IO) {
-        if (dao.getById(id) == null) return@withContext false
-        dao.deleteById(id)
-        true
+    override suspend fun delete(id: Long): Boolean = learning.withDecision {
+        withContext(Dispatchers.IO) {
+            if (dao.getById(id) == null) return@withContext false
+            dao.deleteById(id)
+            true
+        }
     }
 
     override suspend fun updateMessageMatch(
@@ -91,7 +97,8 @@ class KeywordSpamRepositoryImpl(
         }
     }
 
-    override suspend fun rebuildMatches(messages: List<KeywordSpamMessage>): Int =
+    // 锁顺序保持学习决策锁在前、白名单锁在后。
+    override suspend fun rebuildMatches(messages: List<KeywordSpamMessage>): Int = learning.withDecision {
         withContext(Dispatchers.IO) {
             val keywords = dao.getAll()
             val now = System.currentTimeMillis()
@@ -109,6 +116,7 @@ class KeywordSpamRepositoryImpl(
             dao.replaceAllMatches(matches)
             matches.size
         }
+    }
 
     private fun findMatch(
         content: String,

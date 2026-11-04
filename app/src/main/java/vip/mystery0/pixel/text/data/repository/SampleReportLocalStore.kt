@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.source.SampleReportBody
 import vip.mystery0.pixel.text.data.source.SampleReportDraftDto
+import vip.mystery0.pixel.text.data.source.toDto
 import vip.mystery0.pixel.text.data.source.toBody
 import vip.mystery0.pixel.text.domain.hub.*
 import java.io.File
@@ -62,11 +63,11 @@ class SampleReportLocalStore(context: Context) {
         val text = read(draftFile) ?: return@locked null
         val dto = try { draftAdapter.fromJson(text) } catch (_: Exception) { corrupt("保留草稿") }
             ?: corrupt("保留草稿")
-        SampleReportDraft(dto.content, dto.sender, dto.category)
+        SampleReportDraft(dto.content, dto.sender, dto.category, dto.learningFeedback?.toDomain())
     }
 
     suspend fun saveDraft(draft: SampleReportDraft) = locked {
-        write(draftFile, draftAdapter.toJson(SampleReportDraftDto(draft.content, draft.sender, draft.category)))
+        write(draftFile, draftAdapter.toJson(SampleReportDraftDto(draft.content, draft.sender, draft.category, draft.learningFeedback?.toDto())))
     }
 
     suspend fun clearDraft() = locked {

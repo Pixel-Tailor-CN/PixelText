@@ -166,6 +166,7 @@ fun SettingsScreen(
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToAppIdentity: () -> Unit = {},
+    onNavigateToPersonalLearning: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToOpenSource: () -> Unit = {},
@@ -513,6 +514,12 @@ fun SettingsScreen(
                             Icon(Icons.Rounded.Shield, contentDescription = null)
                         }
                     )
+                },
+                SettingsEntry("personal_learning") {
+                    Preference(title = { Text("个人学习") },
+                        summary = { Text(if (settings.personalLearningEnabled) "已开启 · 管理学习样本与贡献草稿" else "已关闭 · 主动纠正后在本机学习") },
+                        icon = { Icon(Icons.Rounded.Memory, null) },
+                        onClick = onNavigateToPersonalLearning)
                 },
                 SettingsEntry("keyword_spam") {
                     Preference(

@@ -19,6 +19,7 @@ class SampleSubmissionRepository(
     private val client: PixelTextHubClient,
     private val settings: AppSettingsRepository,
     private val localStore: SampleReportLocalStore,
+    private val resources: vip.mystery0.pixel.text.data.resource.HubResourceStore,
 ) {
     private val submitMutex = Mutex()
     private var submitRetryAt = 0L
@@ -31,6 +32,8 @@ class SampleSubmissionRepository(
             localStore.installationId())
     }
 
+    fun automaticDesensitizationEnabled(): Boolean = settings.settings.value.learningAutoDesensitizeEnabled
+
     suspend fun pending(): SampleReportRequest? = localStore.pending()
     suspend fun draft(): SampleReportDraft? = localStore.draft()
     suspend fun saveDraft(draft: SampleReportDraft) = localStore.saveDraft(draft)
@@ -39,18 +42,20 @@ class SampleSubmissionRepository(
     suspend fun detail(id: String): SampleReportDetail = client.getReport(identity(), id)
 
     suspend fun submit(content: String, sender: String, category: String,
-        onPersisted: (SampleReportRequest) -> Unit): SampleReportSubmission =
+        onPersisted: (SampleReportRequest) -> Unit,
+        learningFeedback: LearningFeedback? = null): SampleReportSubmission =
         submitMutex.withLock {
             // 其他页面已持久化的请求优先恢复，不能把另一份表单覆盖进去。
             if (localStore.pending() != null) throw SampleReportException("PENDING_EXISTS", "有一条提交尚未确认，请先恢复本次提交")
-            val versions = listOf(BuildConfig.VERSION_NAME, settings.getRuleResourceVersion(), settings.getSpamModelResourceVersion())
+            val modelVersion = withContext(kotlinx.coroutines.Dispatchers.IO) { resources.currentModelBundle().version }
+            val versions = listOf(BuildConfig.VERSION_NAME, settings.getRuleResourceVersion(), modelVersion)
             validationError(content, sender, category, versions)?.let { throw SampleReportException("VALIDATION", it) }
             val identity = identity()
             if (identity.androidId.isEmpty()) throw SampleReportException("DEVICE_ID", "无法读取有效的设备标识，暂不能提交")
             checkSubmitCooldown()
             val request = localStore.confirm(SampleReportRequest(identity.androidId, identity.installationId,
                 UUID.randomUUID().toString(), content.trim(), sender.trim(), category,
-                versions[0], versions[1], versions[2]))
+                versions[0], versions[1], versions[2], learningFeedback))
             // 只有完整负载原子落盘并回读成功，界面才能解除准备阶段的返回保护。
             onPersisted(request)
             sendConfirmed(request)

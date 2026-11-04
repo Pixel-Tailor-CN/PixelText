@@ -1,86 +1,41 @@
 package vip.mystery0.pixel.text.domain.spam
 
-import android.content.Context
 import android.util.Log
-import org.tensorflow.lite.Interpreter
-import vip.mystery0.pixel.text.data.resource.HubResourceStore
-import java.io.FileInputStream
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository
+import vip.mystery0.pixel.text.domain.spam.learning.SpamModelEngine
 
-class SpamClassifier(
-    context: Context,
-    private val resourceStore: HubResourceStore,
-) : AutoCloseable {
-    companion object {
-        private const val TAG = "SpamClassifier"
-        private const val MODEL_FILE = "spam_classifier.tflite"
-        private const val VOCAB_FILE = "vocab.txt"
-        private const val SEQ_LEN = 40
-        private const val UNKNOWN_TOKEN_ID = 1
-        private val whitespaceRegex = Regex("\\s+")
-    }
+data class SpamPrediction(val score: Float, val source: String, val modelIdentity: String,
+    val personalGeneration: Long?, val revision: Long)
 
-    private val interpreter: Interpreter
-    private val vocabulary: Map<String, Int>
-
-    init {
-        val model = loadModel(context)
-        val options = Interpreter.Options()
-        interpreter = Interpreter(model, options)
-        vocabulary = loadVocabulary(context)
-    }
-
-    private fun loadModel(context: Context): MappedByteBuffer {
-        val activeModel = resourceStore.activeModelFile()
-        if (activeModel.isFile) {
-            return FileInputStream(activeModel).channel.use { channel ->
-                channel.map(FileChannel.MapMode.READ_ONLY, 0, activeModel.length())
-            }
+/** 会话独占模型；公共模型先处理全文，个人参数有效时以个人结果为准。 */
+class SpamClassifier(private val engine: SpamModelEngine,
+    private val learning: PersonalLearningRepository,
+    private val settings: AppSettingsRepository,
+    private val recoverParameters: suspend (Long) -> Unit) : AutoCloseable {
+    suspend fun predict(text: String): SpamPrediction {
+        currentCoroutineContext().ensureActive()
+        var revision = learning.stateRevision()
+        var parameters = if (settings.settings.value.personalLearningEnabled) learning.currentParameters(engine.identity) else null
+        val publicScore = engine.inferPublic(text)
+        val score = try {
+            parameters?.let { engine.inferPersonal(text, it.payload) } ?: publicScore
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            recoverParameters(revision)
+            revision = learning.stateRevision()
+            parameters = null
+            publicScore
         }
-        val fd = context.assets.openFd(MODEL_FILE)
-        return FileInputStream(fd.fileDescriptor).channel.map(
-            FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength
-        )
+        currentCoroutineContext().ensureActive()
+        return SpamPrediction(score, if (parameters == null) "public" else "personal", engine.identity, parameters?.generation, revision)
     }
-
-    private fun loadVocabulary(context: Context): Map<String, Int> {
-        val activeVocab = resourceStore.activeVocabFile()
-        if (activeVocab.isFile) {
-            return activeVocab.bufferedReader(Charsets.UTF_8).useLines { lines ->
-                lines.mapIndexed { index, token -> token to index + 1 }.toMap()
-            }
-        }
-        return context.assets.open(VOCAB_FILE).bufferedReader(Charsets.UTF_8).useLines { lines ->
-            lines.mapIndexed { index, token -> token to index + 1 }.toMap()
-        }
-    }
-
-    fun classify(text: String): Float {
-        return try {
-            val input = Array(1) { encode(text) }
-            val output = Array(1) { FloatArray(1) }
-            interpreter.run(input, output)
-            output[0][0]
-        } catch (e: Exception) {
-            Log.e(TAG, "inference failed message=${e.message}")
-            -1f
-        }
-    }
-
-    private fun encode(text: String): IntArray {
-        val encoded = IntArray(SEQ_LEN)
-        var index = 0
-        val iterator = text.replace(whitespaceRegex, " ").codePoints().iterator()
-        while (iterator.hasNext() && index < SEQ_LEN) {
-            val token = String(Character.toChars(iterator.nextInt()))
-            encoded[index] = vocabulary[token] ?: UNKNOWN_TOKEN_ID
-            index++
-        }
-        return encoded
-    }
-
-    override fun close() {
-        interpreter.close()
-    }
+    suspend fun classify(text: String): Float = try { predict(text).score }
+    catch (error: CancellationException) { throw error }
+    catch (_: Exception) { Log.e("SpamClassifier", "inference failed"); -1f }
+    override fun close() = engine.close()
 }

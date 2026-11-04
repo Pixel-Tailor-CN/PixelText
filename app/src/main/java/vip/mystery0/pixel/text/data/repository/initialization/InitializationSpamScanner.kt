@@ -46,9 +46,8 @@ class InitializationSpamScanner(
                     complete = true
                 )
                 val sms = row.sms ?: throw IOException("sms_structure_missing")
-                val score =
-                    if (whitelist.isAllowed(row.message.sourceId)) 0f else activeClassifier.classify(sms.body.orEmpty())
-                if (!score.isFinite() || score < 0f) throw IOException("spam_classification_unavailable")
+                val prediction = if (whitelist.isAllowed(row.message.sourceId) || sms.body.isNullOrBlank()) null
+                    else activeClassifier.predict(sms.body.orEmpty())
                 // 分类期间被修改的数据由下一批重读，不以旧内容推进检查点。
                 val unchanged = MirrorSynchronizationLock.mutex.withLock {
                     val latest = dao.getLocal(row.message.localId)
@@ -56,7 +55,10 @@ class InitializationSpamScanner(
                         if (latest.message.revision != row.message.revision) {
                             return@withLock false
                         }
-                        repository.save(row.message.sourceId, row.message.threadId ?: -1, score)
+                        if (prediction != null && !repository.savePrediction(row.message.sourceId, row.message.threadId ?: -1, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
+                                "SMS", row.message.sourceId, sms.address.orEmpty(), row.message.originalDate ?: 0L, sms.body.orEmpty()))) {
+                            throw IOException("stale_spam_prediction")
+                        }
                     }
                     true
                 }

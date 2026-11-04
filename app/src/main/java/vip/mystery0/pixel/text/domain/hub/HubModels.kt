@@ -19,6 +19,12 @@ data class HubSpamModelArtifact(
     val model: HubFileArtifact,
     val vocab: HubFileArtifact,
     val releaseNotes: String,
+    val contract: HubFileArtifact,
+    val minAppVersionCode: Int,
+    val modelContractVersion: Int,
+    val preprocessingVersion: String,
+    val personalParameterVersion: String,
+    val featureCompatibilityId: String,
 )
 
 data class HubResourceManifest(

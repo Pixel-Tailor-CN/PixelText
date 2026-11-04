@@ -16,6 +16,7 @@ import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import java.util.UUID
+import kotlinx.coroutines.ensureActive
 
 class HistoricalSpamScanWorker(
     context: Context,
@@ -32,12 +33,14 @@ class HistoricalSpamScanWorker(
         const val KEY_TOTAL = "total"
         const val KEY_PROCESSED = "processed"
         const val KEY_SPAM_COUNT = "spam_count"
+        private const val KEY_SILENT = "silent"
 
-        fun schedule(context: Context): UUID {
-            val request = OneTimeWorkRequestBuilder<HistoricalSpamScanWorker>().build()
+        fun schedule(context: Context, replace: Boolean = true, silent: Boolean = false): UUID {
+            val request = OneTimeWorkRequestBuilder<HistoricalSpamScanWorker>()
+                .setInputData(workDataOf(KEY_SILENT to silent)).build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
+                if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request
             )
             return request.id
@@ -66,10 +69,12 @@ class HistoricalSpamScanWorker(
                 spamClassifierFactory.create().use { classifier ->
                     pendingMessages.chunked(BATCH_SIZE).forEach { batch ->
                         batch.forEach { message ->
-                            val score = if (whitelist.isAllowed(message.messageId)) 0f
-                                else classifier.classify(message.content)
-                            if (score >= 0f) {
-                                spamRepository.save(message.messageId, message.threadId, score)
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            if (!spamRepository.isEnabled()) return Result.success()
+                            val prediction = if (whitelist.isAllowed(message.messageId) || message.content.isBlank()) null
+                                else classifier.predict(message.content)
+                            if (prediction != null) {
+                                if (!spamRepository.savePrediction(message.messageId, message.threadId, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create("SMS", message.messageId, message.address, message.date, message.content))) return Result.retry()
                                 if ((spamRepository.getScore(message.messageId) ?: -1f) >= SPAM_THRESHOLD) spamCount++
                             }
                             processed++
@@ -83,7 +88,7 @@ class HistoricalSpamScanWorker(
             if (pendingMessages.isNotEmpty()) {
                 SmartspacerIntegration.notifyChanged(applicationContext)
             }
-            SpamScanNotificationHelper.showCompleted(applicationContext, processed, spamCount)
+            if (!inputData.getBoolean(KEY_SILENT, false)) SpamScanNotificationHelper.showCompleted(applicationContext, processed, spamCount)
             Result.success(
                 workDataOf(
                     KEY_TOTAL to pendingMessages.size,
@@ -91,9 +96,11 @@ class HistoricalSpamScanWorker(
                     KEY_SPAM_COUNT to spamCount
                 )
             )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "historical spam scan failed", e)
-            SpamScanNotificationHelper.showFailed(applicationContext)
+            if (!inputData.getBoolean(KEY_SILENT, false)) SpamScanNotificationHelper.showFailed(applicationContext)
             Result.failure()
         }
     }
@@ -112,9 +119,9 @@ class HistoricalSpamScanWorker(
             )
         )
 
-        if (forceNotification ||
+        if (!inputData.getBoolean(KEY_SILENT, false) && (forceNotification ||
             processed == total ||
-            processed % NOTIFICATION_UPDATE_INTERVAL == 0
+            processed % NOTIFICATION_UPDATE_INTERVAL == 0)
         ) {
             SpamScanNotificationHelper.showProgress(applicationContext, processed, total)
         }

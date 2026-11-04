@@ -14,6 +14,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Streaming
 import retrofit2.http.Url
+import retrofit2.http.Query
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.domain.hub.HubArtifact
 import vip.mystery0.pixel.text.domain.hub.HubFileArtifact
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
@@ -36,7 +38,7 @@ class PixelTextHubClient(
     }
 
     suspend fun fetchManifest(): HubResourceManifest = withContext(Dispatchers.IO) {
-        bodyOrThrow(service.fetchManifest(), "request failed").toDomain()
+        bodyOrThrow(service.fetchManifest(BuildConfig.VERSION_CODE, 2), "资源协议 v2 暂不可用").toDomain()
     }
 
     suspend fun submitReport(request: SampleReportRequest): SampleReportSubmission = withContext(Dispatchers.IO) {
@@ -156,10 +158,12 @@ class PixelTextHubClient(
     suspend fun downloadTo(
         url: String,
         target: File,
+        maxSizeBytes: Long = Long.MAX_VALUE,
         onProgress: (Long) -> Unit = {},
     ): Long = withContext(Dispatchers.IO) {
         val response = service.download(url)
         if (!response.isSuccessful) {
+            response.errorBody()?.close()
             throw IllegalStateException("download failed status=${response.code()}")
         }
         val body = response.body() ?: throw IllegalStateException("download failed empty body")
@@ -172,6 +176,7 @@ class PixelTextHubClient(
                     while (true) {
                         val readBytes = input.read(buffer)
                         if (readBytes < 0) break
+                        check(totalBytes <= maxSizeBytes - readBytes) { "download size exceeded" }
                         output.write(buffer, 0, readBytes)
                         totalBytes += readBytes
                         onProgress(totalBytes)
@@ -204,8 +209,11 @@ class PixelTextHubClient(
 }
 
 private interface PixelTextHubService {
-    @GET("api/v1/resources/manifest")
-    suspend fun fetchManifest(): Response<HubResourceManifestResponse>
+    @GET("api/v2/resources/manifest")
+    suspend fun fetchManifest(
+        @Query("appVersionCode") appVersionCode: Int,
+        @Query("modelContractVersion") modelContractVersion: Int,
+    ): Response<HubResourceManifestResponse>
 
     @GET("api/v1/sender-profiles/manifest")
     suspend fun fetchSenderProfileManifest(): Response<SenderProfileManifestResponse>
@@ -271,12 +279,24 @@ internal data class HubSpamModelArtifactResponse(
     val model: HubFileArtifactResponse,
     val vocab: HubFileArtifactResponse,
     val releaseNotes: String = "",
+    val contract: HubFileArtifactResponse,
+    val minAppVersionCode: Int,
+    val modelContractVersion: Int,
+    val preprocessingVersion: String,
+    val personalParameterVersion: String,
+    val featureCompatibilityId: String,
 ) {
     fun toDomain(): HubSpamModelArtifact = HubSpamModelArtifact(
         version = version,
         model = model.toDomain(),
         vocab = vocab.toDomain(),
-        releaseNotes = releaseNotes
+        releaseNotes = releaseNotes,
+        contract = contract.toDomain(),
+        minAppVersionCode = minAppVersionCode,
+        modelContractVersion = modelContractVersion,
+        preprocessingVersion = preprocessingVersion,
+        personalParameterVersion = personalParameterVersion,
+        featureCompatibilityId = featureCompatibilityId,
     )
 }
 

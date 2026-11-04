@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import android.widget.Toast
+import vip.mystery0.pixel.text.domain.hub.LearningFeedback
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.CircularProgressIndicator
@@ -73,6 +74,7 @@ fun SampleSubmissionScreen(
     initialContent: String = "",
     initialSender: String = "",
     initialCategory: String = SampleCategory.NORMAL.value,
+    initialLearningFeedback: LearningFeedback? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -97,7 +99,7 @@ fun SampleSubmissionScreen(
     }
     BackHandler(enabled = !state.desensitizationState.visible && state.draftChoice == null, onBack = requestBack)
     LaunchedEffect(initialContent, initialSender, initialCategory) {
-        viewModel.initialize(initialContent, initialSender, initialCategory)
+        viewModel.initialize(initialContent, initialSender, initialCategory, initialLearningFeedback)
     }
     LaunchedEffect(state.successReportId) {
         state.successReportId?.let { id ->
@@ -116,6 +118,14 @@ fun SampleSubmissionScreen(
         LazyColumn(Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (state.loading) item { CircularProgressIndicator() }
+            if (state.learningFeedback != null) item {
+                Text("本地学习已记录。此处编辑只影响贡献草稿；只有勾选确认并提交后才上传，返回或取消不会上传。",
+                    style = MaterialTheme.typography.bodyMedium)
+                if (contentError != null) Text("当前正文不满足上报长度要求，仍保留本地学习；不会自动裁剪正文。",
+                    color = MaterialTheme.colorScheme.error)
+            }
+            item { Text("自动脱敏不能识别所有敏感信息，请检查正文和可选发件方，也可继续使用脱敏助手。",
+                style = MaterialTheme.typography.bodySmall) }
             if (state.preparing) item {
                 Text("正在保存本次提交，请稍候。保存完成后即可返回，网络等待不会阻止退出。",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -174,10 +184,16 @@ fun SampleSubmissionScreen(
                     isError = senderTooLong,
                     supportingText = { Text(if (senderTooLong) "发送方不能超过 256 个字符" else "最多 256 个字符，请一并脱敏") })
             }
+            state.learningFeedback?.let { feedback -> item {
+                Text("随样本提交的学习反馈：本机学习；基础版本 ${feedback.baseModelVersion.ifBlank { "内置" }}；" +
+                    "个人代次 ${feedback.personalGeneration?.toString() ?: "无"}；" +
+                    "本地标签 ${if (feedback.originalLabel == "spam") "骚扰短信" else "正常短信"}。不上传个人参数或学习库。",
+                    style = MaterialTheme.typography.bodySmall)
+            } }
             if (!state.pending) item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     Checkbox(checked = state.agreed, onCheckedChange = viewModel::updateAgreed, enabled = !state.locked)
-                    Text("我确认已删除或替换姓名、手机号、地址、订单号、银行卡号等敏感信息，并同意主动提交此样本、发送方、分类、版本、Android 设备标识及本次安装身份，用于规则改进、模型优化、反滥用风控和查询本人记录。",
+                    Text("我确认已删除或替换姓名、手机号、地址、订单号、银行卡号等敏感信息，并同意主动提交此样本、发送方、分类、版本、本页展示的学习反馈（如有）、Android 设备标识及本次安装身份，用于规则改进、模型优化、反滥用风控和查询本人记录。",
                         Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium)
                 }
             }

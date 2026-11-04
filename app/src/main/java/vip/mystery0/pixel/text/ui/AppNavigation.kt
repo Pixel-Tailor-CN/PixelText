@@ -1,6 +1,8 @@
 package vip.mystery0.pixel.text.ui
 
 import android.net.Uri
+import vip.mystery0.pixel.text.domain.hub.LearningFeedback
+import vip.mystery0.pixel.text.ui.screen.PersonalLearningScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -207,6 +209,7 @@ fun AppNavigation(
             }
             composable("settings") {
                 SettingsScreen(
+                    onNavigateToPersonalLearning = { navController.navigate("personal_learning") },
                     onNavigateToBackup = { navController.navigate("backup_restore") },
                     onNavigateToOpenSource = { navController.navigate("open_source") },
                     onNavigateBack = { navController.popBackStack() },
@@ -259,6 +262,9 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
+            composable("personal_learning") {
+                PersonalLearningScreen(onNavigateBack = { navController.popBackStack() })
+            }
             composable("keyword_spam") {
                 KeywordSpamSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
@@ -296,16 +302,23 @@ fun AppNavigation(
                     onReportLoaded = { sourceListViewModel?.updateReport(it) },
                     onReportNotFound = { sourceListViewModel?.markReportUnavailable(it) })
             }
-            composable("sample_submission") {
+            composable("sample_submission") { submissionEntry ->
                 val draftHandle = navController.previousBackStackEntry?.savedStateHandle
-                val initialContent = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CONTENT).orEmpty()
+                // 转移到当前页面所属状态，旋转或恢复导航后不丢失原始草稿及反馈。
+                fun initialString(key: String): String {
+                    return submissionEntry.savedStateHandle.get<String>(key)
+                        ?: draftHandle?.remove<String>(key).orEmpty().also { submissionEntry.savedStateHandle[key] = it }
                 }
-                val initialSender = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_SENDER).orEmpty()
-                }
-                val initialCategory = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CATEGORY).orEmpty()
+                val initialContent = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_CONTENT) }
+                val initialSender = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_SENDER) }
+                val initialCategory = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_CATEGORY) }
+                val learningLabel = remember(submissionEntry) { initialString("learning_feedback_label") }
+                val learningBase = remember(submissionEntry) { initialString("learning_feedback_base") }
+                val learningGeneration = remember(submissionEntry) { initialString("learning_feedback_generation").toLongOrNull() }
+                val learningFeedback = remember(submissionEntry) {
+                    learningLabel.takeIf { it.isNotEmpty() }?.let {
+                        LearningFeedback(baseModelVersion = learningBase, personalGeneration = learningGeneration, originalLabel = it)
+                    }
                 }
                 SampleSubmissionScreen(
                     onNavigateBack = { navController.popBackStack() },
@@ -319,6 +332,7 @@ fun AppNavigation(
                     initialContent = initialContent,
                     initialSender = initialSender,
                     initialCategory = initialCategory,
+                    initialLearningFeedback = learningFeedback,
                 )
             }
             composable("search") {
@@ -400,6 +414,17 @@ fun AppNavigation(
                     onOpenMmsPart = { part -> navController.navigate(if (part.partId < 0)
                         "mirror_message/${part.message.transport.name}/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToLearningContribution = { content, sender, category, feedback ->
+                        navController.currentBackStackEntry?.savedStateHandle?.apply {
+                            set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
+                            set(SAMPLE_SUBMISSION_DRAFT_SENDER, sender)
+                            set(SAMPLE_SUBMISSION_DRAFT_CATEGORY, category)
+                            set("learning_feedback_label", feedback?.originalLabel.orEmpty())
+                            set("learning_feedback_base", feedback?.baseModelVersion.orEmpty())
+                            set("learning_feedback_generation", feedback?.personalGeneration?.toString().orEmpty())
+                        }
+                        navController.navigate("sample_submission")
+                    },
                     onNavigateToSampleSubmission = { content, sender, category ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)

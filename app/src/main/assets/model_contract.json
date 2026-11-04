@@ -1,0 +1,164 @@
+{
+  "modelContractVersion": 2,
+  "preprocessingVersion": "unicode-codepoint-v2",
+  "personalParameterVersion": "linear-head-v1",
+  "featureCompatibilityId": "4a695171fec334b0b78fcc3b36216fe742f39a7b300db87f239cbe927d3460ed",
+  "model": {
+    "sha256": "1303838359976818687b9e2b5a11bfbbf03ebc0e09de8a65715c0ef8a1419a70",
+    "sizeBytes": 204652
+  },
+  "vocab": {
+    "sha256": "4a6deb7af3c5d6411389b40a0e38f80b49cc0dedca3dc5dfa96076c078c59a38",
+    "sizeBytes": 14802
+  },
+  "signatures": {
+    "infer_personal": {
+      "inputs": {
+        "parameters": {
+          "dtype": "float32",
+          "shape": [
+            17
+          ]
+        },
+        "tokens": {
+          "dtype": "int32",
+          "shape": [
+            1,
+            -1
+          ]
+        }
+      },
+      "outputs": {
+        "score": {
+          "dtype": "float32",
+          "shape": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "infer_public": {
+      "inputs": {
+        "tokens": {
+          "dtype": "int32",
+          "shape": [
+            1,
+            -1
+          ]
+        }
+      },
+      "outputs": {
+        "score": {
+          "dtype": "float32",
+          "shape": [
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "reset_personal": {
+      "inputs": {},
+      "outputs": {
+        "parameters": {
+          "dtype": "float32",
+          "shape": [
+            17
+          ]
+        },
+        "vocab_size": {
+          "dtype": "int32",
+          "shape": []
+        }
+      }
+    },
+    "train_personal": {
+      "inputs": {
+        "label": {
+          "dtype": "float32",
+          "shape": [
+            1,
+            1
+          ]
+        },
+        "learning_rate": {
+          "dtype": "float32",
+          "shape": []
+        },
+        "parameters": {
+          "dtype": "float32",
+          "shape": [
+            17
+          ]
+        },
+        "regularization": {
+          "dtype": "float32",
+          "shape": []
+        },
+        "tokens": {
+          "dtype": "int32",
+          "shape": [
+            1,
+            -1
+          ]
+        }
+      },
+      "outputs": {
+        "parameters": {
+          "dtype": "float32",
+          "shape": [
+            17
+          ]
+        }
+      }
+    }
+  },
+  "personalTraining": {
+    "learningRate": 0.01,
+    "regularization": 0.1,
+    "epochs": 5
+  },
+  "publicDecisionThreshold": 0.7,
+  "inputEncoding": {
+    "paddingId": 0,
+    "unknownTokenId": 1,
+    "whitespaceCodePoints": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      28,
+      29,
+      30,
+      31,
+      32,
+      133,
+      160,
+      5760,
+      8192,
+      8193,
+      8194,
+      8195,
+      8196,
+      8197,
+      8198,
+      8199,
+      8200,
+      8201,
+      8202,
+      8232,
+      8233,
+      8239,
+      8287,
+      12288
+    ],
+    "truncate": false
+  },
+  "runtime": {
+    "operators": "TFLITE_BUILTINS",
+    "converterVersion": "2.21.0",
+    "androidVerified": false
+  }
+}

@@ -30,8 +30,22 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         migrateSpamIsolationSetting()
     }
 
+    private val learningPrefs = context.getSharedPreferences("personal_learning_settings", Context.MODE_PRIVATE)
+
     private val _settings = MutableStateFlow(readSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    // 学习设置独立存储，不随常规设置备份或迁移。
+
+    override fun setPersonalLearningEnabled(enabled: Boolean) {
+        check(learningPrefs.edit().putBoolean("enabled", enabled).commit())
+        refreshSettings()
+    }
+
+    override fun setLearningAutoDesensitizeEnabled(enabled: Boolean) {
+        check(learningPrefs.edit().putBoolean("auto_desensitize", enabled).commit())
+        refreshSettings()
+    }
 
     override fun setAutoDownloadMms(enabled: Boolean) {
         updatePrefs { putBoolean("auto_download_mms", enabled) }
@@ -369,6 +383,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private fun readSettings(): AppSettings {
         return AppSettings(
             autoDownloadMms = prefs.getBoolean("auto_download_mms", false),
+            personalLearningEnabled = learningPrefs.getBoolean("enabled", false),
+            learningAutoDesensitizeEnabled = learningPrefs.getBoolean("auto_desensitize", true),
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),
@@ -424,6 +440,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     fun restorePortablePreferences(entries: List<vip.mystery0.pixel.text.data.backup.PortablePreference>): Boolean {
         val editor = prefs.edit()
         entries.forEach { entry ->
+            if (entry.key in setOf("personal_learning_enabled", "learning_auto_desensitize_enabled")) return@forEach
             when (entry.type) {
                 "boolean" -> editor.putBoolean(entry.key, entry.value.toBooleanStrict())
                 "int" -> editor.putInt(entry.key, entry.value.toInt())

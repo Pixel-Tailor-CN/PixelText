@@ -126,7 +126,8 @@ import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
-import vip.mystery0.pixel.text.viewmodel.MarkSpamResultEvent
+import vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel
+import vip.mystery0.pixel.text.domain.hub.LearningFeedback
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
 
@@ -142,6 +143,8 @@ fun ConversationDetailScreen(
         sender: String,
         category: String,
     ) -> Unit = { _, _, _ -> },
+    onNavigateToLearningContribution: (String, String, String, LearningFeedback?) -> Unit = { _, _, _, _ -> },
+    learningViewModel: PersonalLearningViewModel = koinViewModel(),
     onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
     isTablet: Boolean = false,
     initialMessageText: String = "",
@@ -391,9 +394,6 @@ fun ConversationDetailScreen(
         conversationTitle.isNotBlank() -> conversationTitle
         else -> address
     }
-    val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
-    val spamMarkMenuText =
-        if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
     val canReportSelectedSample = selectedMessage?.content?.isNotBlank() == true
 
     LaunchedEffect(Unit) {
@@ -415,24 +415,7 @@ fun ConversationDetailScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.markSpamResultEvents.collect { event ->
-            when (event) {
-                is MarkSpamResultEvent.Success -> {
-                    val message = if (event.markedAsSpam) {
-                        "已标记为骚扰短信"
-                    } else {
-                        "已标记为非骚扰短信"
-                    }
-                    snackbarHostState.showSnackbar(message)
-                }
-
-                is MarkSpamResultEvent.Failure -> {
-                    snackbarHostState.showSnackbar(event.reason)
-                }
-            }
-        }
-    }
+    PersonalLearningDialog(learningViewModel, onNavigateToLearningContribution)
 
     LaunchedEffect(selectedMessage?.id) {
         val message = selectedMessage ?: return@LaunchedEffect
@@ -541,16 +524,11 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(spamMarkMenuText) },
-                                        enabled = selectedMessage != null,
+                                        text = { Text("让 AI 学习") },
+                                        enabled = selectedMessage != null && !selectedMessage.isMms,
                                         onClick = {
                                             showMoreMenu = false
-                                            selectedMessage?.let {
-                                                viewModel.markMessageSpam(
-                                                    message = it,
-                                                    markedAsSpam = !selectedMessageIsSpam
-                                                )
-                                            }
+                                            selectedMessage?.let(learningViewModel::begin)
                                             selectedMessageIds.clear()
                                         }
                                     )

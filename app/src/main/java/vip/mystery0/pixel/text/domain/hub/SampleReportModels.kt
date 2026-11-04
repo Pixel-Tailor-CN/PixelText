@@ -15,6 +15,15 @@ data class SampleReportRequest(
     val appVersion: String,
     val ruleVersion: String,
     val modelVersion: String,
+    val learningFeedback: LearningFeedback? = null,
+)
+
+/** 随人工确认一起冻结的可选学习反馈，不包含个人参数。 */
+data class LearningFeedback(
+    val origin: String = "on_device_learning",
+    val baseModelVersion: String,
+    val personalGeneration: Long? = null,
+    val originalLabel: String,
 )
 
 enum class SampleReportStatus(val label: String) {
@@ -59,7 +68,8 @@ data class SampleReportDetail(
 
 data class SampleReportPage(val items: List<SampleReportSummary>, val nextCursor: String?)
 data class SampleReportSubmission(val report: SampleReportDetail, val created: Boolean)
-data class SampleReportDraft(val content: String, val sender: String, val category: String)
+data class SampleReportDraft(val content: String, val sender: String, val category: String,
+    val learningFeedback: LearningFeedback? = null)
 
 /** 只包含面向用户的安全提示，不传播服务端原始错误体。 */
 class SampleReportException(
