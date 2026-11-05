@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -272,28 +271,19 @@ private fun KeywordEditorDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(if (keyword == null) "添加拦截关键词" else "编辑拦截关键词") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = {
-                        input = it
-                        onInputChanged()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("关键词或短语") },
-                    placeholder = { Text("例如：免费领券") },
-                    singleLine = true,
-                    enabled = !saving,
-                    isError = error != null,
-                    supportingText = error?.let { { Text(it) } },
-                )
-                HorizontalDivider()
-                Text(
-                    "正文包含此内容的短信将按骚扰短信处理。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            OutlinedTextField(
+                value = input,
+                onValueChange = {
+                    input = it
+                    onInputChanged()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("关键词或短语") },
+                singleLine = true,
+                enabled = !saving,
+                isError = error != null,
+                supportingText = error?.let { { Text(it) } },
+            )
         },
         confirmButton = {
             TextButton(

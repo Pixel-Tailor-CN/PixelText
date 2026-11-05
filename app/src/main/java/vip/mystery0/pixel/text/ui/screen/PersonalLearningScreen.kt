@@ -142,20 +142,11 @@ fun PersonalLearningScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("使用个人学习", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = when {
-                                    settings.personalLearningEnabled -> "已开启"
-                                    samples.isNotEmpty() -> "已暂停"
-                                    else -> "未开启"
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (settings.personalLearningEnabled) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            "使用个人学习",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
                         Switch(
                             checked = settings.personalLearningEnabled,
                             onCheckedChange = null,
@@ -178,7 +169,6 @@ fun PersonalLearningScreen(
                     error?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
 
@@ -207,42 +197,39 @@ fun PersonalLearningScreen(
                 }
             } else {
                 items(samples, key = { it.id }) { sample ->
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { detailSampleId = sample.id }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { detailSampleId = sample.id }
+                            .padding(vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(
-                                    text = sample.text,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                                Text(
-                                    text = buildString {
-                                        append(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
-                                        append(" · ")
-                                        append(formatLearningSampleDate(sample.updatedAt))
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                contentDescription = "查看详情",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Text(
+                                text = sample.text,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = buildString {
+                                    append(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
+                                    append(" · ")
+                                    append(formatLearningSampleDate(sample.updatedAt))
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = "查看详情",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -374,11 +361,11 @@ private fun PersonalLearningStatusSection(
         }
         !enabled -> {
             title = "已暂停"
-            subtitle = "已停止个人训练与预测，保留 $sampleCount 条学习样本与人工纠正。"
+            subtitle = ""
         }
         !spamDetectionEnabled -> {
             title = "本地模型识别已关闭"
-            subtitle = "学习记录与人工纠正已保留；需在骚扰识别设置中开启本地模型识别后才会参与预测。"
+            subtitle = "在骚扰识别设置中开启后生效。"
         }
         sampleCount == 0 -> {
             title = "等待学习"
@@ -389,12 +376,12 @@ private fun PersonalLearningStatusSection(
             subtitle = ""
         }
         state.status == LearningStatus.APPLIED -> {
-            title = "个人学习结果未就绪，暂时使用基础识别"
-            subtitle = "当前模型尚无有效个人参数，可点击重试学习。"
+            title = "学习结果未就绪"
+            subtitle = "暂时使用基础识别。"
         }
         state.status == LearningStatus.RUNNING -> {
             title = "正在更新个人学习"
-            subtitle = "正在本机更新学习结果，请稍候。"
+            subtitle = ""
         }
         state.status == LearningStatus.FAILED -> {
             title = if (state.hasActiveParameters) {
@@ -402,11 +389,11 @@ private fun PersonalLearningStatusSection(
             } else {
                 "本次更新失败，暂时使用基础识别"
             }
-            subtitle = state.error ?: "本地学习未完成，可点击重试。"
+            subtitle = state.error.orEmpty()
         }
         else -> {
             title = "等待更新"
-            subtitle = "纠正已保存，正在排队更新个人学习。"
+            subtitle = ""
         }
     }
 
@@ -523,7 +510,6 @@ private fun LearningSampleDetailSheet(
                 SelectionContainer(Modifier.padding(vertical = 24.dp)) {
                     Text(sample.text, style = MaterialTheme.typography.bodyLarge)
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 ListItem(
                     headlineContent = { Text("短信分类") },
                     supportingContent = {
@@ -639,12 +625,6 @@ private fun ContributionSettingsSheet(
                     )
                 }
             }
-
-            Text(
-                "贡献样本前会单独确认上传内容，本地学习不会自动上传短信。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
 
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }

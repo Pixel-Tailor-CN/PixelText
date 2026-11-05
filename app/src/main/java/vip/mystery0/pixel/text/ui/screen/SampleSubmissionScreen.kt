@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,6 +56,7 @@ fun SampleSubmissionScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
     var confirmStep by rememberSaveable { mutableStateOf(false) }
+    var contentEdited by rememberSaveable { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
     val seconds = sampleReportRetrySeconds(state.retryAt)
@@ -66,6 +66,7 @@ fun SampleSubmissionScreen(
         else -> null
     }
     val senderTooLong = state.sender.codePointCount(0, state.sender.length) > 256
+    val visibleContentError = contentError.takeIf { contentEdited || state.content.isNotEmpty() }
     val canProceedToConfirm = !state.locked && state.validationError == null && contentError == null && !senderTooLong
     val canSubmit = !state.loading && !state.localError && !state.submitting && !state.saving &&
         state.draftChoice == null && seconds == 0L &&
@@ -202,15 +203,16 @@ fun SampleSubmissionScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = state.content,
-                            onValueChange = viewModel::updateContent,
+                            onValueChange = {
+                                contentEdited = true
+                                viewModel.updateContent(it)
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !state.locked,
                             label = { Text("短信正文") },
                             minLines = 4,
-                            isError = state.content.isNotEmpty() && contentError != null,
-                            supportingText = {
-                                Text(contentError ?: "请移除姓名、号码等敏感信息")
-                            },
+                            isError = visibleContentError != null,
+                            supportingText = visibleContentError?.let { { Text(it) } },
                         )
                         TextButton(
                             onClick = {
@@ -222,7 +224,6 @@ fun SampleSubmissionScreen(
                             Icon(Icons.Rounded.Edit, null)
                             Text("辅助脱敏", Modifier.padding(start = 8.dp))
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
 
@@ -235,7 +236,7 @@ fun SampleSubmissionScreen(
                         )
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(0.dp),
                         ) {
                             SampleCategory.entries.forEach { category ->
                                 FilterChip(
@@ -246,7 +247,6 @@ fun SampleSubmissionScreen(
                                 )
                             }
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
 
@@ -259,34 +259,21 @@ fun SampleSubmissionScreen(
                         singleLine = true,
                         label = { Text("发送方（可选）") },
                         isError = senderTooLong,
-                        supportingText = {
-                            Text(if (senderTooLong) "发送方不能超过 256 个字符" else "最多 256 个字符，请一并脱敏")
-                        },
+                        supportingText = if (senderTooLong) ({ Text("发送方不能超过 256 个字符") }) else null,
                     )
                 }
 
                 item(key = "step1_next") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    Button(
+                        onClick = {
+                            dismissKeyboard()
+                            viewModel.updateAgreed(false)
+                            confirmStep = true
+                        },
+                        enabled = canProceedToConfirm,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
-                        Button(
-                            onClick = {
-                                dismissKeyboard()
-                                viewModel.updateAgreed(false)
-                                confirmStep = true
-                            },
-                            enabled = canProceedToConfirm,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        ) {
-                            Text("下一步：确认提交")
-                        }
-                        Text(
-                            "返回不会上传，也不影响本地学习。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Text("下一步：确认提交")
                     }
                 }
             } else {
@@ -337,7 +324,6 @@ fun SampleSubmissionScreen(
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -353,7 +339,6 @@ fun SampleSubmissionScreen(
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         if (!state.pending) {
                             TextButton(
                                 onClick = {
@@ -397,25 +382,6 @@ fun SampleSubmissionScreen(
                     }
                 }
 
-                item(key = "step2_desensitize_warning") {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = "自动脱敏可能遗漏，请再次检查内容。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-
                 if (!state.pending) {
                     item(key = "step2_consent") {
                         Row(
@@ -439,7 +405,7 @@ fun SampleSubmissionScreen(
                                 modifier = Modifier.clearAndSetSemantics {},
                             )
                             Text(
-                                text = "我确认已检查并移除姓名、手机号、地址、订单号、银行卡号等敏感信息，并同意主动提交以上内容。",
+                                text = "我已检查脱敏结果并移除敏感信息，同意上传以上内容。",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -666,14 +632,6 @@ private fun SubmissionStepHeader(confirmStep: Boolean) {
                 },
             )
         }
-
-        Box(
-            modifier = Modifier
-                .width(36.dp)
-                .height(1.dp)
-                .align(Alignment.CenterVertically)
-                .background(MaterialTheme.colorScheme.outlineVariant)
-        )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
