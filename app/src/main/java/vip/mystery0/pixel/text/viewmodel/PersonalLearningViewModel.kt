@@ -258,7 +258,6 @@ class PersonalLearningViewModel(
         coordinator.setEnabled(enabled)
     }
 
-    fun setAutoDesensitize(enabled: Boolean) = settingsRepository.setLearningAutoDesensitizeEnabled(enabled)
     fun prepareStoredSampleContribution(id: String, onReady: (String, String) -> Unit) {
         if (mutableUpdatingSample.value) return
         mutableUpdatingSample.value = true

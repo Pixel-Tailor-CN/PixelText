@@ -42,11 +42,6 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         refreshSettings()
     }
 
-    override fun setLearningAutoDesensitizeEnabled(enabled: Boolean) {
-        check(learningPrefs.edit().putBoolean("auto_desensitize", enabled).commit())
-        refreshSettings()
-    }
-
     override fun setAutoDownloadMms(enabled: Boolean) {
         updatePrefs { putBoolean("auto_download_mms", enabled) }
     }
@@ -384,7 +379,6 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         return AppSettings(
             autoDownloadMms = prefs.getBoolean("auto_download_mms", false),
             personalLearningEnabled = learningPrefs.getBoolean("enabled", false),
-            learningAutoDesensitizeEnabled = learningPrefs.getBoolean("auto_desensitize", true),
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),

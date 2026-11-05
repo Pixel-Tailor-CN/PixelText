@@ -3,8 +3,6 @@ package vip.mystery0.pixel.text.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -61,11 +59,8 @@ class SampleSubmissionViewModel(
             try {
                 val pending = repository.pending()
                 val draft = if (pending == null) repository.draft() else null
-                val prepared = withContext(Dispatchers.Default) {
-                    if (repository.automaticDesensitizationEnabled()) AutomaticSampleDesensitizer().prepare(content, sender)
-                    else DesensitizedDraft(content, sender)
-                }
-                val currentMessage = SampleReportDraft(prepared.text, prepared.sender,
+                // 保留短信原文与发送号码，只有用户应用辅助脱敏结果时才修改草稿。
+                val currentMessage = SampleReportDraft(content, sender,
                     SampleCategory.fromValue(category)?.value ?: SampleCategory.NORMAL.value, learningFeedback)
                 mutableState.value = if (pending != null) SampleSubmissionState(
                     content = pending.content, sender = pending.sender, category = pending.category,

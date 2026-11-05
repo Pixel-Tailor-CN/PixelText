@@ -4,7 +4,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 data class AppSettings(
     val personalLearningEnabled: Boolean = false,
-    val learningAutoDesensitizeEnabled: Boolean = true,
     val autoDownloadMms: Boolean = false,
     val spamDetectionEnabled: Boolean = AppSettingsKeys.DEFAULT_SPAM_DETECTION_ENABLED,
     val muteSpamNotificationsEnabled: Boolean =
@@ -90,7 +89,6 @@ interface AppSettingsRepository {
     val settings: StateFlow<AppSettings>
 
     fun setPersonalLearningEnabled(enabled: Boolean)
-    fun setLearningAutoDesensitizeEnabled(enabled: Boolean)
 
     fun setAutoDownloadMms(enabled: Boolean)
 

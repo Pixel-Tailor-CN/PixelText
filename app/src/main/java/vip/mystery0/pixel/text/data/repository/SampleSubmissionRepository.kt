@@ -32,7 +32,6 @@ class SampleSubmissionRepository(
             localStore.installationId())
     }
 
-    fun automaticDesensitizationEnabled(): Boolean = settings.settings.value.learningAutoDesensitizeEnabled
 
     suspend fun pending(): SampleReportRequest? = localStore.pending()
     suspend fun draft(): SampleReportDraft? = localStore.draft()

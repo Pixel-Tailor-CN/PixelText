@@ -707,20 +707,22 @@ private fun ColumnScope.DesensitizationAssistantSheet(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.tokens.forEach { token ->
-                        TokenChip(
-                            token = token,
-                            selected = state.isTokenSelected(token),
-                            onClick = {
-                                if (token.selectable) {
-                                    onSelectRange(token.start, token.end)
-                                }
-                            },
-                        )
+                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        state.tokens.forEach { token ->
+                            TokenChip(
+                                token = token,
+                                selected = state.isTokenSelected(token),
+                                onClick = {
+                                    if (token.selectable) {
+                                        onSelectRange(token.start, token.end)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -734,7 +736,7 @@ private fun ColumnScope.DesensitizationAssistantSheet(
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     SensitiveType.entries.forEach { type ->
                         FilterChip(

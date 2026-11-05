@@ -18,7 +18,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,7 +58,6 @@ fun PersonalLearningScreen(
     var deletionId by rememberSaveable { mutableStateOf<String?>(null) }
     var clearConfirmation by rememberSaveable { mutableStateOf(false) }
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
-    var showContributionSettings by rememberSaveable { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -72,9 +70,6 @@ fun PersonalLearningScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showContributionSettings = true }) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "样本贡献设置")
-                    }
                     Box {
                         IconButton(onClick = { showMoreMenu = true }) {
                             Icon(Icons.Rounded.MoreVert, contentDescription = "更多选项")
@@ -255,14 +250,6 @@ fun PersonalLearningScreen(
                 detailSampleId = null
                 deletionId = sample.id
             },
-        )
-    }
-
-    if (showContributionSettings) {
-        ContributionSettingsSheet(
-            autoDesensitizeEnabled = settings.learningAutoDesensitizeEnabled,
-            onAutoDesensitizeChange = viewModel::setAutoDesensitize,
-            onDismiss = { showContributionSettings = false },
         )
     }
 
@@ -567,67 +554,6 @@ private fun LearningSampleDetailSheet(
                 TextButton(onClick = { editingLabel = false }) { Text("取消") }
             },
         )
-    }
-}
-
-@Composable
-private fun ContributionSettingsSheet(
-    autoDesensitizeEnabled: Boolean,
-    onAutoDesensitizeChange: (Boolean) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text("样本贡献设置", style = MaterialTheme.typography.titleLarge)
-
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .toggleable(
-                        value = autoDesensitizeEnabled,
-                        role = Role.Switch,
-                        onValueChange = onAutoDesensitizeChange,
-                    ),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("贡献草稿自动脱敏", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "自动脱敏可能遗漏，上传前仍需检查。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = autoDesensitizeEnabled,
-                        onCheckedChange = null,
-                        modifier = Modifier.clearAndSetSemantics {},
-                    )
-                }
-            }
-
-            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-        }
     }
 }
 
