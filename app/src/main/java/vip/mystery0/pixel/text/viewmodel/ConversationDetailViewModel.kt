@@ -1,35 +1,38 @@
 package vip.mystery0.pixel.text.viewmodel
 
-import kotlin.time.Duration.Companion.milliseconds
-
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -39,6 +42,7 @@ import vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 单次性的发送结果事件，供 UI 用 Snackbar 等方式提示用户。
@@ -99,9 +103,27 @@ class ConversationDetailViewModel(
     private var currentThreadId: Long = -1L
     private var currentContentFilter = ConversationContentFilter.ALL
     private var offset = 0
-    private var isLoadingMore = false
     private var hasMore = true
     private var loadVersion = 0
+    private var messageLoadJob: Job? = null
+    private var activeLoadIsRefresh = false
+    private var pendingPage = false
+    private var pendingRefresh: RefreshRequest? = null
+    private var loadFailureCount = 0L
+
+    private data class RefreshRequest(
+        val preserveLoadedHistory: Boolean,
+        val insertionBaseline: Set<String>?,
+    ) {
+        fun merge(other: RefreshRequest) = RefreshRequest(
+            preserveLoadedHistory || other.preserveLoadedHistory,
+            when {
+                insertionBaseline == null -> other.insertionBaseline
+                other.insertionBaseline == null -> insertionBaseline
+                else -> insertionBaseline intersect other.insertionBaseline
+            },
+        )
+    }
     private val _messages = mutableListOf<MessageModel>()
     private val manualClassificationMutex = Mutex()
     private val spamDetectionReceiver = object : BroadcastReceiver() {
@@ -167,15 +189,22 @@ class ConversationDetailViewModel(
         _address.value = address
         _conversationTitle.value = address
         viewModelScope.launch {
-            _conversationTitle.value = resolveConversationTitle(address)
+            val title = resolveConversationTitle(address)
+            if (_address.value == address) _conversationTitle.value = title
         }
         if (currentThreadId == threadId &&
             currentContentFilter == contentFilter &&
-            _messages.isNotEmpty()
+            (_messages.isNotEmpty() || messageLoadJob != null || _uiState.value is MessageUiState.Success)
         ) {
             return
         }
 
+        // 只有会话或筛选上下文重置才让已有结果失效，普通通知只合并补刷。
+        loadVersion++
+        messageLoadJob?.cancel()
+        messageLoadJob = null
+        pendingRefresh = null
+        pendingPage = false
         currentThreadId = threadId
         mirrorThreadId.value = threadId
         currentContentFilter = contentFilter
@@ -183,9 +212,7 @@ class ConversationDetailViewModel(
         readRequested.clear()
         _newMessageKeys.value = emptySet()
         offset = 0
-        isLoadingMore = false
         hasMore = true
-        loadVersion++
 
         if (threadId == -1L) {
             // 新会话，没有历史消息
@@ -211,59 +238,121 @@ class ConversationDetailViewModel(
     }
 
     suspend fun loadUntilMessage(messageId: Long): Int? {
-        while (true) {
+        val generation = loadVersion
+        val failures = loadFailureCount
+        while (generation == loadVersion && currentThreadId >= 0) {
             val targetIndex = _messages.indexOfFirst { it.id == messageId }
             if (targetIndex >= 0) return targetIndex
-            if (!hasMore) return null
+            if (!hasMore || loadFailureCount != failures) return null
 
-            val previousSize = _messages.size
-            if (!isLoadingMore) fetchMessages()
-            while (isLoadingMore) delay(MESSAGE_LOAD_POLL_INTERVAL_MILLIS.milliseconds)
-
-            if (_messages.size == previousSize) return null
+            // 等待本次加载即可；持续到来的刷新不能把定位操作一直留在 busy 循环中。
+            if (messageLoadJob == null || activeLoadIsRefresh) fetchMessages()
+            messageLoadJob?.join()
         }
+        return null
     }
 
     private fun fetchMessages() {
-        if (isLoadingMore || !hasMore) return
-        isLoadingMore = true
-        val requestVersion = loadVersion
-        viewModelScope.launch {
-            repository.getMessagesByThread(
-                currentThreadId,
-                MESSAGE_PAGE_SIZE,
-                offset,
-                currentContentFilter,
-            )
-                .catch { e ->
-                    if (requestVersion != loadVersion) return@catch
-                    if (_messages.isEmpty()) {
-                        _uiState.value = MessageUiState.Error(e.message ?: "Unknown error")
-                    }
-                    isLoadingMore = false
-                }
-                .collect { newMessages ->
-                    if (requestVersion != loadVersion) return@collect
-                    if (newMessages.isEmpty()) {
-                        hasMore = false
-                        if (_messages.isEmpty()) {
-                            _uiState.value = MessageUiState.Success(emptyList())
-                        }
-                    } else {
-                        val existingKeys = _messages.map { it.stableKey }.toSet()
-                        val deduplicated = newMessages.filter { it.stableKey !in existingKeys }
-                        if (deduplicated.isEmpty()) {
-                            hasMore = false
-                        } else {
-                            _messages.addAll(deduplicated)
-                            offset += newMessages.size
-                        }
-                        _uiState.value = MessageUiState.Success(_messages.toList())
-                        markDisplayedMessagesRead(_messages)
-                    }
-                    isLoadingMore = false
-                }
+        if (!hasMore || currentThreadId < 0) return
+        if (messageLoadJob != null) {
+            // 正在翻页时重复的触底事件不再排一页；刷新期间的翻页需求保留。
+            if (activeLoadIsRefresh) pendingPage = true
+            return
         }
+        startMessageLoad()
+    }
+
+    private fun startMessageLoad(refresh: RefreshRequest? = null) {
+        val generation = loadVersion
+        val threadId = currentThreadId
+        val filter = currentContentFilter
+        val requestedOffset = if (refresh == null) offset else 0
+        val requestedLimit = if (refresh == null) MESSAGE_PAGE_SIZE else {
+            _messages.size.coerceAtLeast(MESSAGE_PAGE_SIZE) +
+                    if (refresh.preserveLoadedHistory) MESSAGE_PAGE_SIZE else 0
+        }
+        val source = if (refresh == null) "page" else "refresh"
+        activeLoadIsRefresh = refresh != null
+        // 先保存任务再启动，避免立即返回的仓库在 finally 清理后又留下已完成任务。
+        messageLoadJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            val started = SystemClock.elapsedRealtime()
+            if (BuildConfig.DEBUG) Log.d(
+                TAG,
+                "message load started source=$source generation=$generation offset=$requestedOffset limit=$requestedLimit"
+            )
+            try {
+                val rows = repository.getMessagesByThread(
+                    threadId, requestedLimit, requestedOffset, filter,
+                ).first()
+                if (generation != loadVersion) return@launch
+                if (refresh == null) {
+                    val existingKeys = _messages.mapTo(mutableSetOf()) { it.stableKey }
+                    val added = rows.filter { it.stableKey !in existingKeys }
+                    _messages.addAll(added)
+                    offset += rows.size
+                    hasMore = rows.size >= requestedLimit && added.isNotEmpty()
+                    if (requestedOffset > 0) {
+                        // 补刷等待期间翻到的旧消息不属于新插入，不能触发入场提示。
+                        pendingRefresh?.let { pending ->
+                            pendingRefresh = pending.copy(
+                                insertionBaseline = pending.insertionBaseline?.plus(
+                                    rows.map { it.stableKey },
+                                ),
+                            )
+                        }
+                    }
+                } else {
+                    // 扩大查询窗口保留已加载历史，但不拼回已删除或被筛掉的旧对象。
+                    val keys = rows.mapTo(mutableSetOf()) { it.stableKey }
+                    _newMessageKeys.value = _newMessageKeys.value intersect keys
+                    refresh.insertionBaseline?.let { baseline ->
+                        _newMessageKeys.value += keys - baseline
+                    }
+                    _messages.clear()
+                    _messages.addAll(rows)
+                    offset = rows.size
+                    hasMore = rows.size >= requestedLimit
+                }
+                _uiState.value = MessageUiState.Success(_messages.toList())
+                markDisplayedMessagesRead(_messages)
+                if (BuildConfig.DEBUG) Log.d(
+                    TAG,
+                    "message load published source=$source generation=$generation count=${_messages.size} elapsed_ms=${SystemClock.elapsedRealtime() - started}"
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (generation == loadVersion) {
+                    loadFailureCount++
+                    if (_messages.isEmpty()) {
+                        _uiState.value = MessageUiState.Error(error.message ?: "加载失败，请重试")
+                    }
+                    Log.w(
+                        TAG,
+                        "message load failed source=$source generation=$generation error=${error.javaClass.simpleName}"
+                    )
+                }
+            } finally {
+                if (generation == loadVersion) {
+                    messageLoadJob = null
+                    if (currentCoroutineContext().isActive) drainPendingLoads()
+                }
+            }
+        }
+        messageLoadJob?.start()
+    }
+
+    private fun drainPendingLoads() {
+        // 先兑现用户翻页，避免全局评分持续变化导致翻页饿死。
+        val nextPage = pendingPage
+        pendingPage = false
+        if (nextPage && hasMore) {
+            startMessageLoad()
+            return
+        }
+        val refresh = pendingRefresh ?: return
+        pendingRefresh = null
+        startMessageLoad(refresh)
     }
 
     /**
@@ -283,8 +372,7 @@ class ConversationDetailViewModel(
                 val pendingUri = android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id)
                 val resolvedThreadId = runCatching { telephonyDataSource.queryThreadIdFromUri(pendingUri) }.getOrNull() ?: currentThreadId
                 if (currentThreadId == -1L && resolvedThreadId != -1L) {
-                    currentThreadId = resolvedThreadId
-                    mirrorThreadId.value = resolvedThreadId
+                    loadThread(resolvedThreadId, address, currentContentFilter)
                 }
 
                 _sendResultEvents.trySend(SendResultEvent.Submitted(message))
@@ -382,54 +470,20 @@ class ConversationDetailViewModel(
         preserveLoadedHistory: Boolean = false,
         reportInsertions: Boolean = false,
     ) {
-        val existingMessages = _messages.toList()
-        val requestedLimit = if (preserveLoadedHistory) {
-            existingMessages.size.coerceAtLeast(MESSAGE_PAGE_SIZE) + MESSAGE_PAGE_SIZE
-        } else {
-            existingMessages.size.coerceAtLeast(MESSAGE_PAGE_SIZE)
-        }
-        val requestVersion = ++loadVersion
-        isLoadingMore = true
-        viewModelScope.launch {
-            repository.getMessagesByThread(
-                currentThreadId,
-                requestedLimit,
-                0,
-                currentContentFilter,
+        if (currentThreadId < 0) return
+        val request = RefreshRequest(
+            preserveLoadedHistory,
+            if (reportInsertions) _messages.mapTo(mutableSetOf()) { it.stableKey } else null,
+        )
+        if (messageLoadJob != null) {
+            val alreadyQueued = pendingRefresh != null
+            pendingRefresh = pendingRefresh?.merge(request) ?: request
+            if (BuildConfig.DEBUG && !alreadyQueued) Log.d(
+                TAG,
+                "message load queued source=refresh generation=$loadVersion"
             )
-                .catch { error ->
-                    if (requestVersion != loadVersion) return@catch
-                    if (_messages.isEmpty()) {
-                        _uiState.value = MessageUiState.Error(error.message ?: "Unknown error")
-                    }
-                    isLoadingMore = false
-                }
-                .collect { refreshedMessages ->
-                    if (requestVersion != loadVersion) return@collect
-                    val refreshedKeys = refreshedMessages.mapTo(mutableSetOf()) { it.stableKey }
-                    val reconciledMessages = if (preserveLoadedHistory) {
-                        refreshedMessages + existingMessages.filter { it.stableKey !in refreshedKeys }
-                    } else {
-                        refreshedMessages
-                    }
-                    _newMessageKeys.value = _newMessageKeys.value intersect
-                        reconciledMessages.mapTo(mutableSetOf()) { it.stableKey }
-                    if (reportInsertions) {
-                        val existingKeys = existingMessages.mapTo(mutableSetOf()) { it.stableKey }
-                        _newMessageKeys.value += refreshedKeys - existingKeys
-                    }
-                    _messages.clear()
-                    _messages.addAll(reconciledMessages)
-                    offset = reconciledMessages.size
-                    hasMore = if (preserveLoadedHistory) {
-                        hasMore || refreshedMessages.size >= requestedLimit
-                    } else {
-                        refreshedMessages.size >= requestedLimit
-                    }
-                    _uiState.value = MessageUiState.Success(_messages.toList())
-                    markDisplayedMessagesRead(_messages)
-                    isLoadingMore = false
-                }
+        } else {
+            startMessageLoad(request)
         }
     }
 
@@ -458,6 +512,5 @@ class ConversationDetailViewModel(
         private const val TAG = "ConversationDetailViewM"
         private const val SPAM_THRESHOLD = 0.7f
         private const val MESSAGE_PAGE_SIZE = 20
-        private const val MESSAGE_LOAD_POLL_INTERVAL_MILLIS = 16L
     }
 }
