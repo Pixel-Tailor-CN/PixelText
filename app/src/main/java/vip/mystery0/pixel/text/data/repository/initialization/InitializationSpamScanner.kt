@@ -2,8 +2,6 @@ package vip.mystery0.pixel.text.data.repository.initialization
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.withLock
-import vip.mystery0.pixel.text.data.repository.mirror.MirrorSynchronizationLock
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.domain.model.InitializationBatchResult
@@ -49,11 +47,11 @@ class InitializationSpamScanner(
                 val prediction = if (whitelist.isAllowed(row.message.sourceId) || sms.body.isNullOrBlank()) null
                     else activeClassifier.predict(sms.body.orEmpty())
                 // 分类期间被修改的数据由下一批重读，不以旧内容推进检查点。
-                val unchanged = MirrorSynchronizationLock.mutex.withLock {
+                val unchanged = run {
                     val latest = dao.getLocal(row.message.localId)
                     if (latest != null) {
                         if (latest.message.revision != row.message.revision) {
-                            return@withLock false
+                            return@run false
                         }
                         if (prediction != null && !repository.savePrediction(row.message.sourceId, row.message.threadId ?: -1, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
                                 "SMS", row.message.sourceId, sms.address.orEmpty(), row.message.originalDate ?: 0L, sms.body.orEmpty()))) {

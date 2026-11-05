@@ -1,24 +1,17 @@
 package vip.mystery0.pixel.text.data.repository
 
-import kotlin.time.Duration.Companion.milliseconds
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
@@ -31,7 +24,6 @@ import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.mirror.ConversationListQuery
-import vip.mystery0.pixel.text.domain.model.mirror.ConversationMessageVersion
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
@@ -46,10 +38,6 @@ import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 
-private const val SPAM_THRESHOLD = 0.7f
-private const val FILTERED_MESSAGE_QUERY_STEP = 100
-private const val CONVERSATION_FILTER_CHUNK_SIZE = 200
-private const val SPAM_CHANGE_DEBOUNCE_MILLIS = 300L
 
 class MessageRepositoryImpl(
     private val telephonyDataSource: TelephonyDataSource,
@@ -63,7 +51,6 @@ class MessageRepositoryImpl(
     private val verificationCodeRepository: VerificationCodeRepository,
     private val mirror: MessageMirrorRepository,
     private val mmsTextIndexer: vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer,
-    private val localSpamFilter: vip.mystery0.pixel.text.data.repository.mirror.LocalConversationSpamFilter,
     private val context: Context
 ) : MessageRepository {
 
@@ -88,31 +75,26 @@ class MessageRepositoryImpl(
         conversationCacheRepository.refreshIncremental()
     }
 
-    @OptIn(FlowPreview::class)
     override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
         conversationCacheRepository.refreshIncremental(requireComplete = true)
+        spamRepository.ensureReady()
         emitAll(
             combine(
                 mirror.observeConversationChanges(),
-                spamRepository.observeChanges()
-                    .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS.milliseconds)
-                    .onStart { emit(Unit) },
                 settingsRepository.settings,
                 contactDataSource.changes,
                 archiveDao.observeArchivedThreadIds(),
-            ) { _, _, settings, _, archived -> settings.spamIsolationEnabled to archived.toSet() }
+            ) { _, settings, _, archived -> settings.spamIsolationEnabled to archived.toSet() }
                 .conflate()
                 .map { (isolationEnabled, archivedThreadIds) ->
                     // 表变化只触发一次聚合，避免先读取整张摘要列表再重新过滤分组。
                     val preparationStarted = android.os.SystemClock.elapsedRealtime()
-                    val spamVersions = if (isolationEnabled) verifiedSpamVersions() else emptyList()
                     val visibleConversations = enrichWithSenderProfiles(
                         mirror.queryConversations(
                             ConversationListQuery(
                                 contentFilter = if (isolationEnabled) {
                                     ConversationContentFilter.NORMAL
                                 } else ConversationContentFilter.ALL,
-                                spamMessages = spamVersions,
                                 excludedThreadIds = archivedThreadIds,
                                 incomingUnreadOnly = !isolationEnabled,
                             )
@@ -143,16 +125,14 @@ class MessageRepositoryImpl(
     override fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
         flow {
             require(limit >= 0 && offset >= 0)
+            spamRepository.ensureReady()
             val started = android.os.SystemClock.elapsedRealtime()
-            val spamVersions = verifiedSpamVersions()
-            val verifiedAt = android.os.SystemClock.elapsedRealtime()
             // SQL 先按有效骚扰消息选会话页，再按隔离设置汇总可见消息。
             val conversations = mirror.queryConversations(
                 ConversationListQuery(
                     contentFilter = if (settingsRepository.isSpamIsolationEnabled()) {
                         ConversationContentFilter.SPAM
                     } else ConversationContentFilter.ALL,
-                    spamMessages = spamVersions,
                     onlySpamThreads = true,
                     limit = limit,
                     offset = offset,
@@ -164,8 +144,8 @@ class MessageRepositoryImpl(
                 val finishedAt = android.os.SystemClock.elapsedRealtime()
                 android.util.Log.d(
                     "SpamListLoad",
-                    "spam list loaded spam_messages=${spamVersions.size} page_count=${enriched.size} " +
-                        "verify_ms=${verifiedAt - started} aggregate_ms=${aggregatedAt - verifiedAt} " +
+                    "spam list loaded page_count=${enriched.size} " +
+                        "aggregate_ms=${aggregatedAt - started} " +
                         "profiles_ms=${finishedAt - aggregatedAt} total_ms=${finishedAt - started}",
                 )
             }
@@ -250,77 +230,31 @@ class MessageRepositoryImpl(
         }
     }
 
-    @OptIn(FlowPreview::class)
-    override fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch> {
-        val spamChanges = spamRepository.observeChanges()
-            .debounce(SPAM_CHANGE_DEBOUNCE_MILLIS.milliseconds)
-            .onStart { emit(Unit) }
-
-        return combine(mirror.searchMessages(request), spamChanges) { batch, _ ->
-            if (batch.messages.isEmpty()) {
-                batch
-            } else {
-                val messageIds = batch.messages.map { it.id }
-                val spamIds = spamRepository.getSpamMessageIds(messageIds, SPAM_THRESHOLD)
-                val enrichedMessages = batch.messages.map { message ->
-                    message.copy(
-                        simName = telephonyDataSource.getSimName(message.subId),
-                        spamScore = if (message.id in spamIds) SPAM_THRESHOLD else -1f,
-                    )
-                }
-                batch.copy(messages = enrichedMessages)
-            }
-        }.distinctUntilChanged().flowOn(Dispatchers.IO)
-    }
+    override fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch> = flow {
+        spamRepository.ensureReady()
+        // 判定列与搜索原文同在镜像库，镜像失效观察已经覆盖分类更新。
+        emitAll(mirror.searchMessages(request).map { batch ->
+            val scores = spamRepository.getScores(batch.messages.map { it.id })
+            batch.copy(messages = batch.messages.map { message ->
+                message.copy(simName = telephonyDataSource.getSimName(message.subId),
+                    spamScore = scores[message.id] ?: -1f)
+            })
+        })
+    }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     override fun getMessagesByThread(
         threadId: Long, limit: Int, offset: Int, contentFilter: ConversationContentFilter,
     ): Flow<List<MessageModel>> = flow {
         if (limit <= 0) { emit(emptyList()); return@flow }
-        if (contentFilter != ConversationContentFilter.ALL) {
-            // 过滤偏移仍以可见消息计数；历史短信只读轻量字段，当前页才解析卡片。
-            val snapshots = mirror.getConversationMessages(listOf(threadId))
-            val visiblePage = mutableListOf<MessageModel>()
-            var skipped = 0
-            for (batch in snapshots.chunked(200)) {
-                currentCoroutineContext().ensureActive()
-                // 保留 Provider 身份核验和白名单持久放行语义，不替换为镜像只读判断。
-                val spamIds = spamRepository.getSpamMessageIds(batch.map { it.message.id }, SPAM_THRESHOLD)
-                for (snapshot in batch) {
-                    val message = snapshot.message
-                    if (!contentFilter.includes(message.id in spamIds)) continue
-                    if (skipped++ < offset) continue
-                    visiblePage += message.copy(
-                        simName = telephonyDataSource.getSimName(message.subId),
-                        parsedResult = parseMessage(message.sender, message.content),
-                        spamScore = spamRepository.getScore(message.id) ?: -1f,
-                    )
-                    if (visiblePage.size == limit) break
-                }
-                if (visiblePage.size == limit) break
-            }
-            emit(visiblePage)
-            return@flow
-        }
-        val result = mutableListOf<MessageModel>()
-        var sourceOffset = if (contentFilter == ConversationContentFilter.ALL) offset else 0
-        var skipped = 0
-        while (result.size < limit) {
-            val batchSize = if (contentFilter == ConversationContentFilter.ALL) minOf(limit - result.size, 200) else 200
-            val rows = mirror.observeMessagesByThread(threadId, batchSize, sourceOffset).first().map { it.toMessageModel() }
-            if (rows.isEmpty()) break
-            val spamIds = spamRepository.getSpamMessageIds(rows.map { it.id }, SPAM_THRESHOLD)
-            for (message in rows) {
-                if (!contentFilter.includes(message.id in spamIds)) continue
-                if (contentFilter != ConversationContentFilter.ALL && skipped++ < offset) continue
-                result += message.copy(simName = telephonyDataSource.getSimName(message.subId),
-                    parsedResult = parseMessage(message.sender, message.content), spamScore = spamRepository.getScore(message.id) ?: -1f)
-                if (result.size == limit) break
-            }
-            sourceOffset += rows.size
-            if (rows.size < batchSize) break
-        }
-        emit(result)
+        spamRepository.ensureReady()
+        // 先按持久化状态过滤和分页，仅加载当前页的正文及彩信关系。
+        val messages = mirror.queryThreadMessages(threadId, limit, offset, contentFilter).map { it.toMessageModel() }
+        val scores = spamRepository.getScores(messages.map { it.id })
+        emit(messages.map { message ->
+            message.copy(simName = telephonyDataSource.getSimName(message.subId),
+                parsedResult = parseMessage(message.sender, message.content),
+                spamScore = scores[message.id] ?: -1f)
+        })
     }.flowOn(Dispatchers.IO)
 
     override fun getMessages(): Flow<List<MessageModel>> = flow {
@@ -376,31 +310,6 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return emptyList()
         // 归档等入口只读取每个线程最终展示的正文，历史消息只参与 SQL 聚合。
         return mirror.queryConversations(ConversationListQuery(threadIds = threadIds))
-    }
-
-    private suspend fun verifiedSpamVersions(): List<ConversationMessageVersion> {
-        val started = android.os.SystemClock.elapsedRealtime()
-        val candidateIds = spamRepository.getPotentialSpamMessageIds(SPAM_THRESHOLD)
-        val candidatesAt = android.os.SystemClock.elapsedRealtime()
-        val candidates = mirror.getConversationMessagesByIds(candidateIds)
-        val loadedAt = android.os.SystemClock.elapsedRealtime()
-        val spamIds = localSpamFilter.spamIds(candidates, SPAM_THRESHOLD)
-        val versions = candidates.filter { it.message.id in spamIds }
-            .map { ConversationMessageVersion(it.localId, it.revision) }
-        if (vip.mystery0.pixel.text.BuildConfig.DEBUG) {
-            android.util.Log.d(
-                "ConversationClassification",
-                "conversation classification candidate_count=${candidates.size} spam_count=${versions.size} " +
-                    "candidate_ms=${candidatesAt - started} read_ms=${loadedAt - candidatesAt} " +
-                    "verify_ms=${android.os.SystemClock.elapsedRealtime() - loadedAt}",
-            )
-        }
-        return versions
-    }
-    private fun ConversationContentFilter.includes(isSpam: Boolean): Boolean = when (this) {
-        ConversationContentFilter.ALL -> true
-        ConversationContentFilter.NORMAL -> !isSpam
-        ConversationContentFilter.SPAM -> isSpam
     }
 
     private fun parseMessage(address: String, content: String): ParsedResult {

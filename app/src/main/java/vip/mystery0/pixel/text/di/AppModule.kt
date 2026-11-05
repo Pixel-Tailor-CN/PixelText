@@ -116,10 +116,11 @@ val appModule = module {
     single { vip.mystery0.pixel.text.data.backup.BackupArchiveCodec(androidContext()) }
     single { vip.mystery0.pixel.text.data.backup.BackupSettingsMapper(androidContext(), get(), get(), get(), get()) }
     single { vip.mystery0.pixel.text.data.backup.BackupRuleStore(get<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository>() as vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl) }
-    single { vip.mystery0.pixel.text.data.backup.SmsRestoreDataSource(androidContext(), get(), get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.backup.SmsRestoreDataSource(androidContext(), get(), get(), get(), get(), get()) }
     single<vip.mystery0.pixel.text.domain.backup.BackupRepository> {
         vip.mystery0.pixel.text.data.repository.BackupRepositoryImpl(
             androidContext(),
+            get(),
             get(),
             get(),
             get(),
@@ -224,7 +225,7 @@ val appModule = module {
     }
     single { vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer(get(), get()) }
     single<MessageMirrorRepository> { MessageMirrorRepositoryImpl(get(), get()) }
-    single { vip.mystery0.pixel.text.data.repository.mirror.LocalConversationSpamFilter(get(), get()) }
+    single { vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter(get(), get(), get(), get(), get(), get()) }
     single { MmsPartReader() }
     single { MmsHtmlParser() }
     single { MmsContactParser() }
@@ -250,8 +251,15 @@ val appModule = module {
         }
     }
     single { vip.mystery0.pixel.text.data.db.PersonalLearningDatabase.create(androidContext()) }
+    single {
+        vip.mystery0.pixel.text.data.repository.PersonalLearningRepositoryImpl(get(), get(), get(), get(), get(),
+            refreshKeywords = { ids ->
+                // 延迟解析关键词仓库，避免训练仓库和规则仓库互相构造。
+                ids.filter { it > 0 }.forEach { id -> get<KeywordSpamRepository>().updateMessageMatch(id, 0, "") }
+            })
+    }
     single<vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository> {
-        vip.mystery0.pixel.text.data.repository.PersonalLearningRepositoryImpl(get())
+        get<vip.mystery0.pixel.text.data.repository.PersonalLearningRepositoryImpl>()
     }
     single { vip.mystery0.pixel.text.worker.PersonalLearningScheduler(androidContext()) }
     single(createdAtStart = true) {
@@ -259,7 +267,7 @@ val appModule = module {
             engineFactory = { vip.mystery0.pixel.text.data.spam.learning.TfliteSpamModelEngine(get<HubResourceStore>().currentModelBundle()) },
             candidateEngineFactory = { vip.mystery0.pixel.text.data.spam.learning.TfliteSpamModelEngine(it) },
             onChanged = {
-                get<SpamDatabase>().spamResultDao().invalidatePredictions()
+                // 保留最终标记，后台按新模型／学习版本逐条更新，不让列表重新判定。
                 if (get<AppSettingsRepository>().isSpamDetectionEnabled()) vip.mystery0.pixel.text.worker.HistoricalSpamScanWorker.schedule(androidContext(), silent = true)
                 vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration.notifyChanged(androidContext())
             })
@@ -271,12 +279,14 @@ val appModule = module {
         SpamClassifierFactory { get<SpamClassifier>() }
     }
     single { vip.mystery0.pixel.text.data.source.WhitelistMessageSource(get()) }
+    single { vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl(get(), get(), get(), get(), get()) }
     single<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository> {
-        vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl(get(), get())
+        get<vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl>()
     }
-    single<SpamRepository> { SpamRepositoryImpl(get(), get(), get(), get(), get(), get()) }
-    single<KeywordSpamRepository> { KeywordSpamRepositoryImpl(get(), get(), get()) }
-    single(createdAtStart = true) { vip.mystery0.pixel.text.worker.SpamModelRefreshObserver(androidContext(), get()) }
+    single<SpamRepository> { SpamRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { KeywordSpamRepositoryImpl(get(), get(), get(), get(), get(), get()) }
+    single<KeywordSpamRepository> { get<KeywordSpamRepositoryImpl>() }
+    single(createdAtStart = true) { vip.mystery0.pixel.text.worker.SpamModelRefreshObserver(androidContext(), get(), get()) }
     single { UnreadSmsCounter(get(), get(), get()) }
     single<VerificationCodeRepository> {
         VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
@@ -289,7 +299,6 @@ val appModule = module {
     }
     single<MessageRepository> {
         MessageRepositoryImpl(
-            get(),
             get(),
             get(),
             get(),

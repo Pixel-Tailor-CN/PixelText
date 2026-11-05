@@ -8,7 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.data.db.SpamDatabase
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.spam.learning.ModelContract
 import vip.mystery0.pixel.text.domain.hub.LearningFeedback
@@ -55,7 +55,7 @@ class PersonalLearningViewModel(
     private val settingsRepository: AppSettingsRepository,
     private val resources: HubResourceStore,
     private val whitelist: SenderWhitelistRepository,
-    private val spamDatabase: SpamDatabase,
+    private val mirrorDatabase: MessageMirrorDatabase,
 ) : ViewModel() {
     val settings = settingsRepository.settings
     val samples = repository.observeSamples().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -113,7 +113,7 @@ class PersonalLearningViewModel(
                     }
                     val ruleConflict = when {
                         whitelist.isAllowed(message.id) -> LearningRuleConflict.WHITELIST
-                        message.id in spamDatabase.spamResultDao().keywordIds(listOf(message.id)) -> LearningRuleConflict.KEYWORD
+                        mirrorDatabase.spamDao().rows(listOf(message.id)).any { it.spamKeywordId != null } -> LearningRuleConflict.KEYWORD
                         else -> null
                     }
                     matchedSample to ruleConflict

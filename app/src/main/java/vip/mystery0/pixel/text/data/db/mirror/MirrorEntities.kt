@@ -2,13 +2,37 @@ package vip.mystery0.pixel.text.data.db.mirror
 
 import androidx.room.*
 
-@Entity(tableName = "mirror_message", indices = [Index(value = ["transport", "sourceId"], unique = true), Index("threadId"), Index(value = ["threadId", "timestamp", "localId"]), Index("timestamp"), Index("subscriptionId")])
+@Entity(tableName = "mirror_message", indices = [Index(value = ["transport", "sourceId"], unique = true), Index("threadId"), Index(value = ["threadId", "timestamp", "localId"]), Index("timestamp"), Index("subscriptionId"), Index(value = ["isSpam", "threadId", "timestamp", "localId"])])
 data class MirrorMessageEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val transport: String, val sourceId: Long, val revision: Long = 1,
     val threadId: Long?, val timestamp: Long?, val originalDate: Long?, val dateUnit: String,
     val subscriptionId: Int?, val boxType: Int?, val read: Int?, val seen: Int?,
     val structureComplete: Boolean, val generation: Long = 0,
+    val isSpam: Boolean? = null,
+    @ColumnInfo(defaultValue = "0") val spamSource: Int = 0,
+    val spamScore: Float? = null,
+    val spamModelIdentity: String? = null,
+    val spamModelRevision: Long? = null,
+    val spamModelGeneration: Long? = null,
+    @ColumnInfo(defaultValue = "0") val spamModelManual: Boolean = false,
+    val spamKeywordId: Long? = null,
+    val spamAllowedSource: Int? = null,
+    val spamCorrection: Boolean? = null,
+)
+
+/** 仅在消息身份和内容未改变时继承判定，避免元数据同步写回默认空标记。 */
+internal fun MirrorMessageEntity.copySpamStateFrom(previous: MirrorMessageEntity) = copy(
+    isSpam = previous.isSpam,
+    spamSource = previous.spamSource,
+    spamScore = previous.spamScore,
+    spamModelIdentity = previous.spamModelIdentity,
+    spamModelRevision = previous.spamModelRevision,
+    spamModelGeneration = previous.spamModelGeneration,
+    spamModelManual = previous.spamModelManual,
+    spamKeywordId = previous.spamKeywordId,
+    spamAllowedSource = previous.spamAllowedSource,
+    spamCorrection = previous.spamCorrection,
 )
 
 @Entity(tableName = "mirror_sms", foreignKeys = [ForeignKey(entity = MirrorMessageEntity::class, parentColumns = ["localId"], childColumns = ["localId"], onDelete = ForeignKey.CASCADE)], indices = [Index("address")])

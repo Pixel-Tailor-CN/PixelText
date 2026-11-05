@@ -10,20 +10,37 @@ import androidx.room.RoomDatabase
         MirrorAddressEntity::class, MirrorPartEntity::class, MirrorAttachmentEntity::class,
         MirrorThreadSourceEntity::class, MirrorCanonicalAddressEntity::class, MirrorSyncStateEntity::class,
         MirrorDirtyEntity::class, MirrorFileCleanupEntity::class, MmsDownloadRequestEntity::class, MmsTextIndexEntity::class, DataInitializationEntity::class],
-    version = 5, exportSchema = true,
+    version = 6, exportSchema = true,
 )
 abstract class MessageMirrorDatabase : RoomDatabase() {
     abstract fun mirrorDao(): MirrorDao
     abstract fun syncDao(): MirrorSyncDao
     abstract fun searchDao(): MirrorSearchDao
     abstract fun initializationDao(): DataInitializationDao
+    abstract fun spamDao(): MirrorSpamDao
 
     companion object {
         const val DATABASE_NAME = "message_mirror.db"
         // 后续版本必须显式注册 Migration，禁止破坏性重建。
         fun create(context: Context): MessageMirrorDatabase = Room.databaseBuilder(
             context.applicationContext, MessageMirrorDatabase::class.java, DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration, MIGRATION_4_5).build()
+        ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration, MIGRATION_4_5, MIGRATION_5_6).build()
+
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN isSpam INTEGER")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamSource INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamScore REAL")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamModelIdentity TEXT")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamModelRevision INTEGER")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamModelGeneration INTEGER")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamModelManual INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamKeywordId INTEGER")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamAllowedSource INTEGER")
+                db.execSQL("ALTER TABLE mirror_message ADD COLUMN spamCorrection INTEGER")
+                db.execSQL("CREATE INDEX index_mirror_message_isSpam_threadId_timestamp_localId ON mirror_message(isSpam, threadId, timestamp, localId)")
+            }
+        }
 
         val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

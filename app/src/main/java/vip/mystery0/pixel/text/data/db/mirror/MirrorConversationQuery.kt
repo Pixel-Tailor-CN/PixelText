@@ -17,18 +17,12 @@ internal object MirrorConversationQuery {
             "AND m.threadId NOT IN (${query.excludedThreadIds.joinToString(",")})"
         val baseCondition = "$threadCondition $excludedCondition"
         val needsSpam = query.onlySpamThreads || query.contentFilter != ConversationContentFilter.ALL
-        val versionRows = query.spamMessages.distinct().let { versions ->
-            if (versions.isEmpty()) "SELECT NULL, NULL WHERE 0" else
-                "VALUES " + versions.joinToString(",") { "(${it.localId},${it.revision})" }
-        }
         val spamDefinition = if (!needsSpam) "" else """
-            spam_versions(localId, revision) AS ($versionRows),
             spam AS (
                 SELECT m.localId, m.threadId, COALESCE(m.timestamp, 0) AS timestamp,
                     m.transport, m.read, m.boxType
-                FROM spam_versions v JOIN mirror_message m
-                    ON m.localId=v.localId AND m.revision=v.revision
-                WHERE $baseCondition
+                FROM mirror_message m
+                WHERE m.isSpam=1 AND $baseCondition
             ),
         """.trimIndent()
         val pagination = "LIMIT ${query.limit ?: -1} OFFSET ${query.offset}"
@@ -46,9 +40,9 @@ internal object MirrorConversationQuery {
             ),
         """.trimIndent()
         val source = if (query.contentFilter == ConversationContentFilter.SPAM) "spam" else "mirror_message"
-        // 骚扰集合先通过主键核对版本，再用单列集合过滤，避免逐消息比较大量版本元组。
+        // 最终状态随消息写入，读取列表只筛选标记，未识别消息仍然可见。
         val classificationCondition = if (query.contentFilter == ConversationContentFilter.NORMAL)
-            "AND m.localId NOT IN (SELECT localId FROM spam)" else ""
+            "AND (m.isSpam=0 OR m.isSpam IS NULL)" else ""
         val pageThreadCondition = if (needsThreadPage)
             "AND m.threadId IN (SELECT threadId FROM thread_page)" else ""
         val unreadExpression = if (query.incomingUnreadOnly)

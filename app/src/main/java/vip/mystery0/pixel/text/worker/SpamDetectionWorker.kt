@@ -79,6 +79,7 @@ class SpamDetectionWorker(
     private val messageRepository: MessageRepository by inject()
 
     override suspend fun doWork(): Result {
+        spamRepository.ensureReady()
         val messageId = inputData.getLong(KEY_MESSAGE_ID, -1L)
         if (messageId < 0) return Result.failure()
         val messageUri = android.content.ContentUris.withAppendedId(android.provider.Telephony.Sms.CONTENT_URI, messageId).toString()

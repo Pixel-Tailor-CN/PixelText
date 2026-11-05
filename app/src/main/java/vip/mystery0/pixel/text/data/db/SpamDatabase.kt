@@ -12,26 +12,10 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
-
-@Entity(tableName = "spam_result")
-data class SpamResultEntity(
-    @PrimaryKey
-    @ColumnInfo(name = "message_id")
-    val messageId: Long,
-    @ColumnInfo(name = "thread_id") val threadId: Long,
-    @ColumnInfo(name = "spam_score") val spamScore: Float,
-    @ColumnInfo(name = "checked_at") val checkedAt: Long,
-    @ColumnInfo(name = "source", defaultValue = "'legacy'") val source: String = "legacy",
-    @ColumnInfo(name = "model_identity", defaultValue = "''") val modelIdentity: String = "",
-    @ColumnInfo(name = "personal_generation") val personalGeneration: Long? = null,
-    @ColumnInfo(name = "message_fingerprint", defaultValue = "''") val messageFingerprint: String = "",
-    @ColumnInfo(name = "decision_revision", defaultValue = "-1") val decisionRevision: Long = -1,
-)
 
 @Entity(
     tableName = "blocked_keyword",
@@ -45,99 +29,6 @@ data class BlockedKeywordEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )
-
-@Entity(
-    tableName = "keyword_spam_match",
-    indices = [Index("thread_id"), Index("keyword_id")],
-)
-data class KeywordSpamMatchEntity(
-    @PrimaryKey
-    @ColumnInfo(name = "message_id") val messageId: Long,
-    @ColumnInfo(name = "thread_id") val threadId: Long,
-    @ColumnInfo(name = "keyword_id") val keywordId: Long,
-    @ColumnInfo(name = "matched_at") val matchedAt: Long,
-)
-
-@Dao
-interface SpamResultDao {
-    @Query("SELECT * FROM spam_result WHERE message_id IN (:messageIds)")
-    suspend fun results(messageIds: List<Long>): List<SpamResultEntity>
-
-    @Query("SELECT message_id FROM keyword_spam_match WHERE message_id IN (:messageIds)")
-    suspend fun keywordIds(messageIds: List<Long>): List<Long>
-
-    @Query("SELECT message_id FROM spam_result UNION SELECT message_id FROM keyword_spam_match")
-    suspend fun allDecisionIds(): List<Long>
-
-    @Query("DELETE FROM spam_result")
-    suspend fun invalidatePredictions()
-
-    @Query(
-        """
-        SELECT CASE
-            WHEN EXISTS(
-                SELECT 1 FROM keyword_spam_match WHERE message_id = :messageId
-            ) THEN 1.0
-            ELSE (
-                SELECT spam_score FROM spam_result WHERE message_id = :messageId
-            )
-        END
-        """
-    )
-    suspend fun getScore(messageId: Long): Float?
-
-    @Query("SELECT message_id FROM spam_result WHERE message_id IN (:messageIds)")
-    suspend fun getExistingMessageIds(messageIds: List<Long>): List<Long>
-
-    @Query(
-        """
-        SELECT message_id FROM spam_result
-        WHERE message_id IN (:messageIds) AND spam_score >= :threshold
-        UNION
-        SELECT message_id FROM keyword_spam_match
-        WHERE message_id IN (:messageIds)
-        """
-    )
-    suspend fun getSpamMessageIds(messageIds: List<Long>, threshold: Float): List<Long>
-
-    @Query(
-        """
-        SELECT thread_id FROM (
-            SELECT message_id, thread_id, checked_at AS matched_at
-            FROM spam_result
-            WHERE spam_score >= :threshold
-            UNION ALL
-            SELECT message_id, thread_id, matched_at
-            FROM keyword_spam_match
-        ) AS matches
-        WHERE NOT EXISTS (SELECT 1 FROM spam_allowed_message a WHERE a.message_id = matches.message_id)
-        GROUP BY thread_id
-        ORDER BY MAX(matched_at) DESC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
-
-    @Query("SELECT message_id FROM spam_result WHERE spam_score >= :threshold UNION SELECT message_id FROM keyword_spam_match")
-    suspend fun getCandidateSpamMessageIds(threshold: Float): List<Long>
-
-    @Query(
-        """
-        SELECT
-            (SELECT COUNT(*) FROM spam_result) +
-            (SELECT COUNT(*) FROM keyword_spam_match) +
-            (SELECT COUNT(*) FROM sender_whitelist_rule) +
-            (SELECT COUNT(*) FROM spam_allowed_message)
-        """
-    )
-    fun observeCount(): Flow<Int>
-
-    @Query("DELETE FROM spam_result WHERE message_id IN (:messageIds)")
-    suspend fun deleteByMessageIds(messageIds: List<Long>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(result: SpamResultEntity)
-}
 
 @Dao
 interface BlockedKeywordDao {
@@ -162,41 +53,17 @@ interface BlockedKeywordDao {
     @Query("DELETE FROM blocked_keyword WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMatch(entity: KeywordSpamMatchEntity)
-
-    @Query("DELETE FROM keyword_spam_match WHERE message_id = :messageId")
-    suspend fun deleteMatch(messageId: Long)
-
-    @Query("DELETE FROM keyword_spam_match WHERE message_id IN (:messageIds)")
-    suspend fun deleteMatches(messageIds: List<Long>)
-
-    @Query("DELETE FROM keyword_spam_match")
-    suspend fun deleteAllMatches()
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMatches(matches: List<KeywordSpamMatchEntity>)
-
-    @Transaction
-    suspend fun replaceAllMatches(matches: List<KeywordSpamMatchEntity>) {
-        deleteAllMatches()
-        if (matches.isNotEmpty()) insertMatches(matches)
-    }
 }
 
 @Database(
     entities = [
-        SpamResultEntity::class,
         BlockedKeywordEntity::class,
-        KeywordSpamMatchEntity::class,
         SenderWhitelistRuleEntity::class,
-        SpamAllowedMessageEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class SpamDatabase : RoomDatabase() {
-    abstract fun spamResultDao(): SpamResultDao
     abstract fun blockedKeywordDao(): BlockedKeywordDao
     abstract fun senderWhitelistDao(): SenderWhitelistDao
 
@@ -207,8 +74,13 @@ abstract class SpamDatabase : RoomDatabase() {
                 SpamDatabase::class.java,
                 "spam.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+        }
+
+        // 旧逐消息表暂留作导入来源；镜像事务提交完成标记后，由导入器删除。
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) = Unit
         }
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {

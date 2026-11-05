@@ -40,6 +40,18 @@ class MessageMirrorRepositoryImpl(
         dao.observeThread(threadId, limit.coerceAtLeast(1), offset.coerceAtLeast(0))
             .map { rows -> rows.map { it.toModel() } }.flowOn(Dispatchers.IO)
 
+    override suspend fun queryThreadMessages(threadId: Long, limit: Int, offset: Int,
+        filter: vip.mystery0.pixel.text.domain.repository.ConversationContentFilter): List<MirrorMessageModel> =
+        withContext(Dispatchers.IO) {
+            require(limit >= 0 && offset >= 0)
+            val filterValue = when (filter) {
+                vip.mystery0.pixel.text.domain.repository.ConversationContentFilter.ALL -> 0
+                vip.mystery0.pixel.text.domain.repository.ConversationContentFilter.NORMAL -> 1
+                vip.mystery0.pixel.text.domain.repository.ConversationContentFilter.SPAM -> 2
+            }
+            dao.threadPage(threadId, filterValue, limit, offset).map { it.toModel() }
+        }
+
     override fun observeAllMessages(): Flow<List<MirrorMessageModel>> =
         dao.observeAll().map { rows -> rows.map { it.toModel() } }.flowOn(Dispatchers.IO)
 
@@ -147,7 +159,9 @@ class MessageMirrorRepositoryImpl(
             dao.observeAttachmentFailures(), dao.observePendingAttachments(), database.syncDao().observeDirtyCount()) {
                 incomplete, downloads, failed, pending, dirty -> intArrayOf(incomplete, downloads, failed, pending, dirty)
         }
-        return combine(database.syncDao().observeStates(), counts) { states, count ->
+        return combine(database.syncDao().observeStates(), counts) { allStates, count ->
+            // 判定迁移与跨库写入恢复共用进度存储，但不属于系统消息同步集合。
+            val states = allStates.filter { it.collection in setOf("SMS", "MMS", "THREADS", "CANONICAL", "ROUND", "TARGETED") }
             val required = setOf("SMS", "MMS", "THREADS", "CANONICAL")
             val completed = states.filter { it.complete }.map { it.collection }.toSet()
             MirrorSyncState(
