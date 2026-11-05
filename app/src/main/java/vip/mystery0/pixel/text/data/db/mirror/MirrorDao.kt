@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.data.db.mirror
 
 import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -42,6 +43,44 @@ abstract class MirrorDao {
 
     @Transaction @Query("SELECT * FROM mirror_message ORDER BY timestamp DESC, localId DESC")
     abstract fun observeAll(): Flow<List<MirrorMessageRecord>>
+
+    @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' ORDER BY timestamp DESC, localId DESC")
+    abstract fun observeMms(): Flow<List<MirrorMessageRecord>>
+
+    @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' AND threadId IN (:threadIds) ORDER BY timestamp DESC, localId DESC")
+    abstract suspend fun conversationMms(threadIds: List<Long>): List<MirrorMessageRecord>
+
+    @Query("""
+        SELECT m.localId, m.sourceId, m.threadId, m.timestamp, m.originalDate, m.revision,
+            m.subscriptionId, m.boxType, m.read, s.body, s.address, s.dateSent
+        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId
+        WHERE m.transport='SMS' AND m.threadId IN (:threadIds)
+        ORDER BY m.timestamp DESC, m.localId DESC
+    """)
+    abstract suspend fun conversationSms(threadIds: List<Long>): List<MirrorConversationSmsRow>
+
+    @Query("""
+        SELECT m.localId, m.sourceId, m.threadId, m.timestamp, m.originalDate, m.revision,
+            m.subscriptionId, m.boxType, m.read, s.body, s.address, s.dateSent
+        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId
+        WHERE m.transport='SMS' AND m.sourceId IN (:sourceIds)
+        ORDER BY m.timestamp DESC, m.localId DESC
+    """)
+    abstract suspend fun conversationSmsByIds(sourceIds: List<Long>): List<MirrorConversationSmsRow>
+
+    @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' AND sourceId IN (:sourceIds) ORDER BY timestamp DESC, localId DESC")
+    abstract suspend fun conversationMmsByIds(sourceIds: List<Long>): List<MirrorMessageRecord>
+
+    @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' AND localId IN (:localIds)")
+    abstract suspend fun conversationMmsByLocalIds(localIds: List<Long>): List<MirrorMessageRecord>
+
+    @RawQuery
+    abstract suspend fun filteredConversations(query: SupportSQLiteQuery): List<MirrorFilteredConversationRow>
+
+    @RawQuery(observedEntities = [MirrorMessageEntity::class, MirrorSmsEntity::class,
+        MirrorMmsEntity::class, MirrorAddressEntity::class, MirrorPartEntity::class,
+        MirrorAttachmentEntity::class, MmsTextIndexEntity::class])
+    abstract fun observeConversationChanges(query: SupportSQLiteQuery): Flow<Int>
 
     @Query("""
         SELECT m.threadId AS threadId,

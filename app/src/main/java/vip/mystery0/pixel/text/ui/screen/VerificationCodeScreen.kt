@@ -92,6 +92,9 @@ fun VerificationCodeScreen(
     conversationListViewModel: ConversationListViewModel,
 ) {
     val state by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "verification", state.pages.takeIf { it.isNotEmpty() }?.sumOf { it.messages.size },
+    )
     val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     val snackbarHostState = remember { SnackbarHostState() }
     var showMenuSheet by remember { mutableStateOf(false) }

@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -72,7 +71,7 @@ class SpamConversationListViewModel(
         observationJob = viewModelScope.launch {
             // 镜像入库和骚扰判定可先后完成，两者均需触发刷新，不能只等页面重新进入。
             merge(
-                mirror.observeConversationSummaries().map { },
+                mirror.observeConversationChanges(),
                 spamRepository.observeChanges(),
             ).debounce(100.milliseconds).collect {
                 loadSpamConversations(force = true, showLoading = false)

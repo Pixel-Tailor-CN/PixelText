@@ -126,6 +126,21 @@ interface VerificationCodeIndexDao {
     @Query("SELECT * FROM sms_scan_state WHERE generation = :generation AND message_id IN (:messageIds)")
     suspend fun getScanStates(generation: Long, messageIds: List<Long>): List<SmsScanStateEntity>
 
+    @Query("SELECT COUNT(*) FROM sms_scan_state WHERE generation = :generation")
+    suspend fun getScanStateCount(generation: Long): Long
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM verification_code_index AS entry
+            LEFT JOIN sms_scan_state AS state
+                ON state.generation = entry.generation AND state.message_id = entry.message_id
+            WHERE entry.generation = :generation AND state.message_id IS NULL
+        )
+        """
+    )
+    suspend fun hasEntriesWithoutScanState(generation: Long): Boolean
+
     @Query("SELECT * FROM verification_code_index WHERE generation = :generation AND message_id IN (:messageIds)")
     suspend fun getEntries(generation: Long, messageIds: List<Long>): List<VerificationCodeIndexEntity>
 

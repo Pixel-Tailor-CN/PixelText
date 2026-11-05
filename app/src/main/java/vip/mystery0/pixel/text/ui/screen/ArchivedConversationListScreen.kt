@@ -61,6 +61,9 @@ fun ArchivedConversationListScreen(
     onNavigateToDetail: (Long, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "archive", (uiState as? ArchivedConversationListUiState.Success)?.conversations?.size,
+    )
     var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val selectionMode = selectedThreadIds.isNotEmpty()
     val snackbarHostState = remember { SnackbarHostState() }

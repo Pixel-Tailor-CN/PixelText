@@ -2,7 +2,7 @@ package vip.mystery0.pixel.text.data.db.mirror
 
 import androidx.room.*
 
-@Entity(tableName = "mirror_message", indices = [Index(value = ["transport", "sourceId"], unique = true), Index("threadId"), Index("timestamp"), Index("subscriptionId")])
+@Entity(tableName = "mirror_message", indices = [Index(value = ["transport", "sourceId"], unique = true), Index("threadId"), Index(value = ["threadId", "timestamp", "localId"]), Index("timestamp"), Index("subscriptionId")])
 data class MirrorMessageEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val transport: String, val sourceId: Long, val revision: Long = 1,
@@ -103,4 +103,24 @@ data class MmsTextIndexEntity(@PrimaryKey val localId: Long, val version: Int,
     @ColumnInfo(defaultValue = "''") val searchBody: String = "",
     @ColumnInfo(defaultValue = "0") val searchReady: Boolean = false,
     @ColumnInfo(defaultValue = "0") val sourceRevision: Long = 0,
+)
+
+/** 直接投影短信列表所需字段，避免加载完整关系和解码原始快照。 */
+data class MirrorConversationSmsRow(
+    val localId: Long, val sourceId: Long, val threadId: Long?, val timestamp: Long?,
+    val originalDate: Long?, val subscriptionId: Int?, val boxType: Int?, val read: Int?,
+    val body: String?, val address: String?, val dateSent: Long?,
+    val revision: Long,
+)
+
+/** 实时聚合后的会话；短信正文仅从每个会话的最新可见消息读取。 */
+data class MirrorFilteredConversationRow(
+    val localId: Long,
+    val threadId: Long,
+    val timestamp: Long?,
+    val latestIsMms: Boolean,
+    val unreadCount: Int,
+    val containsMms: Boolean,
+    val address: String?,
+    val snippet: String?,
 )

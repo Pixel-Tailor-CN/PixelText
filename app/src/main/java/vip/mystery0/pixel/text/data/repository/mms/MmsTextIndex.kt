@@ -77,8 +77,8 @@ class MmsTextIndexer(
         job = scope.launch {
             var previousInputs: List<Pair<SourceMessageKey, String>>? = null
             var previousMissing = emptySet<SourceMessageKey>()
-            mirror.observeAllMessages().map { rows -> rows.filter { it.key.transport == MessageTransport.MMS }
-                .map { snapshot -> ensureActive(); snapshot to mmsContentFingerprint(snapshot) } }
+            mirror.observeMmsMessages().map { rows ->
+                rows.map { snapshot -> ensureActive(); snapshot to mmsContentFingerprint(snapshot) } }
                 .transform { rows ->
                     val inputs = rows.map { it.first.key to it.second }
                     val missing = rows.filter { it.first.mmsSummary == null }.mapTo(mutableSetOf()) { it.first.key }

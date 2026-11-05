@@ -31,15 +31,22 @@ class ConversationCacheRepository(
         synchronizer.reconcile()
         MessageMirrorScheduler(context).schedule(reason = "manual_repair")
     }
-    suspend fun refreshIncremental() {
+    suspend fun refreshIncremental(requireComplete: Boolean = false) {
         if (!isCacheReady()) {
             synchronizer.reconcile()
-        } else {
-            val result = incrementalSynchronizer.syncRecent()
-            if (result.remaining) incrementalSynchronizer.markWake()
         }
+        var result = incrementalSynchronizer.syncRecent()
+        if (requireComplete && result.requiresFullReconcile) {
+            synchronizer.reconcile()
+            result = incrementalSynchronizer.syncRecent()
+        }
+        if (result.remaining) incrementalSynchronizer.markWake()
         // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
+        // 首次发布前必须确认新消息已追平；失败交给订阅重试，不能把旧镜像当作新结果。
+        if (requireComplete) check(!result.remaining && !result.requiresFullReconcile) {
+            "message synchronization incomplete"
+        }
     }
     suspend fun syncIncomingSms(messageId: Long) {
         // 新收短信已有确切身份，按消息排队即可；全量对账会让新消息等待历史扫描。

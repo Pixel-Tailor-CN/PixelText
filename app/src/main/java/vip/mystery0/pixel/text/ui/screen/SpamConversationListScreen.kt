@@ -61,6 +61,9 @@ fun SpamConversationListScreen(
     onNavigateToDetail: (Long, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "spam", (uiState as? SpamConversationListUiState.Success)?.conversations?.size,
+    )
     val historyStatsState by viewModel.historyStatsState.collectAsState()
     val scanProgress by viewModel.historyScanProgress.collectAsState()
     val isCompletedScanProgressHidden by viewModel.isCompletedScanProgressHidden.collectAsState()

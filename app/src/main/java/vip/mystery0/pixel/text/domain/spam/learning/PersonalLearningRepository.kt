@@ -14,8 +14,17 @@ data class LearningMessageKey(val sourceType: String, val sourceId: Long, val fi
         }
     }
 }
-fun learningDigest(text: String): String = MessageDigest.getInstance("SHA-256")
-    .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+fun learningDigest(text: String): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+    val digits = "0123456789abcdef"
+    return buildString(digest.size * 2) {
+        for (byte in digest) {
+            val value = byte.toInt() and 0xff
+            append(digits[value ushr 4])
+            append(digits[value and 0x0f])
+        }
+    }
+}
 data class LearningSample(val id: String, val text: String, val label: LearningLabel,
     val updatedAt: Long, val revision: Long, val linkedMessageCount: Int = 0)
 data class LearningSnapshot(val revision: Long, val samples: List<LearningSample>)
@@ -31,10 +40,12 @@ interface PersonalLearningRepository {
     suspend fun deleteSample(id: String)
     suspend fun clear()
     suspend fun linkedMessageKeys(): List<LearningMessageKey>
+    suspend fun correctedMessageIds(label: LearningLabel): Set<Long>
     suspend fun unlinkIds(sourceType: String, ids: List<Long>)
     suspend fun forgetDeletedMessages(keys: List<LearningMessageKey>)
     suspend fun unlinkMessage(key: LearningMessageKey)
     suspend fun correction(key: LearningMessageKey): LearningLabel?
+    suspend fun corrections(keys: Collection<LearningMessageKey>): Map<LearningMessageKey, LearningLabel>
     suspend fun snapshot(): LearningSnapshot
     suspend fun stateRevision(): Long
     suspend fun currentParameters(identity: String): PersonalParameters?

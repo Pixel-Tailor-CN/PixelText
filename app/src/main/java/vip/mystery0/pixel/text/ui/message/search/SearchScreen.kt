@@ -61,6 +61,9 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "search", (uiState as? SearchUiState.Success)?.results?.size, searchQuery,
+    )
     val domainFilter by viewModel.domainFilter.collectAsState()
     val selectionState by viewModel.selectionState.collectAsState()
     val context = LocalContext.current

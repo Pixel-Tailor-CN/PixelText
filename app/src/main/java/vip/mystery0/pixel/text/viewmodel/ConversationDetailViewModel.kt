@@ -107,7 +107,7 @@ class ConversationDetailViewModel(
     private var loadVersion = 0
     private var messageLoadJob: Job? = null
     private var activeLoadIsRefresh = false
-    private var pendingPage = false
+    private var pendingPageSize = 0
     private var pendingRefresh: RefreshRequest? = null
     private var loadFailureCount = 0L
 
@@ -204,7 +204,7 @@ class ConversationDetailViewModel(
         messageLoadJob?.cancel()
         messageLoadJob = null
         pendingRefresh = null
-        pendingPage = false
+        pendingPageSize = 0
         currentThreadId = threadId
         mirrorThreadId.value = threadId
         currentContentFilter = contentFilter
@@ -223,8 +223,8 @@ class ConversationDetailViewModel(
         }
     }
 
-    private suspend fun resolveConversationTitle(address: String): String {
-        return contactDataSource.getDisplayName(address)?.takeIf { it.isNotBlank() }
+    private suspend fun resolveConversationTitle(address: String): String = withContext(Dispatchers.IO) {
+        contactDataSource.getDisplayName(address)?.takeIf { it.isNotBlank() }
             ?: senderProfileRepository.findByNumber(address)?.displayName
             ?: address
     }
@@ -246,28 +246,31 @@ class ConversationDetailViewModel(
             if (!hasMore || loadFailureCount != failures) return null
 
             // 等待本次加载即可；持续到来的刷新不能把定位操作一直留在 busy 循环中。
-            if (messageLoadJob == null || activeLoadIsRefresh) fetchMessages()
+            if (messageLoadJob == null || activeLoadIsRefresh) fetchMessages(TARGET_MESSAGE_PAGE_SIZE)
             messageLoadJob?.join()
         }
         return null
     }
 
-    private fun fetchMessages() {
+    private fun fetchMessages(pageSize: Int = MESSAGE_PAGE_SIZE) {
         if (!hasMore || currentThreadId < 0) return
         if (messageLoadJob != null) {
             // 正在翻页时重复的触底事件不再排一页；刷新期间的翻页需求保留。
-            if (activeLoadIsRefresh) pendingPage = true
+            if (activeLoadIsRefresh) pendingPageSize = maxOf(pendingPageSize, pageSize)
             return
         }
-        startMessageLoad()
+        startMessageLoad(pageSize = pageSize)
     }
 
-    private fun startMessageLoad(refresh: RefreshRequest? = null) {
+    private fun startMessageLoad(
+        refresh: RefreshRequest? = null,
+        pageSize: Int = MESSAGE_PAGE_SIZE,
+    ) {
         val generation = loadVersion
         val threadId = currentThreadId
         val filter = currentContentFilter
         val requestedOffset = if (refresh == null) offset else 0
-        val requestedLimit = if (refresh == null) MESSAGE_PAGE_SIZE else {
+        val requestedLimit = if (refresh == null) pageSize else {
             _messages.size.coerceAtLeast(MESSAGE_PAGE_SIZE) +
                     if (refresh.preserveLoadedHistory) MESSAGE_PAGE_SIZE else 0
         }
@@ -344,10 +347,10 @@ class ConversationDetailViewModel(
 
     private fun drainPendingLoads() {
         // 先兑现用户翻页，避免全局评分持续变化导致翻页饿死。
-        val nextPage = pendingPage
-        pendingPage = false
-        if (nextPage && hasMore) {
-            startMessageLoad()
+        val nextPageSize = pendingPageSize
+        pendingPageSize = 0
+        if (nextPageSize > 0 && hasMore) {
+            startMessageLoad(pageSize = nextPageSize)
             return
         }
         val refresh = pendingRefresh ?: return
@@ -512,5 +515,6 @@ class ConversationDetailViewModel(
         private const val TAG = "ConversationDetailViewM"
         private const val SPAM_THRESHOLD = 0.7f
         private const val MESSAGE_PAGE_SIZE = 20
+        private const val TARGET_MESSAGE_PAGE_SIZE = 200
     }
 }

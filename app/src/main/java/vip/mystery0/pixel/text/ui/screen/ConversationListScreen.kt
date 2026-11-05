@@ -263,6 +263,9 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "home", (uiState as? ConversationListUiState.Success)?.conversations?.size,
+    )
     val settings by viewModel.settings.collectAsState()
     val initialization by viewModel.initializationState.collectAsState()
     val initializationProgress by viewModel.initializationProgress.collectAsState()

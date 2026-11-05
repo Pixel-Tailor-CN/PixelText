@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         MirrorAddressEntity::class, MirrorPartEntity::class, MirrorAttachmentEntity::class,
         MirrorThreadSourceEntity::class, MirrorCanonicalAddressEntity::class, MirrorSyncStateEntity::class,
         MirrorDirtyEntity::class, MirrorFileCleanupEntity::class, MmsDownloadRequestEntity::class, MmsTextIndexEntity::class, DataInitializationEntity::class],
-    version = 4, exportSchema = true,
+    version = 5, exportSchema = true,
 )
 abstract class MessageMirrorDatabase : RoomDatabase() {
     abstract fun mirrorDao(): MirrorDao
@@ -23,7 +23,13 @@ abstract class MessageMirrorDatabase : RoomDatabase() {
         // 后续版本必须显式注册 Migration，禁止破坏性重建。
         fun create(context: Context): MessageMirrorDatabase = Room.databaseBuilder(
             context.applicationContext, MessageMirrorDatabase::class.java, DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration).build()
+        ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration, MIGRATION_4_5).build()
+
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_mirror_message_threadId_timestamp_localId ON mirror_message(threadId, timestamp, localId)")
+            }
+        }
 
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

@@ -80,6 +80,23 @@ class PersonalLearningRepositoryImpl(private val database: PersonalLearningDatab
     }
     override suspend fun correction(key: LearningMessageKey): LearningLabel? =
         dao.correction(key.sourceType, key.sourceId, key.fingerprint)?.let(LearningLabel::valueOf)
+    override suspend fun correctedMessageIds(label: LearningLabel): Set<Long> =
+        dao.correctedMessageIds(label.name).toSet()
+    override suspend fun corrections(keys: Collection<LearningMessageKey>): Map<LearningMessageKey, LearningLabel> {
+        if (keys.isEmpty()) return emptyMap()
+        val requested = keys.toSet()
+        return buildMap {
+            // 按来源分批查询，仍以完整指纹匹配，避免系统复用短信 ID 后误用旧纠正。
+            requested.groupBy { it.sourceType }.forEach { (type, typedKeys) ->
+                typedKeys.map { it.sourceId }.distinct().chunked(500).forEach { ids ->
+                    dao.corrections(type, ids).forEach { row ->
+                        val key = LearningMessageKey(row.sourceType, row.sourceId, row.fingerprint)
+                        if (key in requested) put(key, LearningLabel.valueOf(row.label))
+                    }
+                }
+            }
+        }
+    }
     override suspend fun snapshot(): LearningSnapshot = database.withTransaction {
         LearningSnapshot(stateRevision(), dao.samples().map { it.toModel() })
     }

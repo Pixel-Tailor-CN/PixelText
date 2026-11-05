@@ -693,10 +693,15 @@ fun ConversationDetailScreen(
             }
 
             is MessageUiState.Success -> {
-                val currentMessageKeys = state.messages.map { it.stableKey }
-                val entranceMessageKeys = currentMessageKeys.toSet() intersect newMessageKeys
-                val hasNewSentMessage = state.messages.any { message ->
-                    message.stableKey in entranceMessageKeys && !message.isReceived
+                val entranceMessageKeys = remember(state.messages, newMessageKeys) {
+                    if (newMessageKeys.isEmpty()) emptySet() else {
+                        state.messages.mapTo(mutableSetOf()) { it.stableKey } intersect newMessageKeys
+                    }
+                }
+                val hasNewSentMessage = remember(state.messages, entranceMessageKeys) {
+                    entranceMessageKeys.isNotEmpty() && state.messages.any { message ->
+                        message.stableKey in entranceMessageKeys && !message.isReceived
+                    }
                 }
                 LaunchedEffect(entranceMessageKeys, hasNewSentMessage) {
                     if (entranceMessageKeys.isEmpty()) return@LaunchedEffect
