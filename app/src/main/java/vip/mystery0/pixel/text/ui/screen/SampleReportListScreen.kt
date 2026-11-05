@@ -6,6 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Outbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +27,6 @@ import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
 
 internal const val SAMPLE_REPORT_REFRESH_REQUESTED = "sample_report_refresh_requested"
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SampleReportListScreen(
     onNavigateBack: () -> Unit,
@@ -54,18 +56,33 @@ fun SampleReportListScreen(
             }
     }
     Scaffold(topBar = {
-        SampleReportTopBar("我的上报", onNavigateBack) { TextButton(onClick = onNewReport) { Text("上报") } }
+        SampleReportTopBar("我的上报", onNavigateBack) {
+            IconButton(onClick = { showInfo = true }) {
+                Icon(Icons.Rounded.Info, contentDescription = "关于上报记录")
+            }
+        }
+    }, floatingActionButton = {
+        if (!state.hasPending) {
+            ExtendedFloatingActionButton(
+                onClick = onNewReport,
+                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                text = { Text("贡献样本") },
+            )
+        }
     }, containerColor = MaterialTheme.colorScheme.background) { padding ->
         ExpressivePullToRefreshBox(isRefreshing = state.refreshing, onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 104.dp)) {
                 if (state.hasPending) item(key = "pending") {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-                        Text("有一条提交尚未确认", style = MaterialTheme.typography.titleSmall)
-                        Text("这是本机保留的请求，不是审核记录", style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = onNewReport) { Text("恢复本次提交") }
-                        HorizontalDivider()
+                    Surface(onClick = onNewReport, shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(Icons.Rounded.Outbox, contentDescription = null)
+                            Text("提交结果待确认", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+                        }
                     }
                 }
                 state.pendingError?.let { message -> item(key = "pending_error") {
@@ -73,10 +90,9 @@ fun SampleReportListScreen(
                 } }
                 state.error?.let { message -> item(key = "error") { SampleReportError(message, state.retryAt, viewModel::refresh) } }
                 if (state.loaded && state.items.isEmpty() && state.error == null) item(key = "empty") {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("暂无上报记录", style = MaterialTheme.typography.titleMedium)
-                        Text("可以从短信详情长按单条短信，快速带入并上报脱敏样本", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = onNewReport) { Text("上报样本") }
+                    Box(Modifier.fillMaxWidth().padding(vertical = 96.dp), contentAlignment = Alignment.Center) {
+                        Text("暂无上报记录", style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 state.items.forEachIndexed { index, report ->
@@ -88,21 +104,16 @@ fun SampleReportListScreen(
                     item(key = "report_${report.id}") {
                         Row(Modifier.fillMaxWidth().clickable { onOpenReport(report.id) }.padding(vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                // 宽度不足时状态自然换行，避免大字号挤压分类。
-                                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(sampleReportCategory(report.submittedCategory), style = MaterialTheme.typography.titleMedium)
-                                    SampleReportStatusLabel(report.status)
-                                }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(when {
                                     report.id in state.unavailableReportIds -> "无法查看这条上报记录"
                                     report.status == SampleReportStatus.REMOVED -> "样本已移除，内容不再提供"
                                     else -> report.contentPreview.ifBlank { "暂无摘要" }
                                 },
-                                    maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                                Text(sampleReportDate(report.submittedAt), style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+                                Text("${sampleReportCategory(report.submittedCategory)} · ${sampleReportDate(report.submittedAt)}", style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                SampleReportStatusLabel(report.status)
                             }
                             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -119,13 +130,10 @@ fun SampleReportListScreen(
                 if (state.nextCursor != null && !state.loadingMore && state.appendError == null && !state.refreshing) item(key = "load_more") {
                     TextButton(onClick = viewModel::loadMore, modifier = Modifier.fillMaxWidth()) { Text("加载更多") }
                 }
-                item(key = "info") {
-                    TextButton(onClick = { showInfo = true }, modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) { Text("记录说明") }
-                }
             }
         }
     }
-    if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("记录说明") },
-        text = { Text("上报记录存储于服务端，与本次应用安装关联，卸载或清除数据后将无法访问。历史记录仅代表服务端保留的历史数据。审核通过不代表已用于训练或发布规则。") },
+    if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("关于上报记录") },
+        text = { Text("记录与本次应用安装关联，卸载或清除应用数据后将无法访问。审核状态不影响本机的短信分类。") },
         confirmButton = { TextButton(onClick = { showInfo = false }) { Text("知道了") } })
 }

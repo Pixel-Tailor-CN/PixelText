@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
@@ -425,7 +426,17 @@ fun ConversationDetailScreen(
     )
 
     LaunchedEffect(learningViewModel) {
-        learningViewModel.savedEvents.collect { event ->
+        learningViewModel.savedEvents.collectLatest { event ->
+            event.contribution?.let { draft ->
+                snackbarHostState.currentSnackbarData?.dismiss()
+                onNavigateToLearningContribution(
+                    draft.content,
+                    draft.sender.ifBlank { address },
+                    draft.category,
+                    draft.feedback,
+                )
+                return@collectLatest
+            }
             val text = when (event.ruleConflict) {
                 vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.WHITELIST ->
                     "纠正已保存，正在更新个人学习（此短信已放行，放行优先于个人学习）"
@@ -516,16 +527,7 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = {
-                                            Column {
-                                                Text("纠正识别")
-                                                Text(
-                                                    "让个人学习记住这次选择",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        },
+                                        text = { Text("调整短信分类") },
                                         enabled = selectedMessage != null && !selectedMessage.isMms,
                                         onClick = {
                                             showMoreMenu = false

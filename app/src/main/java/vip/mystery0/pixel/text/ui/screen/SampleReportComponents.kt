@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.HelpOutline
@@ -33,7 +34,7 @@ internal fun SampleReportTopBar(title: String, onBack: () -> Unit, action: @Comp
 }
 
 @Composable
-internal fun SampleReportStatusLabel(status: SampleReportStatus) {
+internal fun SampleReportStatusLabel(status: SampleReportStatus, prominent: Boolean = false) {
     val icon: ImageVector = when (status) {
         SampleReportStatus.APPROVED -> Icons.Rounded.CheckCircle
         SampleReportStatus.REJECTED -> Icons.Rounded.Cancel
@@ -44,9 +45,17 @@ internal fun SampleReportStatusLabel(status: SampleReportStatus) {
         SampleReportStatus.PENDING -> Icons.Rounded.Schedule
         SampleReportStatus.UNKNOWN -> Icons.AutoMirrored.Rounded.HelpOutline
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(status.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    val color = when (status) {
+        SampleReportStatus.REJECTED, SampleReportStatus.RESTRICTED -> MaterialTheme.colorScheme.error
+        SampleReportStatus.REMOVED, SampleReportStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+        SampleReportStatus.APPROVED -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = color,
+            modifier = Modifier.size(if (prominent) 28.dp else 18.dp))
+        Text(status.label, style = if (prominent) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.labelLarge,
+            color = color)
     }
 }
 

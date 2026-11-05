@@ -517,9 +517,21 @@ fun SettingsScreen(
                 },
                 SettingsEntry("personal_learning") {
                     Preference(title = { Text("个人学习") },
-                        summary = { Text(if (settings.personalLearningEnabled) "已开启 · 管理学习样本与贡献草稿" else "已关闭 · 主动纠正后在本机学习") },
+                        summary = { Text(if (settings.personalLearningEnabled) "已开启" else "已关闭") },
                         icon = { Icon(Icons.Rounded.Memory, null) },
                         onClick = onNavigateToPersonalLearning)
+                },
+                SettingsEntry("sample_reports") {
+                    Preference(
+                        title = { Text("我的上报") },
+                        summary = {
+                            Text("查看贡献记录与审核结果")
+                        },
+                        icon = {
+                            Icon(Icons.Rounded.UploadFile, contentDescription = null)
+                        },
+                        onClick = onNavigateToSampleReports
+                    )
                 },
                 SettingsEntry("keyword_spam") {
                     Preference(
@@ -814,18 +826,6 @@ fun SettingsScreen(
                 },
             )))
             add(SettingsSection("about_community", "社区与帮助改进", listOf(
-                SettingsEntry("sample_reports") {
-                    Preference(
-                        title = { Text("我的上报") },
-                        summary = {
-                            Text("查看上报记录与审核结果，主动提交脱敏短信样本")
-                        },
-                        icon = {
-                            Icon(Icons.Rounded.UploadFile, contentDescription = null)
-                        },
-                        onClick = onNavigateToSampleReports
-                    )
-                },
                 SettingsEntry("pixel_tailor") {
                     Preference(
                         external = true,

@@ -265,7 +265,18 @@ fun AppNavigation(
             composable("personal_learning") {
                 PersonalLearningScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToSampleReports = { navController.navigate("sample_reports") },
+                    onContributeSample = { content, category ->
+                        navController.currentBackStackEntry?.savedStateHandle?.apply {
+                            set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
+                            set(SAMPLE_SUBMISSION_DRAFT_SENDER, "")
+                            set(SAMPLE_SUBMISSION_DRAFT_CATEGORY, category)
+                            // 历史样本未保存当时的模型快照，不用当前版本冒充来源。
+                            set("learning_feedback_label", "")
+                            set("learning_feedback_base", "")
+                            set("learning_feedback_generation", "")
+                        }
+                        navController.navigate("sample_submission")
+                    },
                 )
             }
             composable("keyword_spam") {

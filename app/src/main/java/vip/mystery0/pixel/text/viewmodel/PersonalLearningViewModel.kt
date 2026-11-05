@@ -31,6 +31,7 @@ data class LearningInteraction(
     val linkedMessageCount: Int = 0,
     val ruleConflict: LearningRuleConflict? = null,
     val needsEnable: Boolean = false,
+    val contributeSample: Boolean = false,
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -38,6 +39,14 @@ data class LearningInteraction(
 data class LearningSavedEvent(
     val label: LearningLabel,
     val ruleConflict: LearningRuleConflict?,
+    val contribution: LearningContributionDraft? = null,
+)
+
+data class LearningContributionDraft(
+    val content: String,
+    val sender: String,
+    val category: String,
+    val feedback: LearningFeedback,
 )
 
 class PersonalLearningViewModel(
@@ -76,6 +85,8 @@ class PersonalLearningViewModel(
     val interaction = mutableInteraction.asStateFlow()
     private val mutableError = MutableStateFlow<String?>(null)
     val error = mutableError.asStateFlow()
+    private val mutableUpdatingSample = MutableStateFlow(false)
+    val updatingSample = mutableUpdatingSample.asStateFlow()
 
     private val _savedEvents = Channel<LearningSavedEvent>(Channel.BUFFERED)
     val savedEvents = _savedEvents.receiveAsFlow()
@@ -137,6 +148,11 @@ class PersonalLearningViewModel(
         if (!interaction.value.busy) mutableInteraction.value = LearningInteraction()
     }
 
+    fun setContributeSample(checked: Boolean) {
+        if (interaction.value.busy) return
+        mutableInteraction.update { it.copy(contributeSample = checked) }
+    }
+
     fun saveSelection() {
         val before = interaction.value
         val message = before.message ?: return
@@ -174,7 +190,18 @@ class PersonalLearningViewModel(
                 )
                 recordedFeedbackByKey[key] = feedback
                 mutableInteraction.value = LearningInteraction()
-                _savedEvents.trySend(LearningSavedEvent(label = label, ruleConflict = before.ruleConflict))
+                // 仅准备贡献草稿，仍需用户检查内容并明确确认后才上传。
+                val contribution = if (before.contributeSample) {
+                    LearningContributionDraft(
+                        content = message.content,
+                        sender = message.sender,
+                        category = if (label == LearningLabel.SPAM) "spam" else "normal",
+                        feedback = feedback,
+                    )
+                } else null
+                _savedEvents.trySend(
+                    LearningSavedEvent(label, before.ruleConflict, contribution),
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -232,7 +259,42 @@ class PersonalLearningViewModel(
     }
 
     fun setAutoDesensitize(enabled: Boolean) = settingsRepository.setLearningAutoDesensitizeEnabled(enabled)
-    fun updateSampleLabel(id: String, label: LearningLabel) = operation { coordinator.updateSampleLabel(id, label) }
+    fun prepareStoredSampleContribution(id: String, onReady: (String, String) -> Unit) {
+        if (mutableUpdatingSample.value) return
+        mutableUpdatingSample.value = true
+        mutableError.value = null
+        viewModelScope.launch {
+            try {
+                // 从持久化记录读取最新分类，避免保存后列表尚未刷新时带入旧标签。
+                val sample = repository.observeSamples().first().firstOrNull { it.id == id }
+                    ?: error("learning sample not found")
+                onReady(sample.text, if (sample.label == LearningLabel.SPAM) "spam" else "normal")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutableError.value = "无法准备贡献样本，请重试"
+            } finally {
+                mutableUpdatingSample.value = false
+            }
+        }
+    }
+
+    fun updateSampleLabel(id: String, label: LearningLabel) {
+        if (mutableUpdatingSample.value) return
+        mutableUpdatingSample.value = true
+        mutableError.value = null
+        viewModelScope.launch {
+            try {
+                check(coordinator.updateSampleLabel(id, label))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutableError.value = "分类未能保存，请重试"
+            } finally {
+                mutableUpdatingSample.value = false
+            }
+        }
+    }
     fun deleteSample(id: String) = operation { coordinator.deleteSample(id) }
     fun clear() = operation { coordinator.clear() }
     fun retry() = coordinator.requestLearning()

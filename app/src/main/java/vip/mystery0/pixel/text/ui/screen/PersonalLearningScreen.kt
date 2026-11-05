@@ -15,13 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.ReportProblem
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,13 +45,14 @@ private const val LEARNING_NOTICE =
 @Composable
 fun PersonalLearningScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToSampleReports: (() -> Unit)? = null,
+    onContributeSample: (content: String, category: String) -> Unit = { _, _ -> },
     viewModel: PersonalLearningViewModel = koinViewModel(),
 ) {
     val settings by viewModel.settings.collectAsState()
     val samples by viewModel.samples.collectAsState()
     val state by viewModel.learningState.collectAsState()
     val error by viewModel.error.collectAsState()
+    val updatingSample by viewModel.updatingSample.collectAsState()
     var enableConfirmation by rememberSaveable { mutableStateOf(false) }
     var detailSampleId by rememberSaveable { mutableStateOf<String?>(null) }
     var deletionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -72,6 +71,9 @@ fun PersonalLearningScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showContributionSettings = true }) {
+                        Icon(Icons.Rounded.Settings, contentDescription = "样本贡献设置")
+                    }
                     Box {
                         IconButton(onClick = { showMoreMenu = true }) {
                             Icon(Icons.Rounded.MoreVert, contentDescription = "更多选项")
@@ -108,7 +110,7 @@ fun PersonalLearningScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item(key = "master_switch") {
                 Surface(
@@ -156,6 +158,7 @@ fun PersonalLearningScreen(
             }
 
             item(key = "status") {
+                Spacer(Modifier.height(20.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PersonalLearningStatusSection(
                         enabled = settings.personalLearningEnabled,
@@ -172,6 +175,7 @@ fun PersonalLearningScreen(
             }
 
             item(key = "records_header") {
+                Spacer(Modifier.height(20.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -199,7 +203,7 @@ fun PersonalLearningScreen(
                         ) {
                             Text("还没有学习记录", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "在短信详情长按单条短信，从更多菜单选择“纠正识别”，即可在本机记住你的分类选择。",
+                                "你调整过分类的短信会显示在这里。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -217,15 +221,6 @@ fun PersonalLearningScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            Icon(
-                                imageVector = if (sample.label == LearningLabel.SPAM) {
-                                    Icons.Rounded.ReportProblem
-                                } else {
-                                    Icons.Rounded.MailOutline
-                                },
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -241,9 +236,6 @@ fun PersonalLearningScreen(
                                         append(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
                                         append(" · ")
                                         append(formatLearningSampleDate(sample.updatedAt))
-                                        if (sample.linkedMessageCount > 0) {
-                                            append(" · 关联 ${sample.linkedMessageCount} 条")
-                                        }
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -258,54 +250,6 @@ fun PersonalLearningScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
-                item(key = "records_hint") {
-                    Text(
-                        "点击记录查看全文或管理纠正。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            item(key = "contribution_settings_entry") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Spacer(Modifier.height(8.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showContributionSettings = true }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Shield,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text("样本贡献设置", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                if (settings.learningAutoDesensitizeEnabled) {
-                                    "自动脱敏与提交说明 · 自动脱敏已开启"
-                                } else {
-                                    "自动脱敏与提交说明 · 自动脱敏已关闭"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = "打开样本贡献设置",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
             }
         }
     }
@@ -313,10 +257,17 @@ fun PersonalLearningScreen(
     samples.firstOrNull { it.id == detailSampleId }?.let { sample ->
         LearningSampleDetailSheet(
             sample = sample,
+            busy = updatingSample,
+            error = error,
             onDismiss = { detailSampleId = null },
             onUpdateLabel = { newLabel ->
                 viewModel.updateSampleLabel(sample.id, newLabel)
-                detailSampleId = null
+            },
+            onContribute = {
+                viewModel.prepareStoredSampleContribution(sample.id) { content, category ->
+                    detailSampleId = null
+                    onContributeSample(content, category)
+                }
             },
             onRequestDelete = {
                 detailSampleId = null
@@ -329,12 +280,6 @@ fun PersonalLearningScreen(
         ContributionSettingsSheet(
             autoDesensitizeEnabled = settings.learningAutoDesensitizeEnabled,
             onAutoDesensitizeChange = viewModel::setAutoDesensitize,
-            onNavigateToSampleReports = onNavigateToSampleReports?.let { navigate ->
-                {
-                    showContributionSettings = false
-                    navigate()
-                }
-            },
             onDismiss = { showContributionSettings = false },
         )
     }
@@ -366,7 +311,8 @@ fun PersonalLearningScreen(
             onDismissRequest = { deletionId = null },
             title = { Text("删除学习样本") },
             text = {
-                Text("将撤销 ${sample.linkedMessageCount} 条关联短信的人工纠正，原短信保留。个人参数立即失效，更新期间暂时使用基础识别；白名单和关键词保留。")
+                Text("删除后将撤销此样本的分类纠正，并重新学习。原短信会保留。" +
+                    if (sample.linkedMessageCount > 1) "这会影响 ${sample.linkedMessageCount} 条相同内容的短信。" else "")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -429,7 +375,7 @@ private fun PersonalLearningStatusSection(
     when {
         !enabled && sampleCount == 0 -> {
             title = "尚未开启"
-            subtitle = "开启后，可在短信详情更多菜单选择“纠正识别”，仅在本机保存。"
+            subtitle = ""
         }
         !enabled -> {
             title = "已暂停"
@@ -441,11 +387,11 @@ private fun PersonalLearningStatusSection(
         }
         sampleCount == 0 -> {
             title = "等待学习"
-            subtitle = "还没有学习记录，从短信详情更多菜单选择“纠正识别”开始。"
+            subtitle = ""
         }
         state.status == LearningStatus.APPLIED && state.hasActiveParameters -> {
             title = "已生效"
-            subtitle = "当前使用最新学习结果。"
+            subtitle = ""
         }
         state.status == LearningStatus.APPLIED -> {
             title = "个人学习结果未就绪，暂时使用基础识别"
@@ -510,11 +456,13 @@ private fun PersonalLearningStatusSection(
                     else -> MaterialTheme.colorScheme.onSurface
                 },
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (canRetry) {
                 TextButton(
                     onClick = onRetry,
@@ -530,93 +478,114 @@ private fun PersonalLearningStatusSection(
 @Composable
 private fun LearningSampleDetailSheet(
     sample: LearningSample,
+    busy: Boolean,
+    error: String?,
     onDismiss: () -> Unit,
     onUpdateLabel: (LearningLabel) -> Unit,
+    onContribute: () -> Unit,
     onRequestDelete: () -> Unit,
 ) {
+    var showMore by remember { mutableStateOf(false) }
+    var editingLabel by rememberSaveable(sample.id) { mutableStateOf(false) }
     var selectedLabel by rememberSaveable(sample.id, sample.label) { mutableStateOf(sample.label) }
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text("学习样本详情", style = MaterialTheme.typography.titleLarge)
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth(),
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                Column(Modifier.weight(1f)) {
+                    Text("学习记录", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "样本全文",
-                        style = MaterialTheme.typography.labelMedium,
+                        formatLearningSampleDetailTime(sample.updatedAt),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    SelectionContainer {
-                        Text(sample.text, style = MaterialTheme.typography.bodyLarge)
+                }
+                Box {
+                    IconButton(onClick = { showMore = true }, enabled = !busy) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "记录选项")
+                    }
+                    DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                        DropdownMenuItem(
+                            text = { Text("删除记录", color = MaterialTheme.colorScheme.error) },
+                            onClick = { showMore = false; onRequestDelete() },
+                        )
                     }
                 }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    "关联 ${sample.linkedMessageCount} 条短信 · 更新于 ${formatLearningSampleDetailTime(sample.updatedAt)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "删除原短信不会忘记此样本；修改或删除样本会影响全部关联短信的人工纠正。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Text("分类标签", style = MaterialTheme.typography.titleSmall)
-            LearningLabelRadioGroup(
-                selectedLabel = selectedLabel,
-                enabled = true,
-                onSelect = { selectedLabel = it },
-            )
-
-            if (selectedLabel != sample.label) {
-                Button(
-                    onClick = { onUpdateLabel(selectedLabel) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("保存标签修改")
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Rounded.Close, contentDescription = "关闭")
                 }
             }
-
-            OutlinedButton(
-                onClick = onRequestDelete,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+            Column(
+                modifier = Modifier.weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             ) {
-                Icon(Icons.Rounded.Delete, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("删除此样本")
+                SelectionContainer(Modifier.padding(vertical = 24.dp)) {
+                    Text(sample.text, style = MaterialTheme.typography.bodyLarge)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ListItem(
+                    headlineContent = { Text("短信分类") },
+                    supportingContent = {
+                        Text(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
+                    },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+                    },
+                    colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                    modifier = Modifier.clickable(enabled = !busy) {
+                        selectedLabel = sample.label
+                        editingLabel = true
+                    },
+                )
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
-
+            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Button(
+                onClick = onContribute,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = 48.dp),
+            ) { Text("贡献样本") }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
+    }
+    if (editingLabel) {
+        AlertDialog(
+            onDismissRequest = { editingLabel = false },
+            title = { Text("短信分类") },
+            text = {
+                Column {
+                    LearningLabelRadioGroup(
+                        selectedLabel = selectedLabel,
+                        enabled = true,
+                        onSelect = { selectedLabel = it },
+                    )
+                    if (sample.linkedMessageCount > 1) {
+                        Text(
+                            "将同时更新 ${sample.linkedMessageCount} 条相同内容短信的分类。",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { onUpdateLabel(selectedLabel); editingLabel = false },
+                    enabled = selectedLabel != sample.label,
+                ) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingLabel = false }) { Text("取消") }
+            },
+        )
     }
 }
 
@@ -624,7 +593,6 @@ private fun LearningSampleDetailSheet(
 private fun ContributionSettingsSheet(
     autoDesensitizeEnabled: Boolean,
     onAutoDesensitizeChange: (Boolean) -> Unit,
-    onNavigateToSampleReports: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberBottomSheetState(
@@ -678,26 +646,10 @@ private fun ContributionSettingsSheet(
             }
 
             Text(
-                "本地学习与样本贡献相互独立。在会话中纠正识别不会自动上传任何短信；只有你主动从菜单打开“贡献样本”并完成确认提交后才会上传。",
+                "贡献样本前会单独确认上传内容，本地学习不会自动上传短信。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-
-            if (onNavigateToSampleReports != null) {
-                OutlinedButton(
-                    onClick = onNavigateToSampleReports,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("查看我的上报")
-                }
-            }
-
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("完成")
-            }
 
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
@@ -857,8 +809,34 @@ internal fun PersonalLearningDialog(
                 }
             }
 
+            if (message.content.isNotBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .toggleable(
+                            value = interaction.contributeSample,
+                            enabled = !interaction.busy,
+                            role = Role.Checkbox,
+                            onValueChange = viewModel::setContributeSample,
+                        )
+                        .heightIn(min = 48.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = interaction.contributeSample,
+                        onCheckedChange = null,
+                        enabled = !interaction.busy,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                    Text("同时贡献此样本", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
             Text(
-                text = "仅在本机学习，不会上传短信。",
+                text = if (interaction.contributeSample) {
+                    "保存后可检查待上传内容，确认后才会上传样本。"
+                } else {
+                    "仅在本机学习，不会上传短信。"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

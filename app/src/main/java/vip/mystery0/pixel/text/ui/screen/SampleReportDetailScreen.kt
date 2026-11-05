@@ -2,11 +2,17 @@ package vip.mystery0.pixel.text.ui.screen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
@@ -16,68 +22,139 @@ import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
 import vip.mystery0.pixel.text.viewmodel.SampleReportDetailViewModel
 
 @Composable
-fun SampleReportDetailScreen(reportId: String, onNavigateBack: () -> Unit,
+fun SampleReportDetailScreen(
+    reportId: String,
+    onNavigateBack: () -> Unit,
     onReportLoaded: (SampleReportSummary) -> Unit = {},
     onReportNotFound: (String) -> Unit = {},
-    viewModel: SampleReportDetailViewModel = koinViewModel()) {
+    viewModel: SampleReportDetailViewModel = koinViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val retrySeconds = sampleReportRetrySeconds(state.retryAt)
+    var showInfo by remember { mutableStateOf(false) }
     SampleReportOnResume { viewModel.refresh(reportId) }
     LaunchedEffect(state.report, state.notFound) {
         state.report?.summary?.let(onReportLoaded)
         if (state.notFound) onReportNotFound(reportId)
     }
-    Scaffold(topBar = {
-        SampleReportTopBar("上报详情", onNavigateBack) {
-            TextButton(onClick = { viewModel.refresh(reportId) }, enabled = !state.loading && retrySeconds == 0L) { Text("刷新") }
-        }
-    }, containerColor = MaterialTheme.colorScheme.background) { padding ->
-        ExpressivePullToRefreshBox(isRefreshing = state.loading, onRefresh = { viewModel.refresh(reportId) },
-            modifier = Modifier.fillMaxSize().padding(padding)) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                state.error?.let { message -> item { SampleReportError(message, state.retryAt, { viewModel.refresh(reportId) }) } }
+    Scaffold(
+        topBar = {
+            SampleReportTopBar("上报详情", onNavigateBack) {
+                IconButton(onClick = { showInfo = true }, enabled = state.report != null) {
+                    Icon(Icons.Rounded.Info, contentDescription = "记录信息")
+                }
+                IconButton(
+                    onClick = { viewModel.refresh(reportId) },
+                    enabled = !state.loading && retrySeconds == 0L,
+                ) {
+                    Icon(Icons.Rounded.Refresh, contentDescription = "刷新")
+                }
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        ExpressivePullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = { viewModel.refresh(reportId) },
+            modifier = Modifier.fillMaxSize().padding(padding),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                state.error?.let { message ->
+                    item { SampleReportError(message, state.retryAt) { viewModel.refresh(reportId) } }
+                }
                 state.report?.let { report ->
                     val summary = report.summary
                     item {
-                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                SampleReportStatusLabel(summary.status)
-                                Text(if (summary.status == SampleReportStatus.REMOVED) "样本已移除，内容不再提供"
-                                    else summary.reasonText.ifBlank { "审核状态待确认" })
-                                if (summary.status == SampleReportStatus.APPROVED) Text("审核通过不代表已用于训练或发布规则",
-                                    style = MaterialTheme.typography.bodySmall)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SampleReportStatusLabel(summary.status, prominent = true)
+                            if (summary.status == SampleReportStatus.REMOVED) {
+                                Text("样本内容已移除", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else if (summary.reasonText.isNotBlank() && summary.reasonText != summary.status.label) {
+                                Text(summary.reasonText, style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            Text(sampleReportDate(summary.statusUpdatedAt),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
+                    item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                     if (summary.status != SampleReportStatus.REMOVED) {
-                        item { SelectionContainer { SampleReportField("脱敏正文", report.submittedContent.ifBlank { "暂无正文" }) }; HorizontalDivider() }
-                        item { SelectionContainer { SampleReportField("发送方", report.submittedSender.ifBlank { "未提供发送方" }) }; HorizontalDivider() }
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("上报内容", style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                SelectionContainer {
+                                    Text(report.submittedContent.ifBlank { "暂无正文" },
+                                        style = MaterialTheme.typography.bodyLarge)
+                                }
+                                if (report.submittedSender.isNotBlank()) {
+                                    SelectionContainer {
+                                        ReportDetailMetadata("发送方", report.submittedSender)
+                                    }
+                                }
+                            }
+                        }
+                        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
                     }
-                    item { SampleReportField("提交分类", sampleReportCategory(summary.submittedCategory)) }
-                    if (summary.reviewedCategory.isNotBlank()) item {
-                        SampleReportField(if (summary.reviewedCategory != summary.submittedCategory) "审核分类（与提交分类不同）" else "审核分类",
-                            sampleReportCategory(summary.reviewedCategory))
-                    }
-                    item { HorizontalDivider(); SampleReportField("上报时间", sampleReportDate(summary.submittedAt)) }
-                    item { SampleReportField("状态更新时间", sampleReportDate(summary.statusUpdatedAt)) }
-                    summary.reviewedAt?.let { date -> item { SampleReportField("审核时间", sampleReportDate(date)) } }
-                    if (summary.reviewMethod.isNotBlank()) item { SampleReportField("审核方式", when (summary.reviewMethod) {
-                        "ai" -> "自动审核"; "manual" -> "人工审核"; else -> "方式待确认"
-                    }) }
                     item {
-                        HorizontalDivider()
-                        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("记录编号：${summary.id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(when (summary.source) {
-                                "legacy" -> "历史记录：正文、发送方和分类为服务端保留的历史数据"
-                                "app" -> "来源：应用上报"
-                                else -> "来源待确认"
-                            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            ReportDetailMetadata("提交分类", sampleReportCategory(summary.submittedCategory))
+                            if (summary.reviewedCategory.isNotBlank()) {
+                                ReportDetailMetadata("审核分类", sampleReportCategory(summary.reviewedCategory))
+                            }
+                            ReportDetailMetadata("上报时间", sampleReportDate(summary.submittedAt))
                         }
                     }
                 }
             }
-            if (state.loading && state.report == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            if (state.loading && state.report == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
         }
+    }
+    if (showInfo) {
+        state.report?.summary?.let { summary ->
+            AlertDialog(
+                onDismissRequest = { showInfo = false },
+                title = { Text("记录信息") },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        SelectionContainer { SampleReportField("记录编号", summary.id) }
+                        summary.reviewedAt?.let { SampleReportField("审核时间", sampleReportDate(it)) }
+                        if (summary.reviewMethod.isNotBlank()) {
+                            SampleReportField("审核方式", when (summary.reviewMethod) {
+                                "ai" -> "自动审核"
+                                "manual" -> "人工审核"
+                                else -> "待确认"
+                            })
+                        }
+                        SampleReportField("来源", when (summary.source) {
+                            "legacy" -> "历史上报"
+                            "app" -> "应用上报"
+                            else -> "待确认"
+                        })
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showInfo = false }) { Text("关闭") } },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailMetadata(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(label, modifier = Modifier.weight(0.4f), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, modifier = Modifier.weight(0.6f), style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End)
     }
 }
