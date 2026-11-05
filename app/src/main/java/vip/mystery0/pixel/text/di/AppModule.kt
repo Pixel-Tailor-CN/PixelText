@@ -319,7 +319,7 @@ val appModule = module {
     viewModel { SearchViewModel(get(), get()) }
     viewModel { SettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { SampleSubmissionViewModel(get()) }
-    viewModel { vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel(get(), get(), get(), get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { SampleReportListViewModel(get()) }
     viewModel { SampleReportDetailViewModel(get()) }
     viewModel { VerificationCodeViewModel(get(), get(), get(), get()) }

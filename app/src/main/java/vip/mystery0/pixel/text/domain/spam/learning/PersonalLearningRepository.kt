@@ -20,13 +20,14 @@ data class LearningSample(val id: String, val text: String, val label: LearningL
     val updatedAt: Long, val revision: Long, val linkedMessageCount: Int = 0)
 data class LearningSnapshot(val revision: Long, val samples: List<LearningSample>)
 data class LearningState(val revision: Long = 0, val status: LearningStatus = LearningStatus.IDLE,
-    val sampleCount: Int = 0, val error: String? = null)
+    val sampleCount: Int = 0, val error: String? = null, val hasActiveParameters: Boolean = false)
 data class PersonalParameters(val identity: String, val generation: Long, val payload: FloatArray)
 
 interface PersonalLearningRepository {
     fun observeSamples(): Flow<List<LearningSample>>
     fun observeState(): Flow<LearningState>
     suspend fun record(key: LearningMessageKey, text: String, label: LearningLabel): Long
+    suspend fun updateSampleLabel(id: String, label: LearningLabel): Boolean
     suspend fun deleteSample(id: String)
     suspend fun clear()
     suspend fun linkedMessageKeys(): List<LearningMessageKey>

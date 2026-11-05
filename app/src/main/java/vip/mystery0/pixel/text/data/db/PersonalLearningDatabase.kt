@@ -20,6 +20,7 @@ interface PersonalLearningDao {
     @Query("SELECT s.*, (SELECT COUNT(*) FROM learning_link l WHERE l.sampleId=s.id) AS linkedMessageCount FROM learning_sample s ORDER BY updatedAt DESC")
     fun observeSamples(): Flow<List<LearningSampleRow>>
     @Query("SELECT * FROM learning_parameters WHERE identity=:identity") suspend fun parameters(identity: String): LearningParametersEntity?
+    @Query("SELECT * FROM learning_parameters") fun observeParameters(): Flow<List<LearningParametersEntity>>
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putParameters(parameters: LearningParametersEntity)
     @Query("DELETE FROM learning_parameters") suspend fun clearParameters()
     @Query("SELECT * FROM learning_state WHERE id=1") fun observeState(): Flow<LearningStateEntity?>

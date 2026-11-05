@@ -20,8 +20,19 @@ class PersonalLearningRepositoryImpl(private val database: PersonalLearningDatab
     override fun observeSamples(): Flow<List<LearningSample>> = dao.observeSamples().map { rows ->
         rows.map { it.sample.toModel(it.linkedMessageCount) }
     }
-    override fun observeState(): Flow<LearningState> = combine(dao.observeState(), dao.observeSamples()) { state, samples ->
-        LearningState(state?.revision ?: 0, LearningStatus.valueOf(state?.status ?: "IDLE"), samples.size, state?.error)
+    override fun observeState(): Flow<LearningState> = combine(
+        dao.observeState(),
+        dao.observeSamples(),
+        dao.observeParameters(),
+    ) { state, samples, _ ->
+        // 参数有效性需结合当前模型契约身份与参数维度校验，仓库层默认不直接声称有效。
+        LearningState(
+            revision = state?.revision ?: 0L,
+            status = LearningStatus.valueOf(state?.status ?: "IDLE"),
+            sampleCount = samples.size,
+            error = state?.error,
+            hasActiveParameters = false,
+        )
     }
     override suspend fun record(key: LearningMessageKey, text: String, label: LearningLabel): Long = withDecision {
         require(text.isNotBlank()) { "empty learning sample" }
@@ -37,6 +48,15 @@ class PersonalLearningRepositoryImpl(private val database: PersonalLearningDatab
             dao.putSample(sample)
             dao.putLink(LearningLinkEntity(key.sourceType, key.sourceId, key.fingerprint, sample.id))
             revision
+        }
+    }
+    override suspend fun updateSampleLabel(id: String, label: LearningLabel): Boolean = withDecision {
+        database.withTransaction {
+            val old = dao.samples().firstOrNull { it.id == id } ?: return@withTransaction false
+            if (old.label == label.name) return@withTransaction false
+            val revision = advanceRevisionKeepingParameters()
+            dao.putSample(old.copy(label = label.name, updatedAt = System.currentTimeMillis(), revision = revision))
+            true
         }
     }
     override suspend fun deleteSample(id: String) = withDecision {

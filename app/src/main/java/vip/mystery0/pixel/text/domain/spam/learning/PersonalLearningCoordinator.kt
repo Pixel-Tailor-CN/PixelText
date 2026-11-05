@@ -59,6 +59,16 @@ class PersonalLearningCoordinator(
         revision
     }
 
+    suspend fun updateSampleLabel(id: String, label: LearningLabel): Boolean = mutationGate.withLock {
+        val updated = repository.updateSampleLabel(id, label)
+        if (updated) {
+            repository.updateStatus(repository.stateRevision(), LearningStatus.QUEUED)
+            requestLearning()
+            onChanged()
+        }
+        updated
+    }
+
     suspend fun deleteSample(id: String) = mutationGate.withLock {
         repository.deleteSample(id)
         requestLearning()

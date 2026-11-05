@@ -144,6 +144,9 @@ fun ConversationDetailScreen(
         category: String,
     ) -> Unit = { _, _, _ -> },
     onNavigateToLearningContribution: (String, String, String, LearningFeedback?) -> Unit = { _, _, _, _ -> },
+    onNavigateToPersonalLearning: () -> Unit = {},
+    onNavigateToSenderWhitelist: () -> Unit = {},
+    onNavigateToKeywordSpam: () -> Unit = {},
     learningViewModel: PersonalLearningViewModel = koinViewModel(),
     onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
     isTablet: Boolean = false,
@@ -415,25 +418,29 @@ fun ConversationDetailScreen(
         }
     }
 
-    PersonalLearningDialog(learningViewModel, onNavigateToLearningContribution)
+    PersonalLearningDialog(
+        viewModel = learningViewModel,
+        onOpenWhitelist = onNavigateToSenderWhitelist,
+        onOpenKeywords = onNavigateToKeywordSpam,
+    )
 
-    LaunchedEffect(selectedMessage?.id) {
-        val message = selectedMessage ?: return@LaunchedEffect
-        if (!canReportSelectedSample) return@LaunchedEffect
-        if (appSettings.sampleSubmissionShortcutHintShown) return@LaunchedEffect
-        settingsRepository.setSampleSubmissionShortcutHintShown(true)
-        val result = snackbarHostState.showSnackbar(
-            message = "可点右上角上报图标，自动带入当前短信",
-            actionLabel = "上报",
-            withDismissAction = true
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            onNavigateToSampleSubmission(
-                message.content,
-                message.sender.ifBlank { address },
-                message.sampleCategory().value,
+    LaunchedEffect(learningViewModel) {
+        learningViewModel.savedEvents.collect { event ->
+            val text = when (event.ruleConflict) {
+                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.WHITELIST ->
+                    "纠正已保存，正在更新个人学习（此短信已放行，放行优先于个人学习）"
+                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.KEYWORD ->
+                    "纠正已保存，正在更新个人学习（该短信仍按关键词优先处理）"
+                null -> "纠正已保存，正在更新个人学习"
+            }
+            val result = snackbarHostState.showSnackbar(
+                message = text,
+                actionLabel = "查看学习",
+                withDismissAction = true,
             )
-            selectedMessageIds.clear()
+            if (result == SnackbarResult.ActionPerformed) {
+                onNavigateToPersonalLearning()
+            }
         }
     }
 
@@ -473,21 +480,6 @@ fun ConversationDetailScreen(
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete")
                         }
                         if (selectedMessageIds.size == 1) {
-                            if (canReportSelectedSample) {
-                                IconButton(onClick = {
-                                    onNavigateToSampleSubmission(
-                                        selectedMessage.content,
-                                        selectedMessage.sender.ifBlank { address },
-                                        selectedMessage.sampleCategory().value,
-                                    )
-                                    selectedMessageIds.clear()
-                                }) {
-                                    Icon(
-                                        Icons.Rounded.UploadFile,
-                                        contentDescription = "Report sample"
-                                    )
-                                }
-                            }
                             var showMoreMenu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
@@ -524,7 +516,16 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("让 AI 学习") },
+                                        text = {
+                                            Column {
+                                                Text("纠正识别")
+                                                Text(
+                                                    "让个人学习记住这次选择",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        },
                                         enabled = selectedMessage != null && !selectedMessage.isMms,
                                         onClick = {
                                             showMoreMenu = false
@@ -533,16 +534,18 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("上报样本") },
-                                        enabled = selectedMessage?.content?.isNotBlank() == true,
+                                        text = { Text("贡献样本") },
+                                        enabled = canReportSelectedSample,
                                         onClick = {
                                             showMoreMenu = false
                                             selectedMessage?.let { message ->
-                                                onNavigateToSampleSubmission(
-                                                    message.content,
-                                                    message.sender.ifBlank { address },
-                                                    message.sampleCategory().value,
-                                                )
+                                                learningViewModel.prepareContribution(message, address) { content, sender, category, feedback ->
+                                                    if (feedback != null) {
+                                                        onNavigateToLearningContribution(content, sender, category, feedback)
+                                                    } else {
+                                                        onNavigateToSampleSubmission(content, sender, category)
+                                                    }
+                                                }
                                             }
                                             selectedMessageIds.clear()
                                         }

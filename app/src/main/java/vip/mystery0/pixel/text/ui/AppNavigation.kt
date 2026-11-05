@@ -263,7 +263,10 @@ fun AppNavigation(
                 )
             }
             composable("personal_learning") {
-                PersonalLearningScreen(onNavigateBack = { navController.popBackStack() })
+                PersonalLearningScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSampleReports = { navController.navigate("sample_reports") },
+                )
             }
             composable("keyword_spam") {
                 KeywordSpamSettingsScreen(
@@ -414,6 +417,9 @@ fun AppNavigation(
                     onOpenMmsPart = { part -> navController.navigate(if (part.partId < 0)
                         "mirror_message/${part.message.transport.name}/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPersonalLearning = { navController.navigate("personal_learning") },
+                    onNavigateToSenderWhitelist = { navController.navigate("sender_whitelist") },
+                    onNavigateToKeywordSpam = { navController.navigate("keyword_spam") },
                     onNavigateToLearningContribution = { content, sender, category, feedback ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
