@@ -7,8 +7,11 @@ data class ConversationListQuery(
     val contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
     val threadIds: List<Long>? = null,
     val excludedThreadIds: Set<Long> = emptySet(),
+    val archiveFilter: ConversationArchiveFilter = ConversationArchiveFilter.ALL,
     val onlySpamThreads: Boolean = false,
     val incomingUnreadOnly: Boolean = false,
     val limit: Int? = null,
     val offset: Int = 0,
 )
+
+enum class ConversationArchiveFilter { ALL, ARCHIVED, UNARCHIVED }

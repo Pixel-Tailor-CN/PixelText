@@ -8,8 +8,6 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
-import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.source.whitelistMessageFingerprint
 import vip.mystery0.pixel.text.domain.backup.BackupSection
@@ -18,13 +16,11 @@ import java.io.File
 /** 从 Room 的事务视图复制允许数据，不能复制主文件后 DELETE 裁剪。 */
 class AppDatabaseSnapshotter(
     private val mirror: MessageMirrorDatabase,
-    private val spam: SpamDatabase,
-    private val archive: ConversationArchiveDatabase,
 ) {
     val definitions: List<SnapshotDefinition> get() = listOf(
         SnapshotDefinition("message_mirror.db", mirror, 3, listOf("mirror_message", "mirror_sms")),
-        SnapshotDefinition("spam.db", spam, 3, listOf("blocked_keyword", "sender_whitelist_rule", "spam_allowed_message")),
-        SnapshotDefinition("conversation_archive.db", archive, 1, listOf("archived_conversation")),
+        SnapshotDefinition("spam.db", mirror, 3, listOf("blocked_keyword", "sender_whitelist_rule", "spam_allowed_message")),
+        SnapshotDefinition("conversation_archive.db", mirror, 1, listOf("archived_conversation")),
     )
 
     suspend fun capture(directory: File, sections: Set<BackupSection>) {
@@ -36,9 +32,6 @@ class AppDatabaseSnapshotter(
             if (definition.name == "spam.db" && !hasSms && BackupSection.RULES !in sections) continue
             val source = definition.database.openHelper.readableDatabase
             val file = File(databases, definition.name)
-            val smsSnapshot = if (hasSms && definition.name != "message_mirror.db")
-                SQLiteDatabase.openDatabase(File(databases, "message_mirror.db").path, null, SQLiteDatabase.OPEN_READONLY) else null
-            try {
             SQLiteDatabase.openOrCreateDatabase(file, null).use { target ->
                 target.rawQuery("PRAGMA journal_mode=DELETE", null).use { backupRequire(it.moveToFirst() && it.getString(0).equals("delete", ignoreCase = true)) }
                 target.version = definition.version
@@ -60,6 +53,8 @@ class AppDatabaseSnapshotter(
                                 "mirror_message" -> "SELECT $BACKUP_MESSAGE_COLUMNS FROM mirror_message WHERE transport='SMS' ORDER BY localId"
                                 "mirror_sms" -> "SELECT s.* FROM mirror_sms s JOIN mirror_message m ON s.localId=m.localId WHERE m.transport='SMS' ORDER BY s.localId"
                                 "blocked_keyword", "sender_whitelist_rule" -> "SELECT * FROM $table" + if (BackupSection.RULES in sections) "" else " WHERE 0"
+                                // SMS 备份持有镜像同步锁，关联条件与本次导出的短信集合保持一致。
+                                "archived_conversation" -> "SELECT a.* FROM archived_conversation a WHERE EXISTS (SELECT 1 FROM mirror_message m WHERE m.threadId=a.thread_id AND m.transport='SMS')"
                                 else -> "SELECT * FROM $table"
                             }
                             source.query(sql).use { cursor ->
@@ -68,16 +63,13 @@ class AppDatabaseSnapshotter(
                                     currentCoroutineContext().ensureActive()
                                     backupRequire(++count <= MAX_SMS_COUNT, "数据数量超过备份限制")
                                     val row = ContentValues().also { DatabaseUtils.cursorRowToContentValues(cursor, it) }
-                                    // 状态只允许关联本次快照中的 SMS。
-                                    val accepted = when (table) {
-                                        "archived_conversation" -> matchesSms(smsSnapshot, "threadId", row.getAsLong("thread_id"))
-                                        else -> true
-                                    }
                                     if (table == "archived_conversation") {
+                                        // 旧协议包含展示字段，运行库只保留归档状态；恢复时不使用这些占位值。
+                                        row.put("address", ""); row.put("timestamp", 0L)
                                         row.put("snippet", ""); row.putNull("display_name")
                                         row.put("unread_count", 0); row.put("is_mms", 0); row.put("has_mms", 0)
                                     }
-                                    if (accepted) backupRequire(target.insertOrThrow(table, null, row) != -1L)
+                                    backupRequire(target.insertOrThrow(table, null, row) != -1L)
                                 }
                             }
                         }
@@ -112,14 +104,8 @@ class AppDatabaseSnapshotter(
                     target.setTransactionSuccessful()
                 } finally { target.endTransaction() }
             }
-            } finally { smsSnapshot?.close() }
             backupRequire(file.length() <= MAX_BACKUP_BYTES, "数据库快照过大")
         }
-    }
-
-    private fun matchesSms(db: SQLiteDatabase?, column: String, value: Long?): Boolean {
-        if (value == null || db == null) return false
-        return db.rawQuery("SELECT 1 FROM mirror_message WHERE $column=? LIMIT 1", arrayOf(value.toString())).use { it.moveToFirst() }
     }
 }
 
@@ -129,10 +115,12 @@ data class SnapshotDefinition(val name: String, val database: RoomDatabase, val 
 private const val BACKUP_MESSAGE_COLUMNS = "localId, transport, sourceId, revision, threadId, timestamp, originalDate, dateUnit, subscriptionId, boxType, read, seen, structureComplete, generation"
 private const val BACKUP_MESSAGE_TABLE = "CREATE TABLE IF NOT EXISTS `mirror_message` (`localId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `transport` TEXT NOT NULL, `sourceId` INTEGER NOT NULL, `revision` INTEGER NOT NULL, `threadId` INTEGER, `timestamp` INTEGER, `originalDate` INTEGER, `dateUnit` TEXT NOT NULL, `subscriptionId` INTEGER, `boxType` INTEGER, `read` INTEGER, `seen` INTEGER, `structureComplete` INTEGER NOT NULL, `generation` INTEGER NOT NULL)"
 private const val BACKUP_ALLOWED_TABLE = "CREATE TABLE IF NOT EXISTS `spam_allowed_message` (`message_id` INTEGER NOT NULL, `fingerprint` TEXT NOT NULL, `allowed_at` INTEGER NOT NULL, PRIMARY KEY(`message_id`))"
+private const val BACKUP_ARCHIVED_TABLE = "CREATE TABLE IF NOT EXISTS `archived_conversation` (`thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `display_name` TEXT, `snippet` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `unread_count` INTEGER NOT NULL, `is_mms` INTEGER NOT NULL, `has_mms` INTEGER NOT NULL, `archived_at` INTEGER NOT NULL, PRIMARY KEY(`thread_id`))"
 
 internal fun snapshotTableSql(definition: SnapshotDefinition, table: String): String = when {
     definition.name == "message_mirror.db" && table == "mirror_message" -> BACKUP_MESSAGE_TABLE
     definition.name == "spam.db" && table == "spam_allowed_message" -> BACKUP_ALLOWED_TABLE
+    definition.name == "conversation_archive.db" && table == "archived_conversation" -> BACKUP_ARCHIVED_TABLE
     else -> tableSql(definition.database.openHelper.readableDatabase, table)
 }
 

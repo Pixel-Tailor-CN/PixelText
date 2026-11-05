@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import vip.mystery0.pixel.text.data.db.BlockedKeywordEntity
-import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSyncStateEntity
@@ -24,14 +23,13 @@ import vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository
 import java.util.Locale
 
 class KeywordSpamRepositoryImpl(
-    db: SpamDatabase,
+    private val mirror: MessageMirrorDatabase,
     private val whitelist: SenderWhitelistRepository,
     private val learning: PersonalLearningRepository,
-    private val mirror: MessageMirrorDatabase,
     private val importer: MirrorSpamLegacyImporter,
     private val synchronizer: MessageMirrorSynchronizer,
 ) : KeywordSpamRepository {
-    private val dao = db.blockedKeywordDao()
+    private val dao = mirror.blockedKeywordDao()
     private val decisions = mirror.spamDao()
 
     override fun observeKeywords(): Flow<List<BlockedKeyword>> =
@@ -50,16 +48,20 @@ class KeywordSpamRepositoryImpl(
                 val now = System.currentTimeMillis()
                 val existing = if (id == null) null else dao.getById(id)
                 if (id != null && existing == null) return@withContext KeywordSaveResult.NotFound
-                markProjectionDirty()
-                val saved = if (existing == null) {
-                    val entity = BlockedKeywordEntity(keyword = trimmed, normalizedKeyword = normalized,
-                        createdAt = now, updatedAt = now)
-                    entity.copy(id = dao.insert(entity))
-                } else {
-                    existing.copy(keyword = trimmed, normalizedKeyword = normalized, updatedAt = now)
-                        .also { dao.update(it) }
+                val saved = MirrorSynchronizationLock.mutex.withLock {
+                    mirror.withTransaction {
+                        val entity = if (existing == null) {
+                            val row = BlockedKeywordEntity(keyword = trimmed, normalizedKeyword = normalized,
+                                createdAt = now, updatedAt = now)
+                            row.copy(id = dao.insert(row))
+                        } else {
+                            existing.copy(keyword = trimmed, normalizedKeyword = normalized, updatedAt = now)
+                                .also { dao.update(it) }
+                        }
+                        rebuildKeywordProjection(mirror)
+                        entity
+                    }
                 }
-                rebuildCurrentMatches()
                 KeywordSaveResult.Success(saved.toDomain())
             }
         }
@@ -70,9 +72,12 @@ class KeywordSpamRepositoryImpl(
         return learning.withDecision {
             withContext(Dispatchers.IO) {
                 if (dao.getById(id) == null) return@withContext false
-                markProjectionDirty()
-                dao.deleteById(id)
-                rebuildCurrentMatches()
+                MirrorSynchronizationLock.mutex.withLock {
+                    mirror.withTransaction {
+                        dao.deleteById(id)
+                        rebuildKeywordProjection(mirror)
+                    }
+                }
                 true
             }
         }
@@ -109,38 +114,18 @@ class KeywordSpamRepositoryImpl(
                     }
                 }
                 whitelist.allowedMessageIds(messages.map { it.messageId })
-                markProjectionDirty()
                 rebuildCurrentMatches()
             }
         }
     }
 
-    /** 只修复规则提交后被进程终止打断的写入，不在正常列表查询中扫描正文。 */
+    /** 只修复旧版跨库写入遗留的中断标记，新写入与规则在同一事务内提交。 */
     suspend fun reconcileMessageKeywordsIfNeeded() = learning.withDecision {
-        // 备份合并也可能设置标记，因此不只依赖当前实例的内存状态。
         if (mirror.syncDao().state(PROJECTION_STATE)?.complete == false) rebuildCurrentMatches()
     }
 
-    private suspend fun markProjectionDirty() {
-        mirror.syncDao().putState(MirrorSyncStateEntity(PROJECTION_STATE, complete = false))
-    }
-
     private suspend fun rebuildCurrentMatches(): Int = MirrorSynchronizationLock.mutex.withLock {
-        val keywords = dao.getAll()
-        val rows = decisions.allRows()
-        val allowed = rows.filter { it.spamAllowedSource != null }.mapTo(mutableSetOf()) { it.messageId }
-        val sms = rows.map { it.messageId }.filter { it > 0 }.chunked(500)
-            .flatMap { mirror.mirrorDao().conversationSmsByIds(it) }
-        val versions = sms.associate { it.sourceId to (it.localId to it.revision) }
-        val matches = sms.mapNotNull { message ->
-            if (message.sourceId in allowed) return@mapNotNull null
-            findMatch(message.body.orEmpty(), keywords)?.let { message.sourceId to it.id }
-        }.toMap()
-        mirror.withTransaction {
-            decisions.replaceKeywords(matches, versions)
-            mirror.syncDao().putState(MirrorSyncStateEntity(PROJECTION_STATE, complete = true))
-        }
-        matches.size
+        mirror.withTransaction { rebuildKeywordProjection(mirror) }
     }
 
     private fun findMatch(content: String, keywords: List<BlockedKeywordEntity>): BlockedKeywordEntity? {
@@ -156,4 +141,20 @@ class KeywordSpamRepositoryImpl(
     private companion object {
         const val PROJECTION_STATE = "keyword_decision_projection"
     }
+}
+
+/** 调用方持有镜像同步锁和主库事务，保证规则与消息最终标记同时提交。 */
+internal suspend fun rebuildKeywordProjection(mirror: MessageMirrorDatabase): Int {
+    val keywords = mirror.blockedKeywordDao().getAll()
+    val decisions = mirror.spamDao()
+    val sms = decisions.keywordCandidates()
+    val versions = sms.associate { it.sourceId to (it.localId to it.revision) }
+    val matches = sms.mapNotNull { message ->
+        if (message.spamAllowedSource != null) return@mapNotNull null
+        val content = message.body.orEmpty().lowercase(Locale.ROOT)
+        keywords.firstOrNull { it.normalizedKeyword in content }?.let { message.sourceId to it.id }
+    }.toMap()
+    decisions.replaceKeywords(matches, versions)
+    mirror.syncDao().putState(MirrorSyncStateEntity("keyword_decision_projection", complete = true))
+    return matches.size
 }

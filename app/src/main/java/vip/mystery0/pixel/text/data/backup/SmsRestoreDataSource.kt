@@ -11,7 +11,6 @@ import android.provider.Telephony
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
-import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
@@ -26,7 +25,6 @@ import java.security.MessageDigest
 class SmsRestoreDataSource(
     private val context: Context,
     private val mirror: MessageMirrorDatabase,
-    private val archive: ConversationArchiveDatabase,
     private val importer: MirrorSpamLegacyImporter,
     private val synchronizer: MessageMirrorSynchronizer,
     private val safety: RestoreSafetyCoordinator,
@@ -160,15 +158,8 @@ class SmsRestoreDataSource(
         if (archivedAt != null) {
             if (thread == null || thread <= 0) skipped++
             else {
-                val row = resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("address", "body", "date"), "thread_id=?", arrayOf(thread.toString()), "date DESC, _id DESC")?.use {
-                    if (!it.moveToFirst()) null else Triple(it.getString(0).orEmpty(), it.getString(1).orEmpty(), it.getLong(2))
-                }
-                if (row == null) skipped++
-                else {
-                    val unread = resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id"), "thread_id=? AND read=0", arrayOf(thread.toString()), null)?.use { it.count } ?: 0
-                    val hasMms = resolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id"), "thread_id=?", arrayOf(thread.toString()), null)?.use { it.moveToFirst() } ?: false
-                    archive.archivedConversationDao().archive(listOf(ArchivedConversationEntity(thread, row.first, null, row.second, row.third, unread, 0, if (hasMms) 1 else 0, archivedAt)))
-                }
+                // 会话展示通过主库联表读取，不再为每条恢复短信重复查询正文、未读数和彩信状态。
+                mirror.archivedConversationDao().archive(listOf(ArchivedConversationEntity(thread, archivedAt)))
             }
         }
         return skipped

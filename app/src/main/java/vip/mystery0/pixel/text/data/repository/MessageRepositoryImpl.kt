@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
+import vip.mystery0.pixel.text.domain.model.mirror.ConversationArchiveFilter
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.MmsConversationRow
@@ -45,7 +46,7 @@ class MessageRepositoryImpl(
     private val messageParser: MessageParser,
     private val spamRepository: SpamRepository,
     private val settingsRepository: AppSettingsRepository,
-    private val archiveDatabase: ConversationArchiveDatabase,
+    private val database: MessageMirrorDatabase,
     val conversationCacheRepository: ConversationCacheRepository,
     private val senderProfileRepository: SenderProfileRepository,
     private val verificationCodeRepository: VerificationCodeRepository,
@@ -56,7 +57,7 @@ class MessageRepositoryImpl(
 
 
 
-    private val archiveDao = archiveDatabase.archivedConversationDao()
+    private val archiveDao = database.archivedConversationDao()
 
     override fun startCacheObserving() {
         conversationCacheRepository.startObserving()
@@ -66,8 +67,7 @@ class MessageRepositoryImpl(
 
     override suspend fun forceSyncConversations() {
         withContext(Dispatchers.IO) {
-            val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-            conversationCacheRepository.fullSync(archivedThreadIds)
+            conversationCacheRepository.fullSync()
         }
     }
 
@@ -83,10 +83,9 @@ class MessageRepositoryImpl(
                 mirror.observeConversationChanges(),
                 settingsRepository.settings,
                 contactDataSource.changes,
-                archiveDao.observeArchivedThreadIds(),
-            ) { _, settings, _, archived -> settings.spamIsolationEnabled to archived.toSet() }
+            ) { _, settings, _ -> settings.spamIsolationEnabled }
                 .conflate()
-                .map { (isolationEnabled, archivedThreadIds) ->
+                .map { isolationEnabled ->
                     // 表变化只触发一次聚合，避免先读取整张摘要列表再重新过滤分组。
                     val preparationStarted = android.os.SystemClock.elapsedRealtime()
                     val visibleConversations = enrichWithSenderProfiles(
@@ -95,7 +94,7 @@ class MessageRepositoryImpl(
                                 contentFilter = if (isolationEnabled) {
                                     ConversationContentFilter.NORMAL
                                 } else ConversationContentFilter.ALL,
-                                excludedThreadIds = archivedThreadIds,
+                                archiveFilter = ConversationArchiveFilter.UNARCHIVED,
                                 incomingUnreadOnly = !isolationEnabled,
                             )
                         )
@@ -110,16 +109,14 @@ class MessageRepositoryImpl(
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
         flow {
-            val threadIds = archiveDao.getArchivedThreadIds(limit, offset)
-            if (threadIds.isEmpty()) {
-                emit(emptyList())
-                return@flow
-            }
-
-            val conversations = enrichWithSenderProfiles(fetchConversationDetails(threadIds))
-                .sortedByDescending { it.timestamp }
-            // 本地暂缺不代表系统删除；首次镜像或失败期间必须保留归档选择。
-            emit(conversations)
+            val conversations = mirror.queryConversations(
+                ConversationListQuery(
+                    archiveFilter = ConversationArchiveFilter.ARCHIVED,
+                    limit = limit,
+                    offset = offset,
+                )
+            )
+            emit(enrichWithSenderProfiles(conversations))
         }.flowOn(Dispatchers.IO)
 
     override fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =
@@ -169,13 +166,7 @@ class MessageRepositoryImpl(
         withContext(Dispatchers.IO) {
             val archivedAt = System.currentTimeMillis()
             archiveDao.archive(
-                conversations.map { conversation ->
-                    conversation.copy(
-                        displayName = contactDataSource.getDisplayName(conversation.address),
-                        avatarPath = null,
-                        avatarSha256 = null,
-                    ).toArchivedConversationEntity(archivedAt)
-                }
+                conversations.map { it.toArchivedConversationEntity(archivedAt) }
             )
             SmartspacerIntegration.notifyChanged(context)
         }

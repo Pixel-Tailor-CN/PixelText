@@ -7,7 +7,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.SenderWhitelistRuleEntity
-import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSyncStateEntity
@@ -15,7 +14,6 @@ import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorSynchronizationLock
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
-import vip.mystery0.pixel.text.data.source.WhitelistMessageIdentity
 import vip.mystery0.pixel.text.data.source.WhitelistMessageSource
 import vip.mystery0.pixel.text.data.source.whitelistMessageFingerprint
 import vip.mystery0.pixel.text.data.source.mirror.ProviderRowSnapshot
@@ -26,13 +24,12 @@ import vip.mystery0.pixel.text.domain.spam.WhitelistRuleType
 import vip.mystery0.pixel.text.domain.spam.MessageSpamSource
 
 class SenderWhitelistRepositoryImpl(
-    private val db: SpamDatabase,
-    private val source: WhitelistMessageSource,
     private val mirror: MessageMirrorDatabase,
+    private val source: WhitelistMessageSource,
     private val importer: MirrorSpamLegacyImporter,
     private val synchronizer: MessageMirrorSynchronizer,
 ) : SenderWhitelistRepository {
-    private val dao = db.senderWhitelistDao()
+    private val dao = mirror.senderWhitelistDao()
     private val decisions = mirror.spamDao()
     private val decisionMutex = Mutex()
     private var cachedRules = emptyList<SenderWhitelistRuleEntity>()
@@ -62,17 +59,10 @@ class SenderWhitelistRepositoryImpl(
             }
             val now = System.currentTimeMillis()
             val additions = values.map { SenderWhitelistRuleEntity(id ?: 0, type.name, it, now) }
-            val history = source.load()
-            // 旧规则覆盖的消息先持久放行，新规则提交后再更新其匹配结果。
-            persistMatches(history, compile(current))
-            markProjectionDirty()
-            db.withTransaction {
-                // 编辑前先将旧规则和新规则覆盖的既有消息持久放行，不能随规则变化撤销。
+            updateRules(current, current.filterNot { it.id == id } + additions) {
                 if (id != null) dao.deleteRule(id)
                 dao.insertRules(additions)
             }
-            persistMatches(history, compile(dao.getRules()))
-            completeProjection()
         }
     }
 
@@ -81,14 +71,9 @@ class SenderWhitelistRepositoryImpl(
         decisionMutex.withLock {
             val current = dao.getRules()
             require(current.any { it.id == id }) { "规则不存在，请刷新后重试" }
-            val history = source.load()
-            persistMatches(history, compile(current))
-            markProjectionDirty()
-            db.withTransaction {
-                // 也涵盖已入 Provider、尚在等待后台检测的新消息。
+            updateRules(current, current.filterNot { it.id == id }) {
                 dao.deleteRule(id)
             }
-            completeProjection()
         }
     }
 
@@ -116,21 +101,17 @@ class SenderWhitelistRepositoryImpl(
         importer.ensureImported()
         decisionMutex.withLock {
             rules.forEach { require(SenderWhitelistMatcher.validate(WhitelistRuleType.valueOf(it.type), it.value) == null) }
-            markProjectionDirty()
-            // 备份也会合并关键词，跨库中断时交给相同的启动恢复入口处理。
-            mirror.syncDao().putState(MirrorSyncStateEntity("keyword_decision_projection", complete = false))
-            db.withTransaction {
-                val current = dao.getRules().map { it.type to it.value }.toSet()
-                val additions = rules.distinctBy { it.type to it.value }.filter { (it.type to it.value) !in current }
-                require(current.size + additions.size <= SenderWhitelistMatcher.MAX_RULES) { "合并后白名单超过 500 条" }
-                val keywordDao = db.blockedKeywordDao()
+            val current = dao.getRules()
+            val keys = current.map { it.type to it.value }.toSet()
+            val additions = rules.distinctBy { it.type to it.value }.filter { (it.type to it.value) !in keys }
+            require(current.size + additions.size <= SenderWhitelistMatcher.MAX_RULES) { "合并后白名单超过 500 条" }
+            updateRules(current, current + additions, rebuildKeywords = true) {
+                val keywordDao = mirror.blockedKeywordDao()
                 keywords.forEach { row ->
                     if (keywordDao.getByNormalizedKeyword(row.normalizedKeyword) == null) keywordDao.insert(row.copy(id = 0))
                 }
                 if (additions.isNotEmpty()) dao.insertRules(additions.map { it.copy(id = 0) })
             }
-            persistMatches(source.load(), compile(dao.getRules()))
-            completeProjection()
         }
     }
 
@@ -159,50 +140,54 @@ class SenderWhitelistRepositoryImpl(
         }
     }
 
-    private suspend fun persistMatches(messages: List<WhitelistMessageIdentity>, matchers: List<SenderWhitelistMatcher>) {
-        if (matchers.isEmpty()) return
-        val matched = messages.filter { message -> matchers.any { it.matches(message.sender) } }
-        val ids = matched.map { it.id }
-        ensureMirrored(ids)
-        MirrorSynchronizationLock.mutex.withLock {
-            val versions = decisions.rows(ids).associate { it.messageId to (it.localId to it.messageRevision) }
-            // 同步期间 Provider 可能发生变化，只放行当前仍匹配规则的身份。
-            val current = source.load(ids).filter { message -> matchers.any { it.matches(message.sender) } }
-            decisions.allow(current.map { it.id }, expectedVersions = versions)
-        }
-    }
-
-    /** 规则已提交但消息更新尚未完成时，重启只补做这次更新。 */
+    /** 只恢复旧版跨库提交遗留的标记，新版规则修改不会产生中间状态。 */
     suspend fun reconcileMessageWhitelistIfNeeded() = decisionMutex.withLock {
         if (projectionChecked) return@withLock
         if (mirror.syncDao().state(PROJECTION_STATE)?.complete == false) {
-            persistMatches(source.load(), compile(dao.getRules()))
-            completeProjection()
+            val rules = dao.getRules()
+            updateRules(rules, rules) {}
         }
         projectionChecked = true
     }
 
-    private suspend fun markProjectionDirty() {
-        projectionChecked = false
-        mirror.syncDao().putState(MirrorSyncStateEntity(PROJECTION_STATE, complete = false))
-    }
-
-    private suspend fun completeProjection() {
-        val previouslyAllowed = decisions.allRows()
-            .filter { it.spamAllowedSource == MessageSpamSource.WHITELIST }.map { it.messageId }
-        if (previouslyAllowed.isNotEmpty()) {
-            ensureMirrored(previouslyAllowed)
-            MirrorSynchronizationLock.mutex.withLock {
-                val versions = decisions.rows(previouslyAllowed)
-                    .associate { it.messageId to (it.localId to it.messageRevision) }
-                val matchers = compile(dao.getRules())
-                val released = source.load(previouslyAllowed)
-                    .filter { message -> matchers.none { it.matches(message.sender) } }.map { it.id }
-                // 规则删改不撤销历史放行；明确记录它已经属于持久放行，而非当前规则命中。
+    /** 同步仅处理缺失或身份变化；规则与全部受影响消息在一个事务内生效。 */
+    private suspend fun updateRules(
+        previous: List<SenderWhitelistRuleEntity>,
+        next: List<SenderWhitelistRuleEntity>,
+        rebuildKeywords: Boolean = false,
+        mutation: suspend () -> Unit,
+    ) {
+        val oldMatchers = compile(previous)
+        val newMatchers = compile(next)
+        val history = source.load()
+        val candidates = history.filter { message ->
+            oldMatchers.any { it.matches(message.sender) } || newMatchers.any { it.matches(message.sender) }
+        }.map { it.id }
+        val previouslyAllowed = decisions.whitelistMessageIds()
+        val affected = (candidates + previouslyAllowed).distinct()
+        ensureMirrored(affected)
+        MirrorSynchronizationLock.mutex.withLock {
+            val rows = decisions.rows(affected)
+            val fingerprints = mirroredFingerprints(affected)
+            // 同步期间 Provider 可能改变身份，使用当前身份重新匹配，防止沿用旧消息权限。
+            val current = source.load(affected).filter { it.fingerprint == fingerprints[it.id] }
+            val validIds = current.mapTo(mutableSetOf()) { it.id }
+            val versions = rows.filter { it.messageId in validIds }
+                .associate { it.messageId to (it.localId to it.messageRevision) }
+            val oldMatches = current.filter { message -> oldMatchers.any { it.matches(message.sender) } }.map { it.id }
+            val newMatches = current.filter { message -> newMatchers.any { it.matches(message.sender) } }.map { it.id }
+            val stillAllowed = rows
+                .filter { it.spamAllowedSource == MessageSpamSource.WHITELIST }.map { it.messageId }
+            val released = (oldMatches + stillAllowed).toSet() - newMatches.toSet()
+            mirror.withTransaction {
+                mutation()
+                decisions.allow(newMatches, expectedVersions = versions)
+                // 删除或修改规则只将历史命中转为永久放行，不撤销它。
                 decisions.allow(released, MessageSpamSource.RELEASED, versions)
+                if (rebuildKeywords) rebuildKeywordProjection(mirror)
+                mirror.syncDao().putState(MirrorSyncStateEntity(PROJECTION_STATE, complete = true))
             }
         }
-        mirror.syncDao().putState(MirrorSyncStateEntity(PROJECTION_STATE, complete = true))
         projectionChecked = true
     }
 
@@ -211,31 +196,33 @@ class SenderWhitelistRepositoryImpl(
         if (requested.isEmpty()) return
         val changed = if (requested.size == 1) requested else {
             val current = source.load(requested).associate { it.id to it.fingerprint }
-            val mirrored = buildMap {
-                requested.filter { it > 0 }.chunked(500).forEach { batch ->
-                    mirror.mirrorDao().conversationSmsByIds(batch).forEach { row ->
-                        put(row.sourceId, whitelistMessageFingerprint(row.sourceId, row.address.orEmpty(),
-                            row.originalDate ?: 0L, row.dateSent ?: 0L))
-                    }
-                }
-                requested.filter { it < 0 }.map { -it }.chunked(500).forEach { batch ->
-                    mirror.mirrorDao().conversationMmsByIds(batch).forEach { row ->
-                        val addresses = row.addresses.sortedBy { it.ordinal }
-                            .filter { !it.address.isNullOrBlank() && it.address != "insert-address-token" }
-                        val sender = addresses.firstOrNull { it.type == 137 }?.address
-                            ?: addresses.firstOrNull()?.address.orEmpty()
-                        val sent = row.mms?.rawSnapshot?.let { ProviderRowSnapshot.decode(it).long("date_sent") } ?: 0L
-                        val id = -row.message.sourceId
-                        put(id, whitelistMessageFingerprint(id, sender, row.message.originalDate ?: 0L, sent))
-                    }
-                }
-            }
+            val mirrored = mirroredFingerprints(requested)
             // 批量身份比较只读数据库；只有缺失、删除或身份变化才触发镜像更新。
             requested.filter { current[it] != mirrored[it] }
         }
         for (id in changed) {
             val key = SourceMessageKey(if (id > 0) MessageTransport.SMS else MessageTransport.MMS, kotlin.math.abs(id))
             check(synchronizer.refreshInitializationMessage(key)) { "message synchronization incomplete" }
+        }
+    }
+
+    private suspend fun mirroredFingerprints(ids: Collection<Long>): Map<Long, String> = buildMap {
+        ids.filter { it > 0 }.chunked(500).forEach { batch ->
+            mirror.mirrorDao().conversationSmsByIds(batch).forEach { row ->
+                put(row.sourceId, whitelistMessageFingerprint(row.sourceId, row.address.orEmpty(),
+                    row.originalDate ?: 0L, row.dateSent ?: 0L))
+            }
+        }
+        ids.filter { it < 0 && it != Long.MIN_VALUE }.map { -it }.chunked(500).forEach { batch ->
+            mirror.mirrorDao().conversationMmsByIds(batch).forEach { row ->
+                val addresses = row.addresses.sortedBy { it.ordinal }
+                    .filter { !it.address.isNullOrBlank() && it.address != "insert-address-token" }
+                val sender = addresses.firstOrNull { it.type == 137 }?.address
+                    ?: addresses.firstOrNull()?.address.orEmpty()
+                val sent = row.mms?.rawSnapshot?.let { ProviderRowSnapshot.decode(it).long("date_sent") } ?: 0L
+                val id = -row.message.sourceId
+                put(id, whitelistMessageFingerprint(id, sender, row.message.originalDate ?: 0L, sent))
+            }
         }
     }
 

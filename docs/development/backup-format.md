@@ -25,6 +25,8 @@ theme/<assetId>.webp
 
 未选类别不包含对应数据。`spam.db` 既可承载规则，也可承载 SMS 放行状态；不能因文件存在就恢复整库。选中 SMS 时生成三个快照库（即使为空），仅规则时只有 spam.db，仅设置时没有数据库。
 
+这些文件是固定的备份传输格式。运行时的骚扰规则、验证码和归档状态已合入 `message_mirror.db` v7；导出仍生成上述文件，不会在应用数据目录重新创建三个旧业务库。验证码索引不导出，恢复后重新识别。
+
 `manifest.json`：
 
 | 字段 | 说明 |
@@ -47,9 +49,11 @@ theme/<assetId>.webp
 | spam.db | blocked_keyword、sender_whitelist_rule、spam_allowed_message | 所选规则，以及选中 SMS 对应的单条放行 |
 | conversation_archive.db | archived_conversation | 能关联到快照 SMS 的归档标记 |
 
-保留表结构、源 user_version 和必要的 SQLite 自动索引/序列；Android 的标准 `android_metadata(locale TEXT)` 可以存在。允许两个确定结构的可选索引 `backup_sms_source`（sourceId 唯一索引）、`backup_sms_thread`（threadId 索引），用于避免状态关联扫描退化。无索引的同版本快照仍可读取，但 sourceId 不允许重复。
+保留协议规定的表结构、user_version 和必要的 SQLite 自动索引/序列；Android 的标准 `android_metadata(locale TEXT)` 可以存在。允许两个确定结构的可选索引 `backup_sms_source`（sourceId 唯一索引）、`backup_sms_thread`（threadId 索引），用于避免状态关联扫描退化。无索引的同版本快照仍可读取，但 sourceId 不允许重复。
 
 不包含 MMS 数据、附件、同步进度、脏记录、下载/清理队列、分类分数或镜像派生缓存。恢复即时重建关键词和验证码索引；模型历史分数不迁移，全量模型识别仍沿用设置页的既有入口。归档快照的 snippet、display_name、计数和 MMS 标记清空，防止混合会话彩信摘要被夹带；恢复时按目标会话重算。快照从新库生成，不能在整库副本上仅 DELETE 后打包。暂存库采用 DELETE journal 模式，关闭后只打包主文件，不包含 journal/WAL/SHM。
+
+归档运行表仅存 `thread_id`、`archived_at`。导出补齐旧协议的展示字段为空值或零，恢复只读取归档关系和归档时间，页面摘要关联当前短信生成。
 
 原 `localId` 是包内 backupId；sourceId/threadId 用于本包关联，不直接写入目标。单条放行必须核对原消息指纹，再读取目标身份重算指纹，不能直接迁移原指纹。跨应用库不保证全局事务快照，无法可靠关联时计入跳过数量。
 

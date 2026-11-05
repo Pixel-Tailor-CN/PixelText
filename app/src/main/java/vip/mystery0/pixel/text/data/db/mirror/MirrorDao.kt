@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.data.db.mirror
 import androidx.room.*
 import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
+import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
 
 @Dao
 abstract class MirrorDao {
@@ -86,9 +87,15 @@ abstract class MirrorDao {
     @RawQuery
     abstract suspend fun filteredConversations(query: SupportSQLiteQuery): List<MirrorFilteredConversationRow>
 
+    @RawQuery
+    abstract suspend fun filteredUnreadSmsCount(query: SupportSQLiteQuery): Int
+
+    @RawQuery
+    abstract suspend fun nonFullySpamThreadIds(query: SupportSQLiteQuery): List<Long>
+
     @RawQuery(observedEntities = [MirrorMessageEntity::class, MirrorSmsEntity::class,
         MirrorMmsEntity::class, MirrorAddressEntity::class, MirrorPartEntity::class,
-        MirrorAttachmentEntity::class, MmsTextIndexEntity::class])
+        MirrorAttachmentEntity::class, MmsTextIndexEntity::class, ArchivedConversationEntity::class])
     abstract fun observeConversationChanges(query: SupportSQLiteQuery): Flow<Int>
 
     @Query("""

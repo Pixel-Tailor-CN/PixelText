@@ -1,20 +1,13 @@
 package vip.mystery0.pixel.text.data.db
 
-import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Dao
-import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
-import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.room.withTransaction
 import androidx.room.RoomWarnings
 import kotlinx.coroutines.flow.Flow
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
@@ -68,30 +61,44 @@ data class SmsScanStateEntity(
 
 @Dao
 interface VerificationCodeIndexDao {
+    // 只展示已同步的原消息；时间和地址校验避免 Provider 复用 ID 时关联旧验证码。
+    // 镜像暂缺只影响可见结果，不据此删除索引，后续同步由 Room 自动刷新。
     @Query(
         """
-        SELECT month_key AS monthKey, MAX(timestamp) AS latestTimestamp, COUNT(*) AS messageCount
-        FROM verification_code_index
-        WHERE generation = COALESCE(
+        SELECT entry.month_key AS monthKey, MAX(entry.timestamp) AS latestTimestamp,
+               COUNT(*) AS messageCount
+        FROM verification_code_index AS entry
+        INNER JOIN mirror_message AS message
+            ON message.transport = 'SMS' AND message.sourceId = entry.message_id
+            AND message.timestamp = entry.timestamp
+        INNER JOIN mirror_sms AS sms ON sms.localId = message.localId
+            AND COALESCE(sms.address, '') = entry.address
+        WHERE entry.generation = COALESCE(
             (SELECT active_generation FROM verification_code_metadata WHERE id = 1),
             0
         )
-        GROUP BY month_key
-        ORDER BY month_key DESC
+        GROUP BY entry.month_key
+        ORDER BY entry.month_key DESC
         """
     )
     fun observeMonths(): Flow<List<VerificationCodeMonthModel>>
 
     @Query(
         """
-        SELECT message_id AS messageId, thread_id AS threadId, address, timestamp,
-               month_key AS monthKey, code, signature, rule_version AS ruleVersion
-        FROM verification_code_index
-        WHERE generation = COALESCE(
+        SELECT entry.message_id AS messageId, COALESCE(message.threadId, entry.thread_id) AS threadId,
+               entry.address, entry.timestamp, entry.month_key AS monthKey,
+               entry.code, entry.signature, entry.rule_version AS ruleVersion
+        FROM verification_code_index AS entry
+        INNER JOIN mirror_message AS message
+            ON message.transport = 'SMS' AND message.sourceId = entry.message_id
+            AND message.timestamp = entry.timestamp
+        INNER JOIN mirror_sms AS sms ON sms.localId = message.localId
+            AND COALESCE(sms.address, '') = entry.address
+        WHERE entry.generation = COALESCE(
             (SELECT active_generation FROM verification_code_metadata WHERE id = 1),
             0
-        ) AND month_key = :monthKey
-        ORDER BY timestamp DESC, message_id DESC
+        ) AND entry.month_key = :monthKey
+        ORDER BY entry.timestamp DESC, entry.message_id DESC
         """
     )
     @Suppress(RoomWarnings.QUERY_MISMATCH)
@@ -100,25 +107,26 @@ interface VerificationCodeIndexDao {
     @Query("SELECT * FROM verification_code_metadata WHERE id = 1")
     suspend fun getMetadata(): VerificationCodeMetadataEntity?
 
-    @Query(
-        """
-        SELECT * FROM verification_code_index
-        WHERE generation = COALESCE(
-            (SELECT active_generation FROM verification_code_metadata WHERE id = 1),
-            0
-        )
-        """
-    )
-    suspend fun getActiveEntries(): List<VerificationCodeIndexEntity>
+    @Query("""
+        SELECT sms.body FROM mirror_message AS message
+        INNER JOIN mirror_sms AS sms ON sms.localId = message.localId
+        WHERE message.transport = 'SMS' AND message.sourceId = :messageId
+    """)
+    suspend fun getMessageBody(messageId: Long): String?
 
     @Query(
         """
-        SELECT message_id FROM verification_code_index
-        WHERE generation = COALESCE(
+        SELECT entry.message_id FROM verification_code_index AS entry
+        INNER JOIN mirror_message AS message
+            ON message.transport = 'SMS' AND message.sourceId = entry.message_id
+            AND message.timestamp = entry.timestamp
+        INNER JOIN mirror_sms AS sms ON sms.localId = message.localId
+            AND COALESCE(sms.address, '') = entry.address
+        WHERE entry.generation = COALESCE(
             (SELECT active_generation FROM verification_code_metadata WHERE id = 1),
             0
-        ) AND timestamp < :cutoffTimestamp
-        ORDER BY timestamp ASC, message_id ASC
+        ) AND entry.timestamp < :cutoffTimestamp
+        ORDER BY entry.timestamp ASC, entry.message_id ASC
         """
     )
     suspend fun getExpiredMessageIds(cutoffTimestamp: Long): List<Long>
@@ -141,8 +149,15 @@ interface VerificationCodeIndexDao {
     )
     suspend fun hasEntriesWithoutScanState(generation: Long): Boolean
 
-    @Query("SELECT * FROM verification_code_index WHERE generation = :generation AND message_id IN (:messageIds)")
-    suspend fun getEntries(generation: Long, messageIds: List<Long>): List<VerificationCodeIndexEntity>
+    /** 未变化的识别结果直接在库内复制到新代，避免读取并重新组装整批对象。 */
+    @Query("""
+        INSERT INTO verification_code_index
+            (message_id, thread_id, address, timestamp, month_key, code, signature, rule_version, generation)
+        SELECT message_id, thread_id, address, timestamp, month_key, code, signature, rule_version, :generation
+        FROM verification_code_index
+        WHERE generation = :sourceGeneration AND message_id IN (:messageIds)
+    """)
+    suspend fun copyEntries(sourceGeneration: Long, generation: Long, messageIds: List<Long>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEntries(entries: List<VerificationCodeIndexEntity>)
@@ -176,61 +191,4 @@ interface VerificationCodeIndexDao {
 
     @Query("DELETE FROM sms_scan_state WHERE generation != :generation")
     suspend fun deleteOtherScanGenerations(generation: Long)
-}
-
-@Database(
-    entities = [
-        VerificationCodeIndexEntity::class,
-        VerificationCodeMetadataEntity::class,
-        SmsScanStateEntity::class,
-    ],
-    version = 3,
-    exportSchema = false,
-)
-abstract class VerificationCodeIndexDatabase : RoomDatabase() {
-    abstract fun verificationCodeIndexDao(): VerificationCodeIndexDao
-
-    suspend fun activateGeneration(
-        generation: Long,
-        ruleVersion: String,
-        reconciledAt: Long,
-    ) {
-        withTransaction {
-            verificationCodeIndexDao().upsertMetadata(
-                VerificationCodeMetadataEntity(
-                    activeGeneration = generation,
-                    lastFullScanRuleVersion = ruleVersion,
-                    lastReconciledAt = reconciledAt,
-                )
-            )
-            verificationCodeIndexDao().deleteOtherGenerations(generation)
-            verificationCodeIndexDao().deleteOtherScanGenerations(generation)
-        }
-    }
-
-    companion object {
-        fun create(context: Context): VerificationCodeIndexDatabase =
-            Room.databaseBuilder(
-                context,
-                VerificationCodeIndexDatabase::class.java,
-                "verification_code_index.db",
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
-
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS `sms_scan_state` (`generation` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `body_fingerprint` TEXT NOT NULL, PRIMARY KEY(`generation`, `message_id`))")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_scan_state_generation_message_id` ON `sms_scan_state` (`generation`, `message_id`)")
-            }
-        }
-
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE `sms_scan_state` RENAME TO `sms_scan_state_v2`")
-                db.execSQL("DROP INDEX IF EXISTS `index_sms_scan_state_generation_message_id`")
-                db.execSQL("CREATE TABLE `sms_scan_state` (`generation` INTEGER NOT NULL, `message_id` INTEGER NOT NULL, `thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `metadata_fingerprint` TEXT NOT NULL, PRIMARY KEY(`generation`, `message_id`))")
-                db.execSQL("CREATE INDEX `index_sms_scan_state_generation_message_id` ON `sms_scan_state` (`generation`, `message_id`)")
-                db.execSQL("DROP TABLE `sms_scan_state_v2`")
-            }
-        }
-    }
 }

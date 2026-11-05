@@ -12,7 +12,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.data.source.SpamScanMessageRow
-import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
@@ -73,7 +72,6 @@ class HistoricalSpamScanWorker(
     private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository by inject()
     private val spamClassifierFactory: SpamClassifierFactory by inject()
     private val mirror: MessageMirrorDatabase by inject()
-    private val rules: SpamDatabase by inject()
     private val keywords: KeywordSpamRepository by inject()
     private val cache: ConversationCacheRepository by inject()
     private val synchronizer: MessageMirrorSynchronizer by inject()
@@ -94,7 +92,7 @@ class HistoricalSpamScanWorker(
             // 应用关闭期间可能复用旧 Provider ID。先批量比较扫描正文，只同步真正变化的行，
             // 不能以旧镜像里的模型版本为依据跳过新消息，也不为此开启整库附件对账。
             synchronizeScanMessages(allMessages)
-            val hasKeywords = rules.blockedKeywordDao().getAll().isNotEmpty()
+            val hasKeywords = mirror.blockedKeywordDao().getAll().isNotEmpty()
             if (!spamRepository.isEnabled()) {
                 val unknownIds = mirror.spamDao().rows(allMessages.map { it.messageId })
                     .filter { it.isSpam == null }.mapTo(mutableSetOf()) { it.messageId }

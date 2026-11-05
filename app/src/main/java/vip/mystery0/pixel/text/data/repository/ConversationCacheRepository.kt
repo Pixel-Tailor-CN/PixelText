@@ -26,7 +26,7 @@ class ConversationCacheRepository(
         val state = mirror.observeSyncState().first()
         return state.completedCollections.containsAll(setOf("SMS", "MMS"))
     }
-    suspend fun fullSync(archivedThreadIds: Set<Long>) {
+    suspend fun fullSync() {
         synchronizer.requestAttachmentVerification()
         synchronizer.reconcile()
         MessageMirrorScheduler(context).schedule(reason = "manual_repair")

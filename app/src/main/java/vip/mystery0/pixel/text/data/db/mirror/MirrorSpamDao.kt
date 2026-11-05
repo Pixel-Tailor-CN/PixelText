@@ -65,8 +65,27 @@ private const val SPAM_COLUMNS = "localId, CASE WHEN transport='MMS' THEN -sourc
     "revision AS messageRevision, threadId, isSpam, spamSource, spamScore, spamModelIdentity, spamModelRevision, " +
     "spamModelGeneration, spamModelManual, spamKeywordId, spamAllowedSource, spamCorrection"
 
+/** 关键词重算只读取正文、版本与放行字段，由主库一次联表取得。 */
+data class KeywordDecisionCandidate(
+    val localId: Long,
+    val sourceId: Long,
+    val revision: Long,
+    val body: String?,
+    val spamAllowedSource: Int?,
+)
+
 @Dao
 abstract class MirrorSpamDao {
+    @Query("""
+        SELECT m.localId, m.sourceId, m.revision, s.body, m.spamAllowedSource
+        FROM mirror_message m JOIN mirror_sms s ON s.localId=m.localId
+        WHERE m.transport='SMS'
+    """)
+    abstract suspend fun keywordCandidates(): List<KeywordDecisionCandidate>
+
+    @Query("SELECT CASE WHEN transport='MMS' THEN -sourceId ELSE sourceId END FROM mirror_message WHERE spamAllowedSource=2")
+    abstract suspend fun whitelistMessageIds(): List<Long>
+
     @Query("SELECT " + SPAM_COLUMNS + " FROM mirror_message WHERE (transport='SMS' AND sourceId IN (:smsIds)) OR (transport='MMS' AND sourceId IN (:mmsIds))")
     abstract suspend fun rowsBySource(smsIds: List<Long>, mmsIds: List<Long>): List<MirrorSpamStateRow>
 

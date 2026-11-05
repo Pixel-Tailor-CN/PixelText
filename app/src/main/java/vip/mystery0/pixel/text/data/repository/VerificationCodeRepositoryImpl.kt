@@ -6,12 +6,12 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDatabase
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.VerificationCodeIndexEntity
 import vip.mystery0.pixel.text.data.db.VerificationCodeMetadataEntity
 import vip.mystery0.pixel.text.data.db.SmsScanStateEntity
@@ -29,7 +29,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 class VerificationCodeRepositoryImpl(
-    private val database: VerificationCodeIndexDatabase,
+    private val database: MessageMirrorDatabase,
     private val telephonyDataSource: TelephonyDataSource,
     private val parser: MessageParser,
     private val settings: AppSettingsRepository,
@@ -41,12 +41,14 @@ class VerificationCodeRepositoryImpl(
     override fun observeMonths(): Flow<List<VerificationCodeMonthModel>> = dao.observeMonths()
 
     override fun observeMonth(monthKey: String): Flow<List<VerificationCodeIndexModel>> =
-        dao.observeMonth(monthKey).map { messages ->
-            messages.map { it.copy(displayName = contactDataSource.getDisplayName(it.address)) }
+        combine(dao.observeMonth(monthKey), contactDataSource.changes) { messages, _ ->
+            contactDataSource.warmUp()
+            val displayNames = contactDataSource.getCachedDisplayNames(messages.map { it.address })
+            messages.map { it.copy(displayName = displayNames[it.address]) }
         }.flowOn(Dispatchers.IO)
 
     override suspend fun getMessageBody(messageId: Long): String? = withContext(Dispatchers.IO) {
-        telephonyDataSource.getSmsBody(messageId)
+        dao.getMessageBody(messageId)
     }
 
     override suspend fun indexMessage(
@@ -106,7 +108,7 @@ class VerificationCodeRepositoryImpl(
                 if (totalCount != null && processedCount > requireNotNull(totalCount)) totalCount = null
                 onProgress?.invoke(processedCount, totalCount)
             }
-            database.activateGeneration(generation, ruleVersion, System.currentTimeMillis())
+            database.activateVerificationGeneration(generation, ruleVersion, System.currentTimeMillis())
         } catch (error: Throwable) {
             withContext(NonCancellable) {
                 dao.deleteGeneration(generation)
@@ -147,7 +149,7 @@ class VerificationCodeRepositoryImpl(
             forEachSmsSummaryPage { summaries ->
                 processPage(summaries, generation, ruleVersion, metadata.activeGeneration)
             }
-            database.activateGeneration(generation, ruleVersion, System.currentTimeMillis())
+            database.activateVerificationGeneration(generation, ruleVersion, System.currentTimeMillis())
         } catch (error: Throwable) {
             withContext(NonCancellable) {
                 dao.deleteGeneration(generation)
@@ -207,6 +209,7 @@ class VerificationCodeRepositoryImpl(
     private suspend fun forEachSmsSummaryPage(
         block: suspend (List<SmsIndexSummaryRow>) -> Unit,
     ) {
+        // 扫描任务可能早于镜像同步，仍以系统原件为准，避免把尚未同步的短信当作已删除。
         var beforeMessageId: Long? = null
         while (true) {
             currentCoroutineContext().ensureActive()
@@ -276,8 +279,6 @@ class VerificationCodeRepositoryImpl(
         val ids = summaries.map { it.id }
         val oldStates = sourceGeneration?.let { dao.getScanStates(it, ids) }
             .orEmpty().associateBy { it.messageId }
-        val oldEntries = sourceGeneration?.let { dao.getEntries(it, ids) }
-            .orEmpty().associateBy { it.messageId }
         val fingerprints = summaries.associate { it.id to it.metadataFingerprint() }
         val unchangedIds = summaries.filter { summary ->
             val old = oldStates[summary.id]
@@ -289,9 +290,7 @@ class VerificationCodeRepositoryImpl(
         val entries = mutableListOf<VerificationCodeIndexEntity>()
         val scanStates = summaries.map { summary ->
             currentCoroutineContext().ensureActive()
-            if (summary.id in unchangedIds) {
-                oldEntries[summary.id]?.let { entries += it.copy(generation = generation) }
-            } else {
+            if (summary.id !in unchangedIds) {
                 bodies[summary.id]?.let { body ->
                     parseIndexEntry(summary, body, generation, ruleVersion)?.let { entries += it }
                 }
@@ -307,6 +306,9 @@ class VerificationCodeRepositoryImpl(
         }
         // 本轮目标代已清空；未命中和已删除短信无需逐条删除，旧代在切换时统一清理。
         database.withTransaction {
+            if (sourceGeneration != null && unchangedIds.isNotEmpty()) {
+                dao.copyEntries(sourceGeneration, generation, unchangedIds.toList())
+            }
             if (entries.isNotEmpty()) dao.upsertEntries(entries)
             dao.upsertScanStates(scanStates)
         }

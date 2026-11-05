@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.data.db.mirror
 
 import androidx.sqlite.db.SimpleSQLiteQuery
 import vip.mystery0.pixel.text.domain.model.mirror.ConversationListQuery
+import vip.mystery0.pixel.text.domain.model.mirror.ConversationArchiveFilter
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 
 /** 只拼接类型明确的数值和固定 SQL，不将号码、正文或其他文本放入查询。 */
@@ -15,7 +16,12 @@ internal object MirrorConversationQuery {
         }
         val excludedCondition = if (query.excludedThreadIds.isEmpty()) "" else
             "AND m.threadId NOT IN (${query.excludedThreadIds.joinToString(",")})"
-        val baseCondition = "$threadCondition $excludedCondition"
+        val archiveCondition = when (query.archiveFilter) {
+            ConversationArchiveFilter.ALL -> ""
+            ConversationArchiveFilter.ARCHIVED -> "AND EXISTS (SELECT 1 FROM archived_conversation a WHERE a.thread_id=m.threadId)"
+            ConversationArchiveFilter.UNARCHIVED -> "AND NOT EXISTS (SELECT 1 FROM archived_conversation a WHERE a.thread_id=m.threadId)"
+        }
+        val baseCondition = "$threadCondition $excludedCondition $archiveCondition"
         val needsSpam = query.onlySpamThreads || query.contentFilter != ConversationContentFilter.ALL
         val spamDefinition = if (!needsSpam) "" else """
             spam AS (

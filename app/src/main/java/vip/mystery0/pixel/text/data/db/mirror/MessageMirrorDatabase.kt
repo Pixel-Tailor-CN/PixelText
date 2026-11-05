@@ -4,13 +4,27 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
+import androidx.sqlite.db.SupportSQLiteDatabase
+import vip.mystery0.pixel.text.data.db.ArchivedConversationDao
+import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
+import vip.mystery0.pixel.text.data.db.BlockedKeywordDao
+import vip.mystery0.pixel.text.data.db.BlockedKeywordEntity
+import vip.mystery0.pixel.text.data.db.SenderWhitelistDao
+import vip.mystery0.pixel.text.data.db.SenderWhitelistRuleEntity
+import vip.mystery0.pixel.text.data.db.SmsScanStateEntity
+import vip.mystery0.pixel.text.data.db.VerificationCodeIndexDao
+import vip.mystery0.pixel.text.data.db.VerificationCodeIndexEntity
+import vip.mystery0.pixel.text.data.db.VerificationCodeMetadataEntity
 
 @Database(
     entities = [MirrorMessageEntity::class, MirrorSmsEntity::class, MirrorMmsEntity::class,
         MirrorAddressEntity::class, MirrorPartEntity::class, MirrorAttachmentEntity::class,
         MirrorThreadSourceEntity::class, MirrorCanonicalAddressEntity::class, MirrorSyncStateEntity::class,
-        MirrorDirtyEntity::class, MirrorFileCleanupEntity::class, MmsDownloadRequestEntity::class, MmsTextIndexEntity::class, DataInitializationEntity::class],
-    version = 6, exportSchema = true,
+        MirrorDirtyEntity::class, MirrorFileCleanupEntity::class, MmsDownloadRequestEntity::class, MmsTextIndexEntity::class, DataInitializationEntity::class,
+        BlockedKeywordEntity::class, SenderWhitelistRuleEntity::class, VerificationCodeIndexEntity::class,
+        VerificationCodeMetadataEntity::class, SmsScanStateEntity::class, ArchivedConversationEntity::class],
+    version = 7, exportSchema = true,
 )
 abstract class MessageMirrorDatabase : RoomDatabase() {
     abstract fun mirrorDao(): MirrorDao
@@ -18,13 +32,36 @@ abstract class MessageMirrorDatabase : RoomDatabase() {
     abstract fun searchDao(): MirrorSearchDao
     abstract fun initializationDao(): DataInitializationDao
     abstract fun spamDao(): MirrorSpamDao
+    abstract fun blockedKeywordDao(): BlockedKeywordDao
+    abstract fun senderWhitelistDao(): SenderWhitelistDao
+    abstract fun verificationCodeIndexDao(): VerificationCodeIndexDao
+    abstract fun archivedConversationDao(): ArchivedConversationDao
+
+    suspend fun activateVerificationGeneration(generation: Long, ruleVersion: String, reconciledAt: Long) {
+        withTransaction {
+            verificationCodeIndexDao().upsertMetadata(VerificationCodeMetadataEntity(
+                activeGeneration = generation, lastFullScanRuleVersion = ruleVersion,
+                lastReconciledAt = reconciledAt,
+            ))
+            verificationCodeIndexDao().deleteOtherGenerations(generation)
+            verificationCodeIndexDao().deleteOtherScanGenerations(generation)
+        }
+    }
 
     companion object {
         const val DATABASE_NAME = "message_mirror.db"
         // 后续版本必须显式注册 Migration，禁止破坏性重建。
-        fun create(context: Context): MessageMirrorDatabase = Room.databaseBuilder(
-            context.applicationContext, MessageMirrorDatabase::class.java, DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration, MIGRATION_4_5, MIGRATION_5_6).build()
+        fun create(context: Context): MessageMirrorDatabase {
+            val merge = MirrorAuxiliaryDatabaseMigration(context.applicationContext)
+            return Room.databaseBuilder(
+                context.applicationContext, MessageMirrorDatabase::class.java, DATABASE_NAME,
+            ).addMigrations(MIGRATION_1_2, MirrorSearchMigration, DataInitializationMigration,
+                MIGRATION_4_5, MIGRATION_5_6, merge)
+                .addCallback(object : Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) = merge.importLegacy(db)
+                    override fun onOpen(db: SupportSQLiteDatabase) = merge.cleanImportedFiles(db)
+                }).build()
+        }
 
         val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

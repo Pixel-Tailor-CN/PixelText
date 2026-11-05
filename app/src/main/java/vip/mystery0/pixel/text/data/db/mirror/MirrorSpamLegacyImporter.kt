@@ -1,9 +1,11 @@
 package vip.mystery0.pixel.text.data.db.mirror
 
+import android.content.Context
 import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.util.Log
 import androidx.room.withTransaction
-import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -11,7 +13,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.PersonalLearningDatabase
-import vip.mystery0.pixel.text.data.db.SpamDatabase
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorSynchronizationLock
 import vip.mystery0.pixel.text.data.source.WhitelistMessageSource
 import vip.mystery0.pixel.text.data.source.mirror.SourceRead
@@ -25,11 +26,11 @@ import java.util.Locale
 
 /**
  * 将旧数据库中的逐消息记录迁入消息行。仅执行一次，列表后续只读最终标记。
- * 完成标记与目标写入同事务提交；旧表只在提交后删除，中断后可以安全重试。
+ * 完成标记与目标写入同事务提交；旧库只在提交后删除，中断后可以安全重试。
  */
 class MirrorSpamLegacyImporter(
+    private val context: Context,
     private val mirror: MessageMirrorDatabase,
-    private val legacy: SpamDatabase,
     private val learning: PersonalLearningDatabase,
     private val source: TelephonyMirrorSource,
     private val identities: WhitelistMessageSource,
@@ -46,32 +47,19 @@ class MirrorSpamLegacyImporter(
                 if (mirror.syncDao().state(MARKER)?.complete != true) {
                     MirrorSynchronizationLock.mutex.withLock { importLocked() }
                 }
-                // 目标事务已完成；即使此处进程终止，下次只会补做旧表清理。
-                legacy.withTransaction {
-                    val db = legacy.openHelper.writableDatabase
-                    LEGACY_TABLES.forEach { db.execSQL("DROP TABLE IF EXISTS $it") }
-                }
+                // 主库打开时已导入规则，此处逐短信判定也已提交，可以清理整个旧库。
+                if (context.getDatabasePath(LEGACY_DATABASE).exists()) context.deleteDatabase(LEGACY_DATABASE)
                 completed = true
             }
         }
     }
 
     private suspend fun importLocked() {
-        val db = legacy.openHelper.readableDatabase
-        val scores = readScores(db)
-        val keywords = if (db.hasTable("keyword_spam_match")) {
-            db.query("SELECT message_id, keyword_id FROM keyword_spam_match").use { cursor ->
-                buildMap { while (cursor.moveToNext()) put(cursor.getLong(0), cursor.getLong(1)) }
-            }
-        } else emptyMap()
-        val keywordRules = db.query("SELECT id, normalized_keyword FROM blocked_keyword").use { cursor ->
-            buildMap { while (cursor.moveToNext()) put(cursor.getLong(0), cursor.getString(1)) }
-        }
-        val allowed = if (db.hasTable("spam_allowed_message")) {
-            db.query("SELECT message_id, fingerprint FROM spam_allowed_message").use { cursor ->
-                buildMap { while (cursor.moveToNext()) put(cursor.getLong(0), cursor.getString(1)) }
-            }
-        } else emptyMap()
+        val old = readLegacy()
+        val scores = old.scores
+        val keywords = old.keywords
+        val allowed = old.allowed
+        val keywordRules = mirror.blockedKeywordDao().getAll().associate { it.id to it.normalizedKeyword }
         val corrections = learning.openHelper.readableDatabase.query(
             "SELECT l.sourceType, l.sourceId, l.fingerprint, s.label FROM learning_link l JOIN learning_sample s ON s.id=l.sampleId"
         ).use { cursor ->
@@ -134,9 +122,30 @@ class MirrorSpamLegacyImporter(
         Log.i(TAG, "legacy spam decisions imported count=${updates.size}")
     }
 
-    private fun readScores(db: SupportSQLiteDatabase): Map<Long, LegacyScore> {
+    private fun readLegacy(): LegacyRecords {
+        val file = context.getDatabasePath(LEGACY_DATABASE)
+        if (!file.exists()) return LegacyRecords(emptyMap(), emptyMap(), emptyMap())
+        // 默认损坏处理器会删除旧文件，改为中止迁移并保留源数据。
+        return SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY) {
+            throw SQLiteDatabaseCorruptException("legacy spam database corrupted")
+        }.use { db ->
+            val keywords = if (db.hasTable("keyword_spam_match")) {
+                db.rawQuery("SELECT message_id, keyword_id FROM keyword_spam_match", null).use { cursor ->
+                    buildMap { while (cursor.moveToNext()) put(cursor.getLong(0), cursor.getLong(1)) }
+                }
+            } else emptyMap()
+            val allowed = if (db.hasTable("spam_allowed_message")) {
+                db.rawQuery("SELECT message_id, fingerprint FROM spam_allowed_message", null).use { cursor ->
+                    buildMap { while (cursor.moveToNext()) put(cursor.getLong(0), cursor.getString(1)) }
+                }
+            } else emptyMap()
+            LegacyRecords(readScores(db), keywords, allowed)
+        }
+    }
+
+    private fun readScores(db: SQLiteDatabase): Map<Long, LegacyScore> {
         if (!db.hasTable("spam_result")) return emptyMap()
-        return db.query("SELECT * FROM spam_result").use { cursor ->
+        return db.rawQuery("SELECT * FROM spam_result", null).use { cursor ->
             buildMap {
                 while (cursor.moveToNext()) {
                     val score = cursor.floatOrNull("spam_score") ?: continue
@@ -152,8 +161,8 @@ class MirrorSpamLegacyImporter(
         }
     }
 
-    private fun SupportSQLiteDatabase.hasTable(name: String): Boolean =
-        query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name)).use { it.moveToFirst() }
+    private fun SQLiteDatabase.hasTable(name: String): Boolean =
+        rawQuery("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name)).use { it.moveToFirst() }
 
     private fun Cursor.stringOrNull(name: String): String? = getColumnIndex(name).takeIf { it >= 0 && !isNull(it) }?.let(::getString)
     private fun Cursor.longOrNull(name: String): Long? = getColumnIndex(name).takeIf { it >= 0 && !isNull(it) }?.let(::getLong)
@@ -162,9 +171,12 @@ class MirrorSpamLegacyImporter(
     private data class LegacyScore(val score: Float, val fingerprint: String, val identity: String?,
         val revision: Long?, val generation: Long?, val manual: Boolean)
 
+    private data class LegacyRecords(val scores: Map<Long, LegacyScore>, val keywords: Map<Long, Long>,
+        val allowed: Map<Long, String>)
+
     private companion object {
         const val TAG = "MirrorSpamImport"
         const val MARKER = "spam_decision_import"
-        val LEGACY_TABLES = listOf("spam_result", "keyword_spam_match", "spam_allowed_message")
+        const val LEGACY_DATABASE = "spam.db"
     }
 }
