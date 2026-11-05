@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
 import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
 
 internal const val SAMPLE_REPORT_REFRESH_REQUESTED = "sample_report_refresh_requested"
@@ -76,6 +77,7 @@ fun SampleReportListScreen(
                 if (state.hasPending) item(key = "pending") {
                     Surface(onClick = onNewReport, shape = MaterialTheme.shapes.large,
                         color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -90,10 +92,11 @@ fun SampleReportListScreen(
                 } }
                 state.error?.let { message -> item(key = "error") { SampleReportError(message, state.retryAt, viewModel::refresh) } }
                 if (state.loaded && state.items.isEmpty() && state.error == null) item(key = "empty") {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 96.dp), contentAlignment = Alignment.Center) {
-                        Text("暂无上报记录", style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    AppEmptyState(
+                        text = "还没有上报记录",
+                        modifier = Modifier.fillParentMaxHeight(0.75f),
+                        imageRes = vip.mystery0.pixel.text.R.drawable.illustration_archived_conversation_empty,
+                    )
                 }
                 state.items.forEachIndexed { index, report ->
                     val month = sampleReportMonth(report.submittedAt)

@@ -3,17 +3,23 @@ package vip.mystery0.pixel.text.ui.message.mms
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -45,18 +51,26 @@ fun MmsMediaCard(
     Surface(modifier.widthIn(max = 360.dp).clickable(enabled = interactionEnabled && (selectionMode || actionable)) {
         if (selectionMode) onMessageClick() else onOpenPart(part.key)
     }, shape = MaterialTheme.shapes.large,
-        color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface,
     ) {
         Column(Modifier.padding(12.dp)) {
             preview?.thumbnail?.let { Image(it.asImageBitmap(), "视频预览，${part.displayName}",
                 Modifier.fillMaxWidth().height(160.dp), contentScale = ContentScale.Fit) }
-            Text(if (part.kind == MmsContentKind.VIDEO) "视频 · ${part.displayName}" else "音频 · ${part.displayName}")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (actionable) Icon(Icons.Rounded.PlayCircle, contentDescription = "播放")
+                Text(
+                    if (part.kind == MmsContentKind.VIDEO) "视频 · ${part.displayName}" else "音频 · ${part.displayName}",
+                    modifier = Modifier.weight(1f),
+                )
+                MmsAttachmentActions(part, enabled = interactionEnabled && !selectionMode, menuOnly = true)
+            }
             MmsPartStatus(part)
             if (actionable) Text(preview?.error ?: preview?.durationMillis?.let(::formatMediaTime)
                 ?: if (preview == null) "正在读取媒体预览" else "预览信息不可用，可尝试播放")
-            Text("点按查看并播放", style = MaterialTheme.typography.labelMedium)
-            MmsAttachmentActions(part, enabled = interactionEnabled && !selectionMode)
         }
     }
 }

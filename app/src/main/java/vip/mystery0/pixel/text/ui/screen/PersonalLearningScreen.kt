@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.spam.learning.*
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.viewmodel.LearningRuleConflict
 import vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel
 import java.text.SimpleDateFormat
@@ -120,6 +121,11 @@ fun PersonalLearningScreen(
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerHigh
                     },
+                    contentColor = if (settings.personalLearningEnabled) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(24.dp))
@@ -140,12 +146,14 @@ fun PersonalLearningScreen(
                             Text("使用个人学习", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = when {
-                                    settings.personalLearningEnabled -> "让识别更符合你的习惯。"
-                                    samples.isNotEmpty() -> "已暂停，保留样本和人工纠正。"
-                                    else -> "仅保存在本机，不参与备份。"
+                                    settings.personalLearningEnabled -> "已开启"
+                                    samples.isNotEmpty() -> "已暂停"
+                                    else -> "未开启"
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (settings.personalLearningEnabled) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         Switch(
@@ -192,23 +200,10 @@ fun PersonalLearningScreen(
 
             if (samples.isEmpty()) {
                 item(key = "empty_records") {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text("还没有学习记录", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                "你调整过分类的短信会显示在这里。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    AppEmptyState(
+                        text = "还没有学习记录",
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    )
                 }
             } else {
                 items(samples, key = { it.id }) { sample ->
@@ -632,7 +627,7 @@ private fun ContributionSettingsSheet(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("贡献草稿自动脱敏", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "仅处理上传草稿，不修改本机学习样本。自动脱敏不能保证去除全部敏感信息，每次提交前仍需人工检查并确认。",
+                            "自动脱敏可能遗漏，上传前仍需检查。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -689,18 +684,12 @@ internal fun PersonalLearningDialog(
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("纠正识别", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    "选择这条短信应有的分类。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text("调整短信分类", style = MaterialTheme.typography.headlineSmall)
 
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))

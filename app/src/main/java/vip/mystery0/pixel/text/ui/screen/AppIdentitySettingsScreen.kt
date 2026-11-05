@@ -213,7 +213,7 @@ fun AppIdentitySettingsScreen(
             }
             item(key = "description", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    "选择名称和图标后，点击「应用」保存；直接返回不会保存更改。名称同步用于桌面和应用主界面，系统通知顶部仍显示「原点尺素」。开启系统主题图标后，桌面配色由系统决定。",
+                    "系统通知名称保持「原点尺素」；主题图标配色跟随系统。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

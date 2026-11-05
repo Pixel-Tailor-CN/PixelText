@@ -112,19 +112,11 @@ fun SettingsPage(
                                 }
                             }
                         }
-                        if (category == SettingsCategory.SPAM) {
-                            item(key = "local_processing_note") {
-                                Text("本地识别、个人学习与规则匹配均在设备上完成。贡献样本需另行编辑并确认上传。",
-                                    Modifier.padding(top = 16.dp),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
                     }
                 }
             } else if (wide) {
                 Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("选择左侧分类以调整设置", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    vip.mystery0.pixel.text.ui.component.AppEmptyState(text = "选择设置分类")
                 }
             }
         }
@@ -166,7 +158,7 @@ private fun CategoryList(
                                 active = wide && category == selectedCategory) {
                                 SettingsPreference(
                                     title = { Text(category.title, color = if (category == selectedCategory)
-                                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) },
+                                        MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface) },
                                     summary = { Text(summary(category)) },
                                     icon = {
                                         val colors = MaterialTheme.colorScheme

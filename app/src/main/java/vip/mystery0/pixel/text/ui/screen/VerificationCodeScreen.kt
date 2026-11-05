@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetState
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -209,7 +210,7 @@ fun VerificationCodeScreen(
                     onAction = onNavigateToSettings,
                 )
 
-                state.pages.isEmpty() -> CenterMessage("暂无验证码", false)
+                state.pages.isEmpty() -> AppEmptyState("还没有验证码", modifier = Modifier.fillMaxSize())
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -355,7 +356,7 @@ private fun VerificationIndexCard(
             Text(
                 text = formatMessageTime(message.timestamp, timeDisplayFormat),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.width(8.dp))
             Text(

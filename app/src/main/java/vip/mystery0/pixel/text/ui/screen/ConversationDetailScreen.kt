@@ -117,6 +117,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.backgroundAppearance
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
@@ -745,6 +746,9 @@ fun ConversationDetailScreen(
                             ?.let(themeAssetRepository::resolve),
                         modifier = Modifier.matchParentSize(),
                     )
+                    if (state.messages.isEmpty()) {
+                        AppEmptyState("还没有消息", modifier = Modifier.fillMaxSize())
+                    }
                     LazyColumn(
                         state = listState,
                         userScrollEnabled = !isZoomGestureActive,

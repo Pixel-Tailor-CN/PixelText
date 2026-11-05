@@ -17,8 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Key
-import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -48,8 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.BlockedKeyword
-import vip.mystery0.pixel.text.ui.component.RuleEmptyState
-import vip.mystery0.pixel.text.ui.component.RuleHelperCard
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.ui.component.RuleItemCard
 import vip.mystery0.pixel.text.viewmodel.KeywordRebuildUiState
 import vip.mystery0.pixel.text.viewmodel.KeywordSaveUiState
@@ -67,6 +66,7 @@ fun KeywordSpamSettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var editingKeyword by remember { mutableStateOf<BlockedKeyword?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
     var deletingKeyword by remember { mutableStateOf<BlockedKeyword?>(null) }
 
     LaunchedEffect(saveState) {
@@ -91,6 +91,11 @@ fun KeywordSpamSettingsScreen(
                     }
                 },
                 title = { Text("关键词拦截") },
+                actions = {
+                    IconButton(onClick = { showInfo = true }) {
+                        Icon(Icons.Rounded.Info, contentDescription = "关于关键词拦截")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 ),
@@ -124,14 +129,6 @@ fun KeywordSpamSettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "privacy") {
-                RuleHelperCard(
-                    icon = Icons.Rounded.Lock,
-                    title = "规则仅保存在此设备",
-                    description = "只匹配短信正文，不会上传关键词、短信内容或匹配结果。",
-                )
-            }
-
             when (rebuildState) {
                 KeywordRebuildUiState.Running -> item(key = "rebuilding") {
                     RebuildStatusCard(running = true, onRetry = {})
@@ -146,10 +143,10 @@ fun KeywordSpamSettingsScreen(
 
             if (keywords.isEmpty()) {
                 item(key = "empty") {
-                    RuleEmptyState(
-                        icon = Icons.Rounded.Key,
-                        title = "还没有拦截关键词",
-                        description = "添加后，正文包含关键词的短信会被标记为骚扰短信。",
+                    AppEmptyState(
+                        imageRes = R.drawable.illustration_spam_conversation_empty,
+                        text = "还没有拦截关键词",
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     )
                 }
             } else {
@@ -164,7 +161,7 @@ fun KeywordSpamSettingsScreen(
                 items(keywords, key = BlockedKeyword::id) { keyword ->
                     RuleItemCard(
                         title = keyword.keyword,
-                        subtitle = "包含此内容的短信会被标记为骚扰",
+                        subtitle = "",
                         onEdit = {
                             editingKeyword = keyword
                             viewModel.resetSaveState()
@@ -175,6 +172,15 @@ fun KeywordSpamSettingsScreen(
                 }
             }
         }
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text("关键词拦截") },
+            text = { Text("正文包含关键词的短信会被标记为骚扰。规则仅保存在本机，不上传关键词、短信内容或匹配结果。") },
+            confirmButton = { TextButton(onClick = { showInfo = false }) { Text("知道了") } },
+        )
     }
 
     if (showEditor) {
@@ -217,10 +223,12 @@ private fun RebuildStatusCard(running: Boolean, onRetry: () -> Unit) {
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (running) {
-                MaterialTheme.colorScheme.primaryContainer
+                MaterialTheme.colorScheme.secondaryContainer
             } else {
                 MaterialTheme.colorScheme.errorContainer
-            }
+            },
+            contentColor = if (running) MaterialTheme.colorScheme.onSecondaryContainer
+                else MaterialTheme.colorScheme.onErrorContainer,
         ),
     ) {
         Column(
@@ -233,11 +241,9 @@ private fun RebuildStatusCard(running: Boolean, onRetry: () -> Unit) {
                 if (running) "正在更新匹配结果" else "匹配结果更新失败",
                 style = MaterialTheme.typography.titleSmall,
             )
-            Text(
-                if (running) "正在后台检查现有短信，你可以继续编辑关键词。"
-                else "旧的匹配结果已保留，可以重新尝试更新。",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            if (!running) {
+                Text("已保留上次匹配结果", style = MaterialTheme.typography.bodyMedium)
+            }
             if (running) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             } else {
@@ -261,8 +267,9 @@ private fun KeywordEditorDialog(
 ) {
     var input by remember(keyword?.id) { mutableStateOf(keyword?.keyword.orEmpty()) }
     val error = (saveState as? KeywordSaveUiState.Error)?.message
+    val saving = saveState == KeywordSaveUiState.Saving
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(if (keyword == null) "添加拦截关键词" else "编辑拦截关键词") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -274,14 +281,15 @@ private fun KeywordEditorDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("关键词或短语") },
-                    placeholder = { Text("例如：账单提醒") },
+                    placeholder = { Text("例如：免费领券") },
                     singleLine = true,
+                    enabled = !saving,
                     isError = error != null,
                     supportingText = error?.let { { Text(it) } },
                 )
                 HorizontalDivider()
                 Text(
-                    "包含该关键词的短信将被标记为骚扰短信，并按照当前骚扰短信配置处理。",
+                    "正文包含此内容的短信将按骚扰短信处理。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -290,9 +298,9 @@ private fun KeywordEditorDialog(
         confirmButton = {
             TextButton(
                 onClick = { onSave(input) },
-                enabled = saveState != KeywordSaveUiState.Saving,
+                enabled = !saving && input.isNotBlank(),
             ) { Text(if (saveState == KeywordSaveUiState.Saving) "保存中" else "保存") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !saving) { Text("取消") } },
     )
 }

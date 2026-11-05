@@ -113,8 +113,8 @@ fun resolveConversationDetailStyle(
 
     val appearance: ConversationDetailAppearance = module.appearance(mode)
     val defaultText = colorScheme.onSurface
-    val defaultBubble = colorScheme.surfaceVariant
-    val defaultInput = colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val defaultBubble = colorScheme.surfaceContainerHigh
+    val defaultInput = colorScheme.surfaceContainer
 
     return ResolvedConversationDetailStyle(
         originalMessage = ResolvedOriginalMessageStyle(

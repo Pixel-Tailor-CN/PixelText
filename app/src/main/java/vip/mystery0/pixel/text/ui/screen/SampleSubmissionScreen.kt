@@ -147,7 +147,7 @@ fun SampleSubmissionScreen(
             if (state.preparing) {
                 item(key = "preparing") {
                     Text(
-                        "正在保存本次提交，请稍候。保存完成后即可返回，网络等待不会阻止退出。",
+                        "正在保存提交内容…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -167,7 +167,7 @@ fun SampleSubmissionScreen(
                         ) {
                             Text("暂未确认提交结果", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "本次内容和请求编号已保留。重试将使用原来确认的全部信息，不能修改后作为同一次请求发送。",
+                                "重试将提交已确认的内容。",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
@@ -198,28 +198,6 @@ fun SampleSubmissionScreen(
             }
 
             if (!onConfirmStep) {
-                item(key = "step1_title") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("检查草稿内容", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            if (state.learningFeedback != null) {
-                                "本地学习已记录。此处编辑只影响贡献草稿；下一步确认并提交后才上传，返回或取消不会上传。"
-                            } else {
-                                "这是可选的样本贡献草稿。自动脱敏不能识别所有敏感信息，请检查正文和可选发送方。"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (state.learningFeedback != null && contentError != null) {
-                            Text(
-                                "当前正文不满足上报长度要求，仍保留本地学习；不会自动裁剪正文。",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
-
                 item(key = "step1_content") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -227,11 +205,11 @@ fun SampleSubmissionScreen(
                             onValueChange = viewModel::updateContent,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !state.locked,
-                            label = { Text("脱敏正文") },
+                            label = { Text("短信正文") },
                             minLines = 4,
                             isError = state.content.isNotEmpty() && contentError != null,
                             supportingText = {
-                                Text(contentError ?: "提交前请人工检查并移除或替换所有敏感信息；最多 64 KiB")
+                                Text(contentError ?: "请移除姓名、号码等敏感信息")
                             },
                         )
                         TextButton(
@@ -319,7 +297,8 @@ fun SampleSubmissionScreen(
                 item(key = "step2_preview") {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
@@ -327,7 +306,7 @@ fun SampleSubmissionScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                "脱敏正文",
+                                "短信正文",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -508,11 +487,6 @@ fun SampleSubmissionScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             ) { Text("保留并返回") }
                         }
-                        Text(
-                            text = "返回不会上传，也不影响本地学习。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
@@ -825,7 +799,7 @@ private fun ColumnScope.DesensitizationAssistantSheet(
             )
         }
         item {
-            Button(
+            FilledTonalButton(
                 onClick = onReplace,
                 enabled = state.canReplace,
                 modifier = Modifier.fillMaxWidth(),
@@ -875,7 +849,7 @@ private fun TokenChip(
         )
     } else {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = MaterialTheme.shapes.small,
         ) {
             Text(

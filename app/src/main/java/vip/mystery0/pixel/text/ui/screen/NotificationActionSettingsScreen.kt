@@ -26,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Forum
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,7 +112,7 @@ fun NotificationActionSettingsScreen(
                     IconButton(onClick = ::requestNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "返回"
                         )
                     }
                 },
@@ -151,9 +150,6 @@ fun NotificationActionSettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item(key = "helper_card") {
-                NotificationActionHelperCard()
-            }
             item(key = "preview_card") {
                 NotificationPreviewCard(actions = currentConfigs)
             }
@@ -162,11 +158,6 @@ fun NotificationActionSettingsScreen(
                     Text(
                         text = "按钮顺序与文案",
                         style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "长按右侧图标拖动排序；普通短信会自动隐藏复制按钮，并保持其他按钮的相对顺序",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -235,35 +226,6 @@ fun NotificationActionSettingsScreen(
     }
 }
 
-@Composable
-private fun NotificationActionHelperCard() {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(Icons.Rounded.Info, contentDescription = null)
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "验证码按钮支持可选占位符 {code}",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
-                    text = "文案不能为空，最多 4 个中文或 8 个英文；验证码按钮只计算固定文案部分长度",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>) {
@@ -292,7 +254,7 @@ private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>
                     modifier = Modifier
                         .size(44.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -300,7 +262,7 @@ private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>
                     Icon(
                         imageVector = Icons.Rounded.Forum,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
                 Column(
@@ -336,8 +298,8 @@ private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>
                 actions.forEach { action ->
                     Surface(
                         shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        contentColor = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     ) {
                         Text(
                             text = action.renderLabel("123456"),
@@ -488,25 +450,20 @@ private fun NotificationActionEditorCard(
                         text = type.settingTitle(),
                         style = MaterialTheme.typography.titleSmall
                     )
-                    Text(
-                        text = type.settingSummary(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
                 Box(
                     modifier = dragHandleModifier
                         .size(40.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        contentDescription = "长按拖动排序",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

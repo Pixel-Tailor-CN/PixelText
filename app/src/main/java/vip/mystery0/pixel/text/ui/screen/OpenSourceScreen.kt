@@ -76,16 +76,6 @@ fun OpenSourceScreen(onNavigateBack: () -> Unit) {
                 sponsorEnabled = false,
             ),
             licenseDialogConfirmText = "关闭",
-            header = {
-                item {
-                    Text(
-                        text = "感谢这些开源项目。此处包含应用依赖及引入源码的声明；许可正文可离线查看，项目链接将在浏览器中打开。",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
             // 直接显示原文，避免默认 HTML 清理误删许可证内的尖括号和原始换行。
             licenseDialogBody = { library, modifier ->
                 Column(

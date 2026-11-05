@@ -26,6 +26,7 @@ Pixel Text（原点短信）是面向国内 Pixel 用户的 Android SMS/MMS 应�
 ## 产品与代码边界
 
 - UI 使用 Jetpack Compose，不新增 XML layout；采用 Material 3 与 `MaterialTheme.colorScheme`，保留暗色模式、Dynamic Color 和必要动效。
+- 页面遵循[界面设计规范](docs/development/ui-design.md)：减少冗余解释与无谓选择，按信息优先级组织操作，空状态使用现有插画与简短文案，容器和内容采用成对的主题语义色。
 - UI 负责渲染和交互，业务解析放在 Domain，系统与数据访问放在 Data。ViewModel 用 `StateFlow` 暴露状态，异步任务使用 `viewModelScope`；新增依赖接入现有 Koin 模块。
 - 优先明确的模型字段；只有现有动态卡片 `details` 模式需要时使用 Map。
 - 只开发传统 SMS/MMS，不开发 RCS。短信解析与分类保持端侧，不引入远程解析、分类、埋点或统计上传。

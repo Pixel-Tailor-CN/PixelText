@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -19,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.domain.backup.BackupSection
@@ -75,13 +78,18 @@ internal fun BackupSectionSelection(
 ) {
     Column {
         sections.forEach { section ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = section in selection,
-                    onCheckedChange = { selected ->
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
+                    value = section in selection,
+                    role = Role.Checkbox,
+                    onValueChange = { selected ->
                         onSelectionChange(if (selected) selection + section else selection - section)
                     },
-                )
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Checkbox(checked = section in selection, onCheckedChange = null)
                 Text(section.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             }
         }
@@ -89,12 +97,15 @@ internal fun BackupSectionSelection(
 }
 
 @Composable
-internal fun BackupPasswordField(password: String, onPasswordChange: (String) -> Unit) {
+internal fun BackupPasswordField(
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    label: String = "备份密码",
+) {
     OutlinedTextField(
         value = password,
         onValueChange = onPasswordChange,
-        label = { Text("密码") },
-        supportingText = { Text("加密导出和恢复加密文件共用此密码，密码不会保存。") },
+        label = { Text(label) },
         visualTransformation = PasswordVisualTransformation(),
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
