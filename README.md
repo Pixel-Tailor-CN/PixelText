@@ -114,6 +114,8 @@ Release APK / AAB 构建：
 配置了 keystore 路径时，应同时提供其余三个有效字段；此时不会因其他字段缺失而自动回退。
 正式发布必须使用完整、有效的正式签名配置，当前[发布工作流](.github/workflows/release.yml)通过环境变量注入。
 
+另有独立的 [Google Play 内部测试工作流](.github/workflows/google-play-internal.yml)：仅当 `main` 主分支推送的最后一个提交信息包含 `ci`（不区分大小写）时，构建 Release AAB 并上传内部测试，此流程不创建 GitHub Release。原有 `v*` 标签 Release 流程保持不变。API、服务账号与 Secret 配置见 [Google Play 自动发布说明](docs/development/google-play-publishing.md)。
+
 使用 debug 签名的 Release 包仍保留混淆、资源压缩和正式包名 `vip.mystery0.pixel.text`，无法直接覆盖安装到正式签名版本上。
 日常调试可使用包名带 `.debug` 后缀的 Debug 构建；签名不同的本地 Release 构建可在独立测试设备或模拟器中验证。
 
