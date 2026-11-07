@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -226,7 +229,8 @@ fun ThemeColorPickerSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(420.dp),
+                    .heightIn(max = 420.dp)
+                    .weight(1f, fill = false),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(bottom = 8.dp),
             ) {
@@ -234,7 +238,7 @@ fun ThemeColorPickerSheet(
                     SourceRow(
                         selected = source == ColorPickerSource.DEFAULT,
                         title = "使用应用内置",
-                        supporting = "跟随 Material You 默认样式",
+                        supporting = "",
                         swatch = officialDefault,
                         onClick = {
                             source = ColorPickerSource.DEFAULT
@@ -262,7 +266,7 @@ fun ThemeColorPickerSheet(
                         selected = source == ColorPickerSource.MATERIAL_ROLE &&
                             selectedRole == role,
                         title = role.displayName(),
-                        supporting = role.storageValue,
+                        supporting = "",
                         swatch = roleColor,
                         onClick = {
                             source = ColorPickerSource.MATERIAL_ROLE
@@ -415,7 +419,7 @@ private fun ColorCombinationPreview(
                 .background(foreground)
                 .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     shape = RoundedCornerShape(12.dp),
                 ),
         )
@@ -454,14 +458,15 @@ private fun SourceRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         RadioButton(
             selected = selected,
-            onClick = onClick,
+            onClick = null,
         )
         Box(
             modifier = Modifier
@@ -470,17 +475,19 @@ private fun SourceRow(
                 .background(swatch)
                 .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     shape = CircleShape,
                 ),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = supporting,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (supporting.isNotBlank()) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

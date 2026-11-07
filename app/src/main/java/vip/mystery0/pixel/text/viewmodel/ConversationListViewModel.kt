@@ -61,6 +61,7 @@ class ConversationListViewModel(
     val markAllReadResultEvents = _markAllReadResultEvents.receiveAsFlow()
 
     private val allConversations = mutableListOf<ConversationModel>()
+    private var latestConversations: List<ConversationModel> = emptyList()
     private val pendingDeletedThreadIds = mutableSetOf<Long>()
     private val pendingArchivedThreadIds = mutableSetOf<Long>()
     private var conversationSubscriptionJob: Job? = null
@@ -143,14 +144,15 @@ class ConversationListViewModel(
     }
 
     private fun refreshLoaded(showRefreshIndicator: Boolean) {
+        val started = android.os.SystemClock.elapsedRealtime()
         isRefreshingLoaded = true
         if (showRefreshIndicator) {
             _isRefreshing.value = true
         }
         viewModelScope.launch {
             try {
-                val newList = repository.getAllConversations().first()
-                replaceConversations(newList)
+                // 现有订阅负责发布结果；刷新只推动镜像增量同步，避免另起全量查询。
+                repository.refreshConversations()
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -162,6 +164,9 @@ class ConversationListViewModel(
                     )
                 }
             } finally {
+                if (vip.mystery0.pixel.text.BuildConfig.DEBUG) Log.d(
+                    TAG, "conversation refresh finished visible=$showRefreshIndicator elapsed_ms=${android.os.SystemClock.elapsedRealtime() - started}",
+                )
                 if (showRefreshIndicator) {
                     _isRefreshing.value = false
                 }
@@ -193,7 +198,6 @@ class ConversationListViewModel(
 
     fun markAllConversationsAsRead() {
         if (_markAllReadProgress.value != null) return
-
         val unreadThreadIds = allConversations
             .filter { it.unreadCount > 0 }
             .map { it.threadId }
@@ -275,10 +279,12 @@ class ConversationListViewModel(
     fun restorePendingDelete(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         pendingDeletedThreadIds.removeAll(threadIds)
+        replaceConversations(latestConversations)
         refreshSilent()
     }
 
     private fun replaceConversations(conversations: List<ConversationModel>) {
+        latestConversations = conversations
         val visibleList = conversations
             .filterNot {
                 it.threadId in pendingDeletedThreadIds ||

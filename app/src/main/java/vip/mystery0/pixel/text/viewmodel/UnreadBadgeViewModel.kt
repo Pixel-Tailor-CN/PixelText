@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -41,7 +43,7 @@ class UnreadBadgeViewModel(
                 observeSmsChanges(),
                 unreadSmsCounter.observeClassificationChanges(),
                 settingsRepository.settings.map { Unit },
-            ).onStart { emit(Unit) }.collect {
+            ).onStart { emit(Unit) }.conflate().collect {
                 refreshCount()
             }
         }
@@ -61,6 +63,8 @@ class UnreadBadgeViewModel(
                 )
             }
             _unreadCount.value = count.coerceAtLeast(0)
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             Log.e(
                 TAG,

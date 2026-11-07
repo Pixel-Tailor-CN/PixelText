@@ -11,20 +11,22 @@ import android.provider.Telephony
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
-import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
-import vip.mystery0.pixel.text.data.db.SpamAllowedMessageEntity
-import vip.mystery0.pixel.text.data.db.SpamDatabase
-import vip.mystery0.pixel.text.data.source.WhitelistMessageSource
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
+import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
+import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.domain.backup.BackupSummary
+import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
+import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
+import vip.mystery0.pixel.text.domain.spam.MessageSpamSource
 import java.io.File
 import java.security.MessageDigest
 
 /** 仅恢复时访问目标 Provider；备份数据来自隔离的应用镜像快照。 */
 class SmsRestoreDataSource(
     private val context: Context,
-    private val spam: SpamDatabase,
-    private val archive: ConversationArchiveDatabase,
-    private val identities: WhitelistMessageSource,
+    private val mirror: MessageMirrorDatabase,
+    private val importer: MirrorSpamLegacyImporter,
+    private val synchronizer: MessageMirrorSynchronizer,
     private val safety: RestoreSafetyCoordinator,
 ) {
     private val resolver get() = context.contentResolver
@@ -35,6 +37,7 @@ class SmsRestoreDataSource(
 
     suspend fun restore(directory: File, initial: BackupSummary, progress: (BackupSummary) -> Unit): BackupSummary {
         requireAccess()
+        importer.ensureImported()
         val indexFile = File(directory, "restore-index.db").also { it.delete() }
         var result = initial
         SQLiteDatabase.openOrCreateDatabase(indexFile, null).use { index ->
@@ -139,9 +142,12 @@ class SmsRestoreDataSource(
             if (row.moveToFirst()) {
                 if (row.getString(0) != oldFingerprint) skipped++
                 else {
-                    val identity = identities.load(listOf(id)).singleOrNull()
-                    if (identity == null) skipped++
-                    else spam.senderWhitelistDao().allow(listOf(SpamAllowedMessageEntity(id, identity.fingerprint, row.getLong(1))))
+                    // 先同步实际目标 ID，避免向尚不存在的镜像行写标记而静默丢失。
+                    val refreshed = synchronizer.refreshInitializationMessage(SourceMessageKey(MessageTransport.SMS, id))
+                    val state = if (refreshed) mirror.spamDao().rows(listOf(id)).singleOrNull() else null
+                    if (state == null) skipped++
+                    else mirror.spamDao().allow(listOf(id), MessageSpamSource.RELEASED,
+                        mapOf(id to (state.localId to state.messageRevision)))
                 }
             }
         }
@@ -152,15 +158,8 @@ class SmsRestoreDataSource(
         if (archivedAt != null) {
             if (thread == null || thread <= 0) skipped++
             else {
-                val row = resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("address", "body", "date"), "thread_id=?", arrayOf(thread.toString()), "date DESC, _id DESC")?.use {
-                    if (!it.moveToFirst()) null else Triple(it.getString(0).orEmpty(), it.getString(1).orEmpty(), it.getLong(2))
-                }
-                if (row == null) skipped++
-                else {
-                    val unread = resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id"), "thread_id=? AND read=0", arrayOf(thread.toString()), null)?.use { it.count } ?: 0
-                    val hasMms = resolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id"), "thread_id=?", arrayOf(thread.toString()), null)?.use { it.moveToFirst() } ?: false
-                    archive.archivedConversationDao().archive(listOf(ArchivedConversationEntity(thread, row.first, null, row.second, row.third, unread, 0, if (hasMms) 1 else 0, archivedAt)))
-                }
+                // 会话展示通过主库联表读取，不再为每条恢复短信重复查询正文、未读数和彩信状态。
+                mirror.archivedConversationDao().archive(listOf(ArchivedConversationEntity(thread, archivedAt)))
             }
         }
         return skipped

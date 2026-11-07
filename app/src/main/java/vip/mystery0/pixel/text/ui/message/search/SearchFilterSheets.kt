@@ -1,6 +1,13 @@
 package vip.mystery0.pixel.text.ui.message.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,6 +71,7 @@ fun SimFilterSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
         ) {
@@ -74,94 +82,76 @@ fun SimFilterSheet(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Text(
-                text = "不选或全选均表示不限 SIM 卡，包括历史和未知 SIM 卡，应用后不会标记为已筛选。只有一张 SIM 卡时，选与不选效果相同。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            if (activeSims.isEmpty()) {
-                Text(
-                    text = "暂无可用的 SIM 卡信息",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-                if (currentSimSubIds.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = {
+            when {
+                activeSims.isEmpty() -> {
+                    AppEmptyState(text = "暂无可用的 SIM 卡")
+                    if (currentSimSubIds.isNotEmpty()) {
+                        TextButton(onClick = { onClear(); onDismissRequest() }) {
+                            Text("清除 SIM 卡筛选")
+                        }
+                    }
+                }
+                activeSims.size == 1 -> {
+                    Text(getSimTitle(activeSims.first()), style = MaterialTheme.typography.bodyLarge)
+                    TextButton(onClick = { onClear(); onDismissRequest() }) { Text("完成") }
+                }
+                activeSims.size == 2 -> {
+                    Column(Modifier.selectableGroup()) {
+                        val unrestricted = currentSimSubIds.isEmpty() ||
+                            currentSimSubIds.containsAll(activeSims.map { it.subscriptionId })
+                        SimFilterOption("不限 SIM 卡", unrestricted) {
                             onClear()
                             onDismissRequest()
-                        },
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) {
-                        Text("清除已有 SIM 卡筛选")
+                        }
+                        activeSims.forEach { sim ->
+                            SimFilterOption(getSimTitle(sim), !unrestricted && sim.subscriptionId in currentSimSubIds) {
+                                onApply(setOf(sim.subscriptionId))
+                                onDismissRequest()
+                            }
+                        }
                     }
                 }
-            } else {
-                activeSims.forEach { sim ->
-                    val isChecked = draftSelection.contains(sim.subscriptionId)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                draftSelection = if (isChecked) {
-                                    draftSelection - sim.subscriptionId
-                                } else {
-                                    draftSelection + sim.subscriptionId
-                                }
-                            }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = { checked ->
-                                draftSelection = if (checked) {
-                                    draftSelection + sim.subscriptionId
-                                } else {
-                                    draftSelection - sim.subscriptionId
-                                }
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = getSimTitle(sim),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                else -> {
+                    activeSims.forEach { sim ->
+                        val checked = sim.subscriptionId in draftSelection
+                        Row(
+                            modifier = Modifier.fillMaxWidth().toggleable(
+                                value = checked,
+                                role = Role.Checkbox,
+                                onValueChange = {
+                                    draftSelection = if (it) draftSelection + sim.subscriptionId
+                                        else draftSelection - sim.subscriptionId
+                                },
+                            ).padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = checked, onCheckedChange = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(getSimTitle(sim))
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { onClear(); onDismissRequest() }) { Text("不限 SIM 卡") }
+                        Button(onClick = { onApply(draftSelection); onDismissRequest() }) { Text("应用") }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = {
-                        draftSelection = emptySet()
-                    }
-                ) {
-                    Text("重置")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        onApply(draftSelection)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text("应用")
-                }
-            }
+            Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+@Composable
+private fun SimFilterOption(text: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(12.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -173,97 +163,30 @@ fun TransportFilterSheet(
     onApply: (Set<MessageTransport>) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var draftSelection by rememberSaveable { mutableStateOf(currentTransports) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = sheetState,
-    ) {
+    val selected = currentTransports.singleOrNull()
+    ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .navigationBarsPadding()
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                .navigationBarsPadding().selectableGroup(),
         ) {
-            Text(
-                text = "结果类型",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Text(
-                text = "不选或全选均表示不限类型，同时搜索短信和彩信。只有单选一种类型时，才会标记为已筛选。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            val options = listOf(
-                MessageTransport.SMS to "短信",
-                MessageTransport.MMS to "彩信",
-            )
-
-            options.forEach { (transport, label) ->
-                val isChecked = draftSelection.contains(transport)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            draftSelection = if (isChecked) {
-                                draftSelection - transport
-                            } else {
-                                draftSelection + transport
-                            }
-                        }
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = isChecked,
-                        onCheckedChange = { checked ->
-                            draftSelection = if (checked) {
-                                draftSelection + transport
-                            } else {
-                                draftSelection - transport
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = {
-                        draftSelection = emptySet()
+            Text("结果类型", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 16.dp))
+            listOf(null to "全部消息", MessageTransport.SMS to "短信", MessageTransport.MMS to "彩信")
+                .forEach { (transport, label) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .selectable(selected = selected == transport, role = Role.RadioButton, onClick = {
+                                onApply(transport?.let { setOf(it) } ?: emptySet())
+                                onDismissRequest()
+                            }).padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected == transport, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
                     }
-                ) {
-                    Text("重置")
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        onApply(draftSelection)
-                        onDismissRequest()
-                    }
-                ) {
-                    Text("应用")
-                }
-            }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }

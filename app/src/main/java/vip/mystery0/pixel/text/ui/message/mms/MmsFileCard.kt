@@ -49,7 +49,7 @@ fun MmsFileCard(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.inverseSurface
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
         animationSpec = tween(200),
         label = "mmsFileContainer",

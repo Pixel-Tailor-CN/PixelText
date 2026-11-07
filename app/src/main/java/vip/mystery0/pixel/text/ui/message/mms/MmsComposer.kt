@@ -8,7 +8,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +20,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository
 import vip.mystery0.pixel.text.mms.outgoing.*
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel
 import java.util.UUID
 
@@ -44,10 +44,10 @@ fun MmsComposerDialog(
             }, actions = { IconButton(enabled = !state.busy, onClick = { confirmDiscard = true }) { Icon(Icons.Rounded.Delete, "删除草稿") } })
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.ChatBubbleOutline, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.outline)
-                    Text("开始一段对话", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                AppEmptyState(
+                    text = "开始一段对话",
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
                 MessageComposer(
                     recipient = initialRecipient, initialBody = initialBody, initialSubject = initialSubject,
                     initialUris = initialUris, inputError = inputError, retryOfRequestId = resendRequestId,

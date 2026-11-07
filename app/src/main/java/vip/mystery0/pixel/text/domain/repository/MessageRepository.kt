@@ -17,6 +17,7 @@ interface MessageRepository {
     suspend fun isCacheReady(): Boolean
 
     suspend fun forceSyncConversations()
+    suspend fun refreshConversations()
     fun getAllConversations(): Flow<List<ConversationModel>>
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>

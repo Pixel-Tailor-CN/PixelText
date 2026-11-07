@@ -14,11 +14,13 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Streaming
 import retrofit2.http.Url
+import retrofit2.http.Query
+import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.domain.hub.HubArtifact
 import vip.mystery0.pixel.text.domain.hub.HubFileArtifact
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.hub.HubSpamModelArtifact
-import vip.mystery0.pixel.text.domain.hub.SampleSubmissionRequest
+import vip.mystery0.pixel.text.domain.hub.*
 import vip.mystery0.pixel.text.domain.model.SenderProfileManifest
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -36,11 +38,55 @@ class PixelTextHubClient(
     }
 
     suspend fun fetchManifest(): HubResourceManifest = withContext(Dispatchers.IO) {
-        bodyOrThrow(service.fetchManifest(), "request failed").toDomain()
+        bodyOrThrow(service.fetchManifest(BuildConfig.VERSION_CODE, 2), "资源协议 v2 暂不可用").toDomain()
     }
 
-    suspend fun submitSample(request: SampleSubmissionRequest) = withContext(Dispatchers.IO) {
-        ensureSuccessful(service.submitSample(request.toBody()), "request failed")
+    suspend fun submitReport(request: SampleReportRequest): SampleReportSubmission = withContext(Dispatchers.IO) {
+        val result = reportBody(service.submitReport(request.toBody()), ReportOperation.SUBMIT)
+        SampleReportSubmission(result.report.detail(), result.created)
+    }
+
+    suspend fun listReports(identity: SampleReportIdentity, cursor: String?, limit: Int = 20): SampleReportPage =
+        withContext(Dispatchers.IO) {
+            val result = reportBody(service.listReports(SampleReportQuery(identity.androidId,
+                identity.installationId, cursor, limit)), ReportOperation.LIST)
+            SampleReportPage(result.items.map { it.summary() }, result.nextCursor)
+        }
+
+    suspend fun getReport(identity: SampleReportIdentity, reportId: String): SampleReportDetail =
+        withContext(Dispatchers.IO) {
+            require(isValidSampleReportId(reportId))
+            reportBody(service.getReport(SampleReportDetailQuery(identity.androidId,
+                identity.installationId, reportId)), ReportOperation.DETAIL).report.detail()
+        }
+
+    private enum class ReportOperation { SUBMIT, LIST, DETAIL }
+
+    private fun <T : Any> reportBody(response: Response<T>, operation: ReportOperation): T {
+        if (response.isSuccessful) return response.body()
+            ?: throw SampleReportException("INVALID_RESPONSE", "服务响应不完整，请稍后重试")
+        val code = response.errorBody()?.use { body ->
+            runCatching { moshi.adapter(SampleReportErrorDto::class.java).fromJson(body.string())?.code }.getOrNull()
+        }.orEmpty()
+        val retryAfter = if (response.code() == 429) {
+            (response.headers()["Retry-After"]?.toLongOrNull() ?: 60L).coerceIn(1, 86400)
+        } else null
+        val message = when (response.code()) {
+            400 -> when {
+                operation == ReportOperation.LIST && code == "INVALID_CURSOR" -> "记录分页已失效，请下拉刷新后重试"
+                operation == ReportOperation.SUBMIT -> "提交信息不符合要求，请检查后重试"
+                else -> "查询信息不符合要求，请刷新后重试"
+            }
+            404 -> if (operation == ReportOperation.DETAIL) "无法查看这条上报记录" else "上报服务暂不可用，请稍后重试"
+            409 -> "本次请求存在冲突，已保留原请求，请稍后重试或反馈问题"
+            413 -> "提交内容超出大小限制，请减少内容后重试"
+            429 -> "请求过于频繁，请在稍后重试"
+            503 -> "上报服务暂不可用，请稍后重试"
+            else -> "服务暂未确认结果，请稍后重试"
+        }
+        throw SampleReportException(code.ifBlank { "HTTP_${response.code()}" }, message, retryAfter,
+            operation == ReportOperation.SUBMIT && ((response.code() == 400 && code == "INVALID_REQUEST") ||
+                (response.code() == 413 && code == "PAYLOAD_TOO_LARGE")))
     }
 
     suspend fun fetchSenderProfileManifest(): SenderProfileManifest? =
@@ -112,10 +158,12 @@ class PixelTextHubClient(
     suspend fun downloadTo(
         url: String,
         target: File,
+        maxSizeBytes: Long = Long.MAX_VALUE,
         onProgress: (Long) -> Unit = {},
     ): Long = withContext(Dispatchers.IO) {
         val response = service.download(url)
         if (!response.isSuccessful) {
+            response.errorBody()?.close()
             throw IllegalStateException("download failed status=${response.code()}")
         }
         val body = response.body() ?: throw IllegalStateException("download failed empty body")
@@ -128,6 +176,7 @@ class PixelTextHubClient(
                     while (true) {
                         val readBytes = input.read(buffer)
                         if (readBytes < 0) break
+                        check(totalBytes <= maxSizeBytes - readBytes) { "download size exceeded" }
                         output.write(buffer, 0, readBytes)
                         totalBytes += readBytes
                         onProgress(totalBytes)
@@ -136,14 +185,6 @@ class PixelTextHubClient(
             }
         }
         target.length()
-    }
-
-    private fun ensureSuccessful(response: Response<ResponseBody>, prefix: String) {
-        response.body()?.close()
-        response.errorBody()?.close()
-        if (!response.isSuccessful) {
-            throw IllegalStateException("$prefix status=${response.code()}")
-        }
     }
 
     private fun <T : Any> bodyOrThrow(response: Response<T>, prefix: String): T {
@@ -168,14 +209,23 @@ class PixelTextHubClient(
 }
 
 private interface PixelTextHubService {
-    @GET("api/v1/resources/manifest")
-    suspend fun fetchManifest(): Response<HubResourceManifestResponse>
+    @GET("api/v2/resources/manifest")
+    suspend fun fetchManifest(
+        @Query("appVersionCode") appVersionCode: Int,
+        @Query("modelContractVersion") modelContractVersion: Int,
+    ): Response<HubResourceManifestResponse>
 
     @GET("api/v1/sender-profiles/manifest")
     suspend fun fetchSenderProfileManifest(): Response<SenderProfileManifestResponse>
 
-    @POST("api/v1/samples")
-    suspend fun submitSample(@Body body: SampleSubmissionBody): Response<ResponseBody>
+    @POST("api/v2/sample-reports")
+    suspend fun submitReport(@Body body: SampleReportBody): Response<SampleReportSubmissionDto>
+
+    @POST("api/v2/sample-reports/list")
+    suspend fun listReports(@Body body: SampleReportQuery): Response<SampleReportPageDto>
+
+    @POST("api/v2/sample-reports/detail")
+    suspend fun getReport(@Body body: SampleReportDetailQuery): Response<SampleReportDetailDto>
 
     @Streaming
     @GET
@@ -229,12 +279,24 @@ internal data class HubSpamModelArtifactResponse(
     val model: HubFileArtifactResponse,
     val vocab: HubFileArtifactResponse,
     val releaseNotes: String = "",
+    val contract: HubFileArtifactResponse,
+    val minAppVersionCode: Int,
+    val modelContractVersion: Int,
+    val preprocessingVersion: String,
+    val personalParameterVersion: String,
+    val featureCompatibilityId: String,
 ) {
     fun toDomain(): HubSpamModelArtifact = HubSpamModelArtifact(
         version = version,
         model = model.toDomain(),
         vocab = vocab.toDomain(),
-        releaseNotes = releaseNotes
+        releaseNotes = releaseNotes,
+        contract = contract.toDomain(),
+        minAppVersionCode = minAppVersionCode,
+        modelContractVersion = modelContractVersion,
+        preprocessingVersion = preprocessingVersion,
+        personalParameterVersion = personalParameterVersion,
+        featureCompatibilityId = featureCompatibilityId,
     )
 }
 
@@ -263,24 +325,3 @@ internal data class SenderProfileManifestResponse(
 
 class SenderProfileDownloadException(val statusCode: Int) :
     IllegalStateException("sender profile download failed status=$statusCode")
-
-@JsonClass(generateAdapter = true)
-internal data class SampleSubmissionBody(
-    val deviceId: String,
-    val content: String,
-    val sender: String?,
-    val category: String,
-    val appVersion: String,
-    val ruleVersion: String,
-    val modelVersion: String,
-)
-
-private fun SampleSubmissionRequest.toBody(): SampleSubmissionBody = SampleSubmissionBody(
-    deviceId = deviceId,
-    content = content,
-    sender = sender,
-    category = category,
-    appVersion = appVersion,
-    ruleVersion = ruleVersion,
-    modelVersion = modelVersion
-)

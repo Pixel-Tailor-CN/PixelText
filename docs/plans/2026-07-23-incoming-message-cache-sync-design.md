@@ -1,72 +1,35 @@
-# 新短信会话缓存同步设计
+# 新短信会话同步设计
 
-## 问题
+## 原问题与保留目标
 
-新短信已经写入系统 Telephony 短信库并生成通知，但首页会话列表可能继续展示旧的 Room 缓存。搜索页直接查询 Telephony，因此“未读”筛选仍能找到该短信；点击通知进入会话后，标记已读流程会显式同步对应会话，首页随后恢复。
+2026-07 的故障是短信已写入 Telephony 并发出通知，首页仍展示旧会话缓存；当时搜索直接查 Provider，因此能找到首页尚未出现的短信。现有搜索已经改查本地镜像，不再具有这一旧数据源差异。
 
-当前链路存在两个缺口：
+原修复解决 Receiver 冷启动漏观察、首页一次性读旧缓存和 LazyColumn 稳定 key 保留旧首项锚点的问题。后来消息镜像与加载性能方案替代了独立 `cached_conversation` 数据路径，但仍要求消息同步后首页响应更新、浏览列表中部时不强制跳顶。
 
-1. 应用进程被系统回收后，短信 Receiver 拉起的是新进程。会话缓存的 ContentObserver 只有首页加载后才注册，因此会错过已经发生的短信插入事件。
-2. 应用进程存活时，首页 ContentObserver 与缓存 ContentObserver 同时响应 Telephony 变化。首页可能先读取旧缓存，缓存稍后才同步完成，而首页并未持续观察 Room 的后续变化。
+## 当前数据流
 
-模拟器验证还确认了第三个 UI 层缺口：
+1. `SmsReceiver` 写入系统 SMS 后取得消息 ID 和会话 ID，在一次 `goAsync()` 生命周期中分别处理镜像唤醒和验证码索引，失败相互隔离。
+2. 有确切消息 ID 时，`ConversationCacheRepository.syncIncomingSms(messageId)` 持久标记对应镜像消息 dirty，并调用 `MessageMirrorScheduler.enqueueMetadata()`。只有无法获得消息 ID 时才回退 `syncThreads()`；该兼容接口也只排队，不在 Receiver 内扫描整库。
+3. `MirrorChangeObserver` 负责系统变化观察；`MessageMirrorSynchronizer` 与增量同步器把消息写入主库。会话是镜像消息的查询投影，不再维护独立 `cached_conversation` 事实表。
+4. `MessageRepositoryImpl.getAllConversations()` 首次发布前要求增量同步完成，随后结合镜像变化、设置和联系人缓存变化，执行主库会话查询。
+5. `ConversationListViewModel` 持续收集会话流，异常按 1–30 秒退避重建订阅。首页不自行注册第二套 Telephony ContentObserver。
+6. `ConversationListScreen` 仍记录旧首项并等待一帧布局；只有原首项被下移且仍为滚动锚点时滚动到 0，浏览中部时保持位置。
 
-3. `LazyColumn` 使用稳定的 `threadId` 作为 key。用户原本位于列表顶部时，新会话插入或旧会话移动到第一位，Compose 会保持原首项作为滚动锚点，使新首项位于当前视口上方。此时缓存和页面状态都已包含新会话，但用户仍需要向上滚动才能看到。
+## 刷新与并发
 
-## 方案
+当前下拉刷新及轻量刷新均调用 `MessageRepository.refreshConversations()`，推动增量同步，由现有订阅发布结果；不再先 `forceSyncConversations()` 全量扫描后 `first()` 读取。完整修复仍可通过 `forceSyncConversations()`／`ConversationCacheRepository.fullSync()` 执行对账与附件校验，不是每次下拉或 ON_RESUME 的默认动作。
 
-采用四层修复：
+镜像同步共用 `MirrorSynchronizationLock` 等当前同步边界，不能恢复旧独立会话缓存 Mutex 和 DAO。详细结构见[消息镜像设计](2026-09-06-message-mirror-design.md)和[消息加载性能方案](2026-11-05-message-loading-performance.md)。镜像已覆盖 SMS/MMS，不能将“当时仅修复 SMS”理解为当前 MMS 没有同步链路。
 
-1. `SmsReceiver` 在短信成功写入并获得有效 `threadId` 后，显式调用会话缓存的 `syncThreads`。同步与验证码索引共用一次 `goAsync` 生命周期，避免 Receiver 结束后后台任务被提前终止。
-2. `CachedConversationDao` 暴露按时间倒序的 `Flow` 查询，`MessageRepository` 将首页会话数据改为持续订阅 Room。缓存完成增量更新后，首页自动收到新列表，不再依赖 UI 层抢先触发的一次性读取。
-3. 手动下拉刷新先执行 `forceSyncConversations`，再读取最新缓存。生命周期恢复和业务操作保留轻量缓存读取，不在每次回到前台时执行全量扫描。
-4. 首页记录上一版列表的首个 `threadId`。新首项出现后等待 LazyColumn 完成一帧布局；如果当前可见首项正是被下移的旧首项，说明用户更新前位于顶部，此时滚动到索引 0。用户原本浏览列表中部时不改变其位置。
+## 错误与隐私
 
-同时移除首页直接监听 Telephony 的 ContentObserver，避免它与缓存同步观察器并发执行。`ConversationCacheRepository.startObserving` 增加幂等保护，防止首页多次加载造成重复注册。
+- Provider 写入失败、同步排队失败和验证码索引失败分别处理，不让其中一个失败吞掉其余流程。
+- 后台持久任务负责后续同步，Receiver 不等待历史全量扫描。
+- 刷新失败保留现有可用列表，结束刷新提示；首次尚无数据时允许显示可恢复错误。
+- 日志使用英文元数据，不记录短信正文。
 
-所有全量和增量缓存同步共用同一个 Mutex，锁住从 Telephony 快照读取到 Room 写入的完整过程，避免旧的全量快照覆盖刚完成的新短信增量同步。首页常驻 Flow 异常时按 1 秒到 30 秒的退避间隔自动重建；Receiver 中缓存同步与验证码索引并行执行，避免长会话缓存扫描串行阻塞验证码索引。
+## 历史验证与当前边界
 
-## 数据流
+[原实施记录](2026-07-23-incoming-message-cache-sync.md)保留了当时编译、Lint、模拟器冷进程／后台收信、全量下拉修复和列表锚点验证通过记录。它们证明当时实现，不能自动覆盖后续镜像重构。
 
-```text
-SMS_DELIVER
-  -> 写入 Telephony
-  -> 获取 threadId
-  -> 增量同步 cached_conversation
-  -> Room Flow 发出新列表
-  -> ConversationListViewModel 更新首页
-  -> 若旧首项仍是当前滚动锚点，则滚动到新首项
-```
-
-手动刷新：
-
-```text
-下拉刷新
-  -> Telephony 全量对账
-  -> 更新 cached_conversation
-  -> Room Flow 发出新列表
-  -> 结束刷新状态
-```
-
-## 错误处理
-
-- Telephony 写入失败时保持现有错误日志和通知行为。
-- 缓存增量同步失败时记录英文日志，不阻止通知、垃圾短信检测和验证码索引。
-- 手动全量同步失败时结束刷新状态并保留当前可用列表。
-- 日志沿用项目约定：英文、小写开头、不使用句末标点。
-
-## 验证
-
-项目约定不新增或运行单元测试，因此使用以下验证：
-
-- `:app:compileDebugKotlin`
-- `:app:lintDebug`
-- 模拟器复现：结束应用进程后接收短信，直接打开首页即可看到；应用在后台时接收短信，首页恢复后可自动看到；下拉刷新能从 Telephony 恢复人为制造的旧缓存。
-- 验证列表中部保护：滚动到列表中部后接收短信，页面不得自动跳回顶部。
-
-## 非目标
-
-- 不调整通知样式和点击行为。
-- 不修改短信解析、垃圾短信识别或验证码提取逻辑。
-- 不为每次 Activity `ON_RESUME` 执行全量 Telephony 扫描。
-- 本次仅修复 SMS；MMS 接收缓存同步可在验证相同现象后复用该链路。
+本次只审计文档和源码。后续相关变更仍需按实际范围确认冷进程收信、前台订阅、增量刷新及列表中部位置保护，不新增或运行单元测试。

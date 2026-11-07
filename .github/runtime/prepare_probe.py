@@ -30,30 +30,18 @@ def member(name, signature):
 root = 'vip.mystery0.pixel.text.'
 config = {}
 for key, name in {
-    'codec': root + 'data.backup.BackupArchiveCodec',
-    'adapter': 'com.squareup.moshi.JsonAdapter',
     'parser': root + 'domain.parser.mms.MmsContactParser',
     'contact': root + 'domain.model.mms.MmsContactModel',
     'value': root + 'domain.model.mms.MmsContactValue',
-    'function': 'kotlin.jvm.functions.Function0',
     'unit': 'kotlin.Unit',
-    'continuation': 'kotlin.coroutines.Continuation',
-    'continuationImpl': 'kotlin.coroutines.jvm.internal.ContinuationImpl',
-    'exportContinuation': root + 'data.backup.BackupArchiveCodec$export$1',
     'emptyContext': 'kotlin.coroutines.EmptyCoroutineContext',
     'tflite': 'org.tensorflow.lite.TensorFlowLite',
 }.items():
     config[key] = cls(name)
-config['continuationContext'] = member('kotlin.coroutines.jvm.internal.ContinuationImpl', 'kotlin.coroutines.CoroutineContext _context')
-config['codecAdapter'] = member(root + 'data.backup.BackupArchiveCodec', 'com.squareup.moshi.JsonAdapter adapter')
-config['fromJson'] = member('com.squareup.moshi.JsonAdapter', 'java.lang.Object fromJson(java.lang.String)')
-config['toJson'] = member('com.squareup.moshi.JsonAdapter', 'java.lang.String toJson(java.lang.Object)')
 config['parse'] = member(root + 'domain.parser.mms.MmsContactParser', 'java.util.List parse(java.lang.String,kotlin.jvm.functions.Function0)')
 config['tfliteInit'] = member('org.tensorflow.lite.TensorFlowLite', 'void init()')
 config['unitInstance'] = member('kotlin.Unit', 'kotlin.Unit INSTANCE')
 config['emptyContextInstance'] = member('kotlin.coroutines.EmptyCoroutineContext', 'kotlin.coroutines.EmptyCoroutineContext INSTANCE')
-config['export'] = member(root + 'data.backup.BackupArchiveCodec', 'java.lang.Object export(java.io.File,vip.mystery0.pixel.text.data.backup.BackupManifest,java.lang.String,char[],kotlin.coroutines.Continuation)')
-config['inspect'] = member(root + 'data.backup.BackupArchiveCodec', 'java.lang.Object inspect(java.lang.String,char[],java.io.File,kotlin.coroutines.Continuation)')
 for name, typ in {'name':'java.lang.String', 'phones':'java.util.List', 'emails':'java.util.List', 'addresses':'java.util.List', 'photoBytes':'byte[]', 'importWarning':'java.lang.String'}.items():
     config['contact_' + name] = member(root + 'domain.model.mms.MmsContactModel', typ + ' ' + name)
 for name in ['value','label']:

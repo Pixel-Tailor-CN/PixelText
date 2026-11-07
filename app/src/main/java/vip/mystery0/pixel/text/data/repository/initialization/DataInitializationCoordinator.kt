@@ -9,7 +9,7 @@ import vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer
 import vip.mystery0.pixel.text.domain.model.*
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
-import vip.mystery0.pixel.text.domain.spam.SpamClassifier
+import vip.mystery0.pixel.text.data.repository.MirrorSpamScanSession
 
 class DataInitializationCoordinator(
     private val repository: DataInitializationRepository,
@@ -24,7 +24,7 @@ class DataInitializationCoordinator(
         guard.withStableInputs {
             val deadline = SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1)
             repository.prepare()
-            var classifier: SpamClassifier? = null
+            var classifier: MirrorSpamScanSession? = null
             try {
                 while (SystemClock.elapsedRealtime() < deadline) {
                     currentCoroutineContext().ensureActive()

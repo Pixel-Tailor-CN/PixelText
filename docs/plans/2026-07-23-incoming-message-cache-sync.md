@@ -1,126 +1,23 @@
-# 新短信会话缓存同步实施计划
+# 新短信会话同步实现与历史验证
 
-> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
+## 当前实现
 
-**Goal:** 新短信到达后，无论应用进程是否存活，首页会话列表都能从 Room 缓存自动显示该消息，手动刷新能够执行 Telephony 对账。
+旧独立会话缓存已被消息镜像替代，当前链路如下。代码路径相对 `app/src/main/java/vip/mystery0/pixel/text/`。
 
-**Architecture:** Receiver 在成功插入短信后按 `threadId` 增量同步缓存；Room DAO 提供响应式会话流，由 Repository 和 ViewModel 持续收集；下拉刷新执行显式全量同步。UI 不再直接监听 Telephony，避免读取旧缓存的竞态。
+| 原实施位置 | 当前实现 |
+| --- | --- |
+| Receiver 直接按 threadId 同步旧缓存 | `SmsReceiver` 优先调用 `ConversationCacheRepository.syncIncomingSms(messageId)`；持久标记 dirty 并排队元数据同步，不在 Receiver 扫描整库 |
+| `CachedConversationDao` / `cached_conversation` | `MessageMirrorRepository` 和镜像会话查询投影；旧缓存不再是运行时数据源 |
+| `ConversationCacheRepository.startObserving()` 的独立观察器 | 委托 `MirrorChangeObserver.start()`，与消息镜像共享系统变化观察 |
+| `getAllConversations()` 读取旧缓存 Flow | 首次增量追平后，结合镜像变更、设置和联系人缓存变更执行主库查询 |
+| 下拉先全量同步再 first() 读缓存 | `ConversationListViewModel.refreshLoaded()` 调用 `refreshConversations()` 增量同步，现有订阅发布结果 |
+| 手动完整对账 | `forceSyncConversations()`／`fullSync()` 仍提供完整修复与附件校验，不是普通下拉默认路径 |
 
-**Tech Stack:** Kotlin、Jetpack Compose、Coroutines Flow、Room、Android Telephony
+Receiver 镜像唤醒和验证码索引共用一次 `goAsync()` 并隔离错误；首页 Flow 仍按 1–30 秒退避重试。列表锚点保护仍由 `ConversationListScreen` 实现。当前行为见[设计](2026-07-23-incoming-message-cache-sync-design.md)，后续镜像和性能变化不能复用旧缓存代码模板。
 
-## Global Constraints
+## 原实施验证记录（2026-07-23）
 
-- 最低 SDK 31，JVM target 21。
-- 不新增 XML layout。
-- 不新增或运行单元测试、仪器测试及测试依赖。
-- 日志使用英文、小写开头、不使用句末标点。
-- 避免无关格式化和重构。
-- 不自动提交 Git，等待用户明确要求。
-
----
-
-### Task 1: Receiver 增量同步缓存
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/receiver/SmsReceiver.kt`
-
-**Interfaces:**
-- Consumes: `ConversationCacheRepository.syncThreads(threadIds: List<Long>)`
-- Produces: 短信插入完成后的缓存更新
-
-- [x] **Step 1: 注入 ConversationCacheRepository**
-
-在 `SmsReceiver` 中增加：
-
-```kotlin
-private val conversationCacheRepository: ConversationCacheRepository by inject()
-```
-
-- [x] **Step 2: 合并 Receiver 后台任务**
-
-在获得 `messageId` 和 `threadId` 后，仅调用一次 `goAsync()`。IO 协程先执行：
-
-```kotlin
-conversationCacheRepository.syncThreads(listOf(threadId))
-```
-
-然后在 `messageId != null` 时执行原有验证码索引，并在 `finally` 中调用 `pendingResult.finish()`。
-
-- [x] **Step 3: 保持失败隔离**
-
-缓存同步和验证码索引分别使用 `runCatching` 或独立 `try/catch`，确保其中一个失败不会跳过另一个；缓存失败日志使用：
-
-```kotlin
-Log.e(TAG, "conversation cache sync failed thread_id=$threadId", error)
-```
-
-- [x] **Step 4: 编译检查**
-
-Run:
-
-```powershell
-.\gradlew.bat :app:compileDebugKotlin --no-daemon --console=plain
-```
-
-Expected: `BUILD SUCCESSFUL`
-
-### Task 2: Room 会话流与首页持续订阅
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/db/ConversationCacheDatabase.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/ConversationCacheRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/MessageRepositoryImpl.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/ConversationListViewModel.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/ConversationListScreen.kt`
-
-**Interfaces:**
-- Produces: `CachedConversationDao.observeAllConversations(): Flow<List<CachedConversationEntity>>`
-- Produces: `ConversationCacheRepository.observeAllConversations(): Flow<List<ConversationModel>>`
-- Preserves: `MessageRepository.getAllConversations(): Flow<List<ConversationModel>>`
-
-- [x] **Step 1: 增加 Room Flow 查询**
-
-在 `CachedConversationDao` 中增加：
-
-```kotlin
-@Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC")
-fun observeAllConversations(): Flow<List<CachedConversationEntity>>
-```
-
-- [x] **Step 2: 暴露领域模型流**
-
-在 `ConversationCacheRepository` 中增加：
-
-```kotlin
-fun observeAllConversations(): Flow<List<ConversationModel>> =
-    dao.observeAllConversations().map { entities ->
-        entities.map { it.toConversationModel() }
-    }
-```
-
-使用 `AtomicBoolean` 保护 `startObserving()`，使重复调用不再重复注册 ContentObserver；`stopObserving()` 仅在成功注册后注销。
-
-- [x] **Step 3: Repository 持续映射列表**
-
-`MessageRepositoryImpl.getAllConversations()` 先确保缓存已初始化，然后 `emitAll` 缓存 Flow。每次缓存变化时重新读取归档集合和隐藏骚扰集合，过滤并补充联系人名称。
-
-- [x] **Step 4: 调整显式刷新**
-
-`ConversationListViewModel` 的常驻加载继续 `collect` 会话 Flow。`refreshSilent()` 使用 `first()` 读取当前缓存快照；手动 `refreshConversations()` 先调用 `forceSyncConversations()`，再用 `first()` 更新页面并结束刷新状态。
-
-- [x] **Step 5: 移除 UI Telephony ContentObserver**
-
-删除 `ConversationListScreen` 中直接注册 `Telephony.Sms` 和 `Telephony.Mms` 的 `DisposableEffect`，并清理只由它使用的 `ContentObserver`、`Handler`、`Looper` import。
-
-- [x] **Step 6: 编译检查**
-
-Run:
-
-```powershell
-.\gradlew.bat :app:compileDebugKotlin --no-daemon --console=plain
-```
-
-Expected: `BUILD SUCCESSFUL`
+原任务 1、2、4 的 Kotlin 编译步骤及任务 3 的 Lint、安装和模拟器检查已勾选完成。下面保留原任务 3、4 的具体记录，涉及“全量下拉”等表述描述当时版本，不是当前增量刷新要求。本次文档核对未重跑这些场景，不将历史结果扩大到后续镜像实现。
 
 ### Task 3: 回归验证
 

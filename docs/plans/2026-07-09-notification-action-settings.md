@@ -81,7 +81,7 @@
   - `onNavigateToNotificationActions: () -> Unit`
   - 新 route：`notification_actions`
 
-- [ ] 在 `SettingsScreen` 的“应用功能”分组新增 `通知快捷操作` 设置项。
+- [ ] 在 `SettingsScreen` 的“显示与外观 → 短信通知”分组新增 `通知快捷操作` 设置项。
 - [ ] 为该设置项添加摘要文案，展示当前排序后的按钮模板。
 - [ ] 为 `SettingsScreen` 增加 `onNavigateToNotificationActions` 参数并从 `AppNavigation` 传入导航行为。
 - [ ] 在 `AppNavigation` 中新增 `notification_actions` route，并挂载新的配置页面。
@@ -108,7 +108,7 @@
 
 - [ ] 新建 `NotificationActionSettingsScreen`，使用 `Scaffold + TopAppBar + LazyColumn` 组织页面。
 - [ ] 从 `settings.notificationQuickActionConfigs` 初始化本地草稿列表，按当前顺序展示。
-- [ ] 绘制说明卡片和验证码通知预览，预览中的 `copy_code` 使用示例码 `123456`。
+- [ ] 绘制验证码通知预览和编辑区标题，预览中的 `copy_code` 使用示例码 `123456`。
 - [ ] 为每个 action 项绘制名称、说明、单行输入框和拖拽手柄。
 - [ ] 使用 Compose 手势实现“长按拖拽手柄后上下重排”。
 - [ ] 对每个输入框实时计算校验结果，并在 UI 中展示错误状态。

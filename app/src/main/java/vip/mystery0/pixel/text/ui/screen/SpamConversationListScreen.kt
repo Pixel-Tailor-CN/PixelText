@@ -49,6 +49,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.viewmodel.HistorySpamScanPhase
 import vip.mystery0.pixel.text.viewmodel.HistorySpamScanProgress
 import vip.mystery0.pixel.text.viewmodel.HistorySpamStatsUiState
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListUiState
@@ -61,20 +62,28 @@ fun SpamConversationListScreen(
     onNavigateToDetail: (Long, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "spam", (uiState as? SpamConversationListUiState.Success)?.conversations?.size,
+    )
     val historyStatsState by viewModel.historyStatsState.collectAsState()
     val scanProgress by viewModel.historyScanProgress.collectAsState()
-    val isCompletedScanProgressHidden by viewModel.isCompletedScanProgressHidden.collectAsState()
+    val isScanProgressHidden by viewModel.isScanProgressHidden.collectAsState()
     var showHistoryDialog by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadSpamConversations(force = true, showLoading = false)
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.startObserving()
+                Lifecycle.Event.ON_PAUSE -> viewModel.stopObserving()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopObserving()
+        }
     }
 
     Scaffold(
@@ -122,11 +131,11 @@ fun SpamConversationListScreen(
                 .consumeWindowInsets(paddingValues)
         ) {
             scanProgress
-                ?.takeUnless { it.isCompleted && isCompletedScanProgressHidden }
+                ?.takeUnless { it.isFinished && isScanProgressHidden }
                 ?.let { progress ->
                     HistoricalSpamScanProgressBanner(
                         progress = progress,
-                        onHide = viewModel::hideCompletedScanProgress
+                        onHide = viewModel::hideScanProgress
                     )
             }
 
@@ -156,6 +165,18 @@ fun SpamConversationListScreen(
                     is SpamConversationListUiState.Success -> {
                         val listState = rememberLazyListState()
                         var isRefreshing by remember { mutableStateOf(false) }
+                        var previousFirstThreadId by remember { mutableStateOf<Long?>(null) }
+                        val firstThreadId = state.conversations.firstOrNull()?.threadId
+
+                        LaunchedEffect(firstThreadId) {
+                            // LazyColumn 默认锚定旧条目的 key；原本在顶部时应跟随新消息，翻阅历史时保持位置。
+                            val wasAtTop = listState.firstVisibleItemScrollOffset == 0 &&
+                                listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key == previousFirstThreadId
+                            if (previousFirstThreadId != null && firstThreadId != previousFirstThreadId && wasAtTop) {
+                                listState.requestScrollToItem(0)
+                            }
+                            previousFirstThreadId = firstThreadId
+                        }
 
                         if (state.conversations.isEmpty()) {
                             ConversationEmptyState(
@@ -260,10 +281,15 @@ private fun HistoricalSpamScanProgressBanner(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            val title = when {
-                progress.isCompleted -> "历史短信识别完成"
-                progress.isFailed -> "历史短信识别失败"
-                else -> "正在识别历史短信"
+            val title = when (progress.phase) {
+                HistorySpamScanPhase.WAITING -> "等待开始历史短信识别"
+                HistorySpamScanPhase.RETRYING -> "等待重试历史短信识别"
+                HistorySpamScanPhase.PREPARING -> "正在准备历史短信识别"
+                HistorySpamScanPhase.SCANNING -> "正在识别历史短信"
+                HistorySpamScanPhase.FINALIZING -> "正在完成历史短信识别"
+                HistorySpamScanPhase.COMPLETED -> "历史短信识别完成"
+                HistorySpamScanPhase.FAILED -> "历史短信识别失败"
+                HistorySpamScanPhase.CANCELLED -> "历史短信识别已取消"
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -274,22 +300,28 @@ private fun HistoricalSpamScanProgressBanner(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall
                 )
-                if (progress.isCompleted) {
+                if (progress.isFinished) {
                     TextButton(onClick = onHide) {
                         Text("隐藏")
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearWavyProgressIndicator(
-                progress = { progress.fraction },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${progress.processed}/${progress.total} ${progress.percent}%",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            val fraction = progress.fraction
+            if (fraction != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearWavyProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${progress.processed}/${progress.total} ${progress.percent}%",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else if (!progress.isFinished) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }

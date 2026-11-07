@@ -18,6 +18,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_THREAD_ID = "extra_thread_id"
         const val EXTRA_ADDRESS = "extra_address"
+        const val EXTRA_IS_SPAM = "extra_is_spam"
         const val EXTRA_OPEN_SETTINGS = "extra_open_settings"
         const val EXTRA_TRIGGER_RESOURCE_UPDATE_CHECK =
             "extra_trigger_resource_update_check"
@@ -63,7 +64,11 @@ class MainActivity : ComponentActivity() {
         val address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
         // threadId 为 0 表示未分配，地址为空则无法跳转
         if (threadId <= 0L || address.isBlank()) return null
-        return ConversationDeepLink(threadId = threadId, address = address)
+        return ConversationDeepLink(
+            threadId = threadId,
+            address = address,
+            isSpam = intent.getBooleanExtra(EXTRA_IS_SPAM, false),
+        )
     }
 
     private fun parseSettingsDeepLink(intent: Intent?): SettingsDeepLink? {

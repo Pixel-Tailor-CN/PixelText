@@ -1,11 +1,15 @@
 # 数据版本驱动初始化实施计划
 
+## 当前实现核对（2026-11-07）
+
+本计划保留原实施记录与未验证清单。当前运行镜像库为 v7，初始化表仍来自 3→4 迁移；数据版本仍为 1。生命周期版本检查与升级 Worker 已落地，但原“列表纯本地”方案已被替代：首次订阅先同步，下拉与静默刷新调用增量同步。任务 6 已按当前代码重写，其他历史勾选不代表本次重新构建或真机验证。
+
 > **For agentic
 workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans 在当前会话逐任务实施；若明确选择子代理方式，则使用 superpowers:subagent-driven-development。步骤使用复选框记录，完成需附实际验证证据。
 
-**Goal:** 用独立数据版本控制一次性完整初始化，同版本启动不触发同步，会话列表下拉只读 App 数据库。
+**Goal:** 用独立数据版本控制一次性完整初始化；同版本生命周期检查不重复升级，列表读取和下拉按当前镜像同步契约工作。
 
-**Architecture:** 在镜像数据库中保存升级状态，由唯一 WorkManager 任务协调镜像及派生索引。列表读取、生命周期检查和真实事件同步严格分开，复用现有镜像锁、dirty token、索引代次与附件解析能力。
+**Architecture:** 在镜像数据库中保存升级状态，由唯一 WorkManager 任务协调镜像及派生索引。区分列表同步、生命周期升级检查和真实事件同步，复用现有镜像锁、dirty token、索引代次与附件解析能力。
 
 **Tech
 Stack:** Kotlin、Room、Coroutines/Flow、WorkManager、Koin、Jetpack Compose、PowerShell、ADB；JDK/JVM 21。
@@ -16,15 +20,15 @@ Stack:** Kotlin、Room、Coroutines/Flow、WorkManager、Koin、Jetpack Compose�
 
 - 未记录数据版本为 `0`，本次目标版本为 `1`，独立于 App 版本和 Room schema version。
 - 全部必要阶段成功后才提交数据版本；关闭骚扰识别时合法跳过且记录原因。
-- 会话列表下拉在任何状态下只读 App 数据库，不触发同步。
-- 同版本冷启动和 Activity 恢复不主动调度同步；真实事件、旧合法恢复任务及明确修复不受此限制。
+- 会话列表下拉调用增量同步，结果通过现有订阅发布；原纯本地方案不再作为当前约束。
+- 同版本生命周期入口不安排升级；进入列表的首次订阅仍执行要求完整的同步，真实事件、合法恢复任务及明确修复继续保留。
 - 取消每日全量对账，取消历史唯一周期任务 `message-mirror-reconcile`。
 - 智能卡片仍按需解析，不增加持久化卡片缓存。
 - 不新增或运行单元测试，不新增测试依赖；使用编译、Lint、模拟器场景与只读数据库检查替代技能模板中的单元测试步骤。
 - 不清空用户数据，不卸载应用，不新增网络下载，不记录短信原文。
 - 所有源码、Git、构建和 ADB 操作在 Windows 项目 `D:\StudioProjects\PixelText` 运行。
 - 临时日志、脚本、截图、数据库副本放 `docs/.local/`，正式资料不得依赖这些文件。
-- 当前连接模拟器为 `emulator-5554`；安装前核对 applicationId 和现有安装，不默认模拟器内数据可以删除。
+- 原实施记录中的模拟器为 `emulator-5554`；安装前核对 applicationId 和现有安装，不默认模拟器内数据可以删除。
 - 不逐任务自动提交；交付前检查全部差异，提交动作按用户授权执行。
 
 ## 文件地图与依赖顺序
@@ -48,7 +52,7 @@ Stack:** Kotlin、Room、Coroutines/Flow、WorkManager、Koin、Jetpack Compose�
 | `data/repository/mms/MmsTextIndex.kt`                                     | 抽取可等待、分页的文本索引入口          |
 | `data/db/mirror/MirrorDao.kt`                                             | 初始化索引分页所需的本地查询            |
 | `PixelTextApp.kt`、镜像 Scheduler/Worker/Observer                         | 生命周期、历史工作与实时事件分流        |
-| `ConversationCacheRepository`、消息 Repository、列表 ViewModel/Screen     | 纯本地刷新与准确升级状态                |
+| `ConversationCacheRepository`、消息 Repository、列表 ViewModel/Screen     | 镜像同步刷新与独立升级状态                |
 | `data/repository/BackupRepositoryImpl.kt`、`HubResourceRepository.kt`     | 恢复和规则变化与升级阶段的协调          |
 | `di/AppModule.kt`                                                         | Koin 接线，避免 UI 实例化带出同步副作用 |
 
@@ -108,7 +112,7 @@ CREATE TABLE IF NOT EXISTS data_initialization (
 
 - [x] 提供仓库 `observe(): Flow<DataInitializationState>`、`read(): DataInitializationState`、`prepare(targetVersion: Int)`、`save(expectedEpoch: Long, state: DataInitializationState): Boolean`。DAO 条件更新必须包含 `epoch` 和 `targetVersion`；受影响行数为 0 表示输入已失效，不得继续提交。
 - [x] `prepare` 对已完成同版本只读；目标更高时初始化新阶段、递增 epoch；遇到更高已完成版本不降级、不清库。阶段切换重置阶段分页游标，保留旧 completedVersion。
-- [x] 注册 Room 4、Migration 和 Koin 仓库。通过 `./gradlew.bat :app:compileDebugKotlin` 生成 schema，核对 3→4 只有预期新增表。
+- [x] 当时注册 Room 4、Migration 和 Koin 仓库（当前已继续升至 v7）。通过 `./gradlew.bat :app:compileDebugKotlin` 生成 schema，核对 3→4 只有预期新增表。
 
 **检查点：** schema 无破坏性迁移；缺行、失败状态、阶段状态均不能映射为版本 1 已完成。
 
@@ -159,6 +163,7 @@ suspend fun indexInitializationBatch(
 // InitializationSpamScanner 新入口
 suspend fun scanBatch(
     afterLocalId: Long, upperLocalId: Long, limit: Int = 200,
+    classifier: MirrorSpamScanSession? = null,
 ): InitializationBatchResult
 ```
 
@@ -174,7 +179,7 @@ ORDER BY localId LIMIT :limit
 - [x] 读取需要附件的 MMS 前完成必要本地复制；仅执行本地复制，不调用 `MmsDownloadCoordinator` 开启下载。待下载 PDU 保留等待状态；现有永久损坏状态可产出不可用结果，瞬时读失败抛出供重试。不能将任意 `Throwable` 都视为永久损坏。
 - [x] 消息在处理中被删除则跳过；指纹改变则不写旧结果、不推进越过未处理消息，下一批重读。批返回后才持久保存 `afterLocalId`。
 - [x] 骚扰扫描沿用现有仅适用 SMS 的筛选、分类器及白名单，不清空人工规则、不重置白名单；查清人工结果存储位置，再使用既有自动结果写入接口。自动结果需要重算，不能用 identified IDs 排除旧自动结果。
-- [x] 骚扰识别关闭：协调器记录 `skipReason=disabled` 并跳过。开启时分类器分数小于 0 抛出明确错误，不增加成功计数。分类器在 `use` 范围内释放资源，每批检查取消。
+- [x] 骚扰识别关闭：协调器记录 `skipReason=spam_disabled` 并跳过。开启时分类器分数小于 0 抛出明确错误，不增加成功计数。当前协调器每个切片复用 `MirrorSpamScanSession`，在 finally 关闭；扫描器未传 session 时自行用 `use` 管理，每批检查取消。
 - [x] 验证码阶段直接等待 `VerificationCodeRepository.rebuildAll()`，不使用 Scheduler 的入队完成作为阶段完成。保留 activeGeneration 原子激活和异常清理。
 - [x] 编译并核对无新增卡片持久化逻辑、无短信明文日志。
 
@@ -210,7 +215,7 @@ SPAM         -> 有限批分类/明确禁用跳过     -> VERIFICATION
 VERIFICATION -> 等待 rebuildAll 成功        -> COMPLETE + completedVersion=target
 ```
 
-- [x] Worker 捕获 CancellationException 后重新抛出；SecurityException 映射 WAITING_PERMISSION；暂时数据库/I/O 错误记录 FAILED 并退避；不支持的高版本不自动重试。时间片未完成返回 More，保留检查点，由 WorkManager 重试续跑，不递归无限调用。
+- [x] Worker 捕获 CancellationException 后重新抛出；SecurityException 映射 WAITING_PERMISSION；暂时数据库/I/O 错误记录 FAILED 并退避；不支持的高版本不自动重试。时间片未完成返回 More 并保留检查点；预算让出或阶段/游标推进时，使用 APPEND_OR_REPLACE 追加接续任务并返回 success；无推进才 retry 退避，不递归无限调用。
 - [x] 升级切片在 Guard 的稳定输入区执行；备份恢复和规则替换持有同一输入变更锁。统一锁顺序为 Guard → 镜像锁或索引内部锁，禁止反向获取。
 - [x] 输入变更只使“尚未完成的升级阶段证据”失效：递增 epoch 并清除受影响阶段检查点，保留 completedVersion。完整已完成同版本不因普通规则更新重启全量升级。
 - [x] 备份恢复开始即持久标记升级输入失效，之后才恢复数据。进程中断后依据既有恢复保护状态阻止升级误提交；用户完成/确认恢复后再续跑。规则替换同样先失效后写文件，确保进程死亡不会复用旧证据。
@@ -230,36 +235,25 @@ VERIFICATION -> 等待 rebuildAll 成功        -> COMPLETE + completedVersion=t
 - [x] 给新镜像任务增加明确的调度原因，例 `provider_event`、`local_write`、`manual_repair`、`restore`；更新所有调用者。Worker 不再把“被唤醒”本身解释为强制全量。
 - [x] 旧任务没有原因时不能可靠区分历史生命周期与真实事件；采取保守兼容：只取消明确的旧周期工作，旧一次性任务有持久 dirty 或恢复证据时允许收尾，无证据时直接结束。禁止清空混合来源的 dirty。日志标记 `legacy_pending`，与新启动触发区分。
 - [x] 本地发送/接收、已读、删除和附件更新继续保留调度；事件期间发现需要初始化时交由升级协调器，不让多个独立全量流程争抢初始化所有权。
-- [x] 搜索全部 `forceReconcile`、`scheduleReconcile`、`markWake`、`ensurePeriodic` 调用，逐项标注触发源；同版本普通启动不能到达系统扫描。
+- [x] 搜索全部 `forceReconcile`、`scheduleReconcile`、`markWake`、`ensurePeriodic` 调用，逐项标注触发源；生命周期版本检查不直接扫描；当前列表订阅仍可进入同步器，须单独追踪该路径。
 - [x] 编译并记录静态检查结果。
 
-**检查点：** 普通启动没有隐式同步；移除周期任务不删除真实事件；明确修复仍有效。
+**检查点：** 生命周期不强制全量；列表同步与升级职责区分；移除周期任务不删除真实事件，明确修复仍有效。
 
-## 任务 6：纯本地列表读取与升级 UI
+## 任务 6：列表同步与独立升级 UI（原纯本地方案已被替代）
 
-**文件：** `domain/repository/MessageRepository.kt`、`MessageRepositoryImpl.kt`、`ConversationCacheRepository.kt`、`ConversationListViewModel.kt`、`ConversationListScreen.kt`、`di/AppModule.kt`。
+**文件：** `domain/repository/MessageRepository.kt`、`MessageRepositoryImpl.kt`、`ConversationCacheRepository.kt`、`ConversationListViewModel.kt`、`ConversationListScreen.kt`。
 
-- [x] 删除 `getAllConversations()` 内缓存不就绪时的 startObserving 副作用；将 MMS indexer 启动从消息仓库构造函数移到明确后台/升级入口，避免创建列表仓库启动解析写库。
-- [x] 删除仅由会话列表调用的同步式 `MessageRepository.refreshConversations()` 接口及实现；保留独立 `forceSyncConversations()` 修复入口，不将其替代到下拉路径。
-- [x] ViewModel 的下拉代码简化为本地获取，不再保留具有同步含义的 forceSync 参数：
+原实施清单中“删除 refreshConversations、下拉只调用 first()、任何状态均不触发同步”的完成标记已不适用于当前实现，故以当前代码事实替换，不将这些旧完成项作为当前验收证据：
 
-```kotlin
-_isRefreshing.value = true
-try {
-    val conversations = repository.getAllConversations().first()
-    replaceConversations(conversations)
-} finally {
-    _isRefreshing.value = false
-}
-```
+- `MessageRepository.refreshConversations()` 现已存在，实现调用 `ConversationCacheRepository.refreshIncremental()`；`forceSyncConversations()` 仍为显式修复入口。
+- `getAllConversations()` 的 Flow 开始先调用 `refreshIncremental(requireComplete = true)`，之后观察镜像、设置与联系人变化并从 SQL 查询会话。
+- `ConversationListViewModel.refreshLoaded()` 同时服务下拉和静默刷新，调用 `refreshConversations()`；现有订阅发布结果，不重新 `first()` 建立全量查询。指示器等待同步调用结束，并保留取消传播和错误日志。
+- 未就绪镜像可能先对账；空库和失败状态不能描述为纯本地回退。同步可能竞争镜像锁，也可能调度后续镜像任务。
+- 升级状态及进度独立观察；权限不足、失败重试和高版本提示仍由初始化状态控制，列表发射不代表升级结束。
+- MMS indexer 由明确后台/升级入口启动；数据版本完成后 Worker 启动 indexer 并调度 `initialization_complete` 收尾工作，不以入队作为阶段完成证据。
 
-- [x] 保留现有取消传播和错误展示；空列表、未初始化、初始化失败一律只读，不递归触发 load→sync。
-- [x] 升级状态由独立仓库 Flow 暴露；去掉基于 isCacheReady 的弹窗开关及“列表发射就关闭弹窗”的逻辑。
-- [x] 沿用 Material 3 对话框显示阶段中文文案；WAITING_PERMISSION 显示授权提示，FAILED 显示原因类别及“重试”，高版本显示兼容性提示。重试按钮显式调用升级 Scheduler，不复用下拉。
-- [x] 已完成版本不因真实后台同步再次显示首次升级弹窗。纯读取页面不会触发 Worker 或文本解析任务；已存在的后台任务独立继续不属于下拉触发。
-- [x] 编译，检查下拉回调到数据源的完整调用链。
-
-**检查点：** 四种数据状态下下拉没有系统查询、同步入队或解析启动副作用。
+**当前检查点：** 对首次读取、下拉和静默刷新分别核对同步调用、错误与 UI 状态；本次仅静态核查，未重新执行设备回归。
 
 ## 任务 7：模拟器验证、回归与交付（部分场景完成）
 
@@ -291,9 +285,9 @@ adb -s emulator-5554 shell am start -W -n vip.mystery0.pixel.text/.MainActivity
 adb -s emulator-5554 logcat -d -v time -s DataInitialization MessageMirrorSync MessageMirrorFastSync VerificationCodeIndexWorker
 ```
 
-若 Debug applicationId 不同，用上一步确认值替换。预期没有新升级阶段、scan batch、启动验证码对账及首次同步弹窗。过滤历史日志时按每次启动时间截取，不清空设备全部日志作为必要步骤。
+若 Debug applicationId 不同，用上一步确认值替换。当前预期没有重复升级阶段、启动验证码全量重建及首次升级弹窗；列表同步产生的 Provider 查询或 scan batch 须记录来源，不再要求启动零扫描。过滤历史日志时按每次启动时间截取，不清空设备全部日志作为必要步骤。
 
-- [ ] 获取屏幕尺寸和 UI 层级，定位会话列表后执行下拉；不要硬编码未经检查的坐标。记录转圈结束时间和任务日志，确认刷新不等待镜像锁。初始化中和失败状态也验证相同纯读取路径。
+- [ ] 获取屏幕尺寸和 UI 层级，定位会话列表后执行下拉；不要硬编码未经检查的坐标。记录转圈结束时间、镜像锁等待和任务日志。初始化中和失败状态也验证增量同步/必要对账路径，不能继续按纯读取验收。
 - [ ] 用一条合成 SMS 验证真实事件：
 
 ```powershell
@@ -317,7 +311,7 @@ adb -s emulator-5554 emu sms send 15555215554 "synthetic initialization event 00
 | MMS 索引、骚扰重建、验证码代次     | 3、4 |
 | 失败、权限、唯一任务、取消传播     | 4、7 |
 | 取消启动/周期同步、真实事件继续    | 5、7 |
-| 下拉只读、UI 不混淆扫描状态        | 6、7 |
+| 下拉同步、UI 不混淆扫描与升级状态  | 6、7 |
 | 备份恢复、规则更新输入失效         | 4、7 |
 | 性能证据、隐私及设备限制           | 7    |
 

@@ -14,7 +14,7 @@
 - 使用 `MaterialTheme.colorScheme.surfaceContainerLow`，保留 Dynamic Color 行为。
 - 不新增或运行单元测试。
 - 避免无关格式化和重构。
-- 保留 `ConversationListScreen.kt` 中已有的未提交修改。
+- 维护时保留工作区现有修改；原实施时的临时未提交状态不作为当前要求。
 
 ---
 

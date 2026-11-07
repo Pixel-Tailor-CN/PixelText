@@ -1,6 +1,6 @@
 # 应用数据备份与恢复
 
-实现入口：设置 → 高级功能 → 备份与恢复。首版仅支持 SMS，不包含 MMS/附件、RCS、第三方备份格式、定时备份或应用主动上传。
+实现入口：设置 → 高级功能 → 备份与恢复。当前仅支持 SMS，不包含 MMS/附件、RCS、第三方备份格式、定时备份或应用主动上传。
 
 ## 数据流与恢复语义
 
@@ -25,6 +25,8 @@ theme/<assetId>.webp
 
 未选类别不包含对应数据。`spam.db` 既可承载规则，也可承载 SMS 放行状态；不能因文件存在就恢复整库。选中 SMS 时生成三个快照库（即使为空），仅规则时只有 spam.db，仅设置时没有数据库。
 
+这些文件是固定的备份传输格式。运行时的骚扰规则、验证码和归档状态已合入 `message_mirror.db` v7；导出仍生成上述文件，不会在应用数据目录重新创建三个旧业务库。验证码索引不导出，恢复后重新识别。
+
 `manifest.json`：
 
 | 字段 | 说明 |
@@ -43,15 +45,17 @@ theme/<assetId>.webp
 
 | 文件 | 允许业务表 | 输出数据 |
 | --- | --- | --- |
-| message_mirror.db | mirror_message、mirror_sms | 仅 transport=SMS 的完整父子行 |
+| message_mirror.db | mirror_message、mirror_sms | 仅 transport=SMS 的协议父子字段，不含运行时分类字段 |
 | spam.db | blocked_keyword、sender_whitelist_rule、spam_allowed_message | 所选规则，以及选中 SMS 对应的单条放行 |
 | conversation_archive.db | archived_conversation | 能关联到快照 SMS 的归档标记 |
 
-保留表结构、源 user_version 和必要的 SQLite 自动索引/序列；Android 的标准 `android_metadata(locale TEXT)` 可以存在。允许两个确定结构的可选索引 `backup_sms_source`（sourceId 唯一索引）、`backup_sms_thread`（threadId 索引），用于避免状态关联扫描退化。无索引的同版本快照仍可读取，但 sourceId 不允许重复。
+保留协议规定的表结构、user_version 和必要的 SQLite 自动索引/序列；Android 的标准 `android_metadata(locale TEXT)` 可以存在。允许两个确定结构的可选索引 `backup_sms_source`（sourceId 唯一索引）、`backup_sms_thread`（threadId 索引），用于避免状态关联扫描退化。无索引的同版本快照仍可读取，但 sourceId 不允许重复。
 
-不包含 MMS 数据、附件、同步进度、脏记录、下载/清理队列、分类分数或镜像派生缓存。恢复即时重建关键词和验证码索引；模型历史分数不迁移，全量模型识别仍沿用设置页的既有入口。归档快照的 snippet、display_name、计数和 MMS 标记清空，防止混合会话彩信摘要被夹带；恢复时按目标会话重算。快照从新库生成，不能在整库副本上仅 DELETE 后打包。暂存库采用 DELETE journal 模式，关闭后只打包主文件，不包含 journal/WAL/SHM。
+不包含 MMS 数据、附件、个人学习数据/模型/设置、云端发件方资源包、彩信发送草稿及请求、同步进度、脏记录、下载/清理队列、分类分数或镜像派生缓存。恢复即时重建关键词和验证码索引；模型历史分数不迁移，全量模型识别仍沿用设置页的既有入口。归档快照的 snippet、display_name、计数和 MMS 标记清空，防止混合会话彩信摘要被夹带；恢复时按目标会话重算。快照从新库生成，不能在整库副本上仅 DELETE 后打包。暂存库采用 DELETE journal 模式，关闭后只打包主文件，不包含 journal/WAL/SHM。
 
-原 `localId` 是包内 backupId；sourceId/threadId 用于本包关联，不直接写入目标。单条放行必须核对原消息指纹，再读取目标身份重算指纹，不能直接迁移原指纹。跨应用库不保证全局事务快照，无法可靠关联时计入跳过数量。
+归档运行表仅存 `thread_id`、`archived_at`。导出补齐旧协议的展示字段为空值或零，恢复只读取归档关系和归档时间，页面摘要关联当前短信生成。
+
+原 `localId` 是包内 backupId；sourceId/threadId 用于本包关联，不直接写入目标。单条放行先核对源消息指纹，再刷新并取得目标镜像身份，按目标 localId/revision 条件写入 RELEASED 放行；不在运行库重建旧 `spam_allowed_message` 指纹表。导出从同一运行库为三个输出文件分别建立读事务，不承诺跨输出文件的全局快照。SMS 及其放行来源在同一读事务内捕获；旧协议 `allowed_at` 使用导出时间，运行消息行没有原始放行操作时间。无法可靠关联时计入跳过数量。
 
 ### SMS 写回
 
@@ -81,19 +85,23 @@ theme/<assetId>.webp
 
 ## 加密、验证与限额
 
-使用 `net.lingala.zip4j:zip4j:2.11.5`，全部有效载荷连同 manifest 采用 ZIP AES-256 认证加密；不使用 ZipCrypto，不自行设计密码学协议。未加密包结构相同。ZIP 条目名称和大小等元信息可能可见；未加密包的 SHA-256 只检测损坏，不认证来源。
+当前版本目录使用 `net.lingala.zip4j:zip4j:2.11.6`，全部有效载荷连同 manifest 采用 ZIP AES-256 认证加密；不使用 ZipCrypto，不自行设计密码学协议。未加密包结构相同。ZIP 条目名称和大小等元信息可能可见；未加密包的 SHA-256 只检测损坏，不认证来源。
 
 密码仅保存在当前操作内存，不写 SharedPreferences、日志、WorkManager Data 或 SavedStateHandle，完成后清理可变字符数组；密码输入不使用 rememberSaveable。密码丢失不可找回。
 
 解密必须完整读取条目并验证认证码、哈希、长度、清单与实际文件集合，再以只读方式检查数据库版本/结构/完整性/外键及全部记录语义；拒绝意外表、视图、触发器、虚拟表、路径穿越、重复条目及运行态数据。不执行备份内提供的任意 SQL。所有验证通过后才展示可恢复预览，使用 token 引用私有快照，不重新读取可能已被替换的外部 URI。
 
-限额：最多 32 条目；解压总量 4 GiB；manifest/设置各 4 MiB；SMS 最多 100 万条，单条文本及 rawSnapshot 负载最多 1 MiB；关键词最多 10 万条且原词/归一化词负载预算 4 MiB；白名单合并后最多 500 条；背景单张最多 32 MiB、解码尺寸不超过 8192×8192。超限拒绝，不截断后报告成功。
+限额：最多 32 条目；输入/输出归档文件及解压总量分别不超过 4 GiB；manifest/设置各 4 MiB；SMS 最多 100 万条，单条文本及 rawSnapshot 负载最多 1 MiB；关键词最多 10 万条且原词/归一化词负载预算 4 MiB；白名单合并后最多 500 条；背景单张最多 32 MiB、解码尺寸不超过 8192×8192。超限拒绝，不截断后报告成功。
 
 临时文件放 `noBackupFilesDir/backup-staging`，完成/取消删除，应用导航初始化备份仓库时异步清理上次遗留数据。不会进入 Android 自动备份；不承诺闪存安全擦除。SAF 输出失败尽力删除新建文件，用户仍应检查不完整目标文件。
 
+## Android 系统备份边界
+
+手动 `.ptbackup` 与 Android 系统备份是独立通道。`app/src/main/res/xml/data_extraction_rules.xml` 的云备份与设备迁移均显式排除 `message_mirror.db` 及 WAL/SHM、`outgoing_mms.db` 及 WAL/SHM、`mms-send-pdu/`、`mms-download/` 和 `mms_download_requests.xml`；个人学习数据库及 journal/WAL/SHM、`personal_learning_settings.xml`、`personal-learning/` 也被排除。兼容配置 `backup_rules.xml` 保留同类排除；两者还有 root 域排除，不能据此把其他独立域的所有文件都宣称为已排除。备份暂存和保护库位于 `noBackupFilesDir`，不进入系统自动备份。
+
 ## 恢复保护与错误
 
-`RestoreSafetyCoordinator` 持久化恢复状态、计数和已完成类别；恢复启动与验证码清理的每个删除批次共用删除锁。历史消息写入前先在 `noBackupFilesDir/backup-protected.db` 持久化内容身份摘要，再调用 Provider，覆盖插入后记账前进程死亡的窗口。
+`RestoreSafetyCoordinator` 在 `backup_operation` 偏好中持久化保护 active 标记、计数摘要和已完成类别（不保存可逐阶段断点续传的执行位置）；恢复启动与验证码清理的每个删除批次共用删除锁。历史消息写入前先在 `noBackupFilesDir/backup-protected.db` 持久化内容身份摘要，再调用 Provider，覆盖插入后记账前进程死亡的窗口。
 
 收信 worker 在保护锁内判断当前消息是否为本次恢复的历史身份；历史消息不重放通知或自动操作。保护期间真实新收信仍可分类和通知，仅暂停其自动垃圾短信操作。锁顺序为恢复保护锁 → 白名单决策锁，保存分类结果时不得在已持有的白名单锁内再次调用会获取该锁的仓库。
 
@@ -109,4 +117,4 @@ theme/<assetId>.webp
 
 ## 依赖许可
 
-Zip4j 2.11.5 的 Maven POM 声明 Apache License 2.0，已核对实际解析 JAR/POM；JAR 不包含额外 LICENSE/NOTICE 条目。许可正文见 [Apache-2.0](../licenses/zip4j-Apache-2.0.txt)，来源为 Apache 官方许可文本；版本来源：[Maven POM](https://repo.maven.apache.org/maven2/net/lingala/zip4j/zip4j/2.11.5/zip4j-2.11.5.pom)。未拷贝上游实现源码。
+以下是 2.11.5 的历史核验记录，不能作为当前 2.11.6 制品已重新核验的证据；本次文档审计未改动许可正文。Zip4j 2.11.5 的 Maven POM 声明 Apache License 2.0，已核对实际解析 JAR/POM；JAR 不包含额外 LICENSE/NOTICE 条目。许可正文见 [Apache-2.0](../licenses/zip4j-Apache-2.0.txt)，来源为 Apache 官方许可文本；版本来源：[Maven POM](https://repo.maven.apache.org/maven2/net/lingala/zip4j/zip4j/2.11.5/zip4j-2.11.5.pom)。未拷贝上游实现源码。

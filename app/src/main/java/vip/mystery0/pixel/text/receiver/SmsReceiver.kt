@@ -96,7 +96,11 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
                         if (threadId > 0) {
                             launch {
                                 try {
-                                    conversationCacheRepository.syncThreads(listOf(threadId))
+                                    if (messageId != null) {
+                                        conversationCacheRepository.syncIncomingSms(messageId)
+                                    } else {
+                                        conversationCacheRepository.syncThreads(listOf(threadId))
+                                    }
                                 } catch (error: CancellationException) {
                                     throw error
                                 } catch (error: Exception) {

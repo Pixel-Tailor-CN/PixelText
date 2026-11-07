@@ -39,6 +39,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     // 密码禁止使用 rememberSaveable，配置变化时由用户重新输入。
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
+    var restorePassword by remember { mutableStateOf("") }
     var warning by remember { mutableStateOf(false) }
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
@@ -51,8 +52,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         password = ""; confirmation = ""
     }
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) viewModel.inspect(uri.toString(), password.takeIf { it.isNotEmpty() }?.toCharArray())
-        password = ""; confirmation = ""
+        if (uri != null) viewModel.inspect(uri.toString(), restorePassword.takeIf { it.isNotEmpty() }?.toCharArray())
+        restorePassword = ""
     }
     LaunchedEffect(state.errorMessage, scrollState) {
         // 错误反馈位于页首，失败后无需用户在长表单或恢复结果中查找。
@@ -79,11 +80,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 .verticalScroll(scrollState).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                "备份应用的设置、规则和短信镜像。不包含彩信、附件及应用名称与图标选择，请在操作期间保持应用前台。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             state.errorMessage?.let {
                 BackupFeedbackCard(title = "操作失败", description = it, isError = true)
             }
@@ -104,6 +100,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
                     BackupTaskCard(title = "备份内容") {
+                        Text("不含彩信、附件及应用名称与图标。", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                         BackupSectionSelection(
                             sections = BackupSection.entries,
                             selection = selection,
@@ -118,22 +116,17 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         ) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("加密导出", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "使用密码保护短信和设置内容",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                             Switch(checked = encrypt, onCheckedChange = { encrypt = it })
                         }
-                        BackupPasswordField(password = password, onPasswordChange = { password = it })
                         if (encrypt) {
+                            BackupPasswordField(password = password, onPasswordChange = { password = it })
                             val mismatch = confirmation.isNotEmpty() && password != confirmation
                             OutlinedTextField(
                                 value = confirmation,
                                 onValueChange = { confirmation = it },
                                 label = { Text("确认密码") },
-                                supportingText = { Text(if (mismatch) "两次输入的密码不一致" else "再次输入导出密码") },
+                                supportingText = if (mismatch) ({ Text("两次输入的密码不一致") }) else null,
                                 isError = mismatch,
                                 visualTransformation = PasswordVisualTransformation(),
                                 singleLine = true,
@@ -154,13 +147,13 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         ) { Text("创建备份") }
                     }
                     BackupTaskCard(title = "从文件恢复") {
-                        Text(
-                            "恢复加密文件前，请在上方“密码”输入框填写文件密码，再选择文件。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        BackupPasswordField(
+                            password = restorePassword,
+                            onPasswordChange = { restorePassword = it },
+                            label = "文件密码（未加密可留空）",
                         )
                         OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                            Text("选择文件并预览恢复")
+                            Text("选择备份文件")
                         }
                     }
                 } else {
@@ -190,6 +183,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 }
             }
             if (state.busy) {
+                Text("请保持应用在前台", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 BackupTaskCard(title = "操作进度") {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     Text(when (state.phase) {
@@ -214,7 +209,11 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             Text("确认结果并结束恢复保护")
                         }
                         if (preview == null) {
-                            BackupPasswordField(password = password, onPasswordChange = { password = it })
+                            BackupPasswordField(
+                                password = restorePassword,
+                                onPasswordChange = { restorePassword = it },
+                                label = "文件密码（未加密可留空）",
+                            )
                             OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
                                 Text("重新选择文件并预览恢复")
                             }

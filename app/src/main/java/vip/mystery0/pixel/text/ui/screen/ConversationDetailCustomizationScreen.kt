@@ -360,14 +360,14 @@ fun ConversationDetailCustomizationScreen(
                         supportingContent = {
                             Text(
                                 if (module.useSameBackgroundImage) {
-                                    "当前统一使用${sourceModeLabel}主题的背景图片"
+                                    "使用${sourceModeLabel}背景"
                                 } else {
-                                    "开启时以当前选中的主题背景为准"
+                                    "使用当前主题的背景"
                                 },
                             )
                         },
                         colors = listItemColors(enabled = backgroundCustomizationEnabled),
-                        content = { Text("不同主题使用相同背景图片") },
+                        content = { Text("日间与暗黑共用背景") },
                     )
                     HorizontalDivider()
                     ListItem(
@@ -383,20 +383,20 @@ fun ConversationDetailCustomizationScreen(
                             Text(
                                 when {
                                     !module.generateColorsFromBackgroundImage ->
-                                        "开启后根据当前生效背景生成本页面的 Material 颜色"
+                                        "跟随系统配色"
                                     backgroundMissing ->
                                         "背景文件缺失，暂时使用系统颜色"
                                     !hasBackground ->
                                         "未设置有效背景，暂时使用系统颜色"
-                                    backgroundColorsLoading -> "正在从背景图片生成主体颜色"
+                                    backgroundColorsLoading -> "正在提取配色"
                                     backgroundColorsApplied ->
-                                        "已根据当前生效背景生成本页面的 Material 颜色"
+                                        "已应用背景配色"
                                     else -> "图片取色失败，暂时使用系统颜色"
                                 },
                             )
                         },
                         colors = listItemColors(enabled = backgroundCustomizationEnabled),
-                        content = { Text("从背景图片生成主体颜色") },
+                        content = { Text("背景取色") },
                     )
                     HorizontalDivider()
                     ListItem(
@@ -513,7 +513,6 @@ fun ConversationDetailCustomizationScreen(
                                 enabled = !state.isSaving,
                             )
                         },
-                        supportingContent = { Text("在消息时间旁显示 SIM 标签") },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         content = { Text("显示 SIM 信息") },
                     )
@@ -526,11 +525,6 @@ fun ConversationDetailCustomizationScreen(
                         Text(
                             text = "文字缩放 ${"%.2f".format(Locale.US, scale)}x",
                             style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = "范围 $MIN_CONVERSATION_DETAIL_TEXT_SCALE – $MAX_CONVERSATION_DETAIL_TEXT_SCALE",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Slider(
                             value = scale,
@@ -583,7 +577,7 @@ fun ConversationDetailCustomizationScreen(
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
             title = { Text("有未保存的修改") },
-            text = { Text("保存后会应用到会话详情页。是否保存本次修改？") },
+            text = { Text("离开后将丢失未保存的修改。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -748,7 +742,7 @@ private fun ColorSettingRow(
                     .background(resolved)
                     .border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         shape = CircleShape,
                     ),
             )

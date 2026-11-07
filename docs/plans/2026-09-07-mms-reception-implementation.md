@@ -1,5 +1,17 @@
 # MMS 完整接收执行文档
 
+## 当前实现核对（2026-11-07）
+
+接收、内容展示与附件操作已接入；本文的模拟器环境是 2026-09-07 历史记录，不代表当前仍在线，也不据此补写未实测的接收矩阵。
+
+- `MmsReceiver` 将 WAP Push 交给 `MmsIncomingPduHandler.enqueue()`；通知与报告分流，下载由 `MmsDownloadCoordinator`、`RetrieveConfParser`、`MmsProviderWriter` 完成，接收确认由 `MmsReceptionResponseSender` 持久化调度。`autoDownloadMms=false` 为默认值。
+- 当前已有 Coil/GIF、Media3、jsoup、ez-vcard 依赖（版本见 `gradle/libs.versions.toml`）；内容入口是 `MmsContentRepositoryImpl`、`MmsContent`、`MmsPartScreen`，不是早期只有 imageUris 的适配器。
+- HTML 使用 `MmsHtmlParser` 清洗及 `MmsHtmlResourceHandler` 自定义拦截供给本地资源，`MmsHtmlViewer` 禁用网络/JS/任意 file/content 访问；未直接采用 WebViewAssetLoader 类。搜索仅使用独立 searchBody（纯文本、HTML 可读文字和主题），不会把名片、日历或 SMIL 全文混入搜索。
+- 用户主动单人 MMS 编辑发送已经由后续 `MmsComposerViewModel`、`OutgoingMmsRepository` 和 `mms/outgoing/` 实现；“不实现发送”仅限定本接收方案的原始范围，不代表当前产品缺少发送能力。
+- `.github/runtime` 当前仅保留 Release 混淆后 vCard 与 ARM64 TensorFlow Lite 初始化检查，不能当作完整 MMS 接收/播放/协议确认回归证据。
+
+源码路径相对 `app/src/main/java/vip/mystery0/pixel/text/`，真机及运营商未验项仍以验收记录为准。
+
 ## 目标与约束
 
 落实[接收设计](2026-09-07-mms-reception-design.md)：实现通知接收、下载恢复、完整内容保存、分类展示、播放与附件导出。保留 Telephony 权威数据源及现有本地镜像架构；本阶段不实现用户主动 MMS 编辑与发送。
@@ -40,7 +52,7 @@
 
 ### 8. 统一展示与索引
 
-会话和独立详情共用 `MmsContent`。仅有附件时不显示“不支持的消息”；SMIL 与容器不混入正文。可读摘要服务于会话、通知和搜索；通过 revision 与索引版本失效派生缓存，数据库新增字段采用显式迁移。
+会话和独立详情共用 `MmsContent`。仅有附件时不显示“不支持的消息”；SMIL 与容器不混入正文。可读摘要服务于会话和通知；搜索另用只含纯文本/HTML 可读文字的 searchBody 及主题；通过 revision 与索引版本失效派生缓存，数据库新增字段采用显式迁移。
 
 ### 9. 接收状态机与协议响应
 

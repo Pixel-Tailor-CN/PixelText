@@ -5,7 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,37 +119,21 @@ private fun UnreadSmsComplicationConfigScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.size(0.dp))
-            Card {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "控制 Smartspacer 未读数量统计哪些短信列表。",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "同一条短信即使同时命中骚扰和归档，也只会累计 1 次。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
             UnreadSmsComplicationSwitchRow(
                 title = "正常短信",
-                summary = "统计未归档且未标记为骚扰的未读短信",
+                summary = "",
                 checked = includeNormalMessages,
                 onCheckedChange = { includeNormalMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
                 title = "骚扰短信",
-                summary = "统计命中骚扰识别的未读短信",
+                summary = "",
                 checked = includeSpamMessages,
                 onCheckedChange = { includeSpamMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
                 title = "归档短信",
-                summary = "统计位于归档会话中的未读短信",
+                summary = "",
                 checked = includeArchivedMessages,
                 onCheckedChange = { includeArchivedMessages = it }
             )
@@ -166,8 +152,8 @@ private fun UnreadSmsComplicationConfigScreen(
             ) {
                 Text("保存")
             }
-            Text(
-                text = "全部关闭后，Smartspacer 将不显示未读数量。",
+            if (!includeNormalMessages && !includeSpamMessages && !includeArchivedMessages) Text(
+                text = "未读数量已隐藏",
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -188,7 +174,7 @@ private fun UnreadSmsComplicationSwitchRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
     ) {
         Box(
             modifier = Modifier
@@ -205,7 +191,7 @@ private fun UnreadSmsComplicationSwitchRow(
                     text = title,
                     style = MaterialTheme.typography.titleMedium
                 )
-                Text(
+                if (summary.isNotBlank()) Text(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -217,7 +203,8 @@ private fun UnreadSmsComplicationSwitchRow(
             ) {
                 Switch(
                     checked = checked,
-                    onCheckedChange = onCheckedChange
+                    onCheckedChange = null,
+                    modifier = Modifier.clearAndSetSemantics {},
                 )
             }
         }
