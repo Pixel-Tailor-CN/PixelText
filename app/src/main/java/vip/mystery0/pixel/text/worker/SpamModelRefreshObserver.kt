@@ -18,6 +18,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 @OptIn(FlowPreview::class)
 class SpamModelRefreshObserver(context: Context, settings: AppSettingsRepository, database: MessageMirrorDatabase) {
     init {
+        SpamDecisionPreparationWorker.schedule(context.applicationContext)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             settings.settings.map { it.spamDetectionEnabled }.distinctUntilChanged().collect { enabled ->
                 if (enabled) HistoricalSpamScanWorker.schedule(context.applicationContext, replace = false, silent = true)

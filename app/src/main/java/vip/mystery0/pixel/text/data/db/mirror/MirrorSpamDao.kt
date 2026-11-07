@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.data.db.mirror
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -65,6 +66,22 @@ private const val SPAM_COLUMNS = "localId, CASE WHEN transport='MMS' THEN -sourc
     "revision AS messageRevision, threadId, isSpam, spamSource, spamScore, spamModelIdentity, spamModelRevision, " +
     "spamModelGeneration, spamModelManual, spamKeywordId, spamAllowedSource, spamCorrection"
 
+/** 扫描只读取镜像正文和分类字段，不加载 MMS 子结构及原始 Provider 快照。 */
+data class MirrorSpamScanRow(
+    @Embedded val state: MirrorSpamStateRow,
+    val body: String?,
+    val address: String?,
+)
+
+private const val SCAN_COLUMNS = "m.localId, m.sourceId AS messageId, m.revision AS messageRevision, " +
+    "m.threadId, m.isSpam, m.spamSource, m.spamScore, m.spamModelIdentity, m.spamModelRevision, " +
+    "m.spamModelGeneration, m.spamModelManual, m.spamKeywordId, m.spamAllowedSource, m.spamCorrection, s.body, s.address"
+private const val SCAN_TABLES = " FROM mirror_message m JOIN mirror_sms s ON s.localId=m.localId WHERE m.transport='SMS'"
+private const val SCAN_PENDING = " AND m.localId <= :upperLocalId AND m.spamAllowedSource IS NULL AND " +
+    "((:modelEnabled=0 AND m.isSpam IS NULL) OR (:modelEnabled=1 AND NOT " +
+    "(m.spamScore IS NOT NULL AND m.spamModelIdentity IS :identity AND m.spamModelRevision IS :revision " +
+    "AND m.spamModelGeneration IS :generation)))"
+
 /** 关键词重算只读取正文、版本与放行字段，由主库一次联表取得。 */
 data class KeywordDecisionCandidate(
     val localId: Long,
@@ -76,6 +93,25 @@ data class KeywordDecisionCandidate(
 
 @Dao
 abstract class MirrorSpamDao {
+    @Query("SELECT COUNT(*)" + SCAN_TABLES + " AND m.localId <= :upperLocalId")
+    abstract suspend fun scanTotal(upperLocalId: Long): Int
+
+    @Query("SELECT COUNT(*)" + SCAN_TABLES + SCAN_PENDING)
+    abstract suspend fun scanCount(upperLocalId: Long, modelEnabled: Boolean, identity: String?,
+        revision: Long?, generation: Long?): Int
+
+    @Query("SELECT " + SCAN_COLUMNS + SCAN_TABLES + SCAN_PENDING +
+        " AND m.localId > :afterLocalId ORDER BY m.localId LIMIT :limit")
+    abstract suspend fun scanBatch(afterLocalId: Long, upperLocalId: Long, limit: Int,
+        modelEnabled: Boolean, identity: String?, revision: Long?, generation: Long?): List<MirrorSpamScanRow>
+
+    @Query("SELECT " + SCAN_COLUMNS + SCAN_TABLES + " AND m.localId IN (:localIds)")
+    abstract suspend fun scanRows(localIds: List<Long>): List<MirrorSpamScanRow>
+
+    /** 调用方在事务中复核消息版本，只批量更新分类列，不覆盖已读和同步字段。 */
+    @Update(entity = MirrorMessageEntity::class)
+    abstract suspend fun updateScanStates(updates: List<MirrorSpamUpdate>)
+
     @Query("""
         SELECT m.localId, m.sourceId, m.revision, s.body, m.spamAllowedSource
         FROM mirror_message m JOIN mirror_sms s ON s.localId=m.localId

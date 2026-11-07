@@ -180,9 +180,6 @@ val appModule = module {
     single { vip.mystery0.pixel.text.worker.DataInitializationScheduler(androidContext(), get()) }
     single {
         vip.mystery0.pixel.text.data.repository.initialization.InitializationSpamScanner(
-            get(),
-            get(),
-            get(),
             get()
         )
     }
@@ -278,6 +275,7 @@ val appModule = module {
         get<vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl>()
     }
     single<SpamRepository> { SpamRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { vip.mystery0.pixel.text.data.repository.MirrorSpamScanner(get(), get(), get(), get(), get()) }
     single { KeywordSpamRepositoryImpl(get(), get(), get(), get(), get()) }
     single<KeywordSpamRepository> { get<KeywordSpamRepositoryImpl>() }
     single(createdAtStart = true) { vip.mystery0.pixel.text.worker.SpamModelRefreshObserver(androidContext(), get(), get()) }
@@ -314,7 +312,7 @@ val appModule = module {
     viewModel { vip.mystery0.pixel.text.viewmodel.SenderWhitelistViewModel(get(), androidApplication()) }
     viewModel { ConversationListViewModel(get(), get(), get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
-    viewModel { SpamConversationListViewModel(get(), get(), get(), get(), androidContext()) }
+    viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
     viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())

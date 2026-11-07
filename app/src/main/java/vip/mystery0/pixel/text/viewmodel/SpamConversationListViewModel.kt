@@ -16,19 +16,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.repository.MirrorSpamScanner
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
-import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.worker.HistoricalSpamScanWorker
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
 class SpamConversationListViewModel(
     private val repository: MessageRepository,
-    private val telephonyDataSource: TelephonyDataSource,
-    private val spamRepository: SpamRepository,
+    private val scanner: MirrorSpamScanner,
     private val mirror: MessageMirrorRepository,
     context: Context
 ) : ViewModel() {
@@ -130,13 +128,8 @@ class SpamConversationListViewModel(
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val messages = telephonyDataSource.getSmsMessagesForSpamScan()
-                    val identifiedIds =
-                        spamRepository.getIdentifiedMessageIds(messages.map { it.messageId })
-                    HistorySpamStats(
-                        totalCount = messages.size,
-                        identifiedCount = identifiedIds.size
-                    )
+                    val stats = scanner.statistics()
+                    HistorySpamStats(totalCount = stats.total, identifiedCount = stats.total - stats.pending)
                 }
             }
             _historyStatsState.value = result.fold(
