@@ -68,6 +68,7 @@ fun MessageItem(
     onCheckSpam: () -> Unit = {},
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDoubleClick: (() -> Unit)? = null,
     interactionEnabled: Boolean = true,
     timeDisplayFormat: MessageTimeDisplayFormat = MessageTimeDisplayFormat.HUMANIZED,
     showSpamContentByDefault: Boolean = false,
@@ -176,6 +177,8 @@ fun MessageItem(
                 enabled = interactionEnabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
+                // 多选模式下不监听双击，避免单击切换选择被双击判定延迟。
+                onDoubleClick = onDoubleClick.takeUnless { selectionMode },
                 indication = null,
                 interactionSource = interactionSource
             )),
