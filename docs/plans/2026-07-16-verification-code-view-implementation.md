@@ -4,19 +4,19 @@
 
 **Goal:** 增加只索引 SMS 的验证码聚合视图，并把会话与验证码组织为带底部导航的首页子页面。
 
-**Architecture:** 使用独立 Room 数据库保存无正文的验证码代际索引，WorkManager 串行完成增量校验和完整重建，新短信即时写入索引。首页容器通过嵌套 NavHost 承载会话与验证码页面，共享会随滚动方向展开/收起的开始聊天按钮。
+**Architecture:** 在 MessageMirrorDatabase 主库保存无正文的验证码代际索引，WorkManager 串行完成增量校验和完整重建，新短信即时写入索引。首页容器通过嵌套 NavHost 承载会话与验证码页面，共享会随滚动方向展开/收起的开始聊天按钮。
 
 **Tech Stack:** Kotlin、Room、WorkManager、Coroutines/Flow、Jetpack Compose、Material 3、Navigation Compose、Koin、Android Telephony ContentProvider
 
 ## Global Constraints
 
 - 仅识别 SMS，不读取或解析 MMS。
-- 索引不保存原始短信正文，正文只在用户切换文本模式时按消息 ID 查询 ContentProvider。
+- 索引不重复保存正文；展示原文时按消息 ID 从主库关联正文表读取，默认展开受 `showVerificationCodeContentByDefault` 控制（默认 true）。
 - 验证码展示全部历史结果，按月份倒序分页，月份标题吸顶。
 - 规则版本变化时完整重建，新短信按当前规则即时更新。
 - 首页底栏只包含“会话”和“验证码”，二级页面不显示底栏。
 - 两个首页子页面共享“开始聊天”扩展按钮，向下滚动收起、向上滚动展开。
-- 不实现验证码定时删除，不新增网络依赖或测试依赖。
+- 验证码定时删除已由独立清理 Worker 提供，本视图不直接执行；不新增网络依赖或测试依赖。
 - 项目不新增或运行单元测试；验证使用 Kotlin 编译、Lint 和人工检查。
 - 代码注释与文档使用中文，日志使用英文且以小写短语开头。
 
@@ -39,7 +39,7 @@
 - [ ] DAO 只读取活动代际，月份和月内消息均倒序；完整重建在成功后事务切换代际。
 - [ ] TelephonyDataSource 增加不含正文的 SMS 元数据摘要、按单个 ID 读取正文和按 ID/会话检查存在性的接口；增量扫描按“短信写入后正文不可变”假设使用元数据指纹，同 ID 正文外部篡改由完整重建发现。
 - [ ] 仓库使用现有 MessageParser 识别 `ParsedResult.VerificationCode`，实现增量校验、完整重建、即时写入和失效清理。
-- [ ] 在 Koin 中注册数据库与仓库。
+- 当前 Koin 注册使用主库 `MessageMirrorDatabase` 的验证码 DAO；旧 `VerificationCodeIndexDatabase` 仅用于迁移，不能重新接回独立运行库。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期通过。
 
 ### Task 2: 后台调度与短信生命周期接入
@@ -50,15 +50,15 @@
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/receiver/SmsReceiver.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/MessageRepositoryImpl.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/HubResourceRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/PixelTextApplication.kt`
+- Modify: `app/src/main/java/vip/mystery0/pixel/text/PixelTextApp.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
 
 **Interfaces:**
 - Consumes: Task 1 repository刷新与清理接口。
 - Produces: `scheduleReconcile()`、`scheduleFullRebuild()`，使用唯一 WorkManager 队列；新 SMS 即时索引；删除与规则更新同步刷新。
 
-- [ ] Worker 通过输入模式执行 reconcile 或 rebuild，失败返回 retry，日志只输出英文元数据。
-- [ ] App 启动调度增量校验，规则安装/回退后调度完整重建。
+- Worker 按输入模式执行 reconcile 或 rebuild；无效模式、权限错误及 IllegalStateException 返回 failure，其他可恢复异常 retry，协程取消向上传播。日志只输出英文元数据。
+- 当前 App 启动检查版本化初始化，所需验证码阶段由初始化协调器重建；页面刷新调度增量校验，规则安装／回退后调度完整重建。
 - [ ] SmsReceiver 插入成功后把 messageId/threadId/address/body/timestamp 交给仓库即时索引。
 - [ ] 应用内删除消息或会话后同步清理索引。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期通过。
@@ -74,9 +74,9 @@
 - Produces: 月份分页状态、`loadNextMonth()`、`refresh()`、`rebuildAll()`、`toggleMessageMode(messageId)`、LRU 正文缓存（30 条）、展开状态和一次性 Snackbar 事件。
 
 - [ ] ViewModel 首次加载最新月份，接近底部时加载下一月份，并使用 SavedStateHandle 保存展开 ID。
-- [ ] 原文模式仅按单条 messageId 查询；正文存入 30 条 LRU 内存缓存，缺失时删除索引并发出提示。
-- [ ] 页面使用 LazyColumn stickyHeader 展示本地化月份，默认卡片只使用索引字段。
-- [ ] 实现复制、显示原文/验证码、进入会话、下拉刷新、完整重建菜单、初始化/空/错误/刷新状态。
+- [ ] 原文模式仅按单条 messageId 从主库关联查询；正文存入 30 条 LRU 内存缓存，缺失时删除索引并发出提示。
+- 当前页面使用 LazyColumn stickyHeader 展示本地化月份；结构化字段来自索引，原文按全局默认设置和单条展开状态加载。
+- 当前页面提供图标复制、展开／收起原文、进入会话、下拉刷新、完整重建菜单及初始化／空／错误／刷新状态；原文展开保留验证码卡片。
 - [ ] 页面上报带阈值的滚动方向，不直接持有首页 FAB。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期通过。
 

@@ -1,5 +1,17 @@
 # 云端发件方资料 App 端设计
 
+## 当前实现核对（2026-11-07）
+
+以下以当前 Android 源码为准；服务端响应示例是协议约定，不代表本轮访问或验证了服务端。原设计中的损坏版本自动回退、资料变更自动刷新和更新时间展示尚未形成完整实现，不作为已交付能力。
+
+- `data/db/ConversationCacheDatabase.kt` 当前为 v3，保留资料 generation/state/profile/number 表；消息列表已由 `MessageMirrorDatabase` v7 的 `MirrorConversationQuery` 聚合，`MessageRepositoryImpl.enrichWithSenderProfiles()` 再批量查询资料并补充联系人名称。
+- 当前没有订阅资料表变化来触发上述列表投影；安装成功会更新设置页版本状态，列表在下一次查询时读取新资料。旧 `cached_conversation` 联表 DAO 仍在代码中，但不再是主列表数据源。
+- `SenderProfileRepository` 保留 active/previous 两代，但没有启动校验或自动切换 previous 的路径。头像解码失败由 `SenderAvatar` 回退默认图标；不能据此声称整个损坏版本自动恢复。
+- `SenderProfileStore` 返回并入库的是私有头像**绝对路径**。ZIP 内引用仍为相对路径，号码逐字精确匹配，无全量常驻 Map。
+- 通知在已有异步链路中等待本地 `findByNumber()` 查询；没有独立的资料预加载就绪状态，也不会为资料更新重建已发通知。
+
+源码入口均相对 `app/src/main/java/vip/mystery0/pixel/text/`。历史验收清单只表示验证要求，本轮仅做文档与源码核对。
+
 ## 1. 文档范围
 
 本文定义 PixelText Android App 对云端发件方资料的接入方案，包括：
@@ -9,7 +21,7 @@
 - 按服务端下发的号码字符串在本地直接精确匹配。
 - 合并联系人、云端资料和原始号码的展示优先级。
 - 在会话列表、详情和通知中显示名称与头像。
-- 第一版仅支持用户手动检查和安装更新，并提供损坏版本自动回退与失败降级。
+- 第一版仅支持用户手动检查和安装更新，保留上一代资料，并在头像不可用时降级默认图标；版本自动回退尚未实现。
 
 服务端资料录入、手动发布、COS 上传和公共接口实现位于：
 
@@ -104,30 +116,24 @@ SenderProfileRepository
   └─ 按号码查询资料
                 |
                 v
-ConversationCacheDatabase SQL 联表
-  ├─ cached_conversation
-  ├─ sender_profile_number
-  └─ sender_profile
-                |
-                v
-现有 ConversationModel / 详情 / 通知 / 其他入口
+MessageMirrorDatabase 的消息聚合
+  └─ MessageRepositoryImpl.enrichWithSenderProfiles
+       ├─ 批量查询 ConversationCacheDatabase 的 active 资料
+       └─ 合并联系人名称 → ConversationModel / 详情 / 通知
 ```
 
 ## 4. 领域模型
 
-建议新增：
+当前领域模型位于 `domain/model/SenderProfileModels.kt`：
 
 ```kotlin
-data class SenderProfile(
-    val numbers: List<String>,
+data class SenderProfileMatch(
     val displayName: String,
-    val avatar: SenderProfileAvatar,
+    val avatarPath: String,
+    val avatarSha256: String,
 )
 
-data class SenderProfileAvatar(
-    val localPath: String,
-    val sha256: String,
-)
+// 资料包使用 SenderProfileBundleItem 和 SenderProfileBundleAvatar；查询结果不重复携带全部号码。
 ```
 
 Room 中的云端资料模型：
@@ -177,7 +183,7 @@ data class SenderProfileNumberEntity(
 )
 ```
 
-头像仍保存在应用私有文件目录，Room 只保存相对路径和 SHA-256，不保存 WebP BLOB。App 不依赖服务端数据库 ID；客户端 Room ID 只用于本地联表。
+头像仍保存在应用私有文件目录，Room 保存私有头像绝对路径和 SHA-256，不保存 WebP BLOB。App 不依赖服务端数据库 ID；客户端 Room ID 只用于本地联表。
 
 正式实现时为 generation、profile、number 增加外键：删除 generation 时级联删除标签和号码；number 使用 `(generation_version, sender_profile_id)` 复合外键关联同 generation 的 profile，避免跨版本错误引用。`sender_profile_state` 为固定 `id=1` 的单行状态表，数据库中不使用多个 generation 的 `active` 布尔值。
 
@@ -224,13 +230,7 @@ App 明确不执行：
 }
 ```
 
-加载资料包时构建：
-
-```kotlin
-Map<String, SenderProfile>
-```
-
-每个 `profile.numbers` 元素直接作为 Map Key，不进行转换。出现完全相同的号码字符串且指向不同标签时拒绝整个新版本，保留当前有效版本。完全相同的字符串在同一标签中重复也视为资料包非法。未精确匹配时按无云端资料处理。
+加载资料包时以临时 `seenNumbers` 集合检查重复，导入时将每个 `profile.numbers` 元素原样写入 `sender_profile_number.number`，不进行转换；查询使用 Room DAO，不维护全量号码 Map。出现完全相同的号码字符串且指向不同标签时拒绝整个新版本，保留当前有效版本。完全相同的字符串在同一标签中重复也视为资料包非法。未精确匹配时按无云端资料处理。
 
 ## 7. 网络层
 
@@ -246,7 +246,7 @@ data class SenderProfileManifestResponse(
     val downloadUrl: String,
     val releaseNotes: String = "",
     val minAppVersionCode: Int,
-    val publishedAt: String,
+    val publishedAt: String?,
 )
 ```
 
@@ -290,11 +290,11 @@ Room 中由单行 `sender_profile_state` 的 `active_version` 和 `previous_vers
 3. 安全解压到临时目录。
 4. 校验 Schema 和版本。
 5. 对每条资料校验号码、名称和头像引用的文件存在。
-6. 校验被引用头像的路径、WebP 可解码性、大小和 SHA-256。
-7. 将头像移动到 `versions/{version}/avatars/`，数据库保存相对路径。
+6. 校验被引用头像的路径、图片可解码性（BitmapFactory，不额外校验实际编码必须为 WebP）、大小和 SHA-256。
+7. 将头像移到 `versions/{version}/avatars/`，数据库保存最终私有文件绝对路径。
 8. 开启 Room Transaction，插入新 generation、标签和号码。
 9. 读取当前 state，将旧 `active_version` 写入 `previous_version`，将新版本写入 `active_version`。
-10. 提交事务后，Room 联表查询 Flow 自动失效并重新查询。
+10. 提交事务后设置页更新安装版本；消息列表下次聚合时批量读取新资料，当前未观察资料表触发主列表自动刷新。
 11. 保留 active 和 previous generation，后台删除更老的数据库记录和头像目录。
 
 头像正式版本目录必须在数据库事务前准备完成。数据库导入失败时 active 状态保持不变，并删除本次无引用头像目录。
@@ -303,13 +303,12 @@ Room 中由单行 `sender_profile_state` 的 `active_version` 和 `previous_vers
 
 必须防止 ZIP Slip、绝对路径、`..`、反斜线绕过、重名条目、大小写路径冲突和压缩炸弹。App 不检查头像引用唯一性，也不拒绝 ZIP 中未被 JSON 引用的头像文件。
 
-建议客户端上限：
+当前已实现的客户端上限：
 
 ```text
 max zip bytes: 10 MiB
 max extracted bytes: 30 MiB
 max entries: 6000
-max profiles: 5000
 max avatar bytes: 256 KiB
 ```
 
@@ -320,50 +319,13 @@ ZIP 中允许：
 
 客户端只要求 JSON 引用的头像文件存在、可解码、大小不超过 256 KiB 且 SHA-256 一致。不要求每个头像文件都被引用，不要求头像路径只能被一个标签引用，也不检查头像是否为正方形；这些发布产物约束由服务端负责。
 
-## 9. Room 联表与 Repository
+## 9. Room 查询与 Repository
 
-发件方资料表加入现有 `ConversationCacheDatabase`，数据库版本需要增加并提供显式 Room Migration。会话缓存通过 SQL 左联表获得 active generation 的云端资料：
+资料仍在 `ConversationCacheDatabase` v3。`SenderProfileDao.findActiveByNumber()` 和 `findActiveByNumbers()` 联接 state、number、profile，按 active generation 与原始号码精确查询。导入通过同一库的事务切换 state，清理先删非 active/previous generation，再删其头像目录。
 
-```sql
-SELECT
-    conversation.*,
-    profile.display_name AS cloud_display_name,
-    profile.avatar_path AS cloud_avatar_path,
-    profile.avatar_sha256 AS cloud_avatar_sha256
-FROM cached_conversation AS conversation
-LEFT JOIN sender_profile_state AS state
-    ON state.id = 1
-LEFT JOIN sender_profile_number AS number
-    ON number.generation_version = state.active_version
-    AND number.number = conversation.address
-LEFT JOIN sender_profile AS profile
-    ON profile.id = number.sender_profile_id
-    AND profile.generation_version = number.generation_version
-ORDER BY conversation.timestamp DESC
-```
+主列表、归档与骚扰列表先由镜像库的 `MirrorConversationQuery` 聚合消息，再由 `MessageRepositoryImpl.enrichWithSenderProfiles()` 批量补充资料与联系人名称。详情和通知使用单号码查询。搜索结果目前补充 SIM 和骚扰判定，不额外显示云端头像。
 
-Room 返回轻量组合结果：
-
-```kotlin
-data class CachedConversationWithSenderProfile(
-    @Embedded val conversation: CachedConversationEntity,
-    @ColumnInfo(name = "cloud_display_name") val cloudDisplayName: String?,
-    @ColumnInfo(name = "cloud_avatar_path") val cloudAvatarPath: String?,
-    @ColumnInfo(name = "cloud_avatar_sha256") val cloudAvatarSha256: String?,
-)
-```
-
-Repository 职责：
-
-- 在事务中导入 generation，并通过单行 state 原子切换 active/previous 版本。
-- 为通知或详情提供按原始号码精确查询 active 资料的方法。
-- 将 Room 联表结果转换回现有 `ConversationModel`，并填充最终名称和云端头像字段。
-- 资料未导入或异步导入尚未完成时按无云端资料处理。
-- 清理时先在事务中删除非 active/previous generation，再删除对应无引用头像目录。
-
-资料更新后 Room 会观察 `sender_profile_state`、`sender_profile_number` 和 `sender_profile`，联表查询 Flow 自动失效并重新执行。不要调用 `fullSync()`，不要重建或改写 `cached_conversation`，也不需要在内存中维护全量号码 Map Snapshot。
-
-主列表直接使用联表 Flow。归档和骚扰列表按 thread ID 集合执行批量联表查询，避免按 address 逐条查询形成 N+1。详情和通知使用 active generation 的单号码精确查询。
+旧 `CachedConversationWithSenderProfile` 与 `observeAllConversationsWithSenderProfile()` 留在旧库中，但主列表不再订阅该 Flow，因此不能把资料表失效通知等同于当前主列表立即刷新。资料安装不调用 `fullSync()`，也不刷写 `cached_conversation`。
 
 ## 10. UI 与通知接入
 
@@ -420,13 +382,9 @@ data class ConversationModel(
 
 通知标题使用解析时可获得的最终展示名称，本地头像可作为 LargeIcon。回复地址、Intent Extra 和 threadId 始终使用原始地址，不能使用展示名称。
 
-如果 App 进程因新短信冷启动，而本地发件方资料尚未加载完成，本次通知直接按无云端资料处理，可以暂时显示原始号码和默认头像。通知发送流程不等待资料加载，也不为该低频场景引入同步磁盘读取、`goAsync()` 等待或复杂的通知重建机制。
+通知在既有异步接收/Worker 链路内调用 suspend `findByNumber()`，查询当前已落库的 active generation，并尝试联系人优先展示；没有独立的资料内存加载阶段。查询失败或无匹配时降级，实际回退边界由各通知调用者处理。`SmsNotificationHelper` 使用本地头像构造发送者图标。
 
-资料加载完成后：
-
-- 当前 App 页面通过 Room 联表查询 Flow 自动刷新名称和头像。
-- 后续新通知使用已经导入 active generation 的资料。
-- 已经发出的旧通知不主动追溯更新；除非后续因同一 threadId 的正常通知事件被重新构建，否则允许其保持原始号码展示。
+资料安装不主动重建已发通知；后续正常通知事件可重新读取资料。页面是否刷新取决于对应查询重跑，不承诺资料安装本身触发所有页面的 Flow。
 
 ## 11. 更新策略
 
@@ -439,7 +397,7 @@ data class ConversationModel(
 - 发现不同且兼容的远端版本后，展示版本、大小和发布说明，由用户确认安装。
 - 用户确认后立即重新请求一次最新 manifest，确保获得新的短期 CDN 签名地址；元数据仍一致时开始下载。
 - 下载、SHA、ZIP、Schema、号码或头像校验失败时保留当前版本并展示错误。
-- Room state 和头像目录保留 active generation 与 previous generation，上一版本只用于 active 数据损坏时自动恢复。
+- Room state 和头像目录保留 active generation 与 previous generation，上一版本目前仅被保留，尚未接入 active 损坏检测和自动恢复。
 
 服务端资料保存不会自动发布，因此 App 只会看到管理员手动发布后的稳定版本。业务版本存在错误时，由服务端管理后台回滚公共稳定版本；用户下次手动检查时安装回滚后的版本。
 
@@ -450,11 +408,11 @@ data class ConversationModel(
 独立设置项展示和处理：
 
 - 当前发件方资料版本。
-- 上次成功更新时间。
+- 当前尚不展示上次成功更新时间（generation 的 importedAt 已保存）。
 - “检查发件方资料更新”操作。
 - 检查中、可更新、下载进度、安装成功和失败状态。
 
-第一版不增加自动更新开关、仅 Wi-Fi 选项或后台检查时间配置。App 不提供“恢复上一版本”设置。上一有效 generation 仅作为 active 数据损坏、头像文件缺失等异常场景下的自动恢复手段。业务数据错误由服务端管理后台回滚公共稳定版本。
+第一版不增加自动更新开关、仅 Wi-Fi 选项或后台检查时间配置。App 不提供“恢复上一版本”设置。上一有效 generation 目前仅被保留，尚未实现 active 数据损坏或头像缺失时的自动切换。业务数据错误由服务端管理后台回滚公共稳定版本。
 
 ## 13. 安全与隐私
 
@@ -473,8 +431,7 @@ sender profile update check failed error=SocketTimeoutException
 sender profile bundle hash mismatch version=2026.08.12.1
 sender profile bundle activated version=2026.08.12.1 profiles=128
 sender profile bundle rejected reason=number_conflict version=2026.08.12.1
-sender avatar decode failed number=10086
-sender profile fallback activated version=2026.08.01.1
+sender avatar decode failed
 ```
 
 ## 14. 失败处理
@@ -482,7 +439,7 @@ sender profile fallback activated version=2026.08.01.1
 | 场景 | 行为 |
 | --- | --- |
 | manifest 网络失败 | 保留当前版本，设置页显示检查失败，不后台重试 |
-| 服务端返回 204 | 保留当前状态，按成功记录检查时间 |
+| 服务端返回 204 | 保留当前版本并返回无稳定版本提示；不持久记录检查时间 |
 | App 版本过低 | 不下载，设置页提示升级 |
 | CDN 返回 401/403 | 重新请求一次 manifest，元数据一致时使用新签名地址重试一次 |
 | 其他 CDN 下载失败 | 删除 `.part`，保留当前版本 |
@@ -492,9 +449,9 @@ sender profile fallback activated version=2026.08.01.1
 | 号码非法或重复 | 拒绝整个版本 |
 | 名称为空 | 拒绝整个版本 |
 | 头像缺失或非法 | 拒绝整个版本 |
-| active generation 数据或头像损坏 | 自动尝试上一有效 generation |
-| active/上一 generation 均损坏 | 清除 active 状态并回退默认展示 |
-| 通知冷启动且资料尚未加载 | 本次通知使用联系人或原始号码和默认头像，不等待、不追溯更新 |
+| active generation 数据或头像损坏 | 当前无版本级校验/自动回退；头像加载失败回退默认图标 |
+| active/上一 generation 均损坏 | 尚无统一版本修复流程，不宣称自动清空 state |
+| 通知无可用资料 | 使用联系人或原始号码，头像回退；不追溯更新 |
 | 运行时头像解码失败 | 仅该头像回退默认图标 |
 
 ## 15. 实施顺序
@@ -514,16 +471,16 @@ sender profile fallback activated version=2026.08.01.1
 
 ## 16. 验收标准
 
-- App 不依赖 `/api/v1/resources/manifest`。
+- 发件方资料更新不依赖 `/api/v1/resources/manifest`；规则与模型更新仍使用该接口。
 - App 只从服务端获取 manifest，ZIP 直接从 CDN 下载。
 - 每条云端资料只包含号码、名称和 WebP 头像引用。
 - App 不处理 category、priority、enabled 或 matcher 数组。
 - 号码匹配完全在本地按原始字符串精确完成，不进行区号截取、分隔符删除或大小写转换。
 - 联系人名称优先于云端名称。
 - 资料已加载时，主列表、归档、骚扰列表、详情和后续通知展示一致。
-- 通知冷启动且资料尚未加载时允许临时显示原始号码，不阻塞通知发送，也不要求追溯更新旧通知。
+- 通知等待当前异步链路内的本地资料查询，无匹配或查询异常时按调用者策略降级，不追溯更新旧通知。
 - 更新失败、包损坏和无网络不影响短信基础功能。
-- 当前页面可响应资料版本变化并自动刷新。
-- Room 和 App 私有头像目录至少保留 active 与上一有效 generation，上一版本仅用于自动故障恢复，不向用户提供手动切换入口。
+- 资料版本变化后，当前列表是否立即刷新仍是待补齐能力；重新查询可读取新资料。
+- Room 和 App 私有头像目录保留 active 与 previous generation；当前没有自动故障恢复或用户手动切换入口。
 - 云端名称和头像信息不写入 `CachedConversationEntity`、`ArchivedConversationEntity` 或 Telephony Provider，只通过 active generation 联表动态获得并填充到 `ConversationModel`。
 - 本次不为未来签名分组设计额外模型；后续签名分组以 `messageId` 为关联单位并单独重构。

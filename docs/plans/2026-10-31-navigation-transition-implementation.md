@@ -57,4 +57,4 @@
 - [x] 运行 `./gradlew.bat :app:compileDebugKotlin`：BUILD SUCCESSFUL；已有 Slider API 和 Gradle 配置警告，无编译错误。
 - [x] `git diff --check` 通过；独立代理核对全部调用点、默认参数及本地 Navigation 源码，未发现 Critical / Important / Minor 问题。
 - [x] 在 emulator-5554（Android 17 / API 37，1080×2424，420 dpi，手势导航）覆盖安装 Debug APK；四种风格保存、分类返回、根导航手势完成与 CANCEL、弹窗取消和单选 checked 状态通过；强制停止重启保持选择；暗色、两倍字号、横屏双栏及选项操作通过，已查看截图。另已核对四种根导航手势中间态截图及取消恢复；系统 animator_duration_scale=0 时导航和设置分类手势取消/完成通过。TalkBack 朗读、备份实际导入导出、跨版本设备和完整连续动画录屏未验证。
-- [x] 更新设计实施状态与验证限制；临时验证记录置于 `docs/.local/`。实现改动留在工作区供后续提交，设计提交独立保留。
+- [x] 更新设计实施状态与验证限制；临时验证记录置于 `docs/.local/`。实现已纳入仓库版本历史，不再保留待提交状态。

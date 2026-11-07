@@ -25,7 +25,7 @@
 - 容器与内容颜色成对使用：`primaryContainer/onPrimaryContainer`、`secondaryContainer/onSecondaryContainer`、`errorContainer/onErrorContainer`；中性表面使用 `onSurface` 和 `onSurfaceVariant`。
 - 错误色用于错误和危险操作，非错误状态不要滥用红色；状态还应有文字或图标，不能仅靠颜色区分。
 - 保留用户自选颜色、品牌标识、插画与媒体本身的颜色；不机械地把所有颜色替换成主色。
-- 联系人默认头像使用原有固定配色，不跟随 Material 3 或动态取色；会话列表和搜索结果保持一致。
+- 联系人默认头像在未选中时使用原有固定配色；选中态使用主题强调色。会话列表和搜索结果保持一致。
 - 优先组件默认的禁用、选中、焦点与按压样式；避免自行拼接低对比颜色。
 
 依据：[Material 色彩角色](https://m3.material.io/styles/color/the-color-system)、[Compose Material 3](https://developer.android.com/develop/ui/compose/designsystems/material3)。

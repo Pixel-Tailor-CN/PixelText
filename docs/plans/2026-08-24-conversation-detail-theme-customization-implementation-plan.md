@@ -1,5 +1,15 @@
 # 会话详情主题自定义 Implementation Plan
 
+## 当前实现核对（2026-11-07）
+
+核心配置、草稿、保存、预览和背景功能已有实现。下文保留最初任务划分与验收清单，不代表本轮重新完成了这些运行时验证。
+
+- `domain/theme/ThemeConfiguration.kt` 的 schemaVersion 仍为 1；默认提示文字为“请输入内容……”，缩放 1f（范围 0.85f..1.8f），显示 SIM 默认 true。
+- 当前新增 `useSameBackgroundImage=false`、`sharedBackgroundImageMode=LIGHT`、`generateColorsFromBackgroundImage=false`：可共用某一模式的背景，并可从背景生成页面色系；独立明暗配置仍保留。
+- `ui/theme/ConversationDetailStyle.kt` 是实际 resolver 文件；默认正文 onSurface、气泡 surfaceContainerHigh、输入区 surfaceContainer。`HighTextContrastMonitor` 通过 Settings.Secure 的 high_text_contrast_enabled 与 ContentObserver 监听，不使用原计划的 AccessibilityManager 监听 API。
+- `ThemeColorReferenceAdapter` 和 `ThemeImageReferenceAdapter` 负责字段级容错，不能用未注册适配器的 Moshi 示例替换当前初始化。保存通过 Repository.update 合并 base/draft/latest，仅覆盖草稿实际改动的字段，避免丢失同时发生的手势缩放；提交使用 NonCancellable + Mutex。
+- 背景原件目录为 filesDir/theme_assets，草稿为 cacheDir/theme_drafts/draft_<uuid>.webp，无 session 子目录；最大边 2160px、WebP 质量 88、过期草稿阈值 24 小时。备份恢复已经包含主题配置及图片，但尚无独立主题包分发功能。
+
 > 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
 
 **Goal:** 为会话详情页增加可版本化的日间/暗黑主题配置、草稿预览、显式保存、背景图片和高对比度回退，并为未来全局主题管理与导入导出保留稳定扩展边界。
@@ -141,7 +151,7 @@ enum class MaterialColorRole(val storageValue: String) {
 }
 
 const val CURRENT_THEME_SCHEMA_VERSION = 1
-const val DEFAULT_CONVERSATION_INPUT_PLACEHOLDER = "请输入"
+const val DEFAULT_CONVERSATION_INPUT_PLACEHOLDER = "请输入内容……"
 const val DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE = 1f
 const val MIN_CONVERSATION_DETAIL_TEXT_SCALE = 0.85f
 const val MAX_CONVERSATION_DETAIL_TEXT_SCALE = 1.8f
@@ -189,8 +199,10 @@ private const val LEGACY_TEXT_SCALE_KEY = "conversation_detail_text_scale"
 初始化流程：
 
 ```kotlin
-private val adapter = Moshi.Builder().build()
-    .adapter(ThemeConfiguration::class.java)
+private val adapter = Moshi.Builder()
+    .add(ThemeColorReferenceAdapter.FACTORY)
+    .add(ThemeImageReferenceAdapter.FACTORY)
+    .build().adapter(ThemeConfiguration::class.java)
 private val _configuration = MutableStateFlow(readOrMigrate())
 override val configuration = _configuration.asStateFlow()
 ```
@@ -423,8 +435,8 @@ fun resolveConversationDetailStyle(
 
 ```kotlin
 text = colorScheme.onSurface
-bubble = colorScheme.surfaceVariant
-input = colorScheme.surfaceVariant.copy(alpha = 0.5f)
+bubble = colorScheme.surfaceContainerHigh
+input = colorScheme.surfaceContainer
 ```
 
 高对比度模式：忽略所有自定义颜色和背景图片；文字使用 `onSurface`，气泡和输入区使用 `surface`，保留 SIM、placeholder 和 textScale。
@@ -446,7 +458,7 @@ fun readableLinkColor(
 
 - [ ] **Step 5: 实现高对比度状态监听**
 
-`HighTextContrastMonitor` 构造时读取 `AccessibilityManager.isHighTextContrastEnabled`，注册 `AccessibilityManager.HighTextContrastChangeListener` 并暴露 `StateFlow<Boolean>`：
+当前 `HighTextContrastMonitor` 读取 `Settings.Secure` 的 `high_text_contrast_enabled`，注册该 URI 的 `ContentObserver` 并暴露 `StateFlow<Boolean>`；原 AccessibilityManager 监听方案未采用：
 
 ```kotlin
 class HighTextContrastMonitor(context: Context) {
@@ -522,7 +534,7 @@ fun OriginalTextCard(
     isSelected: Boolean = false,
     subject: String? = null,
     textScale: Float = 1f,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
 )
 ```
@@ -859,7 +871,7 @@ fun save(exitAfterSave: Boolean = false)
 1. `isSaving = true`。
 2. 对 draft 配置中的每个 `draft:` 引用调用 `commitDraft()`。
 3. 构建只包含正式 asset ID 的 `finalConfiguration.normalized()`。
-4. 调用 `themeRepository.save(finalConfiguration)`。
+4. 调用 `themeRepository.update`，在锁内按 base/draft/latest 合并草稿实际改动，保留最新配置中未被草稿修改的字段。
 5. 保存成功后删除 persisted 配置中已不再引用的旧正式图片。
 6. 清空草稿映射并发出 `Saved` 或 `SavedAndExit`。
 7. 保存失败时删除本次刚提交的正式文件，保留原草稿配置和可重试状态。

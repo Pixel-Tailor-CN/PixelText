@@ -4,9 +4,9 @@
 
 [内部测试发布工作流](../../.github/workflows/google-play-internal.yml)仅监听 `main` 主分支的 push，仅当本次推送最后一个提交的信息包含 `ci`（不区分大小写、按子串匹配）时运行。例如 `ci: 发布内部测试版本` 或 `fix: 修复卡片展示 [ci]`。
 
-一次 push 包含多个提交时，仅检查最后一个提交；不会逐个提交构建。其他分支推送、删除分支、推送标签不会触发此流程。不带 `ci` 的推送会跳过此工作流的发布任务；独立的 PR 运行时回归工作流不受影响。GitHub 自带的 `[skip ci]` 等跳过指令仍然生效。
+一次 push 包含多个提交时，仅检查最后一个提交；不会逐个提交构建。其他分支推送、删除分支、推送标签不会触发此流程。不带 `ci` 的推送会跳过此工作流的发布任务；独立的 PR Release 运行检测工作流不受影响。GitHub 自带的 `[skip ci]` 等跳过指令仍然生效。
 
-流程保留资源同步、完整 Git 历史和已有 Release 签名配置，执行 `:app:bundleRelease`，通过`r0adkll/upload-google-play@v1` 将 AAB 发布到 `internal` 渠道，状态为 `completed`。此工作流不提取 APK，不创建 GitHub Release。原有 [标签 Release 工作流](../../.github/workflows/release.yml) 保持不变，推送 `v*` 标签仍会构建并创建 GitHub Release。
+流程保留资源同步、完整 Git 历史和已有 Release 签名配置，执行 `:app:bundleRelease`，通过 `r0adkll/upload-google-play@v1` 将 AAB 发布到 `internal` 渠道，状态为 `completed`。此工作流不提取 APK，不创建 GitHub Release。原有 [标签 Release 工作流](../../.github/workflows/release.yml) 保持不变，推送 `v*` 标签仍会构建并创建 GitHub Release。
 
 主分支发布任务共用并发组，不取消正在执行的发布，使用 `queue: max` 最多保留 100 个等待任务，超出平台上限的任务会被取消。此队列避免 Play 编辑事务并发，不解决重复上传同一版本号的问题。
 

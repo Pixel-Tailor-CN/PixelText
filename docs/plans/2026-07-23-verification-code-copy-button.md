@@ -1,42 +1,14 @@
-# 验证码复制按钮窄屏适配实施计划
+# 验证码复制按钮适配实现与历史验证
 
-> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
+## 当前组件
 
-**Goal:** 缩小验证码聚合页的复制按钮，确保窄屏设备完整显示 6 位验证码。
+`ui/message/cards/VerificationCodeCard.kt` 当前接口为 `VerificationCodeCard(content, result, isSelected, showOriginal, originalLoading)`。复制使用 40dp 的 `FilledIconButton`、20dp 复制图标与 12dp 间距；Material 组件处理最小交互区域。
 
-**Architecture:** 在通用验证码卡片上增加默认关闭的紧凑操作参数，由聚合页显式启用。紧凑模式只改变按钮尺寸、图标和相邻间距，不影响复制逻辑及其他调用方。
+早期 `compactCopyButton: Boolean = false` 和“仅聚合页启用”的方案已经被统一图标按钮替代。`ui/screen/VerificationCodeScreen.kt` 不再传该参数；会话详情复用相同卡片。当前布局与行为见[设计](2026-07-23-verification-code-copy-button-design.md)。
 
-**Tech Stack:** Kotlin、Jetpack Compose、Material 3
+## 原实施记录（2026-07-23）
 
-## Global Constraints
-
-- UI 使用 Jetpack Compose，不新增 XML layout。
-- 不新增或运行单元测试。
-- 代码注释和文档使用中文，日志使用英文。
-- 避免无关格式化和重构。
-
----
-
-### Task 1: 增加并启用紧凑复制按钮
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/message/cards/VerificationCodeCard.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/VerificationCodeScreen.kt`
-
-**Interfaces:**
-- Consumes: `VerificationCodeCard(content, result, isSelected)` 现有调用方式。
-- Produces: `VerificationCodeCard(content, result, isSelected, compactCopyButton)`，新增参数默认值为 `false`。
-
-- [x] **Step 1: 修改验证码卡片**
-
-为 `VerificationCodeCard` 增加 `compactCopyButton: Boolean = false`。紧凑模式使用
-48dp 的复制图标按钮和 12dp 间距；默认模式保留 56dp 高、至少 104dp 宽的文字按钮和
-20dp 间距。
-
-- [x] **Step 2: 在聚合页启用紧凑模式**
-
-在 `VerificationIndexCard` 调用 `VerificationCodeCard` 时传入
-`compactCopyButton = true`，其他调用方不传该参数。
+当时增加紧凑参数及聚合页启用的两项实现已完成；下列编译、Lint 和差异检查记录保留为当时版本的证据，其中“仅包含紧凑按钮参数”的范围描述不是当前实现要求。本次文档核对没有重跑 UI 或构建。
 
 - [x] **Step 3: 编译验证**
 

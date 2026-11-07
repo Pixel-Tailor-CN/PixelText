@@ -1,94 +1,33 @@
-# Smartspacer 未读数量统计范围实现计划
+# Smartspacer 未读数量实现与维护计划
 
-> 执行本计划时，以当前用户请求和根目录 AGENTS.md 为准；按任务需要选择技能与验证方式。
+## 当前结构
 
-**Goal:** 为 Smartspacer 未读数量增加按正常短信、骚扰短信、归档短信配置统计范围的能力，并保持相关状态变化后实时刷新。
+未读统计已实现。早期放进 `AppSettings`、`SettingsViewModel` 和通用设置页弹窗的方案已被每个 Smartspacer 实例独立配置替代，不应恢复旧接口。
 
-**Architecture:** 在应用设置中新增 Smartspacer 统计范围配置，`SmartspacerSmsRepository` 读取未读短信基础集合后，结合骚扰库和归档库按消息级并集去重统计。设置页通过单独首选项和弹窗编辑配置，相关的骚扰识别与归档动作统一触发 Smartspacer 刷新。
+| 文件（相对应用包目录） | 当前职责 |
+| --- | --- |
+| `smartspacer/UnreadSmsComplicationSettingsRepository.kt` | `UnreadSmsComplicationSettings` 三项默认 true；按 smartspacerId 存储，并提供默认配置与旧 app_settings 迁移读取 |
+| `smartspacer/UnreadSmsComplicationConfigActivity.kt` | 从 Smartspacer 配置入口打开三个开关的 Compose 页面；保存后通知指定实例刷新，返回不保存 |
+| `smartspacer/SmartspacerSmsRepository.kt` | `getUnreadSmsCount(smartspacerId: String)` 将该实例设置传给共享计数器 |
+| `data/repository/UnreadSmsCounter.kt` | 查询系统未读 SMS，结合主库分类与归档执行并集统计；全部关闭返回 0 |
+| `data/db/mirror/UnreadSmsQuery.kt` | 对候选 SMS 按主库最终骚扰标记与归档状态执行参数化计数 |
+| `smartspacer/UnreadSmsComplicationProvider.kt` | 使用实例 ID 获取计数并提供配置入口；实例删除时清理配置 |
 
-**Tech Stack:** Kotlin、Jetpack Compose、SharedPreferences、Room、Android Telephony、Koin
+没有 `AppSettings.smartspacerUnreadCountSettings` 或无参的 `getUnreadSmsCount()`。通用设置页仅保留手动刷新 Smartspacer 数据等操作。
 
-## Global Constraints
+## 维护约束
 
-- UI 必须使用 Jetpack Compose，不新增 XML layout。
-- 代码注释和文档使用中文，日志打印使用英文。
-- 不新增单元测试、不新增测试依赖、不运行单元测试任务。
-- 修改后优先使用 `./gradlew :app:compileDebugKotlin` 验证。
+普通、骚扰、归档是消息级并集，同一 SMS 最多计一次；不统计 MMS。骚扰以统一最终判定为准，包含白名单／持久放行、关键词、人工纠正和模型结果，而非仅原始分数阈值。当前主库与迁移见[主库合并方案](2026-11-05-main-database-consolidation.md)。
 
----
+配置保存及短信读状态、分类和归档变化需要刷新 Smartspacer。不得改变点击跳转或验证码目标卡片的行为。
 
-### Task 1: 扩展设置模型与存储
+## 验证边界
 
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/domain/settings/AppSettingsRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/AppSettingsRepositoryImpl.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/SettingsViewModel.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
+原实施清单未记录本功能编译或设备验收通过，本次源码审计不补写结果。
 
-**Interfaces:**
-- Produces: `SmartspacerUnreadCountSettings`
-- Produces: `AppSettings.smartspacerUnreadCountSettings`
-- Produces: `AppSettingsRepository.setSmartspacerUnreadCountSettings(settings: SmartspacerUnreadCountSettings)`
-- Produces: `AppSettingsRepository.getSmartspacerUnreadCountSettings(): SmartspacerUnreadCountSettings`
+- [ ] 按变更运行 `./gradlew.bat :app:compileDebugKotlin` 和必要 Lint。
+- [ ] 在 Smartspacer 中验证各实例独立配置、保存、取消和全部关闭。
+- [ ] 验证默认配置及旧设置回退，分类／归档交集不重复计数。
+- [ ] 验证新短信、已读、人工纠正及归档操作后的实际刷新。
 
-- [ ] 新增 `SmartspacerUnreadCountSettings` 数据模型，默认三项都为 `true`
-- [ ] 为设置仓库增加 3 个布尔键的读写逻辑
-- [ ] 在 `SettingsViewModel` 增加设置保存入口，并在保存后通知 `Smartspacer` 刷新
-- [ ] 更新 Koin 注入，向 `SettingsViewModel` 传入应用上下文
-
-### Task 2: 重构 Smartspacer 未读统计
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/source/TelephonyDataSource.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/smartspacer/SmartspacerSmsRepository.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/di/AppModule.kt`
-
-**Interfaces:**
-- Produces: `TelephonyDataSource.getUnreadSmsMessagesForSmartspacer(): List<...>`
-- Produces: `SmartspacerSmsRepository.getUnreadSmsCount(): Int`
-
-- [ ] 新增 Smartspacer 未读短信基础查询，返回消息 ID 和会话 ID
-- [ ] 为 `SmartspacerSmsRepository` 注入设置仓库、骚扰仓库和归档数据库
-- [ ] 按“正常/骚扰/归档”并集规则实现未读数量统计
-- [ ] 保持 3 个开关全关时返回 `0`
-
-### Task 3: 补齐 Smartspacer 刷新联动
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/worker/SpamDetectionWorker.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/worker/HistoricalSpamScanWorker.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/viewmodel/ConversationDetailViewModel.kt`
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/MessageRepositoryImpl.kt`
-
-**Interfaces:**
-- Produces: 相关骚扰识别、手动标记、归档变更后的 `SmartspacerIntegration.notifyChanged(...)`
-
-- [ ] 在新短信骚扰识别完成后统一刷新 `Smartspacer`
-- [ ] 在历史骚扰扫描完成后刷新 `Smartspacer`
-- [ ] 在手动标记短信为骚扰或非骚扰后刷新 `Smartspacer`
-- [ ] 在归档和取消归档后刷新 `Smartspacer`
-
-### Task 4: 增加设置页入口与弹窗
-
-**Files:**
-- Modify: `app/src/main/java/vip/mystery0/pixel/text/ui/screen/SettingsScreen.kt`
-
-**Interfaces:**
-- Produces: `SmartspacerUnreadCountSettings.preferenceSummary(): String`
-- Produces: `SmartspacerUnreadCountSettingsDialog`
-
-- [ ] 在设置页“应用功能”分类下新增 `Smartspacer 未读统计范围` 首选项
-- [ ] 根据当前配置显示动态摘要
-- [ ] 新增包含 3 个开关的弹窗，支持确认保存和取消回退
-
-### Task 5: 编译验证
-
-**Files:**
-- Verify only
-
-**Interfaces:**
-- Consumes: 前 4 个任务的全部修改
-
-- [ ] 运行 `./gradlew :app:compileDebugKotlin`
-- [ ] 修复编译错误直到通过
-- [ ] 记录本次验证结果与未覆盖风险
+不新增或运行单元测试。

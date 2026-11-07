@@ -10,9 +10,11 @@
 
 **设计：** [客户端设计](2026-11-01-on-device-learning-design.md)。下文代码路径以 `app/src/main/java/vip/mystery0/pixel/text/` 为根，特别注明者除外。
 
+> 当前状态：全文识别、独立学习库、学习调度、判定接入和贡献页面已实现。下方任务保留实施拆分；实现勾选仅表示代码存在，不替代设备、性能或故障场景验证。早期自动脱敏方案已撤回，当前使用手动辅助脱敏。
+
 ## 全局约束
 
-- 二次学习默认 false，自动脱敏默认 true；完整码点输入，不静默截断；阈值 0.7。
+- 二次学习默认 false，贡献草稿不自动脱敏；完整码点输入，不静默截断；阈值 0.7。
 - 白名单／持久放行 > 关键词 > 当前消息人工纠正 > 个人预测 > 基础预测。
 - 只在确认上传后发请求；学习与贡献相互独立；所有历史重算无已读、删除或通知副作用。
 - 不新增 App 测试目录、测试依赖或单元测试任务。中文文档／注释，英文日志，无短信原文。
@@ -29,9 +31,9 @@
 
 ## 任务 1：全文运行时和公开契约
 
-文件：修改 `domain/spam/SpamClassifier.kt`、`SpamClassifierFactory.kt`、`di/AppModule.kt`；新增 `domain/spam/learning/LearningModels.kt`、`SpamModelEngine.kt`、`data/spam/learning/TfliteSpamModelEngine.kt`。按实际算子需要修改根目录 `gradle/libs.versions.toml` 和 `app/build.gradle.kts`，保留已有编辑。
+实现文件：`domain/spam/SpamClassifier.kt`、`SpamClassifierFactory.kt`、`di/AppModule.kt`、`domain/spam/learning/SpamModelEngine.kt`、`data/spam/learning/TfliteSpamModelEngine.kt`。学习模型类型集中在 `domain/spam/learning/PersonalLearningRepository.kt`，没有独立 `LearningModels.kt`。依赖版本见根目录 `gradle/libs.versions.toml` 和 `app/build.gradle.kts`。
 
-接口：`ModelIdentity(modelSha256, vocabSha256, contractVersion)`；`PersonalParameters(identity, generation, payload)`；`SpamPrediction(score, identity, personalGeneration, source)`。`SpamModelEngine` 提供 `predict(text: String, personal: PersonalParameters?): SpamPrediction`、`train(samples: List<LabeledText>, cancellationCheck: () -> Unit): PersonalParameters` 和 `close()`；资源读写由 Data 负责，不让 UI 直接操作解释器。
+实际接口：模型身份为 `String`；`PersonalParameters(identity, generation, payload: FloatArray)` 保存在学习仓库模型文件。`SpamModelEngine` 暴露 `identity`、`modelVersion`、`parameterCount`、`epochs`，以及 `normalize(text)`、`reset()`、`train(text, label, parameters)`、`inferPublic(text)`、`inferPersonal(text, parameters)` 和 `close()`。整批样本循环、取消检查和代次提交由 `PersonalLearningCoordinator` 负责；`SpamClassifier.kt` 定义 `SpamPrediction(score, source, modelIdentity, personalGeneration, revision)` 以及批次 `SpamPredictionSession`。不存在原草案中的独立 `ModelIdentity` 或引擎批量 `train(samples, cancellationCheck)` 接口，资源读写仍由 Data 负责。
 
 - [x] 固定公开样件的签名、动态形状、预处理、参数格式和训练配置；未知版本明确拒绝。若样件无法运行，记录具体不兼容，业务可继续开发但不宣称模型可用。
 - [x] 按完整 Unicode 码点编码，动态调整输入；空文本拒绝，超长资源失败返回错误。样件覆盖 1、40、41、160、10000 码点及 emoji，核对实际输入长度而非只看结果。
@@ -43,44 +45,44 @@
 
 文件：新增 `data/db/PersonalLearningDatabase.kt`、`domain/spam/learning/PersonalLearningRepository.kt`、`data/repository/PersonalLearningRepositoryImpl.kt`；修改 `data/db/SpamDatabase.kt`、`data/repository/SpamRepositoryImpl.kt` 和 `di/AppModule.kt`。
 
-接口：`LearningMessageKey(sourceType, sourceId, fingerprint)`；仓库 `record(key, text, label): LearningRevision`、`deleteSample(id)`、`clear()`、`unlinkMessage(key)`、`snapshot(): LearningSnapshot`、`observeState(): Flow<LearningState>`。`LearningRevision` 是单调样本集代次；现有预测新增模型标识、个人代次和来源，旧行标为 legacy。
+实际接口：`LearningMessageKey(sourceType, sourceId, fingerprint)`；仓库 `record(key, text, label): Long`、`deleteSample(id)`、`clear()`、`unlinkMessage(key)`、`snapshot(): LearningSnapshot`、`observeState(): Flow<LearningState>`。代次使用单调 `Long`，没有独立 `LearningRevision` 类型；模型标识、个人代次和最终来源写入镜像判定字段，旧预测由迁移器导入，不作为训练标签。
 
-- [ ] Room 创建独立学习库，按正文摘要去重但核对正文以防摘要碰撞；标签更改更新所有关联纠正和样本代次。
-- [ ] 为现有分数库新增显式迁移，旧 0/1 不转换训练标签。确保读侧不会把失效个人预测继续视为当前结果。
-- [ ] 实现删样本／清空原子撤销纠正并失效参数，删原短信仅取消关联；无样本恢复基础预测。
+- [x] Room 创建独立学习库，按正文摘要去重但核对正文以防摘要碰撞；标签更改更新所有关联纠正和样本代次。
+- 当前存储与迁移按后续[主库合并方案](2026-11-05-main-database-consolidation.md)维护；个人学习库仍独立，旧 0/1 不转换训练标签，失效个人预测不作为当前结果。
+- [x] 实现删样本／清空原子撤销纠正并失效参数，删原短信仅取消关联；无样本恢复基础预测。
 - [ ] 用合成消息检查 ID 复用、共享正文冲突、删除影响数量、旧库升级保留规则及进程恢复。
-- [ ] 编译通过；新私有库先不接入生产判定，留给任务 5 统一切换。
+- 独立学习库已接入生产判定；编译与设备验证按当前改动执行，不再保留准备阶段的暂不接入要求。
 
 ## 任务 3：开关与串行学习协调
 
 文件：修改 `domain/settings/AppSettingsRepository.kt`、`data/repository/AppSettingsRepositoryImpl.kt`；新增 `domain/spam/learning/PersonalLearningCoordinator.kt`、`worker/PersonalLearningWorker.kt`、`worker/PersonalLearningScheduler.kt`。
 
-接口：设置 `personalLearningEnabled=false`、`learningAutoDesensitizeEnabled=true`；协调器 `requestLearning()`、`setEnabled(Boolean)`、`invalidatePersonalParameters(revision)`，输出排队／运行／成功／失败 StateFlow。模型、样本和设置代次构成提交条件。
+接口：设置 `personalLearningEnabled=false`，不再提供自动脱敏设置；协调器 `requestLearning()`、`setEnabled(Boolean)`、`invalidatePersonalParameters(revision)`，输出排队／运行／成功／失败 StateFlow。模型、样本和设置代次构成提交条件。
 
-- [ ] 持久设置与任务状态，只在明确开启且有有效样本时训练；Worker 仅携带 ID／代次，不携带正文。
-- [ ] 唯一任务串行合并，训练前读一致样本快照，完成时比较全部代次；旧候选不能覆盖新标签或关闭状态。
-- [ ] 参数候选写入后校验并原子提交；关闭不删除数据，但停止采用个人结果；删样本后回基础直至新参数可用。
+- [x] 持久设置与任务状态，只在明确开启且有有效样本时训练；Worker 仅携带 ID／代次，不携带正文。
+- [x] 唯一任务串行合并，训练前读一致样本快照，完成时比较全部代次；旧候选不能覆盖新标签或关闭状态。
+- [x] 参数候选写入后校验并原子提交；关闭不删除数据，但停止采用个人结果；删样本后回基础直至新参数可用。
 - [ ] 检查快速重复操作、取消、进程死亡和失败重试；重启恢复不能在关闭状态偷偷训练。
 - [ ] 编译，记录样件训练时延及线程行为；避免在主线程和收信接收器内训练。
 
 ## 任务 4：资源 v2、迁移与原子切换
 
-文件：修改 `domain/hub/HubModels.kt`、`data/source/PixelTextHubClient.kt` 及其资源 DTO、`data/resource/HubResourceStore.kt`、`data/repository/HubResourceRepository.kt`、`worker/ResourceUpdateCheckWorker.kt`；新增 `data/spam/learning/SpamModelBundleStore.kt`。
+实现文件：`domain/hub/HubModels.kt`、`data/source/PixelTextHubClient.kt` 及其资源 DTO、`data/resource/HubResourceStore.kt`、`data/repository/HubResourceRepository.kt`、`worker/ResourceUpdateCheckWorker.kt`。组合存储直接由 `HubResourceStore` 实现，没有独立 `SpamModelBundleStore.kt`。
 
-接口：v2 manifest 请求携带当前 versionCode 和 modelContractVersion=2；模型 DTO 包含设计规定的五个能力字段。`SpamModelBundleStore.stage(...)`、`activate(candidate, expectedRevision)`、`recover()` 管理完整版本组合，不单独替换词表。
+实际接口：v2 manifest 请求携带当前 versionCode 和 modelContractVersion=2；模型 DTO 包含五个能力字段及 model／vocab／contract 三个文件描述。`HubResourceStore.stageModelBundle(...)` 准备不可变目录，`PersonalLearningCoordinator.activateBundle(candidate, commit)` 完成候选学习和代次复核后调用 `activateModelBundle(candidate)` 原子更新指针；启动读取 `currentModelBundle()`，没有单独的 `recover()` 接口，也不单独替换词表。
 
-- [ ] 更新 DTO、检查／下载／激活兼容判断，未知协议、过高最低版本及缺失能力拒绝；无兼容资源保留当前资源并展示明确状态。
-- [ ] 校验哈希、大小、签名和词表配对，候选目录中准备整套资源；有学习样本且开关开时重建个人头，成功再切换。
-- [ ] 关闭期间直接更新基础组合并使旧个人参数失效，不训练；重新开启重建。与任务 3 共用提交代次，不另建冲突锁序。
-- [ ] 新安装使用交付的新内置资源；从旧版升级识别并隔离旧固定长度资源，安排无副作用历史重算。
+- 已实现 DTO 和检查／下载／激活兼容判断，未知协议、过高最低版本及缺失能力拒绝；无兼容资源保留当前资源并展示明确状态。
+- 已实现三个文件的大小、哈希及运行签名／词表配对校验，候选目录中准备整套资源；有学习样本且开关开时重建个人参数，成功再切换。这里的签名指 TFLite 调用签名，不表示资源有数字签名验签。
+- 已实现关闭期间更新基础组合并使旧个人参数失效，不训练；重新开启重建，与任务 3 共用提交代次。
+- 当前内置全文资源以 v2 组合读取，旧下载模型目录不作为主模型；模型变化安排无副作用历史重算。以上为源码实现状态，后面的故障与设备验证仍需独立证据。
 - [ ] 用本地模拟响应检查 v2 不可用、未知契约、下载中断、重建失败、每个切换阶段崩溃；确保恢复最后完整组合。
 - [ ] 编译及资源样件验证，外部服务暂未支持时不退回不兼容模型。
 
 ## 任务 5：统一判定与历史刷新
 
-文件：修改 `domain/spam/SpamRepository.kt`、`data/repository/SpamRepositoryImpl.kt`、`worker/SpamDetectionWorker.kt`、`worker/HistoricalSpamScanWorker.kt`、`data/repository/initialization/InitializationSpamScanner.kt`、`viewmodel/ConversationDetailViewModel.kt`；核对 `data/repository/mirror/LocalConversationSpamFilter.kt` 及 Smartspacer 调用方。
+实现文件：`domain/spam/SpamRepository.kt`、`data/repository/SpamRepositoryImpl.kt`、`worker/SpamDetectionWorker.kt`、`worker/HistoricalSpamScanWorker.kt`、`data/repository/initialization/InitializationSpamScanner.kt`、`viewmodel/ConversationDetailViewModel.kt`。列表现由 `data/db/mirror/MirrorConversationQuery.kt` 按持久判定过滤，原 `LocalConversationSpamFilter.kt` 已移除；后台批处理见 `data/repository/MirrorSpamScanner.kt`。
 
-接口：领域 `SpamPrediction` 携带分数、来源、模型身份、个人代次和决策代次，`SpamRepository` 将消息指纹、规则及人工纠正合成有效分数；所有展示和副作用共用该判定。人工标签写入任务 2 仓库，禁止继续伪造模型 0/1。
+实际判定由 `MessageSpamDecision.kt`、`SpamRepository` 及镜像骚扰 DAO 协作，分别保存模型评分、模型身份／代次、关键词、放行及人工纠正，再持久计算最终 `isSpam`。展示直接读取该字段；系统副作用前仍复核当前决定。人工标签写入任务 2 仓库，不伪造模型 0/1。
 
 - [x] 集中实现优先级及模型快照选择，保持白名单最终锁与消息恢复保护的既有语义。
 - [x] 新短信最终自动处理前核对完整决策代次；规则或标签变化时重算，不能拿过期结果执行删除。
@@ -98,14 +100,14 @@
 - [x] 排除学习库、参数及临时文件的系统／手动备份与迁移；恢复设置不能意外开启二次学习或导入参数残留。
 - [ ] 检查亮暗色、返回导航、旋转、进程恢复及无文本消息，编译并用 Mock／真机走通。
 
-## 任务 7：自动脱敏与确认上传
+## 任务 7：手动辅助脱敏与确认上传
 
-文件：复用 `domain/sample/SampleDesensitizer.kt`、`SampleDesensitizationAssistant.kt`；新增 `domain/sample/AutomaticSampleDesensitizer.kt`；修改 `viewmodel/SampleSubmissionViewModel.kt`、`ui/screen/SampleSubmissionScreen.kt`、`domain/hub/SampleReportModels.kt`、`data/source/SampleReportDtos.kt`、`data/repository/SampleReportLocalStore.kt`、`SampleSubmissionRepository.kt` 和导航。
+文件：复用 `domain/sample/SampleDesensitizer.kt`、`SampleDesensitizationAssistant.kt`；修改 `viewmodel/SampleSubmissionViewModel.kt`、`ui/screen/SampleSubmissionScreen.kt`、`domain/hub/SampleReportModels.kt`、`data/source/SampleReportDtos.kt`、`data/repository/SampleReportLocalStore.kt`、`SampleSubmissionRepository.kt` 和导航。
 
-接口：`AutomaticSampleDesensitizer.prepare(text, sender): DesensitizedDraft`；`SampleReportRequest.learningFeedback` 为可选对象，保存确认时的基础版本、个人代次和原始标签。不得重新读取运行状态生成重试负载。
+接口：通过 `SampleDesensitizationAssistant` 选择片段、预览并由用户应用替换，不使用自动脱敏接口；`SampleReportRequest.learningFeedback` 为可选对象，保存确认时的基础版本、个人代次和原始标签。不得重新读取运行状态生成重试负载。
 
-- [ ] 自动规则按范围优先级去重并避免重复替换，处理手机号、证件、账户、验证码和链接参数，保留人工助手；合成样本覆盖数字重叠及 emoji 范围。
-- [ ] 学习完成与否不阻塞贡献确认页；自动开关只影响草稿，关闭仍需确认。上传编辑不回写学习数据。
+- [x] 草稿初始化保留正文及来源提供的发送方；历史学习记录只带保存的正文和最新标签。用户主动打开辅助脱敏、选择片段并应用结果，不自动替换敏感内容。
+- 学习与贡献确认独立；辅助脱敏只修改草稿，上传仍须明确确认，上传编辑不回写学习数据。
 - [ ] 确认才冻结负载／请求 ID；取消无网络请求，未知结果恢复不改正文或元数据；旧待确认负载仍可恢复。
 - [ ] 超出上报限制明确保留本地学习、不自动裁剪；长文本展示与提交错误可恢复。
 - [ ] 在本地模拟端点核对实际请求及请求次数，不向真实端点发送测试短信；编译与界面验证。

@@ -2,15 +2,15 @@
 
 > 实施方式：在当前会话按任务实现与验证。遵循项目文档结构，不新增单元测试或测试依赖；共享 Gradle 构建串行执行。本文描述交付步骤，运行日志和实际完成记录放在 `docs/.local/`，不把已开始的代码改动视为验收通过。
 
-> 后续决定（2026-10-12）：用户要求普通构建开放 MMS 发送入口并移除构建开关。下文关于保留默认开关的旧约束和命令已由该决定取代；此前的方案记录保留作历史。
+> 当前状态：统一编辑器、拍照和录音入口已实现，普通构建开放 MMS 发送，不再使用发送构建开关。下方清单保留原任务拆分，不作为当前功能未实现或已通过全部验证的证明。
 
-**目标：** 提供接近 Google Messages 的统一会话编辑体验，文字走 SMS、附件走 MMS，支持拍照和前台录音。
+**目标：** 提供统一会话编辑体验，无附件且无主题的文字走 SMS，有附件或非空主题走 MMS，支持拍照和前台录音；仅有主题不能发送。
 
 **架构：** 复用现有持久草稿、附件准备及两个发送协调器。统一 Compose 编辑组件处理输入与预览，ViewModel 编排自动准备和持久接纳，不重写平台传输链路。
 
 **技术栈：** Kotlin、Compose/Material 3、Koin、既有 Room/WorkManager、Android Activity Result、MediaRecorder/MediaPlayer。
 
-**设计：** [统一消息编辑器设计](2026-10-03-unified-message-composer-design.md)。用户已确认采集范围及首次费用确认策略；完整细化文档尚未标记为用户审阅通过。
+**设计：** [统一消息编辑器设计](2026-10-03-unified-message-composer-design.md)。采集范围及首次费用确认策略已落入 `MessageComposer.kt`、`ComposerCapture.kt` 和 `MmsComposerViewModel.kt`。
 
 ## 全局约束
 
@@ -34,7 +34,7 @@
 
 ## 文件与接口约定
 
-以下代码路径相对于 `app/src/main/java/vip/mystery0/pixel/text/`。新增组件文件名为本轮拟定职责边界，接入时与调用方一起核对，不为匹配文档而拆分无关代码。
+以下代码路径相对于 `app/src/main/java/vip/mystery0/pixel/text/`。`MessageComposer.kt` 和 `ComposerCapture.kt` 已实现，`MmsComposer.kt` 保留外部输入／草稿宿主和发送状态组件；下方保留原任务拆分与待验证场景，不要求重新创建组件。
 
 ### 任务 1：统一提交编排与草稿生命周期
 
