@@ -7,6 +7,7 @@ import android.text.format.DateFormat
 import java.util.Date
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,31 +59,34 @@ fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit,
                     val incoming = current.boxType == 1
                     val primary = current.address?.takeIf { it.isNotBlank() }
                         ?: current.addresses.firstOrNull { it.type == if (incoming) 137 else 151 }?.address
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(primary ?: "未知号码", style = MaterialTheme.typography.titleLarge)
-                        Text(listOfNotNull(
-                            if (incoming) "收到的消息" else "发出的消息",
-                            current.timestamp?.let { DateFormat.format("yyyy-MM-dd HH:mm", Date(it)).toString() },
-                            current.subscriptionId?.takeIf { it >= 0 }?.let { id ->
-                                SimInfoProvider.getActiveSimList(context).firstOrNull { it.subscriptionId == id }?.let { sim ->
-                                    "${if (sim.slotIndex >= 0) "SIM ${sim.slotIndex + 1}" else "SIM"} · ${sim.displayName}"
-                                }
-                                    ?: "SIM 信息不可用"
-                            },
-                        ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        listOf(137 to "发件人", 151 to "收件人", 130 to "抄送", 129 to "密送").forEach { (type, label) ->
-                            val addresses = current.addresses.filter { it.type == type }.mapNotNull { it.address }
-                                .filter { it.isNotBlank() && it != primary && it != "insert-address-token" }.distinct()
-                            if (addresses.isNotEmpty()) Text("$label：${addresses.joinToString("、")}",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // 号码、时间和短信正文支持长按自由选择复制；彩信正文含附件手势，不包裹选择容器。
+                    SelectionContainer {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(primary ?: "未知号码", style = MaterialTheme.typography.titleLarge)
+                            Text(listOfNotNull(
+                                if (incoming) "收到的消息" else "发出的消息",
+                                current.timestamp?.let { DateFormat.format("yyyy-MM-dd HH:mm", Date(it)).toString() },
+                                current.subscriptionId?.takeIf { it >= 0 }?.let { id ->
+                                    SimInfoProvider.getActiveSimList(context).firstOrNull { it.subscriptionId == id }?.let { sim ->
+                                        "${if (sim.slotIndex >= 0) "SIM ${sim.slotIndex + 1}" else "SIM"} · ${sim.displayName}"
+                                    }
+                                        ?: "SIM 信息不可用"
+                                },
+                            ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            listOf(137 to "发件人", 151 to "收件人", 130 to "抄送", 129 to "密送").forEach { (type, label) ->
+                                val addresses = current.addresses.filter { it.type == type }.mapNotNull { it.address }
+                                    .filter { it.isNotBlank() && it != primary && it != "insert-address-token" }.distinct()
+                                if (addresses.isNotEmpty()) Text("$label：${addresses.joinToString("、")}",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     if (key.transport == vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS) {
                         content?.let { vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, false, true, onOpenPart, detailMode = true) }
                             ?: Text("正在读取彩信")
-                    } else current.body?.let { Text(it) }
+                    } else current.body?.let { SelectionContainer { Text(it) } }
 
                 }
             }
