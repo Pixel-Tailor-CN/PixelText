@@ -22,8 +22,16 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
     private val preferences = context.getSharedPreferences("app_identity", Context.MODE_PRIVATE)
     private val lock = Any()
     private val combinations = AppDisplayName.entries.flatMap { name ->
-        AppIconStyle.entries.map { icon -> AppIdentity(name, icon) }
-    }
+        AppIconStyle.selectableEntries.map { icon -> AppIdentity(name, icon) }
+    } + listOf(
+        // 只保留旧版本实际发布过的杏色入口，用于升级时关闭旧组件。
+        AppDisplayName.CHISU_FULL,
+        AppDisplayName.SMS_FULL,
+        AppDisplayName.JIANXUN_FULL,
+        AppDisplayName.PIXEL_TEXT,
+        AppDisplayName.CHISU,
+        AppDisplayName.SMS,
+    ).map { AppIdentity(it, AppIconStyle.APRICOT) }
     private val mutableIdentity = MutableStateFlow(readActiveIdentity() ?: AppIdentity())
     override val identity: StateFlow<AppIdentity> = mutableIdentity.asStateFlow()
 

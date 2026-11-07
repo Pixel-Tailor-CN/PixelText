@@ -264,11 +264,10 @@ private fun AppIconStyleCard(
 private fun AppIdentityIcon(style: AppIconStyle, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val resourceId = when (style) {
-        AppIconStyle.VIOLET -> R.mipmap.ic_launcher_identity_violet
+        AppIconStyle.VIOLET, AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_violet
         AppIconStyle.BLUE -> R.mipmap.ic_launcher_identity_blue
         AppIconStyle.GREEN -> R.mipmap.ic_launcher_identity_green
-        AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_apricot
-        AppIconStyle.CLASSIC -> R.mipmap.ic_launcher_classic
+        AppIconStyle.CLASSIC -> R.mipmap.ic_launcher
     }
     // 使用平台的自适应图标蒙版，避免 Compose 直接读取 adaptive-icon XML。
     val bitmap = remember(context, resourceId) {

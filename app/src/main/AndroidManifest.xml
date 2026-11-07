@@ -103,7 +103,7 @@
             android:name=".launcher.Identity_chisu_full_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_chisu_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -115,7 +115,7 @@
             android:name=".launcher.Identity_chisu_full_classic"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_chisu_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -163,7 +163,7 @@
             android:name=".launcher.Identity_sms_full_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_sms_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -175,7 +175,7 @@
             android:name=".launcher.Identity_sms_full_classic"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_sms_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -223,7 +223,7 @@
             android:name=".launcher.Identity_jianxun_full_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_jianxun_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -235,7 +235,7 @@
             android:name=".launcher.Identity_jianxun_full_classic"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_jianxun_full"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -283,7 +283,7 @@
             android:name=".launcher.Identity_pixel_text_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_pixel_text"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -295,7 +295,7 @@
             android:name=".launcher.Identity_pixel_text_classic"
             android:enabled="true"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_pixel_text"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -343,7 +343,7 @@
             android:name=".launcher.Identity_chisu_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_chisu"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -355,7 +355,7 @@
             android:name=".launcher.Identity_chisu_classic"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_chisu"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -403,7 +403,7 @@
             android:name=".launcher.Identity_sms_apricot"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_identity_apricot"
+            android:icon="@mipmap/ic_launcher_identity_violet"
             android:label="@string/app_name_identity_sms"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
@@ -415,8 +415,105 @@
             android:name=".launcher.Identity_sms_classic"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_classic"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name_identity_sms"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".launcher.Identity_message_violet"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_violet"
+            android:label="@string/app_name_identity_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_message_blue"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_blue"
+            android:label="@string/app_name_identity_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_message_green"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_green"
+            android:label="@string/app_name_identity_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_message_classic"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name_identity_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_pixel_message_violet"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_violet"
+            android:label="@string/app_name_identity_pixel_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_pixel_message_blue"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_blue"
+            android:label="@string/app_name_identity_pixel_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_pixel_message_green"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_identity_green"
+            android:label="@string/app_name_identity_pixel_message"
+            android:targetActivity=".LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".launcher.Identity_pixel_message_classic"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name_identity_pixel_message"
             android:targetActivity=".LauncherActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

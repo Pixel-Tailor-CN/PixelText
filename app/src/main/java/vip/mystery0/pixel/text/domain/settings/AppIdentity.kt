@@ -7,6 +7,8 @@ enum class AppDisplayName(val storageValue: String, val label: String) {
     PIXEL_TEXT("pixel_text", "Pixel Text"),
     CHISU("chisu", "尺素"),
     SMS("sms", "短信"),
+    MESSAGE("message", "Message"),
+    PIXEL_MESSAGE("pixel_message", "Pixel Message"),
 }
 
 enum class AppIconStyle(val storageValue: String, val label: String) {
