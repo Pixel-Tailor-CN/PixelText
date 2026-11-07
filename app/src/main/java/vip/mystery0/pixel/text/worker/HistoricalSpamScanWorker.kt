@@ -69,7 +69,7 @@ class HistoricalSpamScanWorker(
         if (!contentRefresh && !scanner.isEnabled()) return Result.success()
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            if (!scanner.isReady()) return Result.retry()
+            if (!scanner.isReady()) return retryScan("preparation_pending")
             // 固定镜像上界和内容代次，扫描期间新增、修改的消息留给下一轮。
             val (change, upperLocalId) = mirror.withTransaction {
                 mirror.mirrorDao().spamContentChange() to (mirror.mirrorDao().maximumLocalId() ?: 0L)
@@ -89,7 +89,8 @@ class HistoricalSpamScanWorker(
                         }
                         if (batch.stale || batch.paused) {
                             reporter.update(committed)
-                            return if (batch.paused && !contentRefresh) Result.success() else Result.retry()
+                            return if (batch.paused && !contentRefresh) Result.success()
+                            else retryScan(if (batch.paused) "scan_paused" else "session_changed")
                         }
                         val processed = progress.processed + batch.processed
                         progress = SpamScanProgress(processed, maxOf(progress.total, processed), progress.spamCount + batch.spamCount)
@@ -103,7 +104,7 @@ class HistoricalSpamScanWorker(
                 } finally {
                     reporter.close()
                 }
-                if (!scanner.complete(session, change?.generation)) return Result.retry()
+                if (!scanner.complete(session, change?.generation)) return retryScan("completion_invalidated")
                 runCatching {
                     SmartspacerIntegration.notifyChanged(applicationContext)
                     if (!silent) SpamScanNotificationHelper.showCompleted(applicationContext, progress.processed, progress.spamCount)
@@ -116,13 +117,17 @@ class HistoricalSpamScanWorker(
         } catch (error: CancellationException) {
             throw error
         } catch (_: StaleSpamScanSessionException) {
-            Log.i(TAG, "historical spam scan retry reason=model_changed")
-            return Result.retry()
+            return retryScan("model_changed")
         } catch (error: Exception) {
             Log.e(TAG, "historical spam scan failed", error)
             if (!silent) runCatching { SpamScanNotificationHelper.showFailed(applicationContext) }
             return if (contentRefresh) Result.retry() else Result.failure()
         }
+    }
+
+    private fun retryScan(reason: String): Result {
+        Log.i(TAG, "historical spam scan retry reason=$reason attempt=$runAttemptCount")
+        return Result.retry()
     }
 
     /** 只由独立上报协程调用，识别循环不等待此处的数据库或系统通知操作。 */

@@ -49,6 +49,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.viewmodel.HistorySpamScanPhase
 import vip.mystery0.pixel.text.viewmodel.HistorySpamScanProgress
 import vip.mystery0.pixel.text.viewmodel.HistorySpamStatsUiState
 import vip.mystery0.pixel.text.viewmodel.SpamConversationListUiState
@@ -66,7 +67,7 @@ fun SpamConversationListScreen(
     )
     val historyStatsState by viewModel.historyStatsState.collectAsState()
     val scanProgress by viewModel.historyScanProgress.collectAsState()
-    val isCompletedScanProgressHidden by viewModel.isCompletedScanProgressHidden.collectAsState()
+    val isScanProgressHidden by viewModel.isScanProgressHidden.collectAsState()
     var showHistoryDialog by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -130,11 +131,11 @@ fun SpamConversationListScreen(
                 .consumeWindowInsets(paddingValues)
         ) {
             scanProgress
-                ?.takeUnless { it.isCompleted && isCompletedScanProgressHidden }
+                ?.takeUnless { it.isFinished && isScanProgressHidden }
                 ?.let { progress ->
                     HistoricalSpamScanProgressBanner(
                         progress = progress,
-                        onHide = viewModel::hideCompletedScanProgress
+                        onHide = viewModel::hideScanProgress
                     )
             }
 
@@ -280,10 +281,15 @@ private fun HistoricalSpamScanProgressBanner(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            val title = when {
-                progress.isCompleted -> "历史短信识别完成"
-                progress.isFailed -> "历史短信识别失败"
-                else -> "正在识别历史短信"
+            val title = when (progress.phase) {
+                HistorySpamScanPhase.WAITING -> "等待开始历史短信识别"
+                HistorySpamScanPhase.RETRYING -> "等待重试历史短信识别"
+                HistorySpamScanPhase.PREPARING -> "正在准备历史短信识别"
+                HistorySpamScanPhase.SCANNING -> "正在识别历史短信"
+                HistorySpamScanPhase.FINALIZING -> "正在完成历史短信识别"
+                HistorySpamScanPhase.COMPLETED -> "历史短信识别完成"
+                HistorySpamScanPhase.FAILED -> "历史短信识别失败"
+                HistorySpamScanPhase.CANCELLED -> "历史短信识别已取消"
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -294,22 +300,28 @@ private fun HistoricalSpamScanProgressBanner(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall
                 )
-                if (progress.isCompleted) {
+                if (progress.isFinished) {
                     TextButton(onClick = onHide) {
                         Text("隐藏")
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            LinearWavyProgressIndicator(
-                progress = { progress.fraction },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${progress.processed}/${progress.total} ${progress.percent}%",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            val fraction = progress.fraction
+            if (fraction != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearWavyProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${progress.processed}/${progress.total} ${progress.percent}%",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else if (!progress.isFinished) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
         }
     }
 }
