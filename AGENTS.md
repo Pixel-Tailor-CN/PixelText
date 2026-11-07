@@ -2,7 +2,7 @@
 
 ## 项目与入口
 
-Pixel Text（原点短信）是面向国内 Pixel 用户的 Android SMS/MMS 应用，支持默认短信角色、双卡和端侧智能卡片。
+Pixel Text 是面向国内 Pixel 用户的 Android SMS/MMS 应用，支持默认短信角色、双卡和端侧智能卡片。
 使用 Kotlin、Compose、Material 3、MVVM + Clean Architecture、Coroutines/Flow 和 Koin。
 模块为 `:app`，包名为 `vip.mystery0.pixel.text`；SDK 和依赖版本查 `gradle/libs.versions.toml`，构建配置查 `app/build.gradle.kts`，JDK/JVM 为 21。
 
@@ -28,7 +28,7 @@ Pixel Text（原点短信）是面向国内 Pixel 用户的 Android SMS/MMS 应�
 - UI 使用 Jetpack Compose，不新增 XML layout；采用 Material 3 与 `MaterialTheme.colorScheme`，保留暗色模式、Dynamic Color 和必要动效。
 - 页面遵循[界面设计规范](docs/development/ui-design.md)：减少冗余解释与无谓选择，按信息优先级组织操作，空状态使用现有插画与简短文案，容器和内容采用成对的主题语义色。
 - UI 负责渲染和交互，业务解析放在 Domain，系统与数据访问放在 Data。ViewModel 用 `StateFlow` 暴露状态，异步任务使用 `viewModelScope`；新增依赖接入现有 Koin 模块。
-- 优先明确的模型字段；只有现有动态卡片 `details` 模式需要时使用 Map。
+- 业务实体优先使用明确的模型字段；索引、键值映射及动态卡片 `details` 等动态字段可使用 Map。
 - 只开发传统 SMS/MMS，不开发 RCS。短信解析与分类保持端侧，不引入远程解析、分类、埋点或统计上传。
 - 现有联网用途包括 MMS 下载、用户明确确认的单人 MMS 发送及相关请求，Hub 规则/模型/发件方资料更新，以及用户明确确认的样本上报与本人记录查询。解析、分类和个人学习仍在端侧完成；自动资源检查只请求清单，不上传短信。修改时核对既有实现与当前请求，不扩大短信上传范围或删除既有功能。
 - 短信样本按敏感数据处理，优先使用 `samples-desensitized/`；目录不存在时使用合成脱敏样本。不要把原始短信写入日志、文档或提交。
