@@ -4,9 +4,9 @@
 
 **Goal:** 为短信通知增加四种可持久化选择的内置小图标，并保持 Smartspacer 等非短信场景不变。
 
-**Architecture:** 以领域层内置目录提供稳定 ID 到 drawable 的映射，DataStore 保存 ID，设置 UI 通过独立页面修改选择；短信通知创建与回复状态更新统一解析当前资源。
+**Architecture:** 以领域层内置目录提供稳定 ID 到 drawable 的映射，SharedPreferences 保存 ID，设置 UI 通过独立页面修改选择；短信通知创建与回复状态更新统一解析当前资源。
 
-**Tech Stack:** Kotlin、Jetpack Compose、Material 3、DataStore Preferences、Android VectorDrawable、Koin
+**Tech Stack:** Kotlin、Jetpack Compose、Material 3、SharedPreferences、Android VectorDrawable、Koin
 
 ## Global Constraints
 
@@ -30,7 +30,7 @@
 - Produces: `SmsNotificationIcon.entries`、`SmsNotificationIcon.fromId(String?)`、`AppSettings.smsNotificationIconId`、`setSmsNotificationIconId(String)`。
 
 - [ ] 定义四种稳定 ID、显示名称和 drawable 映射，未知 ID 回退到双气泡。
-- [ ] 增加 DataStore key、同步读取与设置状态 Flow 映射。
+- [ ] 增加 SharedPreferences key、同步读取与设置状态 Flow 映射。
 - [ ] 在 ViewModel 暴露设置方法。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期编译通过。
 
@@ -41,7 +41,7 @@
 - Create: `app/src/main/res/drawable/ic_sms_notification_single_bubble.xml`
 - Create: `app/src/main/res/drawable/ic_sms_notification_envelope.xml`
 - Create: `app/src/main/res/drawable/ic_sms_notification_text_bubble.xml`
-- Create: `docs/icon-sources.md`
+- 资源来源：早期计划中的 `docs/icon-sources.md` 未保留在当前仓库，不将其视为已存在的说明。
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/notification/SmsNotificationHelper.kt`
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/receiver/NotificationActionReceiver.kt`
 
@@ -50,7 +50,7 @@
 - Produces: 所有短信通知及回复状态更新使用当前选择；原 `ic_notification_sms` 不变。
 
 - [ ] 将当前与旧版图标整理为短信专用 VectorDrawable。
-- [ ] 参考 iconfont 候选类别在项目内绘制信封和文本气泡，生成符合通知小图标要求的单色 VectorDrawable，并记录来源。
+- 四种本地矢量已接入目录；原来源文档没有保留，不能由本次源码检查证明历史绘制来源。
 - [ ] 在短信通知创建和回复状态更新处读取当前图标。
 - [ ] 搜索 `ic_notification_sms` 调用，确认 Smartspacer 和非短信通知未被改动。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期编译通过。

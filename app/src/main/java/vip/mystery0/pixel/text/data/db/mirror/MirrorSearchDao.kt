@@ -55,9 +55,11 @@ abstract class MirrorSearchDao {
     open suspend fun searchBatch(
         searchQuery: SupportSQLiteQuery,
         unreadyQuery: SupportSQLiteQuery,
+        checkTextReadiness: Boolean = true,
     ): MirrorSearchResult {
         val rows = queryRows(searchQuery)
-        val unready = countUnready(unreadyQuery)
+        // 仅使用时间、SIM 等筛选时，不依赖彩信正文索引，无需额外统计。
+        val unready = if (checkTextReadiness) countUnready(unreadyQuery) else 0
         return MirrorSearchResult(rows = rows, unreadyCount = unready)
     }
 }

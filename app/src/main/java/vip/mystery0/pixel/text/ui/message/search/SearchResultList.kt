@@ -1,7 +1,5 @@
 package vip.mystery0.pixel.text.ui.message.search
 
-import androidx.annotation.DrawableRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -24,9 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 
@@ -43,9 +40,10 @@ fun SearchResultList(
     Box(modifier = modifier.fillMaxSize()) {
         when (uiState) {
             is SearchUiState.Idle -> {
-                SearchPlaceholder(
+                AppEmptyState(
                     imageRes = R.drawable.illustration_search_idle,
-                    text = "输入关键词，或使用筛选条件查找消息"
+                    text = "搜索短信和彩信",
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
@@ -87,9 +85,10 @@ fun SearchResultList(
                     } else {
                         "没有找到符合条件的消息"
                     }
-                    SearchPlaceholder(
+                    AppEmptyState(
                         imageRes = R.drawable.illustration_search_empty,
-                        text = emptyText
+                        text = emptyText,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 } else {
                     LazyColumn(
@@ -104,13 +103,13 @@ fun SearchResultList(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                         .background(
-                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                             shape = RoundedCornerShape(8.dp)
                                         )
                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                 ) {
                                     Text(
-                                        text = "部分消息内容尚未准备好，搜索结果可能不完整",
+                                        text = "部分消息仍在准备，结果可能不完整",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -137,36 +136,6 @@ fun SearchResultList(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SearchPlaceholder(
-    @DrawableRes imageRes: Int,
-    text: String
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Image(
-                painter = painterResource(imageRes),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(220.dp)
-                    .padding(bottom = 20.dp)
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

@@ -1,19 +1,26 @@
 package vip.mystery0.pixel.text.ui
 
 import android.net.Uri
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import vip.mystery0.pixel.text.domain.hub.LearningFeedback
+import vip.mystery0.pixel.text.ui.screen.PersonalLearningScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import vip.mystery0.pixel.text.domain.hub.isValidSampleReportId
+import vip.mystery0.pixel.text.ui.screen.SampleReportListScreen
+import vip.mystery0.pixel.text.ui.screen.SampleReportDetailScreen
+import vip.mystery0.pixel.text.ui.screen.SAMPLE_REPORT_REFRESH_REQUESTED
+import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
+import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -21,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -53,6 +61,7 @@ import vip.mystery0.pixel.text.ui.screen.SwipeActionSettingsScreen
 data class ConversationDeepLink(
     val threadId: Long,
     val address: String,
+    val isSpam: Boolean = false,
 )
 
 data class SettingsDeepLink(
@@ -68,6 +77,18 @@ fun AppNavigation(
     onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val settingsRepository = koinInject<AppSettingsRepository>()
+    val settings by settingsRepository.settings.collectAsState()
+    val reportSnackbarHost = remember { SnackbarHostState() }
+    var submittedReportId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(submittedReportId) {
+        val id = submittedReportId ?: return@LaunchedEffect
+        val result = reportSnackbarHost.showSnackbar("样本已上报", actionLabel = "查看", withDismissAction = true)
+        submittedReportId = null
+        if (result == SnackbarResult.ActionPerformed && isValidSampleReportId(id)) {
+            navController.navigate("sample_report/$id")
+        }
+    }
     val backupRepository = org.koin.compose.koinInject<vip.mystery0.pixel.text.domain.backup.BackupRepository>()
     val backupState by backupRepository.state.collectAsState()
     var showRestoreNotice by remember { mutableStateOf(backupState.restoreProtected) }
@@ -88,7 +109,17 @@ fun AppNavigation(
     // 收到外部 deep link 时，直接跳转到对应会话详情
     LaunchedEffect(pendingDeepLink) {
         val link = pendingDeepLink ?: return@LaunchedEffect
-        navController.navigate(conversationDetailRoute(link.threadId, link.address))
+        navController.navigate(
+            conversationDetailRoute(
+                link.threadId,
+                link.address,
+                contentFilter = if (link.isSpam) {
+                    ConversationContentFilter.SPAM
+                } else {
+                    ConversationContentFilter.NORMAL
+                },
+            )
+        )
         onDeepLinkConsumed()
     }
 
@@ -113,13 +144,13 @@ fun AppNavigation(
             navController = navController,
             startDestination = "home",
             modifier = Modifier.fillMaxSize(),
-            enterTransition = { activityLikeEnterTransition() },
-            exitTransition = { activityLikeExitTransition() },
-            popEnterTransition = { activityLikePopEnterTransition() },
-            popExitTransition = { activityLikePopExitTransition() },
-            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与普通返回一致。
-            predictivePopEnterTransition = { _ -> activityLikePopEnterTransition() },
-            predictivePopExitTransition = { _ -> activityLikePopExitTransition() }
+            enterTransition = { navigationEnterTransition(settings.navigationTransitionStyle) },
+            exitTransition = { navigationExitTransition(settings.navigationTransitionStyle) },
+            popEnterTransition = { navigationPopEnterTransition(settings.navigationTransitionStyle) },
+            popExitTransition = { navigationPopExitTransition(settings.navigationTransitionStyle) },
+            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与所选风格一致。
+            predictivePopEnterTransition = { _ -> navigationPopEnterTransition(settings.navigationTransitionStyle) },
+            predictivePopExitTransition = { _ -> navigationPopExitTransition(settings.navigationTransitionStyle) }
         ) {
             composable("home") {
                 HomeScreen(
@@ -178,11 +209,12 @@ fun AppNavigation(
             }
             composable("settings") {
                 SettingsScreen(
+                    onNavigateToPersonalLearning = { navController.navigate("personal_learning") },
                     onNavigateToBackup = { navController.navigate("backup_restore") },
                     onNavigateToOpenSource = { navController.navigate("open_source") },
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToSampleSubmission = {
-                        navController.navigate("sample_submission")
+                    onNavigateToSampleReports = {
+                        navController.navigate("sample_reports")
                     },
                     onNavigateToSwipeActions = {
                         navController.navigate("swipe_actions")
@@ -230,6 +262,23 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
+            composable("personal_learning") {
+                PersonalLearningScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onContributeSample = { content, category ->
+                        navController.currentBackStackEntry?.savedStateHandle?.apply {
+                            set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
+                            set(SAMPLE_SUBMISSION_DRAFT_SENDER, "")
+                            set(SAMPLE_SUBMISSION_DRAFT_CATEGORY, category)
+                            // 历史样本未保存当时的模型快照，不用当前版本冒充来源。
+                            set("learning_feedback_label", "")
+                            set("learning_feedback_base", "")
+                            set("learning_feedback_generation", "")
+                        }
+                        navController.navigate("sample_submission")
+                    },
+                )
+            }
             composable("keyword_spam") {
                 KeywordSpamSettingsScreen(
                     onNavigateBack = { navController.popBackStack() }
@@ -240,22 +289,64 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() },
                 )
             }
-            composable("sample_submission") {
+            composable("sample_reports") { listEntry ->
+                val refreshRequested by listEntry.savedStateHandle
+                    .getStateFlow(SAMPLE_REPORT_REFRESH_REQUESTED, false).collectAsState()
+                SampleReportListScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNewReport = {
+                        if (navController.previousBackStackEntry?.destination?.route == "sample_submission") {
+                            navController.popBackStack()
+                        } else navController.navigate("sample_submission")
+                    },
+                    onOpenReport = { id ->
+                        if (isValidSampleReportId(id)) navController.navigate("sample_report/$id")
+                    },
+                    refreshRequested = refreshRequested,
+                    onRefreshRequestConsumed = { listEntry.savedStateHandle[SAMPLE_REPORT_REFRESH_REQUESTED] = false },
+                )
+            }
+            composable("sample_report/{reportId}", arguments = listOf(navArgument("reportId") { type = NavType.StringType })) { detailEntry ->
+                val listOwner = remember(detailEntry) {
+                    navController.previousBackStackEntry?.takeIf { it.destination.route == "sample_reports" }
+                }
+                val sourceListViewModel = listOwner?.let { koinViewModel<SampleReportListViewModel>(viewModelStoreOwner = it) }
+                SampleReportDetailScreen(detailEntry.arguments?.getString("reportId").orEmpty(),
+                    onNavigateBack = { navController.popBackStack() },
+                    onReportLoaded = { sourceListViewModel?.updateReport(it) },
+                    onReportNotFound = { sourceListViewModel?.markReportUnavailable(it) })
+            }
+            composable("sample_submission") { submissionEntry ->
                 val draftHandle = navController.previousBackStackEntry?.savedStateHandle
-                val initialContent = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CONTENT).orEmpty()
+                // 转移到当前页面所属状态，旋转或恢复导航后不丢失原始草稿及反馈。
+                fun initialString(key: String): String {
+                    return submissionEntry.savedStateHandle.get<String>(key)
+                        ?: draftHandle?.remove<String>(key).orEmpty().also { submissionEntry.savedStateHandle[key] = it }
                 }
-                val initialSender = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_SENDER).orEmpty()
-                }
-                val initialCategory = remember(it) {
-                    draftHandle?.remove<String>(SAMPLE_SUBMISSION_DRAFT_CATEGORY).orEmpty()
+                val initialContent = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_CONTENT) }
+                val initialSender = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_SENDER) }
+                val initialCategory = remember(submissionEntry) { initialString(SAMPLE_SUBMISSION_DRAFT_CATEGORY) }
+                val learningLabel = remember(submissionEntry) { initialString("learning_feedback_label") }
+                val learningBase = remember(submissionEntry) { initialString("learning_feedback_base") }
+                val learningGeneration = remember(submissionEntry) { initialString("learning_feedback_generation").toLongOrNull() }
+                val learningFeedback = remember(submissionEntry) {
+                    learningLabel.takeIf { it.isNotEmpty() }?.let {
+                        LearningFeedback(baseModelVersion = learningBase, personalGeneration = learningGeneration, originalLabel = it)
+                    }
                 }
                 SampleSubmissionScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onSubmitted = { id ->
+                        navController.previousBackStackEntry?.takeIf { it.destination.route == "sample_reports" }
+                            ?.savedStateHandle?.set(SAMPLE_REPORT_REFRESH_REQUESTED, true)
+                        navController.popBackStack()
+                        submittedReportId = id
+                    },
+                    onViewReports = { navController.navigate("sample_reports") },
                     initialContent = initialContent,
                     initialSender = initialSender,
                     initialCategory = initialCategory,
+                    initialLearningFeedback = learningFeedback,
                 )
             }
             composable("search") {
@@ -337,6 +428,20 @@ fun AppNavigation(
                     onOpenMmsPart = { part -> navController.navigate(if (part.partId < 0)
                         "mirror_message/${part.message.transport.name}/${part.message.sourceId}" else "mms_part/${part.message.sourceId}/${part.partId}") },
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPersonalLearning = { navController.navigate("personal_learning") },
+                    onNavigateToSenderWhitelist = { navController.navigate("sender_whitelist") },
+                    onNavigateToKeywordSpam = { navController.navigate("keyword_spam") },
+                    onNavigateToLearningContribution = { content, sender, category, feedback ->
+                        navController.currentBackStackEntry?.savedStateHandle?.apply {
+                            set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
+                            set(SAMPLE_SUBMISSION_DRAFT_SENDER, sender)
+                            set(SAMPLE_SUBMISSION_DRAFT_CATEGORY, category)
+                            set("learning_feedback_label", feedback?.originalLabel.orEmpty())
+                            set("learning_feedback_base", feedback?.baseModelVersion.orEmpty())
+                            set("learning_feedback_generation", feedback?.personalGeneration?.toString().orEmpty())
+                        }
+                        navController.navigate("sample_submission")
+                    },
                     onNavigateToSampleSubmission = { content, sender, category ->
                         navController.currentBackStackEntry?.savedStateHandle?.apply {
                             set(SAMPLE_SUBMISSION_DRAFT_CONTENT, content)
@@ -351,6 +456,7 @@ fun AppNavigation(
                 vip.mystery0.pixel.text.ui.screen.mock.MockMessageScreen()
             }
         }
+        SnackbarHost(reportSnackbarHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp))
     }
 }
 
@@ -363,107 +469,6 @@ private fun conversationDetailRoute(
     val baseRoute = "conversation_detail/$threadId/${Uri.encode(address)}"
     val messageParameter = messageId?.let { "&messageId=$it" }.orEmpty()
     return "$baseRoute?contentFilter=${contentFilter.name}$messageParameter"
-}
-
-internal fun activityLikeEnterTransition(): EnterTransition {
-    return slideInHorizontally(
-        initialOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
-            scaleIn(
-                initialScale = ACTIVITY_FOREGROUND_INITIAL_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikeExitTransition(): ExitTransition {
-    return slideOutHorizontally(
-        targetOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            activityBackgroundFadeOut() +
-            scaleOut(
-                targetScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikePopEnterTransition(): EnterTransition {
-    return slideInHorizontally(
-        initialOffsetX = { fullWidth -> -fullWidth / ACTIVITY_BACKGROUND_OFFSET_DIVISOR },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            fadeIn(animationSpec = tween(durationMillis = NAV_ENTER_FADE_DURATION_MS)) +
-            scaleIn(
-                initialScale = ACTIVITY_BACKGROUND_TARGET_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_BACKGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-internal fun activityLikePopExitTransition(): ExitTransition {
-    return slideOutHorizontally(
-        targetOffsetX = { fullWidth -> fullWidth },
-        animationSpec = tween(
-            durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-            easing = FastOutSlowInEasing
-        )
-    ) +
-            activityForegroundFadeOut() +
-            scaleOut(
-                targetScale = ACTIVITY_FOREGROUND_POP_EXIT_SCALE,
-                animationSpec = tween(
-                    durationMillis = ACTIVITY_FOREGROUND_DURATION_MS,
-                    easing = FastOutSlowInEasing
-                )
-            )
-}
-
-private const val ACTIVITY_FOREGROUND_DURATION_MS = 300
-private const val ACTIVITY_BACKGROUND_DURATION_MS = 260
-private const val ACTIVITY_BACKGROUND_OFFSET_DIVISOR = 4
-private const val ACTIVITY_FOREGROUND_INITIAL_SCALE = 0.96f
-private const val ACTIVITY_FOREGROUND_POP_EXIT_SCALE = 0.90f
-private const val ACTIVITY_BACKGROUND_TARGET_SCALE = 0.92f
-private const val NAV_ENTER_FADE_DURATION_MS = 90
-private const val NAV_EXIT_FADE_DURATION_MS = 90
-private const val NAV_EXIT_FADE_DELAY_MS = 120
-private const val NAV_FOREGROUND_EXIT_FADE_DELAY_MS = 210
-
-private fun activityBackgroundFadeOut(): ExitTransition {
-    return fadeOut(
-        animationSpec = tween(
-            durationMillis = NAV_EXIT_FADE_DURATION_MS,
-            delayMillis = NAV_EXIT_FADE_DELAY_MS
-        )
-    )
-}
-
-private fun activityForegroundFadeOut(): ExitTransition {
-    return fadeOut(
-        animationSpec = tween(
-            durationMillis = NAV_EXIT_FADE_DURATION_MS,
-            delayMillis = NAV_FOREGROUND_EXIT_FADE_DELAY_MS
-        )
-    )
 }
 
 private const val SPAM_THRESHOLD = 0.7f

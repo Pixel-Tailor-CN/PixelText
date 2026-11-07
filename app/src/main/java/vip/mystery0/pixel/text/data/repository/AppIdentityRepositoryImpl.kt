@@ -22,8 +22,16 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
     private val preferences = context.getSharedPreferences("app_identity", Context.MODE_PRIVATE)
     private val lock = Any()
     private val combinations = AppDisplayName.entries.flatMap { name ->
-        AppIconStyle.entries.map { icon -> AppIdentity(name, icon) }
-    }
+        AppIconStyle.selectableEntries.map { icon -> AppIdentity(name, icon) }
+    } + listOf(
+        // 只保留旧版本实际发布过的杏色入口，用于升级时关闭旧组件。
+        AppDisplayName.CHISU_FULL,
+        AppDisplayName.SMS_FULL,
+        AppDisplayName.JIANXUN_FULL,
+        AppDisplayName.PIXEL_TEXT,
+        AppDisplayName.CHISU,
+        AppDisplayName.SMS,
+    ).map { AppIdentity(it, AppIconStyle.APRICOT) }
     private val mutableIdentity = MutableStateFlow(readActiveIdentity() ?: AppIdentity())
     override val identity: StateFlow<AppIdentity> = mutableIdentity.asStateFlow()
 
@@ -72,13 +80,15 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
 
     private fun readSavedIdentity(): AppIdentity {
         val values = preferences.all
+        // 首装和未保存名称、图标的旧版升级均沿用经典默认组合。
+        val defaults = AppIdentity()
         return AppIdentity(
             displayName = AppDisplayName.entries.firstOrNull {
                 it.storageValue == values[KEY_NAME]
-            } ?: AppDisplayName.CHISU_FULL,
-            iconStyle = AppIconStyle.entries.firstOrNull {
+            } ?: defaults.displayName,
+            iconStyle = AppIconStyle.selectableEntries.firstOrNull {
                 it.storageValue == values[KEY_ICON]
-            } ?: AppIconStyle.VIOLET,
+            } ?: defaults.iconStyle,
         )
     }
 

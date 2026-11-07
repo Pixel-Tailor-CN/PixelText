@@ -30,12 +30,12 @@
 
 ## 二进制依赖
 
-以下版本于 2026-09-12 对照 `debugRuntimeClasspath` 核对；直接依赖版本以[版本目录](../../gradle/libs.versions.toml)为准。许可文件从对应版本的 Gradle 缓存 JAR/AAR 中提取，并按字节核对。
+以下记录保留 2026-09-12 的运行时依赖核对，直接声明的 WebKit 版本已按当前源码更新；直接依赖版本以[版本目录](../../gradle/libs.versions.toml)为准。许可文件从对应版本的 Gradle 缓存 JAR/AAR 中提取，并按字节核对。
 
 | 组件 | 引入关系与用途 | 许可原文 |
 | --- | --- | --- |
 | `org.jsoup:jsoup:1.23.2` | 直接依赖；本地 HTML DOM 解析，也是 ez-vcard 的传递依赖 | [MIT](jsoup-MIT.txt) |
-| `androidx.webkit:webkit:1.17.0` | 直接依赖；系统 WebView 与 WebViewAssetLoader | [Apache-2.0](webkit-Apache-2.0.txt) |
+| `androidx.webkit:webkit:1.18.0` | 直接依赖；系统 WebView 与 WebViewAssetLoader | [Apache-2.0](webkit-Apache-2.0.txt) |
 | `com.googlecode.ez-vcard:ez-vcard:0.12.2` | 直接依赖；本地 vCard 读取 | [BSD 2-Clause](ez-vcard-ezvcard-ez-vcard.license)、[内嵌 Commons Codec 的 Apache-2.0](ez-vcard-ezvcard-commons-codec.license) |
 | `com.github.mangstadt:vinnie:2.0.2` | ez-vcard 传递依赖 | [MIT 与内嵌 Commons Codec 的 Apache-2.0](vinnie-LICENSES) |
 | `org.freemarker:freemarker:2.3.34` | ez-vcard 传递依赖 | [Apache-2.0](freemarker-META-INF-LICENSE) |
@@ -60,4 +60,4 @@ ez-vcard 请求的 jsoup `1.22.1` 被应用直接声明的 `1.23.2` 替代。`ja
 
 升级这些依赖时，在仓库根目录运行 `./gradlew.bat :app:dependencies --configuration debugRuntimeClasspath`，核对实际解析版本及传递依赖，再检查对应 JAR/AAR 中的全部许可与通知条目。同步更新本索引、原文和源码引入记录；实现细节以代码为准，设计历史留在 `docs/plans/`。
 
-本目录继续作为原文来源与溯源索引。应用现通过 AboutLibraries 在设置 → 关于 → 开源声明中展示依赖；本页列出的许可原文由构建任务打包到相应组件的声明中。补充配置、离线阅读与发布核对方式见[开源声明维护](../development/open-source-notices.md)。
+本目录继续作为原文来源与溯源索引。应用现通过 AboutLibraries 在设置 → 关于与帮助 → 版本与开源 → 开源声明中展示依赖；本页列出的许可原文由构建任务打包到相应组件的声明中。补充配置、离线阅读与发布核对方式见[开源声明维护](../development/open-source-notices.md)。

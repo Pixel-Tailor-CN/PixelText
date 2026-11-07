@@ -4,7 +4,7 @@
 
 **Goal:** 增加默认关闭、保留期限可配置的验证码 SMS 自动删除功能，并每 5 小时通过 WorkManager 清理一次。
 
-**Architecture:** 设置由 `AppSettingsRepository` 持久化，`VerificationCodeCleanupScheduler` 管理唯一周期任务，`VerificationCodeCleanupWorker` 调用验证码仓库删除过期 SMS 和索引。设置页负责受控数字输入与错误提示，应用启动和设置变更都会同步任务状态。
+**Architecture:** 设置由 `AppSettingsRepository` 持久化，`VerificationCodeCleanupScheduler` 管理唯一周期任务，`VerificationCodeCleanupWorker` 从验证码仓库取得过期 ID，再经恢复保护调用消息仓库统一删除 SMS 和索引。设置页负责受控数字输入与错误提示，应用启动和设置变更都会同步任务状态。
 
 **Tech Stack:** Kotlin、Jetpack Compose、Room、Koin、WorkManager、Telephony ContentProvider。
 
@@ -39,11 +39,11 @@
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/data/repository/VerificationCodeRepositoryImpl.kt`
 
 **Interfaces:**
-- Produces: `suspend fun deleteExpiredMessages(cutoffTimestamp: Long): VerificationCodeCleanupResult`。
+- 当前接口：`VerificationCodeRepository.getExpiredMessageIds(cutoffTimestamp: Long): List<Long>`；删除复用 `MessageRepository.deleteMessages()`，没有 `deleteExpiredMessages` 或 `VerificationCodeCleanupResult`。
 
-- [ ] 在 DAO 中按活动 generation 和 `timestamp < cutoffTimestamp` 查询过期索引。
-- [ ] 逐批调用 `TelephonyDataSource.deleteMessages` 删除 SMS，再查询仍存在的 ID。
-- [ ] 只清理已不存在的 SMS 对应索引，并返回扫描、删除和失败数量。
+- 当前 DAO 在主库中按活动 generation、`timestamp < cutoffTimestamp` 及消息地址／时间关联查询有效过期 ID。
+- Worker 以 500 条分批，经 `RestoreSafetyCoordinator.cleanupBatch` 调用 `MessageRepository.deleteMessages()`，统一同步 Provider、镜像和索引。
+- 非默认短信应用返回重试；恢复保护阻止不安全删除。原独立索引库作为历史迁移来源，运行时 DAO 由 `MessageMirrorDatabase` 提供。
 - [ ] 运行 `./gradlew :app:compileDebugKotlin`，预期编译通过。
 
 ### Task 3: 周期 Worker 与调度器

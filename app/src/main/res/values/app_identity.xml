@@ -6,4 +6,6 @@
     <string name="app_name_identity_pixel_text">Pixel Text</string>
     <string name="app_name_identity_chisu">尺素</string>
     <string name="app_name_identity_sms">短信</string>
+    <string name="app_name_identity_message">Message</string>
+    <string name="app_name_identity_pixel_message">Pixel Message</string>
 </resources>

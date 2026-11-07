@@ -2,3 +2,8 @@
 
 *.bat text eol=crlf
 *.jar binary
+
+# 模型资源按原始字节校验哈希，禁止 Git 转换换行符。
+/app/src/main/assets/spam_classifier.tflite -text
+/app/src/main/assets/vocab.txt -text
+/app/src/main/assets/model_contract.json -text

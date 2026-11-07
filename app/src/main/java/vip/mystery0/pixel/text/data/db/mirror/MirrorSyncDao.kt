@@ -5,6 +5,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class MirrorSyncDao {
+    /** 识别只等待迁移及投影恢复，不在识别任务内读取 Provider 修复这些状态。 */
+    @Query("""
+        SELECT EXISTS(SELECT 1 FROM mirror_sync_state WHERE collection='spam_decision_import' AND complete=1)
+        AND NOT EXISTS(SELECT 1 FROM mirror_sync_state WHERE complete=0 AND collection IN
+            ('learning_decision_projection', 'whitelist_decision_projection', 'keyword_decision_projection'))
+    """)
+    abstract suspend fun spamScanReady(): Boolean
+
     @Query("SELECT * FROM mirror_sync_state") abstract fun observeStates(): Flow<List<MirrorSyncStateEntity>>
     @Query("SELECT * FROM mirror_sync_state WHERE collection=:collection") abstract suspend fun state(collection: String): MirrorSyncStateEntity?
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun putState(entity: MirrorSyncStateEntity)

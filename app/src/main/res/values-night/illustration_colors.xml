@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 夜间降低大面积底色亮度，并保留装饰与主体细节的明暗层次。 -->
+    <!-- 归档插图 -->
+    <color name="illustration_archive_base">#293441</color>
+    <color name="illustration_archive_header">#3C4B60</color>
+    <color name="illustration_archive_handle">#617796</color>
+    <color name="illustration_archive_detail">#A7BAD2</color>
+    <color name="illustration_archive_lock_halo">#453D2C</color>
+    <color name="illustration_archive_lock">#C7A56C</color>
+    <color name="illustration_archive_lock_shackle">#E2CAA2</color>
+    <color name="illustration_archive_badge">#465B76</color>
+    <color name="illustration_archive_dot">#536985</color>
+    <color name="illustration_archive_dot_muted">#35475C</color>
+
+    <!-- 会话插图 -->
+    <color name="illustration_conversation_cool_base">#25383E</color>
+    <color name="illustration_conversation_cool_detail">#5B7C85</color>
+    <color name="illustration_conversation_warm_base">#3E352E</color>
+    <color name="illustration_conversation_warm_detail">#8F7861</color>
+    <color name="illustration_conversation_badge">#739DA8</color>
+    <color name="illustration_conversation_badge_detail">#D8E9EC</color>
+    <color name="illustration_conversation_cool_dot">#4B6B74</color>
+    <color name="illustration_conversation_warm_dot">#6B5948</color>
+
+    <!-- 搜索初始状态插图 -->
+    <color name="illustration_search_idle_base">#263B38</color>
+    <color name="illustration_search_idle_heading">#608B82</color>
+    <color name="illustration_search_idle_line">#44645E</color>
+    <color name="illustration_search_idle_lens_halo">#334E47</color>
+    <color name="illustration_search_idle_accent">#91C5B9</color>
+    <color name="illustration_search_idle_dot">#628D83</color>
+    <color name="illustration_search_idle_dot_faint">#3B554E</color>
+    <color name="illustration_search_idle_dot_muted">#50776D</color>
+    <color name="illustration_search_idle_tray">#37564D</color>
+    <color name="illustration_search_idle_tray_detail">#74A79B</color>
+
+    <!-- 搜索无结果插图 -->
+    <color name="illustration_search_empty_base">#3B302B</color>
+    <color name="illustration_search_empty_heading">#8B6F5B</color>
+    <color name="illustration_search_empty_line">#5E493D</color>
+    <color name="illustration_search_empty_lens_halo">#4E382E</color>
+    <color name="illustration_search_empty_accent">#D69C7E</color>
+    <color name="illustration_search_empty_dot">#8A6D56</color>
+    <color name="illustration_search_empty_dot_muted">#5C4638</color>
+    <color name="illustration_search_empty_tray">#594337</color>
+    <color name="illustration_search_empty_tray_detail">#AC7F64</color>
+
+    <!-- 骚扰与规则插图 -->
+    <color name="illustration_spam_base">#352C3E</color>
+    <color name="illustration_spam_line">#786388</color>
+    <color name="illustration_spam_shield_halo">#4B3037</color>
+    <color name="illustration_spam_shield">#D38C92</color>
+    <color name="illustration_spam_person_halo">#4C3A59</color>
+    <color name="illustration_spam_person">#B18BC5</color>
+    <color name="illustration_spam_dot">#705681</color>
+    <color name="illustration_spam_dot_muted">#4C3A59</color>
+    <color name="illustration_spam_shield_detail">#442830</color>
+    <color name="illustration_spam_person_head">#D9C1E8</color>
+</resources>

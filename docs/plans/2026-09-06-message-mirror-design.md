@@ -1,5 +1,17 @@
 # 完整消息镜像与同步底座设计
 
+## 当前实现核对（2026-11-07）
+
+原消息镜像方案已落地，但后续库合并与初始化改造改变了部分架构；下文的初始需求和验收场景不代表本轮已经实测。
+
+- 运行库是 `data/db/mirror/MessageMirrorDatabase.kt` 的 `message_mirror.db` v7，显式迁移链为 1→2→3→4→5→6→7。除消息/附件/同步/MMS 文本索引，还包含初始化、关键词、白名单规则、验证码和归档表；骚扰最终判定及放行字段在 `mirror_message`。旧业务库通过 `MirrorAuxiliaryDatabaseMigration`/`MirrorSpamLegacyImporter` 导入，不能再按最初设计把这些数据当作独立运行库。
+- `ConversationCacheDatabase` 仍承载发件方资料，核心会话通过 `MirrorConversationQuery` 从镜像聚合，`MessageRepositoryImpl` 批量补充资料与联系人。MMS 完整展示由 `MmsContentRepositoryImpl` 与 `ui/message/mms/` 提供，已不限于图片子集。
+- `PixelTextApp` 检查独立 `CURRENT_DATA_VERSION=1`，`DataInitializationCoordinator` 顺序执行 MIRROR/MMS_TEXT/SPAM/VERIFICATION；`MessageMirrorScheduler.cancelLegacyPeriodic()` 撤销旧每日对账，不再注册周期全量任务。
+- 当前列表首次订阅和刷新仍分别经 `getAllConversations()` 与 `refreshConversations()` 调用 `ConversationCacheRepository.refreshIncremental()`；未就绪时可能进行完整对账。不能将取消每日任务扩大为“所有启动/刷新均不读取 Provider”。
+- 接收链路为 `MmsReceiver` → `MmsIncomingPduHandler` 落盘队列 → `MmsDownloadCoordinator`/`RetrieveConfParser`/`MmsProviderWriter`，确认响应由 `MmsReceptionResponseSender` 独立持久化重试。`autoDownloadMms` 仍默认 false，镜像任务只复制本地已有 part。
+
+上述路径均相对 `app/src/main/java/vip/mystery0/pixel/text/`；附件复制与设备差异仍按原验收矩阵验证。
+
 ## 需求拆分
 
 本需求为检索页面重设计的前置需求。先建立独立于会话页面的消息存储，再让检索读取本地库。现有页面结构暂不颠覆；未来可直接按消息、参与方、时间、解析结果组合数据。
@@ -13,7 +25,7 @@
 - 取消新彩信无条件自动下载，设置提供“自动下载彩信”，默认关闭，由用户主动开启；支持手动下载。
 - 系统消息确认删除后，删除对应本地消息和附件；权限丢失、查询失败不能视为删除。
 
-## 现状结论
+## 原方案制定时的背景
 
 现有 `cached_conversation` 只有每个 thread 的摘要；`ConversationCacheRepository.fullSync()` 聚合系统消息后只存摘要，初始化还排除归档 thread。短信详情仍查询 Provider。彩信详情读取首个文本 part、一个地址与图片 URI，无法保留完整参与方与多媒体结构。验证码索引和骚扰库只存业务派生数据。
 
@@ -31,7 +43,7 @@
 
 ## 存储模型
 
-新增独立 Room 数据库 `message_mirror.db`，避免把可重建源数据与现有归档、骚扰、服务号资料混为一体。
+使用 Room 数据库 `message_mirror.db`。当前 v7 已合并归档、骚扰规则与验证码索引；消息源结构和用户/派生状态以明确表、字段区分，服务号资料仍在 `ConversationCacheDatabase`。
 
 ### 消息标识
 
@@ -104,7 +116,7 @@
 
 - 进程内观察 SMS/MMS，包括可捕获的 addr/part 变化；具体 URI 能解析为消息时定向回读，否则标记集合需对账。观察器是提示，不是可靠日志。
 - 本应用收发、已读、删除、下载回调成功后追加 dirty 信号，仍以系统回读为最终值，避免双写漂移。
-- 应用进入前台、权限恢复、首次初始化与手动刷新都安排补同步。WorkManager 使用唯一任务串行协调，并安排低频完整对账作为进程死亡后的兜底；不承诺实时后台运行。
+- Application 生命周期入口只检查初始化版本并注册观察；真实事件与显式修复使用唯一 WorkManager 任务。当前列表订阅/刷新另外调用增量同步，未就绪时可能对账；已取消低频每日全量任务，不承诺实时后台运行。
 - 完整对账检查所有旧记录状态与子结构，不能只扫描更大的 ID 或更晚日期；历史已读、草稿修改、旧附件替换都必须可更新。源不提供可信版本的附件，完整校验轮次需要读流校验摘要，不能永远信任“ID 和大小相同”。
 - 所有写入由统一协调器串行化；本地 revision 防止陈旧任务复活删除记录或把新附件绑定到旧消息。
 
@@ -137,7 +149,7 @@
 - 按源消息持久记录请求令牌，避免双击/重复 WAP Push/重入造成重复下载；用接收时 subId，不静默选择另一张卡。
 - 下载完成不等于镜像完成。真实 PDU 必须被解析并正确写入系统 MMS 头、addr、part，再发 dirty 信号，镜像回读并复制附件。
 
-现有 `MmsReceiver` 直接调用下载，`MmsDownloadReceiver` 主要更新状态，不能据回调成功断言系统已拆解所有 part。官方 `downloadMultimediaMessage` 约定输出的是指定 URI 上的 PDU，需要核实并补齐本应用的解析/持久化链路，不能仅沿用现有注释。参见 [SmsManager](https://developer.android.com/reference/android/telephony/SmsManager)。
+原实现曾由 `MmsReceiver` 直接调用下载、`MmsDownloadReceiver` 主要更新状态；当前已改为原事件落盘、后台协调、解析 PDU 和 Provider 持久化，不能据回调成功断言系统已拆解所有 part。官方 `downloadMultimediaMessage` 约定输出的是指定 URI 上的 PDU，需要核实并补齐本应用的解析/持久化链路，不能仅沿用现有注释。参见 [SmsManager](https://developer.android.com/reference/android/telephony/SmsManager)。
 
 实现使用应用控制的临时 PDU 输出 URI 和精确授权，解析后持久化到 Provider；不添加广泛文件访问权限，不依赖隐藏 API 反射。当前 `WapPushPduParser` 只处理通知，不能冒充 RetrieveConf 解析器。下载故障恢复、解析失败、部分写入清理必须与占位记录关联，避免生成重复会话和消息。持久化完成后才将源状态标为已下载；若先前进程中断，恢复任务依据令牌和源状态幂等续作。
 
@@ -148,11 +160,11 @@
 - MessageRepository 的消息详情读取从 mirror_message 及子表获取，图片指向私有副本。
 - 会话摘要由镜像消息聚合形成兼容投影，使用原 threadId 保持现有导航、归档和主题行为；不把摘要表作为详细消息的父实体。
 - 旧 ConversationCacheDatabase 暂保留服务号表，摘要缓存可过渡清理；不得删除服务号资料。
-- 验证码、骚扰分数等保留为业务派生数据；既有独立后台扫描暂不要求全部改写，但核心页面不能混用两个详情来源。
+- 验证码、骚扰判定仍为业务派生数据，当前存储已归入镜像库；核心页面读取镜像，业务后台扫描和用户系统写入仍各有明确入口。
 - 新的底层接口支持按消息 ID、号码、时间、类型直接读取；无 thread 的记录也能获得完整详情。未来群组重组不受当前 ConversationModel 单地址限制。
 - 新检索页使用此底座。草稿/无有效 thread 的结果至少支持独立消息查看，不能导航到 thread=-1；不在本次增加草稿发送编辑器。
 
-过渡适配器不应丢弃附件模型：保留全部附件给未来 UI，现有图片卡只消费图片子集。音频/视频播放界面升级不属于完整镜像验收，但内容与元数据必须已保存且可读。
+过渡适配器不应丢弃附件模型：保留全部附件给未来 UI，现有图片卡只消费图片子集。音频/视频播放已由后续 MMS 接收方案实现；本镜像文档仍以内容与元数据保存及可读性为验收边界。
 
 ## 验收与完成定义
 

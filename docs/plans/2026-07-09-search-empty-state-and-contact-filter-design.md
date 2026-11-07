@@ -1,180 +1,38 @@
-# 搜索页空状态插图与联系人筛选设计
+# 搜索空状态与号码筛选设计
 
-## 背景
+## 方案演进
 
-当前搜索页存在两个体验问题：
+本需求最初采用搜索框右侧联系人按钮、`contactAddress`／`contactDisplayName` 和仓库末端内存过滤。该方案已被[搜索筛选重设计](2026-09-06-search-filters-redesign-design.md)替代；以下记录当前保留的空状态和号码筛选行为。
 
-- 没有输入内容时，页面中部仅显示一行提示文字，信息密度低，视觉层次弱。
-- 搜索只能依赖关键词、未读、SIM 和彩信筛选，无法直接限定某个联系人。
+## 当前交互
 
-本次设计目标是在不改变搜索页整体导航结构的前提下，增强空状态展示，并加入单选联系人筛选能力。
+无搜索词且无有效筛选时，`SearchUiState.Idle` 通过 `SearchResultList` 显示 `illustration_search_idle` 和“搜索短信和彩信”。空结果使用独立的 `illustration_search_empty`。布局由共享 `AppEmptyState` 控制，不再要求本页面固定向上偏移 48–64dp。
 
-## 目标
+搜索框下方为横向筛选栏，包含发件人号码、已读状态、SIM、消息类型和日期。“发件人号码”进入 `SearchPhoneScreen`，可手动输入或从系统联系人选择一个号码；保存后替换当前号码条件，清除操作也在号码页提供。不是搜索框右侧按钮加独立可关闭联系人 chip 的旧布局。
 
-- 将搜索页 `Idle` 空状态从文字替换为插图。
-- 插图在视觉上位于内容区域中心偏上的位置，避免软键盘遮挡。
-- 在搜索输入框右侧增加联系人入口。
-- 允许用户从系统联系人中选择 1 个联系人作为独立筛选条件。
-- 已选联系人以单个 chip 展示，可点击关闭取消筛选。
-- 当仅有联系人筛选且搜索框为空时，直接展示该联系人的全部短信结果。
+没有关键词但有有效号码条件时仍执行搜索；号码与其他筛选共同作用于 SMS/MMS 镜像。姓名只作为显示信息，不作为号码查询条件。
 
-## 非目标
+## 模型与查询
 
-- 不支持同时选择多个联系人。
-- 不引入新的设置项。
-- 不改造消息搜索的底层 Telephony 查询接口签名。
-- 不新增单元测试；按项目约束使用编译和手动检查验证。
+当前模型位于 `domain/model/search/MessageSearchFilter.kt`，字段为 `phoneNumber`、`phoneDisplayName`、`unreadOnly`、`simSubIds`、`transports` 和 `date`。类型条件只有单选 SMS 或 MMS 时生效；全部／未选等价于不限。
 
-## 数据模型
+`SearchViewModel` 构建 `MessageSearchRequest`，通过 `MessageRepository.searchMessages(request)` 查询本地镜像。`MirrorSearchQuery`／`MirrorSearchDao` 负责号码归一化及参数化 SQL 条件，不能恢复为查询所有消息后在内存匹配联系人。号码规则以 `SearchPhoneNumbers` 为准，不再直接使用 `ContactDataSource.matchesAddress()` 作为搜索过滤器。
 
-扩展 `MessageSearchFilter`，新增联系人筛选字段：
+系统联系人选择由 `PickedPhoneSource` 读取返回 URI；选择失败时提示手动输入，不要求先申请整个通讯录权限或默认短信角色来选择号码。其他短信访问的权限与角色约束不因此改变。
 
-- `contactAddress: String?`
-- `contactDisplayName: String?`
+## 文件与资源
 
-其中：
+代码路径相对 `app/src/main/java/vip/mystery0/pixel/text/`：
 
-- `contactAddress` 是实际搜索过滤条件
-- `contactDisplayName` 只用于 UI 上展示 chip 文案
+- `ui/message/search/SearchScreen.kt`、`SearchFilterBar.kt`：搜索与筛选入口。
+- `ui/message/search/SearchPhoneScreen.kt`、`SearchViewModel.kt`：号码编辑、选择和查询状态。
+- `ui/message/search/SearchResultList.kt`、`ui/component/AppEmptyState.kt`：空状态。
+- `data/source/PickedPhoneSource.kt`、`domain/model/search/SearchPhoneNumbers.kt`：所选号码读取与规范化。
+- `data/db/mirror/MirrorSearchQuery.kt`、`MirrorSearchDao.kt`：本地 SQL 搜索。
+- 插图：`app/src/main/res/drawable/illustration_search_idle.xml`。早期计划要求的原始 SVG 未保留在当前仓库，不能把 `docs/assets/search_idle_illustration.svg` 当作可用源文件。
 
-筛选激活条件更新为：
+## 验证
 
-- `unreadOnly == true`
-- 或 `simSubId != null`
-- 或 `mmsOnly == true`
-- 或 `contactAddress != null`
+早期计划没有单独记录本需求的运行验收结果；后续已验与待验范围见[搜索实施计划](2026-09-06-search-filters-redesign.md)。本次只核对源码，不把后续部分验收扩展为全部场景通过。
 
-## 搜索行为
-
-### 无关键词、无筛选
-
-- `SearchUiState` 为 `Idle`
-- 结果区显示空状态插图
-
-### 有联系人筛选、无关键词
-
-- 直接执行搜索
-- 展示该联系人的全部短信 / 彩信结果
-
-### 有联系人筛选、有关键词
-
-- 先按现有关键词逻辑搜索短信内容
-- 再按联系人号码过滤结果
-
-### 联系人匹配规则
-
-联系人筛选不做纯字符串完全相等比较，而是复用现有联系人号码归一化逻辑：
-
-- 保留原始号码
-- 归一化号码
-- 纯数字号码
-- 去掉 `86` / `0086` 国家码后的号码
-
-只要消息发送方号码和所选联系人号码在归一化 key 集合上有交集，即视为匹配。
-
-## UI 结构
-
-### 顶部栏
-
-顶部栏仍然是返回按钮 + 搜索输入区域，但输入区域右侧新增联系人按钮：
-
-- 联系人按钮始终显示
-- 清空按钮仅在搜索词非空时显示
-
-实现上继续使用现有 `TopAppBar`，输入框和联系人/清空按钮放在同一个标题行中，保证视觉上确实位于输入框右侧。
-
-### 筛选 chip 行
-
-联系人筛选加入现有 chip 行：
-
-- 如果未选联系人，则不显示联系人 chip
-- 如果已选联系人，则显示 1 个联系人 chip
-- chip 文案优先显示联系人名，兜底显示号码
-- chip 带 `x` 图标，点击后清除联系人筛选
-
-其余筛选项保留：
-
-- 未读
-- SIM 1
-- SIM 2
-- 彩信
-
-## 联系人选择交互
-
-复用会话列表页现有联系人选择流程：
-
-- 已有联系人权限时，直接打开系统联系人选择器
-- 没有联系人权限时，先走默认短信应用检查，再申请 `READ_CONTACTS`
-- 选中联系人后，读取：
-  - 电话号码
-  - 联系人显示名
-- 用新联系人覆盖旧联系人筛选
-
-同一时间只允许保留 1 个联系人筛选，不做多选或堆叠。
-
-## 空状态插图
-
-### 资源形式
-
-为了满足“先生成 SVG，再导入 Android”：
-
-- 保存一份原始 SVG 源文件到文档目录
-- 在 `res/drawable/` 中新增导入后的 Android `VectorDrawable`
-
-### 视觉方向
-
-插图采用轻量的 Material 风格：
-
-- 中央是一张短信卡片
-- 上方叠加一个放大镜
-- 周围点缀联系人节点和搜索轨迹元素
-- 颜色采用偏蓝绿色和中性色，适配浅色 / 深色背景
-
-### 布局方式
-
-`Idle` 状态使用单独 composable：
-
-- 内容区域仍然整体 `Box` 居中
-- 插图容器在视觉中心基础上向上偏移约 `48dp ~ 64dp`
-- 插图下方保留一行简短辅助文案
-
-这样在搜索页自动聚焦并弹出软键盘后，插图和提示文字仍能留在用户可见区域。
-
-## 代码结构
-
-### 需要新增
-
-- `app/src/main/res/drawable/illustration_search_idle.xml`
-  - Android 可用的导入后插图资源
-- `docs/assets/search_idle_illustration.svg`
-  - 原始 SVG 源文件
-
-### 需要修改
-
-- `app/src/main/java/vip/mystery0/pixel/text/domain/repository/MessageRepository.kt`
-  - 扩展 `MessageSearchFilter`
-- `app/src/main/java/vip/mystery0/pixel/text/data/source/ContactDataSource.kt`
-  - 暴露号码匹配辅助方法
-- `app/src/main/java/vip/mystery0/pixel/text/data/repository/MessageRepositoryImpl.kt`
-  - 在搜索结果上增加联系人过滤
-- `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchViewModel.kt`
-  - 增加设置 / 清除联系人筛选能力
-- `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchScreen.kt`
-  - 顶部联系人入口、联系人 chip、联系人选择流程
-- `app/src/main/java/vip/mystery0/pixel/text/ui/message/search/SearchResultList.kt`
-  - 空状态改为插图
-
-## 验证方案
-
-按项目约束，不新增单元测试，采用以下方式验证：
-
-- 运行 `./gradlew :app:compileDebugKotlin`
-- 手动检查搜索页：
-  - 无输入无筛选时显示插图
-  - 插图位置在中部偏上
-  - 联系人按钮可打开联系人选择器
-  - 选中联系人后出现单个 chip
-  - 关闭 chip 后联系人筛选被清除
-  - 仅联系人筛选时能直接显示该联系人的所有消息
-  - 联系人筛选与未读 / SIM / 彩信筛选可叠加
-  - 有关键词时结果仍按原逻辑高亮关键词
+维护时按改动编译，并检查无输入空状态、键盘与大字体布局、手动输入／联系人选择／清除、仅号码搜索、与其他筛选叠加及关键词高亮。不新增或运行单元测试。

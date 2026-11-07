@@ -2,7 +2,7 @@ package vip.mystery0.pixel.text.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -59,7 +59,7 @@ fun SenderWhitelistDialogs(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WhitelistRuleType.entries.forEach { type ->
                             FilterChip(
                                 selected = editor.type == type,
@@ -69,12 +69,6 @@ fun SenderWhitelistDialogs(
                             )
                         }
                     }
-                    Text(
-                        if (editor.type == WhitelistRuleType.EXACT)
-                            "完整匹配原始号码，不自动去除 +86 等前缀。添加时可每行输入一个号码，或用逗号分隔。"
-                        else "对原始发件号码整串匹配，例如 106.+。使用 RE2 语法，不支持环视和回溯引用。",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
                     OutlinedTextField(
                         value = editor.input,
                         onValueChange = { viewModel.updateEditor(editor.copy(input = it)) },
@@ -84,6 +78,14 @@ fun SenderWhitelistDialogs(
                         minLines = if (editor.type == WhitelistRuleType.EXACT && editor.id == null) 2 else 1,
                         maxLines = 4,
                         isError = state.error != null,
+                        supportingText = {
+                            Text(
+                                if (editor.type == WhitelistRuleType.EXACT) {
+                                    if (editor.id == null) "保留 +86 等前缀，多个号码用换行或逗号分隔"
+                                    else "完整匹配号码，保留 +86 等前缀"
+                                } else "使用 RE2 整串匹配，例如 106.+；不支持环视或回溯引用",
+                            )
+                        },
                     )
                     OutlinedTextField(
                         value = editor.testSender,
@@ -94,7 +96,7 @@ fun SenderWhitelistDialogs(
                         singleLine = true,
                     )
                     preview?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    Text("保存后也会放行匹配的历史消息，且之后删除或修改规则不会撤销已有放行。请确认号码范围。", style = MaterialTheme.typography.bodySmall)
+                    Text("保存会同时放行匹配的历史短信；之后修改或删除规则不会撤销已有放行。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     if (state.busy) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -103,7 +105,7 @@ fun SenderWhitelistDialogs(
                 }
             },
             confirmButton = {
-                TextButton(onClick = viewModel::save, enabled = !state.busy) { Text("保存") }
+                TextButton(onClick = viewModel::save, enabled = !state.busy && editor.input.isNotBlank()) { Text("保存") }
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissDialog, enabled = !state.busy) { Text("取消") }

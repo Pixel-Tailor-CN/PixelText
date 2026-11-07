@@ -2,7 +2,7 @@
 
 > 实施方式：使用 Superpowers writing-plans 的接口与验收拆解，以及 executing-plans / subagent-driven-development 的分工、独立评审和完成前验证。项目规范优先：正式文件放 `docs/plans/`，不新增单元测试，不机械重复已获授权的设计审批；独立模块可以并行实现，共享 Gradle 构建串行执行。
 
-> 后续决定（2026-10-12）：用户要求普通构建开放 MMS 发送入口并移除构建开关。下文关于默认禁用和受控开关的旧约束由该决定取代；历史构建与验证记录保留，运营商验收结果仍须以真机实测为准。
+> 当前状态：单人 MMS 发送已实现并在普通构建开放，不再使用发送构建开关。下方任务清单保留当时的实现与验证拆分，未勾选的验证项不表示对应功能仍被禁用。
 
 **目标：** 为一个明确电话号码实现可恢复草稿、私有附件、平台 MMS 发送与可信结果展示。
 
@@ -22,7 +22,6 @@
 - Provider 在途用 DRAFTS，成功 SENT，其余终态 FAILED；绝不建立系统 OUTBOX/pending 自动发送任务
 - 回调事实、SendConf、Provider同步和镜像状态分开；UNKNOWN 不自动重发；PDU 不放cache
 - 不新增 `src/test`、`src/androidTest`、测试依赖；验证用构建、lint、现有/仓库外 mock runtime harness
-- 已获单独批准推送功能分支、创建草稿 PR 与运行/修复其 CI；仍不真实发送、不合并或发布
 - 普通构建开放发送入口；回调恢复始终启用
 
 ## 重点评审场景
@@ -52,7 +51,7 @@
 
 文件：新增 `mms/outgoing/MmsAttachmentPreparer.kt`、`MmsPayloadStore.kt`、`MmsSendPolicyResolver.kt`、`MmsSendPduComposer.kt`；必要vendor Composer与许可索引。
 
-接口：`MmsSendPolicyResolver.resolve(subId): MmsSendPolicy`；`MmsAttachmentPreparer.import(uri)`和`prepare(original, policy, budget)`产出私有文件身份；`MmsSendPduComposer.compose(snapshot, transactionId): ComposedMms` 返回完整PDU与Provider同源part。
+实际接口：`MmsSendPolicyResolver.resolve(subId): MmsSendPolicy`；`MmsAttachmentPreparer.importAttachment(uri)` 和 `prepare(attachment, policy, budget)` 产出私有附件记录；`MmsSendPduComposer.compose(snapshot, transactionId): ComposedMms` 返回完整 PDU 与 Provider 同源 part。
 
 - [x] content URI有界复制、元数据净化、空间/数量/像素保护与取消清理
 - [x] 静态图方向/尺寸/质量适配；动画不静默静态化，原件型内容超限阻断；非 UTF-8／含 NUL 纯文本及外部 SMIL 以明确提示的 octet-stream 原件保持 Provider/PDU 字节一致
@@ -77,9 +76,9 @@
 
 文件：新增 `MmsComposerViewModel.kt`、`ui/message/mms/MmsComposer.kt`；修改ConversationDetailScreen、ComposeSmsActivity、消息状态投影和Manifest分享入口。
 
-接口：UI通过Repository/协调器编辑和接纳；不直接访问SmsManager，不在ViewModel等待平台结果。独立编辑器与已有正文SMS路径清晰分流。
+当前接口：UI 通过 Repository／协调器编辑和接纳，不直接访问 SmsManager，不在 ViewModel 等待平台结果。后续[统一编辑器](2026-10-03-unified-message-composer-design.md)已替代独立工程表单：`MmsComposerDialog` 仅作为宿主，内部复用 `MessageComposer`；正文无主题和附件时走 SMS，其余走 MMS。
 
-- [x] 单号码确认、附件/主题/模式、实时选SIM、准备/转换/错误、PDU大小、费用提示与草稿恢复
+- [x] 单号码确认、附件／主题、实时选 SIM、准备／转换／错误、费用提示与草稿恢复；当前准备和 PDU 大小校验自动执行，不再提供显式协议切换及手动准备表单
 - [x] 接纳后只清空对应revision；失败保留；确定失败手动重试/未知另发提示
 - [x] 外部SEND/SEND_MULTIPLE/SENDTO只预填并保留授权期间附件快照；全部多号码/CC/BCC阻断
 - [x] 已有入站多地址不裁剪、不由首地址自动发MMS；新单人发送明确确认
@@ -88,7 +87,7 @@
 
 ### 任务5：整合、安全与交付验证
 
-文件：README/PRIVACY/AGENTS、许可配置、必要现有runtime验证脚本，设计状态和本计划。
+文件：README/PRIVACY/AGENTS、许可配置、设计状态和本计划。
 
 - [x] 对照设计逐项审查，独立whole-branch review，修复高风险问题
 - [x] `./gradlew :app:compileDebugKotlin :app:lintDebug :app:assembleDebug` 成功
@@ -97,20 +96,10 @@
 - [x] `git diff --check`、暂存清单/隐私/Manifest/Room schema检查，本地提交与draft PR说明
 - [x] 获发布授权后才push与draft PR，核对远端SHA并启动该SHA的CI；运行时结果见 PR #18，真实运营商验收另需明确许可
 
-## 验证限制与开启门槛
+## 当前实现与验证边界
 
-历史验收策略（已由 2026-10-12 后续决定取代）：本地 mock 与模拟器不能证明运营商接受、计费或 native ARM64 真机适配；当时建议生产入口默认关闭，待目标运营商真机验收（明确 SIM、收件号码、费用许可）后再调整默认构建配置。当前普通构建入口已开放；不把编译或 API 调用返回冒充运营商链路验收。
+单人发送、持久草稿、附件准备、平台提交、回调恢复及状态展示已实现。普通构建开放发送入口；不存在默认关闭版或受控开启版的发布流程。
 
-## 实施与验证记录（2026-10-02）
+当前 CI 仅保留 Release 混淆后的 vCard 解析和 TensorFlow Lite 原生库初始化检查，参见 [运行检测说明](../../.github/runtime/README.md)。MMS probe、冷启动、备份和界面回归脚本已删除，不作为本功能的持续检查要求。
 
-- 已实现并完成独立整分支安全评审；本地草稿的导入未完成原因、未知重发风险及恢复编辑来源均持久化，重开页面不会丢失风险确认
-- Provider 局部写入可本地收尾；明确失败重试先同步旧结果并验证旧内容再切事务。旧尝试迟到成功阻止尚未提交的新尝试，并保留冲突事实
-- 原件型附件先按实际字节保留预算，静态图分配剩余空间；预留保守协议开销，最后仍按完整 PDU 实长校验。正文/主题保留 UTF-8，文件文本仅在可无损往返时内联
-- 纯文字分享仍走 SMS；会话附件入口带入正文，只有彩信持久接纳且原 SMS 输入未再改变才清空。返回或删除彩信草稿不会丢掉原 SMS 输入
-- 仓库外合成 harness 已覆盖 PDU 编码边界、并发接纳与领取、未知结果禁自动重发、不同迟到事实、持久风险标记、13类回调解释，以及替身 Provider 的中断/冲突/删除恢复。生成 Room schema 已在 SQLite 验证唯一约束。这些不是 Android Provider 或运营商实测
-- 本地 Kotlin/Java、Lint 与 Debug 构建已通过；默认关闭/受控开启两种完整 R8 构建均完成，入口修正后再次执行最终构建。具体最后提交的检查结果见对应 PR/CI，不能用旧提交构建代替
-- 无 KVM 的 API35 软件模拟器尝试一次：ADB和ARM64转译可见，但启动未确认完成、APK安装超时；已停止，不声称设备/UI通过
-- CI 保留默认关闭版的既有冷启动/备份/vCard回归，再构建受控开启版运行独立 MMS probe。probe 先确认虚拟机身份、SEND_SMS被拒绝及AppOps阻断，只插入 `sourceId=null` 的提交后合成状态，不构造可提交队列，不调用发信 API。它验证 Room→Receiver→Worker 和编辑入口，不能证明 SmsManager 网络提交、实际 TelephonyProvider 写入、MMSC互通或运营商接受
-- 未验门槛继续保留：API31、实际 ARM64 Pixel、真实双卡/角色切换/APN/漫游、完整发送→独立接收端互通与计费链路。生产默认入口仍关闭
-
-- PR #18 首次 CI 的两种完整 R8 构建与既有运行时回归通过；新增 MMS probe 在前置 AppOps 断言处停止。Android 15 权限同步显示 UID ignore、包 allow，需按有效 UID 优先语义判断；修正为仅接受明确 deny/ignore，并在 instrumentation 中再次验证实际模式，未放宽发送权限限制
+历史 Kotlin、Lint、Debug/Release 构建记录不代表当前所有设备和运营商场景已经验证。API 31、实际 ARM64 Pixel、双卡/角色切换/APN/漫游，以及完整发送到独立接收端的互通和计费链路，仍须以对应设备与运营商的实测结果为准。

@@ -51,7 +51,7 @@ fun SpamMessageCard(isSelected: Boolean = false) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "已识别为骚扰短信，内容已自动隐藏",
+                text = "骚扰内容已隐藏",
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor
             )

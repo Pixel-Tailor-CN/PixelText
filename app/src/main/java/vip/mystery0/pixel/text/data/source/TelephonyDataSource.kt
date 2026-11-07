@@ -63,6 +63,7 @@ data class MmsMessageRow(
 )
 
 data class SpamScanMessageRow(
+    val date: Long,
     val messageId: Long,
     val threadId: Long,
     val address: String,
@@ -759,7 +760,8 @@ class TelephonyDataSource(
                 Telephony.Sms._ID,
                 Telephony.Sms.THREAD_ID,
                 Telephony.Sms.ADDRESS,
-                Telephony.Sms.BODY
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE
             ),
             null,
             null,
@@ -771,6 +773,7 @@ class TelephonyDataSource(
             val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.BODY)
             while (cursor.moveToNext()) {
                 rows += SpamScanMessageRow(
+                    date = cursor.getLong(cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)),
                     messageId = cursor.getLong(idIndex),
                     threadId = cursor.getLong(threadIdIndex),
                     address = cursor.getString(addressIndex).orEmpty(),

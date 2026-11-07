@@ -3,6 +3,8 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,7 +53,7 @@ fun MmsMediaViewer(part: MmsPartContent, onBack: () -> Unit, controller: MmsPlay
     LaunchedEffect(part.mediaCacheKey(), part.state) { controller.onViewerSourceChanged(part) }
     Scaffold(topBar = { TopAppBar(title = { Text(if (part.kind == MmsContentKind.VIDEO) "视频" else "音频") },
         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") } }, actions = { MmsAttachmentActions(part, menuOnly = true) }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(part.displayName)
             MmsMediaContent(part, controller)
         }
@@ -67,24 +72,33 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
         if (part.kind == MmsContentKind.VIDEO) {
             Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
                 ContentFrame(player = if (selected) player else null, modifier = Modifier.fillMaxSize())
-                if (!selected) Text("点按播放视频")
+                if (!selected) {
+                    FilledIconButton(
+                        enabled = interactionEnabled && part.statusInfo().actionable,
+                        onClick = { controller.play(part) },
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = "播放视频")
+                    }
+                }
             }
         }
         MmsPartStatus(part)
         if (selected && playback.isBuffering) CircularProgressIndicator()
-        if (selected) playback.error?.let { Text(it) }
+        if (selected) playback.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         val duration = if (selected) playback.durationMillis else 0
         val position = if (selected) playback.positionMillis else 0
-        Slider(
-            value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()),
-            onValueChange = { dragPosition = it },
-            onValueChangeFinished = { dragPosition?.let { controller.seekTo(it.toLong()) }; dragPosition = null },
-            enabled = interactionEnabled && selected && duration > 0 && player?.isCurrentMediaItemSeekable == true,
-            valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
-            modifier = Modifier.semantics { contentDescription = "播放进度" },
-        )
-        Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (selected) {
+            Slider(
+                value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()),
+                onValueChange = { dragPosition = it },
+                onValueChangeFinished = { dragPosition?.let { controller.seekTo(it.toLong()) }; dragPosition = null },
+                enabled = interactionEnabled && selected && duration > 0 && player?.isCurrentMediaItemSeekable == true,
+                valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
+                modifier = Modifier.semantics { contentDescription = "播放进度" },
+            )
+            Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")
+        }
+        if (part.kind != MmsContentKind.VIDEO || selected) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(enabled = interactionEnabled && part.statusInfo().actionable, onClick = {
                 if (showPause) controller.pause() else controller.play(part)
             }) { Text(if (showPause) "暂停" else "播放") }

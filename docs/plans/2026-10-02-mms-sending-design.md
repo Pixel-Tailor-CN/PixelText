@@ -1,8 +1,8 @@
 # MMS 发送能力设计
 
-状态：单人发送范围与方案已获用户确认（2026-10-02），进入实施。后续决定（2026-10-12）：用户要求普通构建开放 MMS 发送入口并移除构建开关；旧文中默认关闭入口的约束由该决定取代，历史运营商验收状态仍以真实设备结果为准。
+状态：单人 MMS 发送已实现，普通构建入口已开放，发送构建开关已移除。本文保留发送链路的设计约束；设备与运营商实测结果按实际证据记录，不以功能开放代替验证。
 
-代码基线：`main` 的 `09ce5f4d03ae1785a496b8ee833f92c00dea0f05`（2026-10-02，已包含 PR #17 的 Release/R8 修复）。本文按 Superpowers brainstorming 的架构设计路径审查现状、比较方案、定义边界和验收条件；目录、中文文档及验证方式遵循 [AGENTS.md](../../AGENTS.md) 和[编码与验证规范](../development/coding-and-validation.md)。设计审阅通过后按[实施计划](2026-10-02-mms-sending-implementation-plan.md)推进实现和验证。
+最初设计基线：`main` 的 `09ce5f4d03ae1785a496b8ee833f92c00dea0f05`（2026-10-02，已包含 PR #17 的 Release/R8 修复）。第 2 节保留该基线的迁移背景；现行编辑交互已由[统一消息编辑器设计](2026-10-03-unified-message-composer-design.md)替代。目录、中文文档及验证方式遵循 [AGENTS.md](../../AGENTS.md) 和[编码与验证规范](../development/coding-and-validation.md)。实施范围和验证边界见[实施计划](2026-10-02-mms-sending-implementation-plan.md)。
 
 ## 1 目标与范围
 
@@ -23,15 +23,15 @@
 - 在已确认的**单个电话号码收件人**范围内，建议支持多种附件类型。含正文、可选主题（不能单独发送空消息）、单张/多张图片、体积合规的音视频、名片、日历及普通文件；“可选择”不承诺所有运营商或接收终端都支持任意 MIME。
 - 图片提供本地适配；音视频及文件先支持合规原件发送，超限明确阻止。音视频自动转码和剪辑作为独立后续能力，不把“能播放”当作“能压缩到彩信大小”。
 - 发送入口包括会话内附件按钮、外部分享至 PixelText、`sms/smsto/mms/mmsto` 编辑入口。外部 Intent 只预填草稿，不能直接启动发送。
-- 无附件、无主题且没有显式选择彩信的单人正文继续走 SMS；长短信不因字符数而静默切为 MMS，附件失败不静默删附件改发 SMS。选择 MMS 后明确显示“彩信”和所用 SIM。
+- 当前统一编辑器中，无附件且无主题的单人正文走 SMS，有附件或非空主题走 MMS；不再提供显式强制 MMS 模式。长短信不因字符数而静默切为 MMS，附件失败不静默删附件改发 SMS。界面明确显示协议和所用 SIM。
 - 保存 MMS 草稿，支持恢复编辑、发送前取消、确定失败后手动重试；提交给系统后不能承诺撤回。
-- 多人 MMS、逐人群发和 CC/BCC 不在本次范围，也不设后续路线图。本草案另不包含邮件地址收件人、RCS、定时发送、拍摄/录音编辑器、富 HTML/SMIL 编辑器或 MMS 备份格式扩展。
+- 多人 MMS、逐人群发和 CC/BCC 不在本次范围，也不设后续路线图。邮件地址收件人、RCS、定时发送、富 HTML/SMIL 编辑器或 MMS 备份格式扩展仍不包含；系统相机拍照与应用内前台录音已由后续统一编辑器实现，不再列为当前缺失能力。
 
 附件类型、原件限制和转换结果必须明确展示，不做隐藏降级。无需再次选择单人或多人范围。
 
-## 2 应用整体审查与复用边界
+## 2 原设计基线的审查与复用边界
 
-这次审查覆盖与发送有关的系统入口、Compose 页面、ViewModel、Provider、镜像、附件解析/展示、后台恢复、许可、备份及 Release 配置；没有把它扩大为无关功能重构。
+下表是 2026-10-02 实施前的代码背景，不是当前缺失清单。现在 `ComposeSmsActivity` 和会话页共用 `MessageComposer`，SMS 已由 `SmsSendCoordinator` 持久协调，`PduComposer` 已补齐，发送 writer 与发送库均已独立实现；镜像主库现为版本 7，手动备份镜像快照仍固定为版本 3。
 
 | 现状与证据 | 对发送设计的影响 |
 | --- | --- |
@@ -47,7 +47,7 @@
 | 镜像 Room 为版本 4；[备份格式](../development/backup-format.md) 仅包含白名单 SMS 快照，备份容器内镜像版本单独固定为 3 | 发送使用独立数据库，避免为执行态修改镜像 schema/备份协议；升级后仍不得恢复自动发信任务 |
 | minSdk 31、target/compileSdk 37、JDK 21、仅 ARM64；Release 开启 R8，PR #17 刚修复反射问题 | 最终必须验证完整混淆 Release 与真实设备，不能只看 Debug 或裁掉 native 库的模拟包 |
 
-[完整接收设计](2026-09-07-mms-reception-design.md) 和[消息镜像设计](2026-09-06-message-mirror-design.md) 是背景；本节结论以当前代码为准。通知快捷回复和通话快速回复仍是现有 SMS 入口，本次不顺带重写整个 SMS 发送栈，但相关 Manifest 资格与纯文本路径必须回归。
+[完整接收设计](2026-09-07-mms-reception-design.md) 和[消息镜像设计](2026-09-06-message-mirror-design.md) 是背景。通知快捷回复和通话快速回复仍是 SMS 入口；当前都应结合持久 SMS 协调器理解，相关 Manifest 资格与纯文本路径仍需回归。
 
 ## 3 方案比较与建议
 
@@ -61,7 +61,7 @@
 
 ## 4 组件职责与数据流
 
-拟新增组件名称用于确定边界，最终文件拆分应按相邻代码规模保持简洁。
+下表按职责描述已实现组件；发送状态直接通过发送仓库、`OutgoingMmsStatus` 和消息模型投影，不要求存在与职责名完全相同的独立类型。
 
 | 组件 | 输入和输出 | 责任 |
 | --- | --- | --- |
@@ -82,22 +82,23 @@ Koin 在 [AppModule](../../app/src/main/java/vip/mystery0/pixel/text/di/AppModul
 
 ### 私有数据库与文件
 
-新增独立 Room 数据库 `outgoing_mms.db`，首版 schema 1，导出 schema；后续升级必须显式 Migration，禁止破坏性重建。它是命令与执行事实库，不是 Telephony 消息镜像。
+当前使用独立 Room 数据库 `outgoing_mms.db`，schema 1，导出 schema；后续升级必须显式 Migration，禁止破坏性重建。它是命令与执行事实库，不是 Telephony 消息镜像。
 
 核心记录：
 
-- `draft`：`draftId`、编辑版本、单个规范化 `recipientAddress`、正文、主题、显式 SMS/MMS 模式、选定 subId、创建/更新时间。页面 SavedState 只保存 ID；正文和文件不塞进 Intent 或 WorkManager Data。
-- `draft_attachment`：稳定附件 ID、顺序、原 MIME/展示名、私有原件身份、准备版本、发送副本 MIME/长度/哈希、转换说明、可见错误。导入失败项仍可删除或重新选择。
+- `draft`：ID、编辑版本、单个 `recipientAddress`、更新时间和接纳标记；正文、主题、选定 subId、附件及重发来源以显式 JSON 保存在 `content`。当前模型没有显式 SMS/MMS 模式字段，协议由附件和主题决定。
+- 附件没有独立 `draft_attachment` 表：稳定附件 ID、顺序、原 MIME/展示名、私有原件身份、发送副本 MIME/长度/哈希、转换说明和可见错误随草稿或冻结快照原子保存；导入失败仍可删除或重新选择。页面 SavedState 保存草稿 ID，WorkManager 不携带正文或文件内容；外部 Intent 的正文仅用于预填。
 - `send_request`：UUID、唯一 `(draftId, draftRevision)`、不可变内容快照、单个 `recipientAddress`、固定 subId、配置版本、源 MMS ID、源行身份校验值、持久化阶段和删除墓碑。
 - `send_attempt`：请求 ID、序号、唯一 attempt token、独立 Transaction-ID、PDU 文件身份/长度/哈希、提交时间、阶段、结果码、HTTP 状态、受限 SendConf 字节/解析结果、Provider 待补写标记。一个请求同一时刻只能有一个可提交 attempt。
 - `file_cleanup`：只包含本功能拥有且已无引用的私有路径，清理失败可重试。
+- `callback_fact`：保存已关联 attempt 的回调事实，以 `(attemptToken, fingerprint)` 唯一约束去重相同回调，保留不同迟到结果。
 
 源附件放 `noBackupFilesDir/mms-outgoing/`，随机内部名称与原展示名分开；发送 PDU 放专门 `filesDir/mms-send-pdu/`，由独立窄范围 FileProvider 暴露。两者不能放可随时被系统回收的 cache 目录。数据库、WAL/SHM 及 PDU 目录显式加入云备份和设备迁移排除；不依赖“已有 root 排除大概覆盖了所有 domain”。
 
 ### 编辑和提交一致性
 
 - 草稿编辑使用 revision 乐观并发控制。附件选择、转换或返回页面的迟到结果只更新匹配 draft/revision 的记录；换 SIM、删除附件或关闭草稿不能被旧任务复活。
-- 文本短时节流保存，发送、退出编辑与切会话前刷新持久化；正在导入的项目显示准备中。无法保证操作系统强杀前最后一次未提交键入，不能虚称每个键都已落盘。
+- 文本先即时更新界面，再通过串行编辑锁保存并合并过期编辑代次；尚未保存时阻止发送，退出走草稿关闭流程。导入期间显示忙碌状态。无法保证操作系统强杀前最后一次未提交键入，不能虚称每个键都已落盘。
 - 只有当前版本所有附件可用、政策校验通过，才能在一个数据库事务内创建发送请求并锁定该快照。双击、旋转、多窗口重复命令返回同一个 requestId。
 - UI 收到“已接纳到本地发送队列”后才清空该草稿版本，并新建下一份草稿；这不等于网络发送成功。落盘失败保留输入和附件。
 - 草稿与发送请求独立持有文件引用。用户编辑下一条消息、删除原草稿或图库原文件，不能改变已经确认的发送载荷。
@@ -118,12 +119,12 @@ Koin 在 [AppModule](../../app/src/main/java/vip/mystery0/pixel/text/di/AppModul
 ### 预算和转换规则
 
 1. 按所选 subId 读取有效配置，检查 `MMS_CONFIG_MMS_ENABLED`、最大消息字节、最大图片宽高、主题长度和相关文本限制。缺失值不得直接按 `Bundle.getInt` 的零解释为真实限制；配置缺失/不可读单独显示，发送保持阻断并可重新读取，不编造所有运营商统一 300 KB 的承诺。
-2. 先计算文本、主题、SMIL、地址和协议头开销，再给媒体分配预算。图片均分剩余预算后可让未用余额供其他图片使用，顺序可预测；达到尺寸/质量底线仍超限时阻断，不能静默移除内容。
+2. 当前先按正文和主题的 UTF-8 长度，加上 4096 字节及每附件 1024 字节余量，预留地址、SMIL 和协议头预算；先处理原件型附件，再按剩余图片数分配预算，未用余额供后续图片使用。此阶段是保守预算，不是精确头部编码；最终仍以完整 PDU 校验为准。达到尺寸/质量底线仍超限时阻断，不能静默移除内容。
 3. 最终以**完整编码 PDU 的实际字节数**作为发送门槛，附件大小相加不等于彩信大小。总 PDU 另设 10 MiB 防御性上限，取其与运营商上限的较小值。
 4. SIM 或运营商配置改变后使旧预算失效，重新准备并展示内容变化；如果用户已经提交，提交前最后一次复核发现变化则暂停要求重新确认，不能在后台改质量、改附件或改卡。
 5. 音视频/文件超限明确显示大小和限额。后续若增加 Media3 Transformer，要单独定义码率、时长、HDR→SDR、音轨、取消与硬件编码失败处理；[Transformer 依赖设备 MediaCodec 能力](https://developer.android.com/media/media3/transformer/supported-formats)，不是“已经引入 Media3 播放器就能保证压缩”。
 
-输入区持续显示“短信/彩信”、SIM、已准备附件数量和总 PDU 大小；首用彩信和手动重发结果未知消息时提示可能产生运营商费用。不得承诺彩信免费、走 Wi-Fi 必然免费或猜测套餐价格。
+当前输入区显示协议、SIM 和附件预览；准备与完整 PDU 字节校验自动完成，不常驻展示 PDU 大小或要求用户手动准备。首用彩信和手动重发结果未知消息时提示可能产生运营商费用。不得承诺彩信免费、走 Wi-Fi 必然免费或猜测套餐价格。
 
 ## 7 PDU 与平台传输
 
@@ -133,7 +134,7 @@ Koin 在 [AppModule](../../app/src/main/java/vip/mystery0/pixel/text/di/AppModul
 
 发送 PDU 明确包含 `M-Send.req`、MMS 版本、随机唯一且可持久恢复的 Transaction-ID、FROM insert-address-token、唯一 TO 收件地址、日期、可选主题和正文、内容类型及 part。TO 数组必须恰好一项，CC/BCC 为空；应用领域模型保留单个 `recipientAddress`，只有编码边界按 PDU API 构造单元素数组，不引入群收件人抽象。FROM 不依赖读到本机号码，也不把另一张 SIM 的号码填进去。禁用默认请求阅读报告；投递报告先保持关闭，若未来加入开关必须依据运营商能力，且“平台已发送”与“对方已送达/已读”分开。
 
-正文使用 UTF-8；part 具有明确 MIME、字符集、顺序、稳定 CID/Content-Location 和安全协议文件名。多媒体演示使用受限生成的 SMIL 与 `multipart.related`，首 part 为 SMIL且start/CID一致；不接收外部SMIL控制要发送的文件。纯文件集合使用平面 `multipart.mixed`，无需伪造SMIL；普通附件必须保留在multipart和附件列表。上游Composer会为首part写type/start参数，实施时须核对并对mixed与related做必要的最小条件化修正、记录源码差异。发送模型限定平面结构，不假定Composer会递归编码接收器新增的 `PduPart.children`。正文显式选MMS时创建真实文本part；主题为空体时阻断并提示添加正文或附件，所有可提交消息至少有一个有效内容part。
+正文使用 UTF-8；part 具有明确 MIME、字符集、顺序、稳定 CID/Content-Location 和安全协议文件名。多媒体演示使用受限生成的 SMIL 与 `multipart.related`，首 part 为 SMIL且start/CID一致；不接收外部SMIL控制要发送的文件。纯文件集合使用平面 `multipart.mixed`，无需伪造SMIL；普通附件必须保留在multipart和附件列表。上游Composer会为首part写type/start参数，维护时须保留当前对mixed与related的条件处理及源码差异记录。发送模型限定平面结构，不假定Composer会递归编码接收器新增的 `PduPart.children`。走 MMS 的正文创建真实文本part；只有主题而无正文或附件时阻断，所有可提交消息至少有一个有效内容part。
 
 上游有宽松收件人检查、直接访问空字符串首字节、无界流读取等假设；包装层必须先验证恰好一个有效电话号码收件人、非空事务/MIME/CID、字符串终止与长度，Composer内补预算和混合体参数条件，所有charset只使用已验证可编码值。不得把其注释“构造器已验证必需字段”当作实际保证。
 
@@ -225,7 +226,7 @@ MMS 公开存在 `MESSAGE_BOX_FAILED=5`，使用 `Telephony.Mms` 的常量更新
 
 ## 10 界面和系统入口
 
-会话输入区增加附件按钮和附件条，每项显示缩略图/类型、名称、准备进度、转换提示、错误和移除操作。主题采用可展开字段；发送按钮在准备完成、有效收件人/SIM和政策校验通过后可用。附件为空时不自动丢失用户显式选择的彩信模式；切回短信需无主题/附件并有可发送正文。
+会话输入区使用统一 `MessageComposer`，提供附件按钮、预览和移除操作；一次发送操作自动准备附件、校验运营商限制并接纳。主题保留旧草稿和外部输入内容，有非空主题或附件时走 MMS；无主题且明确移除全部附件后回到 SMS。导入失败、准备未完成或无有效号码／SIM 时阻止提交，不能通过丢弃附件降级发送。
 
 状态区不展示伪造百分比：本地导入/压缩可显示实际进度；系统传输只显示“发送中”。气泡或其下方显示发送SIM、失败原因/重试入口、待确认说明。回调结果不是仅一次性 Snackbar，重新打开会话仍能看到。
 
@@ -244,11 +245,11 @@ MMS 公开存在 `MESSAGE_BOX_FAILED=5`，使用 `Telephony.Mms` 的常量更新
 - 现有 `.ptbackup` 仍是 SMS-only，不导出草稿、队列、待回调、MMS附件或 URI授权；旧备份导入不能启动发送。应用数据迁移和降级也不重建网络任务。
 - 当前镜像数据库无 schema 变更即可接收新的标准Provider 行。若实现发现确需扩展持久镜像字段，应另列 Migration和备份影响，不能直接升版本并沿用破坏性兜底。
 - Composer补源需同步许可索引和应用内开源声明配置；不替换已有 parser加固，不为解决R8问题全局 keep整个应用。新增 Receiver/Provider/Room/可选反射入口在完整 Release中验证。
-- 发布前先完成模拟链路与真正运营商验收，再公开发送入口。可用本地构建开关分阶段验证；不引入远程feature开关、埋点或功能上线后默认自动发信。禁用入口也必须允许既有已提交请求记录回调与补写。
+- 普通构建开放发送入口，不设置额外的发送构建开关。发送仍由用户明确确认，不引入远程功能开关或自动发信；已提交请求的回调恢复与补写始终可用。
 
 ## 12 验证策略与验收门槛
 
-遵循仓库“不做单元测试”约定：不新增 `app/src/test/`、`app/src/androidTest/`、测试依赖或 `test*` 任务。设计当前只做代码/文档审查、官方契约核对、差异与引用检查；以下是后续实施验收，不是已通过结果。
+遵循仓库“不做单元测试”约定：不新增 `app/src/test/`、`app/src/androidTest/`、测试依赖或 `test*` 任务。以下是验收要求，不是全部已通过结果；既有构建与运行验证范围见实施计划，本次文档核对不新增设备或运营商通过结论。
 
 | 层级 | 必须覆盖 | 证据与限制 |
 | --- | --- | --- |
@@ -295,4 +296,4 @@ MMS 公开存在 `MESSAGE_BOX_FAILED=5`，使用 `Telephony.Mms` 的常量更新
 - [WorkManager任务管理](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/manage-work)：唯一任务与取消；不能把调度唯一性解释为外部网络恰好一次。
 - [接收外部分享](https://developer.android.com/develop/ui/compose/sharing/receive)：SEND/SEND_MULTIPLE、MIME与用户可编辑确认界面。
 
-仓库目前没有总设计索引；新设计直接放`docs/plans/`并在正文互链相关设计，不新增`docs/superpowers/`或临时进度索引。实现引入Composer时更新已有`docs/licenses/README.md`及开源声明构建配置。验证样例、日志、协议数据和评审过程放已忽略的`docs/.local/`或仓库外，不作为正式文档的必需依赖。
+设计直接放 `docs/plans/` 并在正文互链相关设计，不新增 `docs/superpowers/` 或临时进度索引。已引入 Composer 的来源与许可证见 `docs/licenses/README.md` 及开源声明配置。验证样例、日志、协议数据和评审过程放已忽略的 `docs/.local/` 或仓库外，不作为正式文档的必需依赖。

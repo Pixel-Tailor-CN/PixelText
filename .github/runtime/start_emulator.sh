@@ -16,21 +16,12 @@ echo "$!" > artifacts/emulator.pid
 timeout 240 adb wait-for-device
 for attempt in $(seq 1 120); do
   if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then
-    adb shell input keyevent KEYCODE_WAKEUP
-    adb shell wm dismiss-keyguard
-    adb shell settings put global window_animation_scale 0
-    adb shell settings put global transition_animation_scale 0
-    adb shell settings put global animator_duration_scale 0
-    adb shell settings put system screen_off_timeout 1800000
-    adb shell wm size 1080x2400
-    adb shell wm density 420
     adb shell getprop > artifacts/device-properties.txt
     # 不能用纯 x86 设备、删除原生库或改 ABI 来制造通过结果。
     adb shell getprop ro.product.cpu.abilist | tee artifacts/emulator-abis.txt
     grep -q arm64-v8a artifacts/emulator-abis.txt
     adb shell getprop ro.dalvik.vm.native.bridge | tee artifacts/emulator-native-bridge.txt
     grep -Eq 'lib.*translation|libhoudini' artifacts/emulator-native-bridge.txt
-    adb shell am start -a android.intent.action.MAIN -c android.intent.category.HOME
     exit 0
   fi
   kill -0 "$(cat artifacts/emulator.pid)"

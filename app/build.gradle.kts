@@ -68,6 +68,10 @@ android {
     }
     buildTypes {
         debug {
+            ndk {
+                // 模拟器使用原生 x86_64 库，避免通过 ARM 转译运行模型。
+                abiFilters += "x86_64"
+            }
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
             versionNameSuffix = ".d$gitVersionCode.$gitVersionName"

@@ -7,26 +7,25 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.repository.MirrorSpamScanner
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
-import vip.mystery0.pixel.text.domain.spam.SpamRepository
+import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.worker.HistoricalSpamScanWorker
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
 class SpamConversationListViewModel(
     private val repository: MessageRepository,
-    private val telephonyDataSource: TelephonyDataSource,
-    private val spamRepository: SpamRepository,
+    private val scanner: MirrorSpamScanner,
+    private val mirror: MessageMirrorRepository,
     context: Context
 ) : ViewModel() {
     private val _uiState =
@@ -41,52 +40,77 @@ class SpamConversationListViewModel(
     val historyScanProgress: StateFlow<HistorySpamScanProgress?> =
         _historyScanProgress.asStateFlow()
 
-    private val _isCompletedScanProgressHidden = MutableStateFlow(false)
-    val isCompletedScanProgressHidden: StateFlow<Boolean> =
-        _isCompletedScanProgressHidden.asStateFlow()
+    private val _isScanProgressHidden = MutableStateFlow(false)
+    val isScanProgressHidden: StateFlow<Boolean> =
+        _isScanProgressHidden.asStateFlow()
 
     private val conversations = mutableListOf<ConversationModel>()
     private val appContext = context.applicationContext
     private val workManager = WorkManager.getInstance(appContext)
     private var offset = 0
     private var isLoadingMore = false
-    private var isSilentRefreshActive = false
+    private var listJob: Job? = null
+    private var silentRefreshPending = false
+    private var observationJob: Job? = null
     private var hasMore = true
     private var listRequestVersion = 0
-    private var scanProgressJob: Job? = null
+    private var observedScanId: UUID? = null
 
     init {
-        resumeActiveHistoricalScan()
+        observeHistoricalScans()
+    }
+
+    @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun startObserving() {
+        if (observationJob?.isActive == true) return
+        observationJob = viewModelScope.launch {
+            // 消息和最终判定现在位于同库，统一观察镜像即可覆盖两种更新。
+            mirror.observeConversationChanges().debounce(100.milliseconds).collect {
+                loadSpamConversations(force = true, showLoading = false)
+            }
+        }
+    }
+
+    fun stopObserving() {
+        observationJob?.cancel()
+        observationJob = null
     }
 
     fun loadSpamConversations(
         force: Boolean = false,
         showLoading: Boolean = true,
     ) {
+        // 持续同步时不能反复取消较慢的查询；合并为完成后再刷新一次，既不饿死查询也不丢事件。
+        if (force && !showLoading && isLoadingMore) {
+            silentRefreshPending = true
+            return
+        }
         val keepCurrentContent = force &&
             !showLoading &&
             _uiState.value is SpamConversationListUiState.Success
-        if (keepCurrentContent && isSilentRefreshActive) return
+        val visibleConversations = (_uiState.value as? SpamConversationListUiState.Success)?.conversations
         val fallbackSnapshot = if (keepCurrentContent) {
-            SpamConversationListSnapshot(conversations.toList(), offset, hasMore)
+            SpamConversationListSnapshot(visibleConversations.orEmpty(), visibleConversations.orEmpty().size, hasMore)
         } else {
             null
         }
-        if (keepCurrentContent) isSilentRefreshActive = true
+        val refreshLimit = maxOf(100, visibleConversations?.size ?: 0)
         if (force) {
             listRequestVersion += 1
+            silentRefreshPending = false
+            listJob?.cancel()
             offset = 0
             conversations.clear()
             hasMore = true
             if (!keepCurrentContent) {
                 _uiState.value = SpamConversationListUiState.Loading
             }
-        } else if (conversations.isNotEmpty()) {
+        } else if (isLoadingMore || conversations.isNotEmpty()) {
             return
         }
 
         fetchNextBatch(
-            limit = 100,
+            limit = refreshLimit,
             showError = !keepCurrentContent,
             fallbackSnapshot = fallbackSnapshot,
         )
@@ -102,13 +126,8 @@ class SpamConversationListViewModel(
         viewModelScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val messages = telephonyDataSource.getSmsMessagesForSpamScan()
-                    val identifiedIds =
-                        spamRepository.getIdentifiedMessageIds(messages.map { it.messageId })
-                    HistorySpamStats(
-                        totalCount = messages.size,
-                        identifiedCount = identifiedIds.size
-                    )
+                    val stats = scanner.statistics()
+                    HistorySpamStats(totalCount = stats.total, identifiedCount = stats.total - stats.pending)
                 }
             }
             _historyStatsState.value = result.fold(
@@ -121,14 +140,14 @@ class SpamConversationListViewModel(
     }
 
     fun startHistoricalScan() {
-        _isCompletedScanProgressHidden.value = false
-        val workId = HistoricalSpamScanWorker.schedule(appContext)
-        observeHistoricalScan(workId)
+        _isScanProgressHidden.value = false
+        _historyScanProgress.value = null
+        observedScanId = HistoricalSpamScanWorker.schedule(appContext)
     }
 
-    fun hideCompletedScanProgress() {
-        if (_historyScanProgress.value?.isCompleted == true) {
-            _isCompletedScanProgressHidden.value = true
+    fun hideScanProgress() {
+        if (_historyScanProgress.value?.isFinished == true) {
+            _isScanProgressHidden.value = true
         }
     }
 
@@ -143,7 +162,7 @@ class SpamConversationListViewModel(
     ) {
         val requestVersion = listRequestVersion
         isLoadingMore = true
-        viewModelScope.launch {
+        listJob = viewModelScope.launch {
             try {
                 repository.getSpamConversations(limit, offset)
                     .catch { e ->
@@ -177,90 +196,78 @@ class SpamConversationListViewModel(
                         isLoadingMore = false
                     }
             } finally {
-                if (fallbackSnapshot != null) isSilentRefreshActive = false
+                if (requestVersion == listRequestVersion) {
+                    isLoadingMore = false
+                    if (silentRefreshPending) {
+                        silentRefreshPending = false
+                        loadSpamConversations(force = true, showLoading = false)
+                    }
+                }
             }
         }
     }
 
     private fun mergeConversations(newList: List<ConversationModel>) {
-        val currentByThreadId = conversations.associateBy { it.threadId }
         val merged = (conversations + newList)
-            .distinctBy { it.threadId }
-            .map { conversation ->
-                currentByThreadId[conversation.threadId]?.let { existing ->
-                    if (conversation.timestamp >= existing.timestamp) conversation else existing
-                } ?: conversation
-            }
+            .associateBy { it.threadId }
+            .values
             .sortedByDescending { it.timestamp }
 
         conversations.clear()
         conversations.addAll(merged)
     }
 
-    private fun resumeActiveHistoricalScan() {
+    private fun observeHistoricalScans() {
         viewModelScope.launch {
-            val activeWorkId = withContext(Dispatchers.IO) {
-                workManager.getWorkInfosForUniqueWork(HistoricalSpamScanWorker.UNIQUE_WORK_NAME)
-                    .get()
-                    .firstOrNull { it.state.isActiveScanState() }
-                    ?.id
-            }
-            if (activeWorkId != null) {
-                observeHistoricalScan(activeWorkId)
-            }
+            var lastFinishedId: UUID? = null
+            // 持续观察唯一任务链，排队落库或维护任务替换扫描时不丢失后续状态。
+            workManager.getWorkInfosForUniqueWorkFlow(HistoricalSpamScanWorker.UNIQUE_WORK_NAME)
+                .collect { workInfos ->
+                    val workInfo = workInfos.firstOrNull { !it.state.isFinished }
+                        ?: workInfos.firstOrNull { it.id == observedScanId }
+                        // REPLACE/KEEP 链只有一个当前任务；替换后可能直接收到它的终态。
+                        ?: workInfos.singleOrNull()?.takeIf { observedScanId != null }
+                    if (workInfo == null) {
+                        _historyScanProgress.value = null
+                        return@collect
+                    }
+                    val changedTask = observedScanId != workInfo.id
+                    observedScanId = workInfo.id
+                    if (changedTask || !workInfo.state.isFinished) {
+                        _isScanProgressHidden.value = false
+                    }
+                    val data = if (workInfo.state.isFinished) workInfo.outputData else workInfo.progress
+                    val total = data.getInt(HistoricalSpamScanWorker.KEY_TOTAL, 0)
+                    val processed = data.getInt(HistoricalSpamScanWorker.KEY_PROCESSED, 0)
+                    val phase = when (workInfo.state) {
+                        WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED ->
+                            if (workInfo.runAttemptCount > 0) HistorySpamScanPhase.RETRYING
+                            else HistorySpamScanPhase.WAITING
+                        WorkInfo.State.RUNNING -> when {
+                            !data.keyValueMap.containsKey(HistoricalSpamScanWorker.KEY_TOTAL) ->
+                                HistorySpamScanPhase.PREPARING
+                            total <= 0 || processed >= total -> HistorySpamScanPhase.FINALIZING
+                            else -> HistorySpamScanPhase.SCANNING
+                        }
+                        WorkInfo.State.SUCCEEDED -> HistorySpamScanPhase.COMPLETED
+                        WorkInfo.State.FAILED -> HistorySpamScanPhase.FAILED
+                        WorkInfo.State.CANCELLED -> HistorySpamScanPhase.CANCELLED
+                    }
+                    val progress = HistorySpamScanProgress(
+                        processed = processed,
+                        total = total,
+                        spamCount = data.getInt(HistoricalSpamScanWorker.KEY_SPAM_COUNT, 0),
+                        phase = phase,
+                    )
+                    // 没有待识别短信的后台补扫结束后，不留下空的完成横幅。
+                    _historyScanProgress.value = progress.takeUnless { it.isCompleted && total == 0 }
+                    if (workInfo.state.isFinished && lastFinishedId != workInfo.id) {
+                        lastFinishedId = workInfo.id
+                        loadHistoryStats()
+                        loadSpamConversations(force = true)
+                    }
+                }
         }
-    }
-
-    private fun observeHistoricalScan(workId: UUID) {
-        scanProgressJob?.cancel()
-        scanProgressJob = viewModelScope.launch {
-            while (isActive) {
-                val workInfo = withContext(Dispatchers.IO) {
-                    workManager.getWorkInfoById(workId).get()
-                } ?: break
-
-                val data = if (workInfo.state.isFinishedState()) {
-                    workInfo.outputData
-                } else {
-                    workInfo.progress
-                }
-                val total = data.getInt(HistoricalSpamScanWorker.KEY_TOTAL, 0)
-                val processed = data.getInt(HistoricalSpamScanWorker.KEY_PROCESSED, 0)
-                val spamCount = data.getInt(HistoricalSpamScanWorker.KEY_SPAM_COUNT, 0)
-                if (workInfo.state.isActiveScanState()) {
-                    _isCompletedScanProgressHidden.value = false
-                }
-
-                _historyScanProgress.value = HistorySpamScanProgress(
-                    processed = processed,
-                    total = total,
-                    spamCount = spamCount,
-                    isRunning = workInfo.state.isActiveScanState(),
-                    isCompleted = workInfo.state == WorkInfo.State.SUCCEEDED,
-                    isFailed = workInfo.state == WorkInfo.State.FAILED ||
-                        workInfo.state == WorkInfo.State.CANCELLED
-                )
-
-                if (workInfo.state.isFinishedState()) {
-                    loadHistoryStats()
-                    loadSpamConversations(force = true)
-                    break
-                }
-                delay(800.milliseconds)
-            }
-        }
-    }
-
-    private fun WorkInfo.State.isActiveScanState(): Boolean {
-        return this == WorkInfo.State.ENQUEUED ||
-            this == WorkInfo.State.RUNNING ||
-            this == WorkInfo.State.BLOCKED
-    }
-
-    private fun WorkInfo.State.isFinishedState(): Boolean {
-        return this == WorkInfo.State.SUCCEEDED ||
-            this == WorkInfo.State.FAILED ||
-            this == WorkInfo.State.CANCELLED
     }
 }
 
@@ -291,19 +298,28 @@ sealed class HistorySpamStatsUiState {
     data class Error(val message: String) : HistorySpamStatsUiState()
 }
 
+enum class HistorySpamScanPhase {
+    WAITING, RETRYING, PREPARING, SCANNING, FINALIZING, COMPLETED, FAILED, CANCELLED
+}
+
 data class HistorySpamScanProgress(
     val processed: Int,
     val total: Int,
     val spamCount: Int,
-    val isRunning: Boolean,
-    val isCompleted: Boolean,
-    val isFailed: Boolean
+    val phase: HistorySpamScanPhase,
 ) {
-    val percent: Int
-        get() = if (total <= 0) 100 else ((processed.toFloat() / total) * 100)
-            .toInt()
-            .coerceIn(0, 100)
+    val isCompleted: Boolean get() = phase == HistorySpamScanPhase.COMPLETED
+    val isFinished: Boolean get() = isCompleted || phase == HistorySpamScanPhase.FAILED ||
+        phase == HistorySpamScanPhase.CANCELLED
 
-    val fraction: Float
-        get() = if (total <= 0) 1f else (processed.toFloat() / total).coerceIn(0f, 1f)
+    // 未取得总数、等待重试和收尾时使用不定进度，不能把 0/0 当作 100%。
+    val fraction: Float?
+        get() = when {
+            isCompleted -> 1f
+            phase == HistorySpamScanPhase.SCANNING && total > 0 ->
+                (processed.toFloat() / total).coerceIn(0f, 1f)
+            else -> null
+        }
+
+    val percent: Int? get() = fraction?.let { (it * 100).toInt() }
 }

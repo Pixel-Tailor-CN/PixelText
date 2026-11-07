@@ -98,9 +98,9 @@ fun AppIdentitySettingsScreen(
     var nameValue by rememberSaveable { mutableStateOf(identity.displayName.storageValue) }
     var iconValue by rememberSaveable { mutableStateOf(identity.iconStyle.storageValue) }
     val displayName = AppDisplayName.entries.firstOrNull { it.storageValue == nameValue }
-        ?: AppDisplayName.CHISU_FULL
-    val iconStyle = AppIconStyle.entries.firstOrNull { it.storageValue == iconValue }
-        ?: AppIconStyle.VIOLET
+        ?: AppIdentity().displayName
+    val iconStyle = AppIconStyle.selectableEntries.firstOrNull { it.storageValue == iconValue }
+        ?: AppIdentity().iconStyle
     val draft = AppIdentity(displayName, iconStyle)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -200,7 +200,7 @@ fun AppIdentitySettingsScreen(
             item(key = "icon_heading", span = { GridItemSpan(maxLineSpan) }) {
                 Text("应用图标", style = MaterialTheme.typography.titleSmall)
             }
-            items(AppIconStyle.entries, key = AppIconStyle::storageValue) { style ->
+            items(AppIconStyle.selectableEntries, key = AppIconStyle::storageValue) { style ->
                 AppIconStyleCard(
                     style = style,
                     selected = style == iconStyle,
@@ -213,7 +213,7 @@ fun AppIdentitySettingsScreen(
             }
             item(key = "description", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    "选择名称和图标后，点击「应用」保存；直接返回不会保存更改。名称同步用于桌面和应用主界面，系统通知顶部仍显示「原点尺素」。开启系统主题图标后，桌面配色由系统决定。",
+                    "系统通知名称保持「Pixel Text」；主题图标配色跟随系统。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -264,11 +264,10 @@ private fun AppIconStyleCard(
 private fun AppIdentityIcon(style: AppIconStyle, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val resourceId = when (style) {
-        AppIconStyle.VIOLET -> R.mipmap.ic_launcher_identity_violet
+        AppIconStyle.VIOLET, AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_violet
         AppIconStyle.BLUE -> R.mipmap.ic_launcher_identity_blue
         AppIconStyle.GREEN -> R.mipmap.ic_launcher_identity_green
-        AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_apricot
-        AppIconStyle.CLASSIC -> R.mipmap.ic_launcher_classic
+        AppIconStyle.CLASSIC -> R.mipmap.ic_launcher
     }
     // 使用平台的自适应图标蒙版，避免 Compose 直接读取 adaptive-icon XML。
     val bitmap = remember(context, resourceId) {
