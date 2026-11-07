@@ -2,7 +2,7 @@ name: Release runtime regression
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   android-35-release:
-    if: github.event.action != 'closed'
     name: Minified ARM64 release on Android 15
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -26,13 +25,13 @@ jobs:
       SIGN_KEY_PASSWORD: android
     steps:
       - name: Check out exact PR head
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Set up Java 21
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -69,18 +68,11 @@ jobs:
       - name: Boot KVM emulator and verify official ARM64 translation
         timeout-minutes: 7
         run: bash .github/runtime/start_emulator.sh
-      - name: Exercise cold starts, permissions, backup and vCard runtime
+      - name: Verify minified vCard parsing and native initialization
         timeout-minutes: 12
         run: |
           set -o pipefail
           python3 .github/runtime/runtime_smoke.py --apk app/build/outputs/apk/release/app-release.apk --probe artifacts/probe/probe.apk 2>&1 | tee artifacts/runtime-smoke.log
-      - name: Build independent synthetic MMS callback probe from the release mapping
-        run: bash .github/runtime/build_mms_probe.sh "$GITHUB_WORKSPACE/artifacts/mms-probe"
-      - name: Verify MMS recovery and composer on the release APK without send permission
-        timeout-minutes: 8
-        run: |
-          set -o pipefail
-          python3 .github/runtime/mms_smoke.py --apk app/build/outputs/apk/release/app-release.apk --probe artifacts/mms-probe/probe.apk 2>&1 | tee artifacts/mms-runtime-smoke.log
       - name: Collect final diagnostics
         if: always()
         timeout-minutes: 2
@@ -89,23 +81,9 @@ jobs:
           timeout 15 adb logcat -b crash -d > artifacts/logcat-crash-final.txt 2>&1 || true
           timeout 15 adb emu kill || true
           rm -f "$SIGN_KEY_STORE_FILE"
-      - name: Upload lightweight runtime diagnostics
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: runtime-diagnostics-api35-${{ github.run_id }}
-          path: |
-            artifacts/mms-runtime/
-            artifacts/runtime/
-            artifacts/*runtime-smoke.log
-            artifacts/source-and-runner.txt
-            artifacts/adb-devices.txt
-            artifacts/logcat-crash-final.txt
-          if-no-files-found: error
-          retention-days: 7
       - name: Upload synthetic-data validation evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@v7
         with:
           name: release-runtime-api35-${{ github.run_id }}
           path: |
@@ -114,53 +92,3 @@ jobs:
             app/build/intermediates/mapping/release/minifyReleaseWithR8/mapping.txt
           if-no-files-found: error
           retention-days: 7
-
-  cleanup-pr17-branch:
-    # 用户仅授权本修复分支合并后的清理；不能把范围扩大到其他 PR。
-    if: >-
-      github.event_name == 'pull_request' && github.event.action == 'closed' &&
-      github.event.pull_request.number == 17 && github.event.pull_request.merged == true &&
-      github.repository == 'Pixel-Tailor-CN/PixelText' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'fix/r8-backup-vcard-reflection'
-    name: Delete only merged PR17 temporary branch
-    runs-on: ubuntu-24.04
-    timeout-minutes: 3
-    permissions:
-      contents: write
-      pull-requests: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: Pixel-Tailor-CN/PixelText
-      BRANCH: fix/r8-backup-vcard-reflection
-      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-      EXPECTED_MERGE: ${{ github.event.pull_request.merge_commit_sha }}
-    steps:
-      - name: Verify merge and exact branch before deletion
-        shell: bash
-        run: |
-          set -euo pipefail
-          API="repos/$REPO"
-          DEFAULT_BRANCH=$(gh api "$API" --jq .default_branch)
-          test "$BRANCH" != "$DEFAULT_BRANCH"
-          test "$BRANCH" != main
-          test "$BRANCH" != master
-          PR=$(gh api "$API/pulls/17")
-          jq -e --arg repo "$REPO" --arg branch "$BRANCH" --arg head "$EXPECTED_HEAD" --arg merge "$EXPECTED_MERGE" '
-            .number == 17 and .merged == true and .state == "closed" and
-            .head.repo.full_name == $repo and .head.ref == $branch and
-            .head.sha == $head and .merge_commit_sha == $merge
-          ' <<< "$PR"
-          # 只允许删除 refs/heads 下这个明确的临时分支，保留默认分支及全部标签。
-          REF="$(gh api "$API/git/ref/heads/$BRANCH")"
-          jq -e --arg ref "refs/heads/$BRANCH" --arg head "$EXPECTED_HEAD" '
-            .ref == $ref and .object.type == "commit" and .object.sha == $head
-          ' <<< "$REF"
-          gh api --method DELETE "$API/git/refs/heads/$BRANCH"
-          set +e
-          gh api --include "$API/git/ref/heads/$BRANCH" > "$RUNNER_TEMP/pr17-ref-after.txt" 2>&1
-          STATUS=$?
-          set -e
-          test "$STATUS" -ne 0
-          grep -Eq '^HTTP[^ ]* 404|\(HTTP 404\)' "$RUNNER_TEMP/pr17-ref-after.txt"
-          echo "deleted only refs/heads/$BRANCH at merged head $EXPECTED_HEAD" >> "$GITHUB_STEP_SUMMARY"

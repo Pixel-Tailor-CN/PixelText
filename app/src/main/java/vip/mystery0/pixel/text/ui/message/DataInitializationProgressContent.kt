@@ -52,12 +52,7 @@ internal fun DataInitializationProgressContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "首次准备会处理历史消息，消息较多时可能需要几分钟。",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "步骤 $step/4 · $description",
+            text = "当前步骤 $step/4 · $description",
             style = MaterialTheme.typography.titleMedium,
         )
 
@@ -123,11 +118,6 @@ internal fun DataInitializationProgressContent(
                 else -> "已耗时 ${formatInitializationDuration(currentProgress.elapsedMillis)} · 正在估算剩余时间"
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "进度和用时均针对当前步骤",
-            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

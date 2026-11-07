@@ -70,7 +70,8 @@ class SpamDetectionWorker(
     private val restoreSafety: vip.mystery0.pixel.text.data.backup.RestoreSafetyCoordinator by inject()
     private val spamRepository: SpamRepository by inject()
     private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository by inject()
-    private val spamClassifier: SpamClassifier by inject()
+    private val spamClassifierFactory: vip.mystery0.pixel.text.domain.spam.SpamClassifierFactory by inject()
+    private val learning: vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository by inject()
     private val senderProfileRepository: SenderProfileRepository by inject()
     private val contactDataSource: ContactDataSource by inject()
     private val keywordSpamRepository: KeywordSpamRepository by inject()
@@ -78,6 +79,7 @@ class SpamDetectionWorker(
     private val messageRepository: MessageRepository by inject()
 
     override suspend fun doWork(): Result {
+        spamRepository.ensureReady()
         val messageId = inputData.getLong(KEY_MESSAGE_ID, -1L)
         if (messageId < 0) return Result.failure()
         val messageUri = android.content.ContentUris.withAppendedId(android.provider.Telephony.Sms.CONTENT_URI, messageId).toString()
@@ -106,16 +108,13 @@ class SpamDetectionWorker(
             false
         }
 
-        val score = if (!allowedAtStart && spamRepository.isEnabled()) {
+        val prediction = if (!allowedAtStart && spamRepository.isEnabled() && content.isNotBlank()) {
             runCatching {
-                try {
-                    classificationSemaphore.withPermit {
-                        spamClassifier.classify(content)
-                    }
-                } finally {
-                    spamClassifier.close()
+                classificationSemaphore.withPermit {
+                    spamClassifierFactory.create().use { it.predict(content) }
                 }
             }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 Log.e(TAG, "failed to classify spam message_id=$messageId", error)
                 null
             }
@@ -126,14 +125,27 @@ class SpamDetectionWorker(
 
         // 模型执行期间可能新增白名单。最终自动操作和通知与规则修改串行化，不能使用过期判定。
         // save 自行获取白名单锁，必须位于后面的 withMessageDecision 临界区之外。
+        val key = vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create("SMS", messageId, sender, row.date, content)
+        val messageSource = vip.mystery0.pixel.text.data.source.LearningMessageSource(applicationContext.contentResolver)
+        var stale = false
         restoreSafety.liveMessageEffects(messageId) { allowAutoAction ->
-            if (score != null && score >= 0f) {
-                spamRepository.save(messageId, threadId, score)
-                Log.d(TAG, "spam score message_id=$messageId score=$score")
+            if (prediction != null && spamRepository.isEnabled() && !spamRepository.savePrediction(messageId, threadId, prediction, key)) {
+                stale = true
+                return@liveMessageEffects
             }
+            learning.withDecision {
+            if (prediction != null && !spamRepository.isPredictionCurrent(prediction)) {
+                stale = true
+                return@withDecision
+            }
+            if (messageSource.keys(listOf(messageId))[messageId] != key) return@withDecision
+            // 重新按当前规则匹配，避免推理前的关键词缓存直接驱动自动操作。
+            keywordSpamRepository.updateMessageMatch(messageId, threadId, content)
+            val score = spamRepository.scoreForKey(key)
             whitelist.withMessageDecision(messageId) { allowed ->
-                val isSpam = !allowed && (keywordMatched || (score != null && score >= SPAM_THRESHOLD))
-                if (allowAutoAction) applySpamAutoAction(
+                if (messageSource.keys(listOf(messageId))[messageId] != key) return@withMessageDecision
+                val isSpam = !allowed && (score != null && score >= SPAM_THRESHOLD)
+                if (allowAutoAction && (prediction == null || spamRepository.isEnabled())) applySpamAutoAction(
                     messageId = messageId,
                     isSpam = isSpam,
                     deferNotification = deferNotification,
@@ -150,13 +162,14 @@ class SpamDetectionWorker(
                     notifySpamResult(
                         messageId = messageId,
                         threadId = threadId,
-                        score = if (allowed) 0f else if (keywordMatched) 1f else score ?: -1f,
+                        score = if (allowed) 0f else score ?: -1f,
                     )
                     SmartspacerIntegration.notifyChanged(applicationContext)
                 }
             }
+            }
         }
-        return Result.success()
+        return if (stale) Result.retry() else Result.success()
     }
 
     private suspend fun applySpamAutoAction(
@@ -219,6 +232,7 @@ class SpamDetectionWorker(
                 ?: sender,
             avatarPath = profile?.avatarPath,
             updateExistingOnly = !deferNotification,
+            isSpam = isSpam,
         )
     }
 

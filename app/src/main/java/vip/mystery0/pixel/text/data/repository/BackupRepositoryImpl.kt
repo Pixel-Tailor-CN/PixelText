@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.backup.*
+import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.domain.backup.*
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -34,6 +35,7 @@ class BackupRepositoryImpl(
     private val messages: MessageRepository,
     private val keywords: KeywordSpamRepository,
     private val initializationGuard: vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard,
+    private val spamImporter: MirrorSpamLegacyImporter,
 ) : BackupRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -65,6 +67,8 @@ class BackupRepositoryImpl(
                 if (BackupSection.SMS in sections) {
                     requireReadPermission()
                     phase(BackupPhase.SYNCING_MIRROR)
+                    // 导入器也需要镜像同步锁，必须在快照锁之前完成旧放行状态迁移。
+                    spamImporter.ensureImported()
                     synchronizer.withSmsBackupSnapshot { time ->
                         syncedAt = time
                         phase(BackupPhase.SNAPSHOTTING)

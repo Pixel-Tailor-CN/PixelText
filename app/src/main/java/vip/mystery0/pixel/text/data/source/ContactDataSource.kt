@@ -41,6 +41,17 @@ class ContactDataSource(
         return contactLookupKeys(address).firstNotNullOfOrNull { contactNameCache[it] }
     }
 
+    /** 一次权限检查后批量读取缓存，避免会话列表逐条调用系统权限服务。 */
+    fun getCachedDisplayNames(addresses: Collection<String>): Map<String, String> {
+        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return emptyMap()
+        return buildMap {
+            addresses.distinct().forEach { address ->
+                contactLookupKeys(address).firstNotNullOfOrNull { contactNameCache[it] }
+                    ?.let { put(address, it) }
+            }
+        }
+    }
+
     fun getDisplayName(address: String): String? {
         if (address.isBlank()) return null
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {

@@ -19,6 +19,12 @@ data class HubSpamModelArtifact(
     val model: HubFileArtifact,
     val vocab: HubFileArtifact,
     val releaseNotes: String,
+    val contract: HubFileArtifact,
+    val minAppVersionCode: Int,
+    val modelContractVersion: Int,
+    val preprocessingVersion: String,
+    val personalParameterVersion: String,
+    val featureCompatibilityId: String,
 )
 
 data class HubResourceManifest(
@@ -44,16 +50,6 @@ sealed interface ResourceUpdateAvailability {
         val message: String,
     ) : ResourceUpdateAvailability
 }
-
-data class SampleSubmissionRequest(
-    val deviceId: String,
-    val content: String,
-    val sender: String?,
-    val category: String,
-    val appVersion: String,
-    val ruleVersion: String,
-    val modelVersion: String,
-)
 
 sealed interface HubOperationResult {
     data object Success : HubOperationResult

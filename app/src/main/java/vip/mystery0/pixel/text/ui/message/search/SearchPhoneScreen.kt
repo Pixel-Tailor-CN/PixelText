@@ -139,7 +139,7 @@ fun SearchPhoneScreen(
                                     Text(
                                         text = "输入电话号码",
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 innerTextField()
@@ -217,7 +217,7 @@ fun SearchPhoneScreen(
                         }
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
 
             // 从联系人选择入口
@@ -256,7 +256,7 @@ fun SearchPhoneScreen(
 
             // 若进入时已有号码条件，提供清除入口
             if (!currentFilter.phoneNumber.isNullOrBlank()) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -270,14 +270,14 @@ fun SearchPhoneScreen(
                     Icon(
                         imageVector = Icons.Rounded.Clear,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = "清除号码筛选",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

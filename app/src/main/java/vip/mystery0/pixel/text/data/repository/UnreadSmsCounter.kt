@@ -3,7 +3,9 @@ package vip.mystery0.pixel.text.data.repository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import vip.mystery0.pixel.text.data.db.ConversationArchiveDatabase
+import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
+import vip.mystery0.pixel.text.data.db.mirror.UnreadSmsCandidate
+import vip.mystery0.pixel.text.data.db.mirror.UnreadSmsQuery
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.UnreadSmsCountFilter
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
@@ -11,9 +13,10 @@ import vip.mystery0.pixel.text.domain.spam.SpamRepository
 class UnreadSmsCounter(
     private val telephonyDataSource: TelephonyDataSource,
     private val spamRepository: SpamRepository,
-    archiveDatabase: ConversationArchiveDatabase,
+    database: MessageMirrorDatabase,
 ) {
-    private val archiveDao = archiveDatabase.archivedConversationDao()
+    private val archiveDao = database.archivedConversationDao()
+    private val mirrorDao = database.mirrorDao()
 
     suspend fun count(filter: UnreadSmsCountFilter): Int {
         if (!filter.includeNormalMessages &&
@@ -33,29 +36,20 @@ class UnreadSmsCounter(
             return unreadMessages.size
         }
 
-        val archivedThreadIds = archiveDao.getArchivedThreadIds().toSet()
-        val unreadSpamMessageIds = spamRepository.getSpamMessageIds(
-            unreadMessages.map { it.id },
-            SPAM_THRESHOLD,
-        )
+        // 初始化可能获取同步锁，必须在主库查询或事务之前完成。
+        spamRepository.ensureReady()
         val fullySpamThreadIds = if (filter.excludeFullySpamConversations) {
-            findFullySpamThreadIds(
-                unreadMessages.map { it.threadId }
-                    .distinct()
-                    .filterNot { it in archivedThreadIds },
-            )
+            findFullySpamThreadIds(unreadMessages.map { it.threadId }.distinct())
         } else {
             emptySet()
         }
 
-        return unreadMessages.count { row ->
-            if (row.threadId in fullySpamThreadIds) return@count false
-            val isArchived = row.threadId in archivedThreadIds
-            val isSpam = row.id in unreadSpamMessageIds
-            val isNormal = !isArchived && !isSpam
-            (filter.includeArchivedMessages && isArchived) ||
-                (filter.includeSpamMessages && !isArchived && isSpam) ||
-                (filter.includeNormalMessages && isNormal)
+        return unreadMessages.chunked(UnreadSmsQuery.MAX_CANDIDATES).sumOf { batch ->
+            mirrorDao.filteredUnreadSmsCount(UnreadSmsQuery.count(
+                batch.map { UnreadSmsCandidate(it.id, it.threadId) },
+                filter,
+                fullySpamThreadIds,
+            ))
         }
     }
 
@@ -70,20 +64,19 @@ class UnreadSmsCounter(
             .flatMap { chunk ->
                 val messageIdsByThread =
                     telephonyDataSource.getConversationMessageIdsByThread(chunk)
-                val allMessageIds = messageIdsByThread.values.flatten()
-                val spamMessageIds = spamRepository.getSpamMessageIds(
-                    allMessageIds,
-                    SPAM_THRESHOLD,
-                )
-                messageIdsByThread.filterValues { messageIds ->
-                    messageIds.isNotEmpty() && messageIds.all { it in spamMessageIds }
-                }.keys
+                // 不能仅按镜像判断全会话：尚未同步的正常短信也必须阻止整组隐藏。
+                val candidates = messageIdsByThread.flatMap { (threadId, messageIds) ->
+                    messageIds.map { UnreadSmsCandidate(it, threadId) }
+                }
+                val nonFullySpam = candidates.chunked(UnreadSmsQuery.MAX_CANDIDATES)
+                    .flatMap { batch -> mirrorDao.nonFullySpamThreadIds(UnreadSmsQuery.nonFullySpamThreads(batch)) }
+                    .toSet()
+                messageIdsByThread.filterValues { it.isNotEmpty() }.keys - nonFullySpam
             }
             .toSet()
     }
 
     private companion object {
-        const val SPAM_THRESHOLD = 0.7f
         const val FULLY_SPAM_FILTER_CHUNK_SIZE = 200
     }
 }

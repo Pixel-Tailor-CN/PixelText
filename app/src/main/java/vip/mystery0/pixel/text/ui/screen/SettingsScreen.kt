@@ -3,10 +3,10 @@ package vip.mystery0.pixel.text.ui.screen
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import vip.mystery0.pixel.text.ui.activityLikeEnterTransition
-import vip.mystery0.pixel.text.ui.activityLikeExitTransition
-import vip.mystery0.pixel.text.ui.activityLikePopEnterTransition
-import vip.mystery0.pixel.text.ui.activityLikePopExitTransition
+import vip.mystery0.pixel.text.ui.navigationEnterTransition
+import vip.mystery0.pixel.text.ui.navigationExitTransition
+import vip.mystery0.pixel.text.ui.navigationPopEnterTransition
+import vip.mystery0.pixel.text.ui.navigationPopExitTransition
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import vip.mystery0.pixel.text.ui.screen.settings.SettingsCategory
@@ -43,6 +43,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.Role
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -157,11 +161,12 @@ fun SettingsScreen(
     backupViewModel: BackupViewModel = koinViewModel(),
     whitelistViewModel: SenderWhitelistViewModel = koinViewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToSampleSubmission: () -> Unit = {},
+    onNavigateToSampleReports: () -> Unit = {},
     onNavigateToSwipeActions: () -> Unit = {},
     onNavigateToNotificationActions: () -> Unit = {},
     onNavigateToSmsNotificationIcons: () -> Unit = {},
     onNavigateToAppIdentity: () -> Unit = {},
+    onNavigateToPersonalLearning: () -> Unit = {},
     onNavigateToKeywordSpam: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToOpenSource: () -> Unit = {},
@@ -202,6 +207,7 @@ fun SettingsScreen(
     var confirmSpamDeletion by remember { mutableStateOf(false) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
+    var showNavigationTransitionDialog by remember { mutableStateOf(false) }
     var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
     var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
     var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
@@ -358,7 +364,7 @@ fun SettingsScreen(
                         onValueChange = viewModel::setAutoDownloadMms,
                         title = { Text("自动下载彩信") },
                         icon = { Icon(Icons.Rounded.Image, null) },
-                        summary = { Text("开启后自动下载新收到的彩信，可能使用移动数据") },
+                        summary = { Text("可能使用移动数据") },
                     )
                 },
             )))
@@ -368,12 +374,19 @@ fun SettingsScreen(
                 SettingsEntry("app_identity") {
                     AppIdentitySettingsPreference(onClick = onNavigateToAppIdentity)
                 },
+                SettingsEntry("navigation_transition_style") {
+                    Preference(
+                        title = { Text("页面转场动画") },
+                        summary = { Text(settings.navigationTransitionStyle.title()) },
+                        icon = { Icon(Icons.Rounded.SwapHoriz, contentDescription = null) },
+                        onClick = { showNavigationTransitionDialog = true },
+                    )
+                },
                 SettingsEntry("unread_badge") {
                     SwitchPreference(
                         value = settings.unreadBadgeEnabled,
                         onValueChange = viewModel::setUnreadBadgeEnabled,
                         title = { Text("底部未读数量") },
-                        summary = { Text("在底部会话按钮显示未读短信数量") },
                         icon = {
                             Icon(Icons.Rounded.Notifications, contentDescription = null)
                         },
@@ -461,9 +474,6 @@ fun SettingsScreen(
                         onValueChange =
                             viewModel::setVerificationCodeNotificationActionEnabled,
                         title = { Text("验证码通知快捷复制") },
-                        summary = {
-                            Text("在通知中显示验证码复制按钮")
-                        },
                         icon = {
                             Icon(Icons.Rounded.ContentCopy, contentDescription = null)
                         }
@@ -494,11 +504,26 @@ fun SettingsScreen(
                         onValueChange = viewModel::setSpamDetectionEnabled,
                         title = { Text("本地模型识别") },
                         summary = {
-                            Text("控制本地模型识别；自定义关键词规则不受此开关影响")
+                            Text("关键词拦截单独生效")
                         },
                         icon = {
                             Icon(Icons.Rounded.Shield, contentDescription = null)
                         }
+                    )
+                },
+                SettingsEntry("personal_learning") {
+                    Preference(title = { Text("个人学习") },
+                        summary = { Text(if (settings.personalLearningEnabled) "已开启" else "已关闭") },
+                        icon = { Icon(Icons.Rounded.Memory, null) },
+                        onClick = onNavigateToPersonalLearning)
+                },
+                SettingsEntry("sample_reports") {
+                    Preference(
+                        title = { Text("我的上报") },
+                        icon = {
+                            Icon(Icons.Rounded.UploadFile, contentDescription = null)
+                        },
+                        onClick = onNavigateToSampleReports
                     )
                 },
                 SettingsEntry("keyword_spam") {
@@ -507,9 +532,9 @@ fun SettingsScreen(
                         summary = {
                             Text(
                                 if (blockedKeywords.isEmpty()) {
-                                    "添加只保存在设备本地的短信正文关键词"
+                                    "未添加"
                                 } else {
-                                    "已添加 ${blockedKeywords.size} 个关键词"
+                                    "${blockedKeywords.size} 个关键词"
                                 }
                             )
                         },
@@ -522,7 +547,7 @@ fun SettingsScreen(
                 SettingsEntry("sender_whitelist") {
                     Preference(
                         title = { Text("号码白名单") },
-                        summary = { Text("${whitelistRules.size} 条规则；命中号码优先放行，不受模型或关键词拦截") },
+                        summary = { Text("${whitelistRules.size} 条规则") },
                         icon = { Icon(Icons.Rounded.VerifiedUser, contentDescription = null) },
                         onClick = onNavigateToSenderWhitelist,
                     )
@@ -534,9 +559,6 @@ fun SettingsScreen(
                         value = settings.muteSpamNotificationsEnabled,
                         onValueChange = viewModel::setMuteSpamNotificationsEnabled,
                         title = { Text("骚扰短信不提醒") },
-                        summary = {
-                            Text("模型或关键词识别为骚扰时，不显示通知且不做提醒")
-                        },
                         icon = {
                             Icon(Icons.Rounded.NotificationsOff, contentDescription = null)
                         }
@@ -660,7 +682,7 @@ fun SettingsScreen(
                         onValueChange = viewModel::setResourceAutoCheckEnabled,
                         title = { Text("自动检查资源更新") },
                         summary = {
-                            Text(if (notificationGranted) "定期检查并通知，不会自动下载" else "定期检查，不会自动下载；需要通知权限以接收更新提醒")
+                            Text(if (notificationGranted) "仅提醒，不自动下载" else "仅检查，不自动下载；通知权限未开启")
                         },
                         icon = {
                             Icon(Icons.Rounded.Update, contentDescription = null)
@@ -671,7 +693,7 @@ fun SettingsScreen(
                     Preference(
                         title = { Text("检查间隔时间") },
                         summary = {
-                            Text(if (settings.resourceAutoCheckEnabled) "每 ${settings.resourceAutoCheckIntervalHours} 小时检查一次" else "开启自动检查后生效")
+                            Text(if (settings.resourceAutoCheckEnabled) "每 ${settings.resourceAutoCheckIntervalHours} 小时" else "开启自动检查后生效")
                         },
                         enabled = settings.resourceAutoCheckEnabled,
                         icon = {
@@ -692,7 +714,7 @@ fun SettingsScreen(
                 SettingsEntry("backup_restore") {
                     Preference(
                         title = { Text("备份与恢复") },
-                        summary = { Text(if (backupState.restoreProtected) "恢复保护已开启，请进入确认恢复结果" else "支持加密；不含彩信、附件及应用名称与图标选择") },
+                        summary = { Text(if (backupState.restoreProtected) "恢复保护已开启，请进入确认恢复结果" else "短信、规则与设置") },
                         icon = { Icon(Icons.Rounded.UploadFile, contentDescription = null) },
                         onClick = onNavigateToBackup,
                     )
@@ -707,7 +729,7 @@ fun SettingsScreen(
                                 if (smsSyncState is SmsSyncState.Syncing) {
                                     "正在同步短信数据，请稍候…"
                                 } else {
-                                    "重新读取系统短信和彩信并刷新本地会话缓存"
+                                    "重新读取系统短信和彩信"
                                 }
                             )
                         },
@@ -728,7 +750,7 @@ fun SettingsScreen(
                                 if (isVerificationCodeIndexRunning) {
                                     "正在重新识别短信，请稍候…"
                                 } else {
-                                    "按照当前识别规则重新扫描短信并刷新验证码索引"
+                                    "按当前规则重新识别"
                                 }
                             )
                         },
@@ -745,13 +767,14 @@ fun SettingsScreen(
                     Preference(
                         title = { Text("刷新 Smartspacer 数据") },
                         summary = {
-                            Text("手动触发 Smartspacer 重新计算未读数量和快捷卡片")
+                            Text("更新未读数量与快捷卡片")
                         },
                         icon = {
                             Icon(Icons.Rounded.DashboardCustomize, contentDescription = null)
                         },
                         onClick = {
-                            pendingAdvancedDataAction = AdvancedDataAction.RefreshSmartspacer
+                            SmartspacerIntegration.notifyChanged(context)
+                            Toast.makeText(context, "已刷新 Smartspacer", Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
@@ -787,25 +810,12 @@ fun SettingsScreen(
                 SettingsEntry("open_source") {
                     Preference(
                         title = { Text("开源声明") },
-                        summary = { Text("查看开源组件、源码及许可信息") },
                         icon = { Icon(Icons.Rounded.Code, contentDescription = null) },
                         onClick = onNavigateToOpenSource,
                     )
                 },
             )))
             add(SettingsSection("about_community", "社区与帮助改进", listOf(
-                SettingsEntry("sample_submission") {
-                    Preference(
-                        title = { Text("上报脱敏短信样本") },
-                        summary = {
-                            Text("手动提交已脱敏的短信样本，也可在短信详情页长按单条短信后快速带入")
-                        },
-                        icon = {
-                            Icon(Icons.Rounded.UploadFile, contentDescription = null)
-                        },
-                        onClick = onNavigateToSampleSubmission
-                    )
-                },
                 SettingsEntry("pixel_tailor") {
                     Preference(
                         external = true,
@@ -831,7 +841,6 @@ fun SettingsScreen(
                     Preference(
                         external = true,
                         title = { Text("Telegram 频道") },
-                        summary = { Text("关注 Telegram 频道获取最新动态") },
                         icon = {
                             Icon(Icons.Rounded.Forum, contentDescription = null)
                         },
@@ -895,7 +904,7 @@ fun SettingsScreen(
                 SettingsEntry("system_app_settings") {
                     Preference(
                         title = { Text("在系统中管理权限") },
-                        summary = { Text("权限被拒绝后，可在系统应用详情中重新授权或调整通知") },
+                        summary = { Text("权限与通知") },
                         icon = { Icon(Icons.Rounded.Shield, null) },
                         external = true,
                         onClick = {
@@ -941,10 +950,12 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize(),
                 transitionSpec = {
                     if (navigatingBack) {
-                        (activityLikePopEnterTransition() togetherWith activityLikePopExitTransition())
+                        (navigationPopEnterTransition(settings.navigationTransitionStyle) togetherWith
+                            navigationPopExitTransition(settings.navigationTransitionStyle))
                             .apply { targetContentZIndex = -1f }
                     } else {
-                        (activityLikeEnterTransition() togetherWith activityLikeExitTransition())
+                        (navigationEnterTransition(settings.navigationTransitionStyle) togetherWith
+                            navigationExitTransition(settings.navigationTransitionStyle))
                             .apply { targetContentZIndex = 1f }
                     }.using(null)
                 },
@@ -1057,6 +1068,57 @@ fun SettingsScreen(
                     Text("稍后")
                 }
             }
+        )
+    }
+
+    if (showNavigationTransitionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNavigationTransitionDialog = false },
+            title = { Text("页面转场动画") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(Modifier.selectableGroup()) {
+                        NavigationTransitionStyle.entries.forEach { style ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = settings.navigationTransitionStyle == style,
+                                        role = Role.RadioButton,
+                                        onClick = {
+                                            viewModel.setNavigationTransitionStyle(style)
+                                            showNavigationTransitionDialog = false
+                                        },
+                                    )
+                                    .padding(vertical = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(
+                                    selected = settings.navigationTransitionStyle == style,
+                                    onClick = null,
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(style.title(), style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        style.description(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNavigationTransitionDialog = false }) {
+                    Text("取消")
+                }
+            },
         )
     }
 
@@ -1625,6 +1687,20 @@ private fun SpamAutoActionOption(
     }
 }
 
+private fun NavigationTransitionStyle.title(): String = when (this) {
+    NavigationTransitionStyle.DEFAULT -> "默认"
+    NavigationTransitionStyle.SLIDE -> "横向滑动"
+    NavigationTransitionStyle.FADE -> "淡入淡出"
+    NavigationTransitionStyle.NONE -> "无动画"
+}
+
+private fun NavigationTransitionStyle.description(): String = when (this) {
+    NavigationTransitionStyle.DEFAULT -> "滑动、缩放与淡入淡出"
+    NavigationTransitionStyle.SLIDE -> "左右滑动，返回时反向"
+    NavigationTransitionStyle.FADE -> "渐变切换，不移动页面"
+    NavigationTransitionStyle.NONE -> "直接切换页面"
+}
+
 private fun MessageTimeDisplayFormat.title(): String {
     return when (this) {
         MessageTimeDisplayFormat.HUMANIZED -> "人性化时间"
@@ -1634,8 +1710,8 @@ private fun MessageTimeDisplayFormat.title(): String {
 
 private fun MessageTimeDisplayFormat.dialogSummary(sampleTime: String): String {
     return when (this) {
-        MessageTimeDisplayFormat.HUMANIZED -> "同一条示例短信：5分钟前；点按消息时间可临时切换为详细时间"
-        MessageTimeDisplayFormat.DETAILED -> "同一条示例短信：$sampleTime；点按消息时间可临时切换为人性化时间"
+        MessageTimeDisplayFormat.HUMANIZED -> "5分钟前"
+        MessageTimeDisplayFormat.DETAILED -> sampleTime
     }
 }
 

@@ -13,6 +13,11 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.io.File
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import vip.mystery0.pixel.text.data.resource.HubModelBundle
 
 class HubResourceRepository(
     private val client: PixelTextHubClient,
@@ -21,16 +26,24 @@ class HubResourceRepository(
     private val messageParser: MessageParser,
     private val verificationCodeIndexScheduler: VerificationCodeIndexScheduler,
     private val initializationGuard: vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard,
+    private val activateBundle: suspend (HubModelBundle, suspend () -> Unit) -> Boolean = { _, _ -> false },
 ) {
-    suspend fun checkManifest(): HubResourceManifest = client.fetchManifest()
+    private val updateMutex = Mutex()
+
+    suspend fun checkManifest(): HubResourceManifest = client.fetchManifest().also { manifest ->
+        manifest.spamModel?.let(store::requireCompatible)
+    }
 
     suspend fun checkResourceUpdateAvailability(): ResourceUpdateAvailability {
         val manifest = checkManifest()
-        val remoteRuleVersion = manifest.rules?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
-        val remoteModelVersion =
-            manifest.spamModel?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        if (manifest.rules == null && manifest.spamModel == null) {
+            return ResourceUpdateAvailability.NoUpdate("暂未提供兼容资源，继续使用当前资源")
+        }
         val currentRuleVersion = settings.getRuleResourceVersion()
-        val currentModelVersion = settings.getSpamModelResourceVersion()
+        val currentModelVersion = store.activeModelBundle()?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
+        val remoteRuleVersion = manifest.rules?.version ?: currentRuleVersion
+        val remoteModelVersion =
+            manifest.spamModel?.version ?: currentModelVersion
         return if (
             remoteRuleVersion == currentRuleVersion &&
             remoteModelVersion == currentModelVersion
@@ -48,74 +61,88 @@ class HubResourceRepository(
         manifest: HubResourceManifest,
         onProgress: (message: String, progress: Float) -> Unit = { _, _ -> },
     ): HubOperationResult {
-        return runCatching {
-            val totalBytes = manifest.totalDownloadBytes().coerceAtLeast(1L)
-            var completedBytes = 0L
+        return withContext(Dispatchers.IO) {
+            updateMutex.withLock {
+                runCatching {
+                    manifest.spamModel?.let(store::requireCompatible)
+                    val totalBytes = manifest.totalDownloadBytes().coerceAtLeast(1L)
+                    var completedBytes = 0L
 
-            fun reportProgress(message: String) {
-                onProgress(
-                    message,
-                    (completedBytes.toDouble() / totalBytes.toDouble())
-                        .toFloat()
-                        .coerceIn(0f, 1f)
-                )
-            }
-
-            suspend fun downloadTracked(
-                message: String,
-                url: String,
-                target: File,
-            ) {
-                var reportedBytes = 0L
-                reportProgress(message)
-                client.downloadTo(url, target) { currentBytes ->
-                    val delta = (currentBytes - reportedBytes).coerceAtLeast(0L)
-                    reportedBytes = currentBytes
-                    completedBytes += delta
-                    reportProgress(message)
-                }
-            }
-
-            onProgress("正在准备下载资源", 0f)
-            manifest.rules?.let { rules ->
-                val temp = store.tempFile("rules-${safeVersion(rules.version)}.json")
-                downloadTracked("正在下载智能卡片规则", rules.downloadUrl, temp)
-                store.verifySize(temp, rules.sizeBytes)
-                store.verifySha256(temp, rules.sha256)
-                onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
-                val rulesJson = temp.readText(Charsets.UTF_8)
-                initializationGuard.withInputMutation {
-                    messageParser.replaceRules(rulesJson) {
-                        store.activateRules(temp)
-                        settings.setRuleResourceVersion(rules.version)
+                    fun reportProgress(message: String) {
+                        onProgress(
+                            message,
+                            (completedBytes.toDouble() / totalBytes.toDouble())
+                                .toFloat()
+                                .coerceIn(0f, 1f)
+                        )
                     }
-                    verificationCodeIndexScheduler.scheduleFullRebuild()
+
+                    suspend fun downloadTracked(
+                        message: String,
+                        url: String,
+                        target: File,
+                        expectedSize: Long,
+                    ) {
+                        require(expectedSize > 0) { "resource size missing" }
+                        var reportedBytes = 0L
+                        reportProgress(message)
+                        client.downloadTo(url, target, maxSizeBytes = expectedSize) { currentBytes ->
+                            val delta = (currentBytes - reportedBytes).coerceAtLeast(0L)
+                            reportedBytes = currentBytes
+                            completedBytes += delta
+                            reportProgress(message)
+                        }
+                    }
+
+                    onProgress("正在准备下载资源", 0f)
+                    manifest.rules?.let { rules ->
+                        val temp = store.tempFile("rules-${safeVersion(rules.version)}.json")
+                        downloadTracked("正在下载智能卡片规则", rules.downloadUrl, temp, rules.sizeBytes)
+                        store.verifySize(temp, rules.sizeBytes)
+                        store.verifySha256(temp, rules.sha256)
+                        onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
+                        val rulesJson = temp.readText(Charsets.UTF_8)
+                        initializationGuard.withInputMutation {
+                            messageParser.replaceRules(rulesJson) {
+                                store.activateRules(temp)
+                                settings.setRuleResourceVersion(rules.version)
+                            }
+                            verificationCodeIndexScheduler.scheduleFullRebuild()
+                        }
+                    }
+
+                    manifest.spamModel?.let { spamModel ->
+                        val safeVersion = "${safeVersion(spamModel.version)}-${UUID.randomUUID()}"
+                        val modelTemp = store.tempFile("spam-model-$safeVersion.tflite")
+                        val vocabTemp = store.tempFile("vocab-$safeVersion.txt")
+                        val contractTemp = store.tempFile("contract-$safeVersion.json")
+                        downloadTracked("正在下载离线模型", spamModel.model.downloadUrl, modelTemp, spamModel.model.sizeBytes)
+                        downloadTracked("正在下载模型词表", spamModel.vocab.downloadUrl, vocabTemp, spamModel.vocab.sizeBytes)
+                        downloadTracked("正在下载模型契约", spamModel.contract.downloadUrl, contractTemp, spamModel.contract.sizeBytes)
+                        val candidate = store.stageModelBundle(modelTemp, vocabTemp, contractTemp, spamModel)
+                        modelTemp.delete()
+                        vocabTemp.delete()
+                        contractTemp.delete()
+                        onProgress("正在校验并启用离线模型", completedBytes.toProgress(totalBytes))
+                        // 与初始化扫描保持相同锁序：输入变更锁先于学习决策锁。
+                        initializationGuard.withInputMutation {
+                            check(activateBundle(candidate) {
+                                store.requireCompatible(spamModel)
+                                store.activateModelBundle(candidate)
+                                settings.setSpamModelResourceVersion(spamModel.version)
+                                settings.setVocabResourceVersion(spamModel.version)
+                            }) { "模型更新未完成，已保留当前模型" }
+                        }
+                    }
+
+                    settings.setResourceUpdatedAt(System.currentTimeMillis())
+                    onProgress("资源更新完成", 1f)
+                    HubOperationResult.Success
+                }.getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    HubOperationResult.Failure(error.message ?: "update failed")
                 }
             }
-
-            manifest.spamModel?.let { spamModel ->
-                val safeVersion = safeVersion(spamModel.version)
-                val modelTemp = store.tempFile("spam-model-$safeVersion.tflite")
-                val vocabTemp = store.tempFile("vocab-$safeVersion.txt")
-                downloadTracked("正在下载离线模型", spamModel.model.downloadUrl, modelTemp)
-                downloadTracked("正在下载模型词表", spamModel.vocab.downloadUrl, vocabTemp)
-                store.verifySize(modelTemp, spamModel.model.sizeBytes)
-                store.verifySize(vocabTemp, spamModel.vocab.sizeBytes)
-                store.verifySha256(modelTemp, spamModel.model.sha256)
-                store.verifySha256(vocabTemp, spamModel.vocab.sha256)
-                onProgress("正在校验并启用离线模型", completedBytes.toProgress(totalBytes))
-                initializationGuard.withInputMutation {
-                    store.activateModelAndVocab(modelTemp, vocabTemp)
-                    settings.setSpamModelResourceVersion(spamModel.version)
-                    settings.setVocabResourceVersion(spamModel.version)
-                }
-            }
-
-            settings.setResourceUpdatedAt(System.currentTimeMillis())
-            onProgress("资源更新完成", 1f)
-            HubOperationResult.Success
-        }.getOrElse { error ->
-            HubOperationResult.Failure(error.message ?: "update failed")
         }
     }
 
@@ -136,16 +163,22 @@ class HubResourceRepository(
     }
 
     suspend fun deleteDownloadedModel(): HubOperationResult = withContext(Dispatchers.IO) {
-        runCatching {
-            initializationGuard.withInputMutation {
-                store.deleteActiveModelAndVocab()
-                settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-                settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
-                settings.setResourceUpdatedAt(System.currentTimeMillis())
+        updateMutex.withLock {
+            runCatching {
+                val candidate = store.builtInModelBundle()
+                initializationGuard.withInputMutation {
+                    check(activateBundle(candidate) {
+                        store.activateModelBundle(candidate)
+                        settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                        settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
+                        settings.setResourceUpdatedAt(System.currentTimeMillis())
+                    }) { "模型切换未完成，已保留当前模型" }
+                }
+                HubOperationResult.Success
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                HubOperationResult.Failure(error.message ?: "delete model failed")
             }
-            HubOperationResult.Success
-        }.getOrElse { error ->
-            HubOperationResult.Failure(error.message ?: "delete model failed")
         }
     }
 
@@ -176,7 +209,8 @@ class HubResourceRepository(
         return listOfNotNull(
             rules?.sizeBytes,
             spamModel?.model?.sizeBytes,
-            spamModel?.vocab?.sizeBytes
+            spamModel?.vocab?.sizeBytes,
+            spamModel?.contract?.sizeBytes
         ).sum()
     }
 

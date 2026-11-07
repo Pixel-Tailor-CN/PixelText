@@ -14,13 +14,13 @@
 
 ## 设计
 
-使用 Kotlin 内置目录集中声明图标的稳定 ID、中文名称和 drawable 资源。DataStore 只保存稳定 ID；读取到未知值时回退到双气泡默认项。新增图标只需添加 VectorDrawable 和目录项，不改变存储结构。
+使用 Kotlin 内置目录集中声明图标的稳定 ID、中文名称和 drawable 资源。SharedPreferences 只保存稳定 ID；读取到未知值时回退到双气泡默认项。新增图标只需添加 VectorDrawable 和目录项，不改变存储结构。
 
-保留现有 `ic_notification_sms` 供 Smartspacer 和其他既有调用使用。短信通知使用独立资源，并在构建通知时根据用户设置解析资源。通知回复成功或失败后重建通知时使用相同解析逻辑。
+保留现有 `ic_notification_sms` 供 Smartspacer 和其他既有调用使用。默认双气泡仍复用 `ic_notification_sms`，其他三种使用独立资源；构建短信通知时根据用户设置解析资源。通知回复成功或失败后重建通知时使用相同解析逻辑。
 
 设置页新增“短信通知图标”入口，摘要显示当前图标名称。独立选择页使用两列卡片展示真实单色预览、名称和选中状态；点击立即保存，不主动刷新已经显示的通知。
 
-iconfont 搜索结果用于比较候选类别。首版四种图标均在项目内重新绘制为 Android VectorDrawable，并在资源说明文档中记录来源；应用运行时不访问 iconfont。
+早期设计记录 iconfont 用于比较候选类别；当前四种图标均为本地 Android VectorDrawable，运行时不访问 iconfont。原计划的来源说明文档未保留，源码存在不等于已补齐来源记录。
 
 ## 兼容与验证
 

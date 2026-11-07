@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
 import vip.mystery0.pixel.text.R
@@ -116,6 +117,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeAssetRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeConfigurationRepository
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.backgroundAppearance
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.ui.message.MessageItem
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
@@ -126,7 +128,8 @@ import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
-import vip.mystery0.pixel.text.viewmodel.MarkSpamResultEvent
+import vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel
+import vip.mystery0.pixel.text.domain.hub.LearningFeedback
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
 import vip.mystery0.pixel.text.viewmodel.SendResultEvent
 
@@ -142,6 +145,11 @@ fun ConversationDetailScreen(
         sender: String,
         category: String,
     ) -> Unit = { _, _, _ -> },
+    onNavigateToLearningContribution: (String, String, String, LearningFeedback?) -> Unit = { _, _, _, _ -> },
+    onNavigateToPersonalLearning: () -> Unit = {},
+    onNavigateToSenderWhitelist: () -> Unit = {},
+    onNavigateToKeywordSpam: () -> Unit = {},
+    learningViewModel: PersonalLearningViewModel = koinViewModel(),
     onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
     isTablet: Boolean = false,
     initialMessageText: String = "",
@@ -400,9 +408,6 @@ fun ConversationDetailScreen(
         conversationTitle.isNotBlank() -> conversationTitle
         else -> address
     }
-    val selectedMessageIsSpam = selectedMessage?.spamScore?.let { it >= SPAM_THRESHOLD } == true
-    val spamMarkMenuText =
-        if (selectedMessageIsSpam) "标记为非骚扰短信" else "标记为骚扰短信"
     val canReportSelectedSample = selectedMessage?.content?.isNotBlank() == true
 
     LaunchedEffect(Unit) {
@@ -424,42 +429,39 @@ fun ConversationDetailScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.markSpamResultEvents.collect { event ->
-            when (event) {
-                is MarkSpamResultEvent.Success -> {
-                    val message = if (event.markedAsSpam) {
-                        "已标记为骚扰短信"
-                    } else {
-                        "已标记为非骚扰短信"
-                    }
-                    snackbarHostState.showSnackbar(message)
-                }
+    PersonalLearningDialog(
+        viewModel = learningViewModel,
+        onOpenWhitelist = onNavigateToSenderWhitelist,
+        onOpenKeywords = onNavigateToKeywordSpam,
+    )
 
-                is MarkSpamResultEvent.Failure -> {
-                    snackbarHostState.showSnackbar(event.reason)
-                }
+    LaunchedEffect(learningViewModel) {
+        learningViewModel.savedEvents.collectLatest { event ->
+            event.contribution?.let { draft ->
+                snackbarHostState.currentSnackbarData?.dismiss()
+                onNavigateToLearningContribution(
+                    draft.content,
+                    draft.sender.ifBlank { address },
+                    draft.category,
+                    draft.feedback,
+                )
+                return@collectLatest
             }
-        }
-    }
-
-    LaunchedEffect(selectedMessage?.id) {
-        val message = selectedMessage ?: return@LaunchedEffect
-        if (!canReportSelectedSample) return@LaunchedEffect
-        if (appSettings.sampleSubmissionShortcutHintShown) return@LaunchedEffect
-        settingsRepository.setSampleSubmissionShortcutHintShown(true)
-        val result = snackbarHostState.showSnackbar(
-            message = "可点右上角上报图标，自动带入当前短信",
-            actionLabel = "上报",
-            withDismissAction = true
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            onNavigateToSampleSubmission(
-                message.content,
-                message.sender.ifBlank { address },
-                message.sampleCategory().value,
+            val text = when (event.ruleConflict) {
+                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.WHITELIST ->
+                    "纠正已保存，正在更新个人学习（此短信已放行，放行优先于个人学习）"
+                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.KEYWORD ->
+                    "纠正已保存，正在更新个人学习（该短信仍按关键词优先处理）"
+                null -> "纠正已保存，正在更新个人学习"
+            }
+            val result = snackbarHostState.showSnackbar(
+                message = text,
+                actionLabel = "查看学习",
+                withDismissAction = true,
             )
-            selectedMessageIds.clear()
+            if (result == SnackbarResult.ActionPerformed) {
+                onNavigateToPersonalLearning()
+            }
         }
     }
 
@@ -499,21 +501,6 @@ fun ConversationDetailScreen(
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete")
                         }
                         if (selectedMessageIds.size == 1) {
-                            if (canReportSelectedSample) {
-                                IconButton(onClick = {
-                                    onNavigateToSampleSubmission(
-                                        selectedMessage.content,
-                                        selectedMessage.sender.ifBlank { address },
-                                        selectedMessage.sampleCategory().value,
-                                    )
-                                    selectedMessageIds.clear()
-                                }) {
-                                    Icon(
-                                        Icons.Rounded.UploadFile,
-                                        contentDescription = "Report sample"
-                                    )
-                                }
-                            }
                             var showMoreMenu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
@@ -543,30 +530,27 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(spamMarkMenuText) },
-                                        enabled = selectedMessage != null,
+                                        text = { Text("调整短信分类") },
+                                        enabled = selectedMessage != null && !selectedMessage.isMms,
                                         onClick = {
                                             showMoreMenu = false
-                                            selectedMessage?.let {
-                                                viewModel.markMessageSpam(
-                                                    message = it,
-                                                    markedAsSpam = !selectedMessageIsSpam
-                                                )
-                                            }
+                                            selectedMessage?.let(learningViewModel::begin)
                                             selectedMessageIds.clear()
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("上报样本") },
-                                        enabled = selectedMessage?.content?.isNotBlank() == true,
+                                        text = { Text("贡献样本") },
+                                        enabled = canReportSelectedSample,
                                         onClick = {
                                             showMoreMenu = false
                                             selectedMessage?.let { message ->
-                                                onNavigateToSampleSubmission(
-                                                    message.content,
-                                                    message.sender.ifBlank { address },
-                                                    message.sampleCategory().value,
-                                                )
+                                                learningViewModel.prepareContribution(message, address) { content, sender, category, feedback ->
+                                                    if (feedback != null) {
+                                                        onNavigateToLearningContribution(content, sender, category, feedback)
+                                                    } else {
+                                                        onNavigateToSampleSubmission(content, sender, category)
+                                                    }
+                                                }
                                             }
                                             selectedMessageIds.clear()
                                         }
@@ -711,10 +695,15 @@ fun ConversationDetailScreen(
             }
 
             is MessageUiState.Success -> {
-                val currentMessageKeys = state.messages.map { it.stableKey }
-                val entranceMessageKeys = currentMessageKeys.toSet() intersect newMessageKeys
-                val hasNewSentMessage = state.messages.any { message ->
-                    message.stableKey in entranceMessageKeys && !message.isReceived
+                val entranceMessageKeys = remember(state.messages, newMessageKeys) {
+                    if (newMessageKeys.isEmpty()) emptySet() else {
+                        state.messages.mapTo(mutableSetOf()) { it.stableKey } intersect newMessageKeys
+                    }
+                }
+                val hasNewSentMessage = remember(state.messages, entranceMessageKeys) {
+                    entranceMessageKeys.isNotEmpty() && state.messages.any { message ->
+                        message.stableKey in entranceMessageKeys && !message.isReceived
+                    }
                 }
                 LaunchedEffect(entranceMessageKeys, hasNewSentMessage) {
                     if (entranceMessageKeys.isEmpty()) return@LaunchedEffect
@@ -764,6 +753,9 @@ fun ConversationDetailScreen(
                             ?.let(themeAssetRepository::resolve),
                         modifier = Modifier.matchParentSize(),
                     )
+                    if (state.messages.isEmpty()) {
+                        AppEmptyState("还没有消息", modifier = Modifier.fillMaxSize())
+                    }
                     LazyColumn(
                         state = listState,
                         userScrollEnabled = !isZoomGestureActive,

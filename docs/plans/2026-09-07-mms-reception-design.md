@@ -1,11 +1,23 @@
 # MMS 完整接收方案
 
+## 当前实现核对（2026-11-07）
+
+接收、内容展示与附件操作已接入；本文的模拟器环境是 2026-09-07 历史记录，不代表当前仍在线，也不据此补写未实测的接收矩阵。
+
+- `MmsReceiver` 将 WAP Push 交给 `MmsIncomingPduHandler.enqueue()`；通知与报告分流，下载由 `MmsDownloadCoordinator`、`RetrieveConfParser`、`MmsProviderWriter` 完成，接收确认由 `MmsReceptionResponseSender` 持久化调度。`autoDownloadMms=false` 为默认值。
+- 当前已有 Coil/GIF、Media3、jsoup、ez-vcard 依赖（版本见 `gradle/libs.versions.toml`）；内容入口是 `MmsContentRepositoryImpl`、`MmsContent`、`MmsPartScreen`，不是早期只有 imageUris 的适配器。
+- HTML 使用 `MmsHtmlParser` 清洗及 `MmsHtmlResourceHandler` 自定义拦截供给本地资源，`MmsHtmlViewer` 禁用网络/JS/任意 file/content 访问；未直接采用 WebViewAssetLoader 类。搜索仅使用独立 searchBody（纯文本、HTML 可读文字和主题），不会把名片、日历或 SMIL 全文混入搜索。
+- 用户主动单人 MMS 编辑发送已经由后续 `MmsComposerViewModel`、`OutgoingMmsRepository` 和 `mms/outgoing/` 实现；“不实现发送”仅限定本接收方案的原始范围，不代表当前产品缺少发送能力。
+- `.github/runtime` 当前仅保留 Release 混淆后 vCard 与 ARM64 TensorFlow Lite 初始化检查，不能当作完整 MMS 接收/播放/协议确认回归证据。
+
+源码路径相对 `app/src/main/java/vip/mystery0/pixel/text/`，真机及运营商未验项仍以验收记录为准。
+
 状态：用户已审查通过（2026-09-07）；HTML 已确认采用系统 WebView 离线查看。
 
 ## 目标与已确认选择
 
 让 PixelText 具备从接收通知、下载、持久化到查看及导出附件的完整 MMS 接收体验。
-音视频使用 Media3，图片使用 Coil。后续单独实现用户主动编辑和发送 MMS；本次模型保留复用空间，但不预建发送界面。
+音视频使用 Media3，图片使用 Coil。用户主动编辑和发送 MMS 当时划入后续方案；目前已实现单人发送，接收方案本身不负责其状态机。
 协议要求的接收确认属于接收链路，不能因为发送功能后做而遗漏；先核实系统 MMS 服务承担的行为，再补应用实际负责的部分。
 
 本方案对“完整”的定义：
@@ -17,7 +29,7 @@
 - 不支持的编码、损坏数据和受保护内容给出具体状态及保留附件的操作，不承诺所有历史编码和 DRM 都能原生播放。
 - 下载后的解析、分类、缩略图和内容查看均在本地执行。
 
-## 已核实的工程基础
+## 制定方案时的工程基础（历史）
 
 - MirrorMessageModel 已保留所有 part 的 MIME、字符集、顺序、名称、文件名、CID、Content-Location、文本及附件状态。
 - MirrorAttachmentStore 已将附件复制到应用私有目录；同步层有复制失败恢复和删除清理机制。
@@ -33,7 +45,7 @@ Domain 层新增具有明确字段的 MMS 内容模型，包括文本、图片�
 Data 层负责读取内联文本或本地附件流、字符集解码及附件导出；避免在 Compose 中读取文件或解析内容。
 ViewModel 暴露已经解析的展示状态，异步解析按消息标识和 revision 失效，旧解析结果不能覆盖新消息状态。
 会话页面和独立消息详情共用内容渲染组件；短信智能卡片继续沿用现有工厂。
-会话摘要、检索正文、通知摘要使用可读文本和附件类型摘要，不能把 SMIL、vCard 或 HTML 源代码当普通短信正文。
+会话/通知使用可读摘要与附件类型；检索使用后续搜索方案的独立 searchBody，只匹配主题、纯文本及 HTML 可读文字，不搜索名片/日历字段，也不把 SMIL、vCard 或 HTML 源代码当普通正文。
 
 尽量从已有镜像数据派生展示结构。如需要增加嵌套关系或持久化派生字段，提供明确 Room Migration，禁止破坏性重建数据库。
 附件仍通过消息、part 与 revision 关联，避免把私有文件路径作为业务身份。
@@ -49,7 +61,7 @@ ViewModel 暴露已经解析的展示状态，异步解析按消息标识和 rev
 建议使用文字摘要加独立离线 WebView 查看页：
 
 1. 会话内用 Compose 展示可读摘要和“查看完整内容”入口，列表不为每条 HTML 常驻 WebView。
-2. 通过 WebViewAssetLoader 的受限资源处理器提供本条消息的 HTML 和附件，按 CID、Content-Location 映射引用。
+2. 当前通过 `MmsHtmlResourceHandler` 自定义资源拦截提供本条消息的 HTML 和附件，按 CID、Content-Location 映射引用；原 WebViewAssetLoader 建议未直接采用。
 3. WebView 不执行 JavaScript、不注册原生桥、不提交表单、不允许任意文件读取、不自动加载远程图片或样式。
 4. 未命中本消息资源的请求必须明确拒绝，不能回落到网络请求。HTML/XML 解析禁用外部实体解析，并限制输入大小和嵌套。
 5. 用户点击 HTTP/HTTPS 链接时沿用现有链接确认体验，交由外部浏览器打开。电话号码与邮件链接通过明确的用户操作调用对应系统界面。

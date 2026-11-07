@@ -1,5 +1,9 @@
 # Issue #16：设置与 SMS 备份恢复实施计划
 
+## 当前实现核对（2026-11-07）
+
+运行库已合并为 `message_mirror.db` v7。`AppDatabaseSnapshotter` 仅依赖这一个 Room 库，仍拆分生成固定传输格式 3/3/1 的三个快照文件；这些版本不等于当前运行库版本。放行在运行库消息行保存，导出转换为旧协议关联记录，恢复按目标镜像的 localId/revision 条件写入 RELEASED。以下历史模拟器验证记录保留，不代表本次重新验证；当前协议、限制和系统备份边界见[备份格式](../development/backup-format.md)。
+
 > 执行者逐项实施并记录证据；按当前会话授权选择直接执行或协同，不自动启动 worker，不自动提交。任务勾选仅代表实现和相应验证均完成。
 
 **目标：** 实现本地设置、规则及 SMS 备份恢复，支持可选加密、非破坏合并与安全中断。
@@ -43,7 +47,7 @@
 | `domain/backup/BackupRepository.kt` | 类别/预览/阶段/计数/结果模型及 UI 操作契约 |
 | `data/backup/BackupPayloads.kt` | manifest、设置和恢复读取模型，不另定义 SMS NDJSON 格式 |
 | `data/backup/AppDatabaseSnapshotter.kt` | 应用库一致读事务、允许表/行过滤及干净快照生成 |
-| `data/backup/BackupDatabaseReader.kt` | 不可信备份库校验、版本适配、隔离读取与必要迁移 |
+| `data/backup/BackupDatabaseReader.kt` | 不可信备份库校验、固定 3/3/1 隔离读取 |
 | `data/backup/BackupArchiveCodec.kt` | 版本化 ZIP、密码、校验和、限额 |
 | `data/backup/BackupSettingsMapper.kt` | 可迁移设置及主题/背景映射 |
 | `data/backup/BackupRuleStore.kt` | 关键词/白名单并集与状态关联 |
@@ -92,13 +96,13 @@ interface BackupRepository {
 }
 ```
 
-- [x] 定义 manifest/settings DTO 和备份数据库读取模型；manifest 记录容器版本、各库版本/结构标识、类别计数、快照及 SMS 同步时间。以快照镜像 localId 作为 backupId，旧 sourceId/threadId 仅供包内关联。规则和短信保存在裁剪后的应用 DB，不另导出 JSON/NDJSON。
+- [x] 定义 manifest/settings DTO 和备份数据库读取模型；manifest 记录容器版本、固定传输库版本/结构标识、SMS 数量、快照及 SMS 同步时间。以快照镜像 localId 作为 backupId，旧 sourceId/threadId 仅供包内关联。规则和短信保存在裁剪后的应用 DB，不另导出 JSON/NDJSON。
 - [x] 核验 Zip4j 的稳定版本、许可证、Android 最低版本与 AES 支持，锁定版本，不依赖动态版本。确认其输出加密和输入认证错误可以传播到协调器。
-- [x] 实现固定白名单 ZIP 条目：manifest.json、settings.json、databases/message_mirror.db、databases/spam.db、databases/conversation_archive.db、引用的 theme 资源；对已关闭的快照文件流式计算 SHA-256，校验类别计数，最后生成 manifest。
+- [x] 实现固定白名单 ZIP 条目：manifest.json、settings.json、databases/message_mirror.db、databases/spam.db、databases/conversation_archive.db、引用的 theme 资源；对已关闭的快照文件流式计算 SHA-256，校验 SMS 数量，最后生成 manifest。
 - [x] 加密时所有有效载荷使用 AES-256；不加密时保持同样容器结构。不得回退到 ZipCrypto。
 - [x] inspect 只写私有暂存区，读取所有条目到结尾以验证认证码、哈希、记录数和格式；限制实际解压总量、条目数和每条记录大小；拒绝路径穿越、重复和未知条目。
 - [x] 在 BackupDatabaseReader 中只读检查数据库版本、允许表/列/索引、完整性/外键及记录语义；拒绝意外视图、触发器、虚拟表和运行态数据，限制扫描资源和取消响应。不执行备份提供的任意 SQL。
-- [x] 明确容器与数据库版本支持矩阵；旧库用读取适配或仅在隔离副本中执行已注册迁移，重新验证后才使用。未知更高版本拒绝，禁止破坏性重建及应用业务初始化回调。
+- [x] 明确容器与数据库版本支持矩阵；当前仅接受 3/3/1，没有旧版迁移实现；未来扩展须显式增加隔离读取适配/迁移与验证。其他版本拒绝，禁止破坏性重建及应用业务初始化回调。
 - [x] inspect 成功生成随机 token，仅引用当前已校验的私有快照；备份库不注册到当前镜像同步器。restore 不重新读取可能被替换的外部 URI；token 不跨进程重用。
 - [x] 实现暂存文件生命周期，取消、认证失败和后续启动清理残留；导出完整关闭前不报告成功。
 - [ ] 执行 `./gradlew.bat :app:compileDebugKotlin`；用后续页面或本地临时验证入口生成合成空包、加密包、截断包，检查错误密码与畸形条目被拒绝。没有完成实际往返验证时保持本项未勾选。
@@ -117,7 +121,7 @@ interface BackupRepository {
 - [x] 背景仅复制当前配置引用的资源；导入先验证并生成新资产，再提交主题配置，失败清理新资产，不能先删旧背景。
 - [x] Smartspacer 只导出默认筛选，恢复不写旧 smartspacerId 的 scoped key。
 - [x] 关键词以 trim + lowercase(Locale.ROOT) 取并集，白名单按 type/value 取并集；全量预校验规则、正则和 500 条上限，超限在该类别写入前拒绝，不静默截断。
-- [x] 从 spam/归档库在一致读事务内读取选中类别；与任务 3 的 SMS 来源身份核对，只输出可关联状态，关联失败计入 skippedAssociations。跨库不承诺全局事务，禁止将旧 sourceId 直接当目标 ID。
+- [x] 从运行镜像库读取规则、消息行放行和归档关系，生成独立协议快照；与任务 3 的 SMS 来源身份核对，只输出可关联状态，关联失败计入 skippedAssociations。各输出文件分属独立源读事务，不承诺全局事务，禁止将旧 sourceId 直接当目标 ID。
 - [x] 恢复时从隔离快照读取规则，在运行 Room 库事务内合并，不复制主键、不覆盖整个 DB。单条放行和归档延迟到任务 3 产生目标 ID 映射后处理。
 - [ ] 编译后使用合成配置核对暗/亮主题、背景存在/缺失、通知操作顺序、重复规则、非法正则、已有目标设置不丢失。
 
@@ -148,7 +152,7 @@ interface BackupRepository {
 - [x] 入站、已发、草稿、失败保持类型；出站/发送中转失败，同时规范化匹配类型，使再次导入不会不断重复。Provider 拒绝无地址草稿时作为明确失败报告，不偷偷丢弃。
 - [x] ContentValues 不写旧 `_id/thread_id/sub_id`；订阅显式使用有效的未知值。调用 Provider 后查询目标 threadId，不能从来源猜测。
 - [x] 已有匹配短信不覆盖 read/seen。新增消息保留原 read/seen/date/dateSent，锁定等可选列按目标 Provider 支持处理并报告降级。
-- [x] 按目标消息身份重建单条放行指纹，归档根据实际会话重新查询快照；不把 MMS 旧 ID 混入 SMS 映射。
+- [x] 核对源放行指纹，刷新目标镜像后按 localId/revision 条件写入 RELEASED；归档仅保存实际目标会话关系与归档时间，页面摘要由当前消息查询生成；不把 MMS 旧 ID 混入 SMS 映射。
 - [ ] 编译；在可写 SMS 的测试设备上用合成短信验证同键多条、不同日期/方向、空 body、无地址草稿、双 SIM 来源、已有目标消息、连续导入两次及写入后进程中断重试。
 
 **验收：** 快照完整、一致且不含未选类别/运行态数据；源库有 WAL 时记录不丢失。备份库不替换当前库；写回保留真实重复数量，重复导入不增长，无发送副作用；不能精确匹配时保守处理，不误删目标消息。
@@ -161,7 +165,7 @@ interface BackupRepository {
 
 - [x] 在应用作用域创建单任务互斥、IO Job 和 StateFlow；export/inspect/restore 不依赖页面实例存活。重复点击返回“已有操作进行中”。
 - [x] 备份编排为镜像同步 → SMS 完整性确认 → 数据库/设置/主题快照 → 校验 → 打包输出，分别发布 SYNCING_MIRROR/SNAPSHOTTING/EXPORTING。仅设置/规则备份跳过短信同步。
-- [x] 使用私有持久化日志记录恢复阶段和计数，不记录密码、短信正文。启动时发现中断日志发布 INTERRUPTED，并保留删除保护。
+- [x] 使用 `backup_operation` 偏好持久化保护 active 标记及计数/完成类别摘要，不持久化执行阶段断点，不记录密码、短信正文。启动时发现中断日志发布 INTERRUPTED，并保留删除保护。
 - [x] 将恢复启动与验证码删除批次放在同一互斥边界，按以下语义实现；不要先检查布尔值再脱锁删除：
 
 ```text
@@ -213,7 +217,7 @@ finishRestore:
 | 源库 WAL 未 checkpoint、并发写入 | 快照包含已提交记录、父子关系一致，不靠外部 WAL 读取 |
 | 裁剪库及空闲页检查 | 无 MMS、未选类别和运行态任务数据残留 |
 | DB 损坏/未知版本/异常结构 | 业务写入前拒绝，不执行任意 SQL |
-| 支持的旧库迁移、当前镜像正在同步 | 仅隔离适配/迁移，备份源不被清理，运行库不被替换 |
+| 当前 3/3/1 与未知版本、当前镜像正在同步 | 当前格式隔离读取、其他版本拒绝；未来新增旧版支持时另验适配，备份源不被清理，运行库不被替换 |
 | 从快照恢复完成 | Provider 写回正确，当前镜像对账一致 |
 | 加密/明文往返、Unicode 密码 | 两种容器可读，错误密码零业务写入 |
 | 损坏/截断/路径穿越/重复条目/高版本/超限 | 写入前拒绝 |

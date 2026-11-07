@@ -263,6 +263,9 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
+    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
+        "home", (uiState as? ConversationListUiState.Success)?.conversations?.size,
+    )
     val settings by viewModel.settings.collectAsState()
     val initialization by viewModel.initializationState.collectAsState()
     val initializationProgress by viewModel.initializationProgress.collectAsState()
@@ -660,7 +663,7 @@ fun ConversationListScreen(
             title = { Text("需要短信读取权限") },
             text = {
                 Text(
-                    "本应用需要读取短信权限来显示本机会话列表和短信内容。点击申请后，如尚未设置默认短信应用，会先显示默认短信应用请求，再显示系统权限请求。"
+                    "需要短信读取权限以显示会话和短信内容。"
                 )
             },
             confirmButton = {
@@ -1347,7 +1350,7 @@ fun NewChatBottomSheet(
             title = { Text("需要联系人权限") },
             text = {
                 Text(
-                    "本应用需要联系人权限来打开联系人选择器并填入收件人号码。点击申请后，如尚未设置默认短信应用，会先显示默认短信应用请求，再显示系统权限请求。"
+                    "需要联系人权限以选择收件人。"
                 )
             },
             confirmButton = {

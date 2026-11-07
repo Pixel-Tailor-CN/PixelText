@@ -6,7 +6,7 @@
 
 ## 配置
 
-- `autoDeleteVerificationCodesEnabled`：是否启用自动删除，默认 `false`。
+- `verificationCodeAutoDeleteEnabled`：是否启用自动删除，默认 `false`。
 - `verificationCodeRetentionDays`：验证码短信保留天数，默认 `7`，有效范围为 `1–365`。
 - 设置页面始终显示开关；仅在开关开启时显示“验证码保留时间”配置项，摘要展示当前天数。
 - 点击配置项后通过输入对话框修改天数。输入框只接受十进制数字；空值、`0`、负数、非数字和超出范围的值均不得写入配置，并应显示明确错误。
@@ -33,13 +33,13 @@
 
 - 设置模型与持久化仍由 `AppSettingsRepository` 负责。
 - 设置页面只处理输入状态、校验提示和调用 ViewModel。
-- 验证码仓库负责查询过期索引及协调索引清理，不把 ContentProvider 操作放进 UI。
+- 验证码仓库通过主库 DAO 查询过期消息 ID；Worker 经 `RestoreSafetyCoordinator.cleanupBatch` 调用 `MessageRepository.deleteMessages()` 统一删除，不把 ContentProvider 操作放进 UI。
 - 独立 Worker 负责读取配置并触发清理。
 - 独立 Scheduler 负责唯一周期任务的注册、更新和取消。
 
 ## 异常与日志
 
-- Worker 对无效的历史配置使用默认值 7 天，并将值约束到 `1–365`。
+- 配置缺失时使用 7 天；现存整数配置读取时约束到 `1–365`，Worker 再次约束。
 - 单条短信删除失败不得导致已成功删除的其他短信回滚。
 - 日志使用英文、短语格式和键值对，不记录短信正文、验证码或其他敏感内容。
 - 可恢复异常返回 `Result.retry()`；功能关闭或没有过期数据返回 `Result.success()`。

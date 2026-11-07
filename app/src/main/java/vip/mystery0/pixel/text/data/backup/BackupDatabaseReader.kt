@@ -43,7 +43,7 @@ class BackupDatabaseReader(private val snapshots: AppDatabaseSnapshotter) {
                             if (expectedIndex != null && normalize(cursor.getString(2)) == expectedIndex) continue
                         }
                         backupRequire(type == "table" && name in definition.tables, "数据库包含不允许的结构")
-                        val expected = tableSql(definition.database.openHelper.readableDatabase, name)
+                        val expected = snapshotTableSql(definition, name)
                         backupRequire(matchesTableSchema(definition.name, name, expected, cursor.getString(2)), "数据库结构不匹配")
                         tables += name
                     }

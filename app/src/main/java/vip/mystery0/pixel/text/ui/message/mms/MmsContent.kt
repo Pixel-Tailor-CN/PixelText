@@ -33,7 +33,7 @@ fun MmsContent(
     val controller: MmsPlaybackController = koinInject()
     val click by rememberUpdatedState(onMessageClick)
     val longClick by rememberUpdatedState(onLongClick)
-    val color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceVariant
+    val color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceContainerHigh
     val textColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
     Surface(color = if (detailMode) MaterialTheme.colorScheme.surface else color,
         contentColor = if (detailMode) MaterialTheme.colorScheme.onSurface else textColor,
@@ -76,7 +76,7 @@ fun MmsContent(
         CompositionLocalProvider(LocalMmsLinkGesture provides linkGesture) {
         Column(Modifier.padding(if (detailMode) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode, isSelected = isSelected)
-            if (model.issues.isNotEmpty()) Text("彩信结构或资源引用不完整，已按可用附件显示；可在详情信息中查看附件", style = MaterialTheme.typography.bodySmall)
+            if (model.issues.isNotEmpty()) Text("部分彩信内容不可用", style = MaterialTheme.typography.bodySmall)
             if (!model.preparing && displayContent.attachmentPages.isNotEmpty()) {
                 MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller,
                     isSelected = isSelected, pages = displayContent.attachmentPages)

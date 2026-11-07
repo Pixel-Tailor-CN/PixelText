@@ -11,6 +11,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
@@ -29,8 +30,17 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
         migrateSpamIsolationSetting()
     }
 
+    private val learningPrefs = context.getSharedPreferences("personal_learning_settings", Context.MODE_PRIVATE)
+
     private val _settings = MutableStateFlow(readSettings())
     override val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    // 学习设置独立存储，不随常规设置备份或迁移。
+
+    override fun setPersonalLearningEnabled(enabled: Boolean) {
+        check(learningPrefs.edit().putBoolean("enabled", enabled).commit())
+        refreshSettings()
+    }
 
     override fun setAutoDownloadMms(enabled: Boolean) {
         updatePrefs { putBoolean("auto_download_mms", enabled) }
@@ -104,6 +114,12 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
 
     override fun setUnreadBadgeEnabled(enabled: Boolean) {
         updatePrefs { putBoolean(AppSettingsKeys.KEY_UNREAD_BADGE_ENABLED, enabled) }
+    }
+
+    override fun setNavigationTransitionStyle(style: NavigationTransitionStyle) {
+        updatePrefs {
+            putString(AppSettingsKeys.KEY_NAVIGATION_TRANSITION_STYLE, style.storageValue)
+        }
     }
 
     override fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {
@@ -257,6 +273,14 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             AppSettingsKeys.DEFAULT_UNREAD_BADGE_ENABLED,
         )
 
+    override fun getNavigationTransitionStyle(): NavigationTransitionStyle =
+        NavigationTransitionStyle.fromStorageValue(
+            prefs.getString(
+                AppSettingsKeys.KEY_NAVIGATION_TRANSITION_STYLE,
+                AppSettingsKeys.DEFAULT_NAVIGATION_TRANSITION_STYLE.storageValue,
+            )
+        )
+
     override fun getMessageTimeDisplayFormat(): MessageTimeDisplayFormat =
         MessageTimeDisplayFormat.fromStorageValue(
             prefs.getString(
@@ -354,6 +378,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     private fun readSettings(): AppSettings {
         return AppSettings(
             autoDownloadMms = prefs.getBoolean("auto_download_mms", false),
+            personalLearningEnabled = learningPrefs.getBoolean("enabled", false),
             spamDetectionEnabled = isSpamDetectionEnabled(),
             muteSpamNotificationsEnabled = isMuteSpamNotificationsEnabled(),
             spamAutoAction = getSpamAutoAction(),
@@ -369,6 +394,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
             verificationCodeAutoDeleteEnabled = isVerificationCodeAutoDeleteEnabled(),
             verificationCodeRetentionDays = getVerificationCodeRetentionDays(),
             unreadBadgeEnabled = isUnreadBadgeEnabled(),
+            navigationTransitionStyle = getNavigationTransitionStyle(),
             messageTimeDisplayFormat = getMessageTimeDisplayFormat(),
             rightSwipeAction = getRightSwipeAction(),
             leftSwipeAction = getLeftSwipeAction(),
@@ -408,6 +434,7 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
     fun restorePortablePreferences(entries: List<vip.mystery0.pixel.text.data.backup.PortablePreference>): Boolean {
         val editor = prefs.edit()
         entries.forEach { entry ->
+            if (entry.key in setOf("personal_learning_enabled", "learning_auto_desensitize_enabled")) return@forEach
             when (entry.type) {
                 "boolean" -> editor.putBoolean(entry.key, entry.value.toBooleanStrict())
                 "int" -> editor.putInt(entry.key, entry.value.toInt())

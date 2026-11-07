@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="13%" android:insetTop="13%"
+    android:insetRight="13%" android:insetBottom="13%">
+    <bitmap android:src="@drawable/ic_identity_violet_art"
+        android:gravity="fill" android:filter="true" />
+</inset>

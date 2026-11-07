@@ -22,6 +22,7 @@ import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
@@ -127,6 +128,10 @@ class SettingsViewModel(
 
     fun setUnreadBadgeEnabled(enabled: Boolean) {
         settingsRepository.setUnreadBadgeEnabled(enabled)
+    }
+
+    fun setNavigationTransitionStyle(style: NavigationTransitionStyle) {
+        settingsRepository.setNavigationTransitionStyle(style)
     }
 
     fun setMessageTimeDisplayFormat(format: MessageTimeDisplayFormat) {

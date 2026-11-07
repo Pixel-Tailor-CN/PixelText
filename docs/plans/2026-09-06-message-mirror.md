@@ -1,6 +1,18 @@
 # 完整消息镜像实施计划
 
-> 执行者先阅读 [镜像设计](2026-09-06-message-mirror-design.md)，使用 executing-plans 逐项执行；本计划是检索页计划的前置依赖。复选框只在取得相应验证结果后勾选。
+## 当前实现核对（2026-11-07）
+
+原消息镜像方案已落地，但后续库合并与初始化改造改变了部分架构；下文的初始需求和验收场景不代表本轮已经实测。
+
+- 运行库是 `data/db/mirror/MessageMirrorDatabase.kt` 的 `message_mirror.db` v7，显式迁移链为 1→2→3→4→5→6→7。除消息/附件/同步/MMS 文本索引，还包含初始化、关键词、白名单规则、验证码和归档表；骚扰最终判定及放行字段在 `mirror_message`。旧业务库通过 `MirrorAuxiliaryDatabaseMigration`/`MirrorSpamLegacyImporter` 导入，不能再按最初设计把这些数据当作独立运行库。
+- `ConversationCacheDatabase` 仍承载发件方资料，核心会话通过 `MirrorConversationQuery` 从镜像聚合，`MessageRepositoryImpl` 批量补充资料与联系人。MMS 完整展示由 `MmsContentRepositoryImpl` 与 `ui/message/mms/` 提供，已不限于图片子集。
+- `PixelTextApp` 检查独立 `CURRENT_DATA_VERSION=1`，`DataInitializationCoordinator` 顺序执行 MIRROR/MMS_TEXT/SPAM/VERIFICATION；`MessageMirrorScheduler.cancelLegacyPeriodic()` 撤销旧每日对账，不再注册周期全量任务。
+- 当前列表首次订阅和刷新仍分别经 `getAllConversations()` 与 `refreshConversations()` 调用 `ConversationCacheRepository.refreshIncremental()`；未就绪时可能进行完整对账。不能将取消每日任务扩大为“所有启动/刷新均不读取 Provider”。
+- 接收链路为 `MmsReceiver` → `MmsIncomingPduHandler` 落盘队列 → `MmsDownloadCoordinator`/`RetrieveConfParser`/`MmsProviderWriter`，确认响应由 `MmsReceptionResponseSender` 独立持久化重试。`autoDownloadMms` 仍默认 false，镜像任务只复制本地已有 part。
+
+上述路径均相对 `app/src/main/java/vip/mystery0/pixel/text/`；附件复制与设备差异仍按原验收矩阵验证。
+
+> 历史实施任务与验收清单；维护以当前源码和用户请求为准。原任务划分不要求重新执行、提交或补勾未实测项目。
 
 **目标：** 完整保存可读取 SMS/MMS、关联元数据及已下载附件，可靠同步新增/变更/删除，让消息能独立于会话读取。
 
@@ -93,7 +105,7 @@ interface MessageMirrorRepository {
 
 - 在 Koin 注册 database/source/store/synchronizer/repository/scheduler，保证进程内共享同步协调器。
 - 使用唯一 WorkManager 任务协调续跑，初始每轮最多工作约 2 分钟后提交检查点并安排后续；不能为大附件依赖无限运行的 Receiver 协程。
-- 首次可读、进入前台、权限恢复、手动刷新触发对账；默认安排每天一次低频完整对账，受系统调度约束，无网络条件。任务回读当前权限，失败等待恢复，不自动弹新权限。
+- 首次可读、进入前台、权限恢复、手动刷新触发对账；原每日完整对账方案已取消；`cancelLegacyPeriodic()` 清理旧任务，当前不新增周期全量扫描。任务回读当前权限，失败等待恢复，不自动弹新权限。
 - Observer 回调只标 dirty/调度；收到/发送/已读/删除/下载完成写系统成功后追加可解析的定向 dirty 或集合 dirty，Receiver 使用现有安全生命周期且不执行全库复制。
 - 重试保留数据与检查点，CancellationException 传播；权限缺失不热循环，空间不足使用可恢复错误状态。
 - 镜像 worker/source/store 没有 downloadMultimediaMessage 或 HTTP 调用；真实下载成功后仅回读已形成的 Provider part。
@@ -102,7 +114,7 @@ interface MessageMirrorRepository {
 
 **文件：** 修改 `domain/settings/AppSettingsRepository.kt`、`data/repository/AppSettingsRepositoryImpl.kt`、`viewmodel/SettingsViewModel.kt`、`ui/screen/SettingsScreen.kt`、`receiver/MmsReceiver.kt`、`mms/MmsDownloadReceiver.kt`；新增 `mms/MmsDownloadCoordinator.kt`、`RetrieveConfParser.kt`、`MmsProviderWriter.kt`、`ui/message/cards/MmsDownloadCard.kt`；按需扩展现有 FileProvider 或添加仅暴露临时 PDU 目录的 provider 配置。
 
-**接口：** 设置 `autoDownloadMms: Boolean = false` 和 `setAutoDownloadMms(enabled: Boolean)`；下载入口 `suspend fun requestDownload(key: SourceMessageKey, userInitiated: Boolean)`。
+**接口：** 设置 `autoDownloadMms: Boolean = false` 和 `setAutoDownloadMms(enabled: Boolean)`；当前下载入口 `suspend fun requestDownload(mmsId: Long, userInitiated: Boolean)`，传入 MMS 源 ID。
 
 - 沿用现有设置存储实现保存开关，默认 false，升级默认关闭；设置页用 SwitchPreference，说明可能使用移动数据。
 - 移除接收器无条件 triggerMmsDownload；保存 notification 占位、FROM 地址与头字段。保留原 NotificationInd 类型，初始为待下载，只有真正派发请求才显示下载中。
@@ -117,13 +129,13 @@ interface MessageMirrorRepository {
 
 ## 任务 6：本地读取接口与现有页面适配
 
-**文件：** 新增 `domain/repository/MessageMirrorRepository.kt`、`data/repository/mirror/MessageMirrorRepositoryImpl.kt`、`MirrorMessageMapper.kt`、`viewmodel/MirrorMessageDetailViewModel.kt`、`ui/screen/MirrorMessageDetailScreen.kt`；修改 `data/repository/MessageRepositoryImpl.kt`、`ConversationCacheRepository.kt`、`ui/AppNavigation.kt`、必要的详情状态与 UI。
+**文件：** 新增 `domain/repository/MessageMirrorRepository.kt`、`data/repository/mirror/MessageMirrorRepositoryImpl.kt`、`viewmodel/MirrorMessageDetailViewModel.kt`、`ui/screen/MirrorMessageDetailScreen.kt`；修改 `data/repository/MessageRepositoryImpl.kt`、`ConversationCacheRepository.kt`、`ui/AppNavigation.kt`、必要的详情状态与 UI。
 
 - 实现任务 1 接口，新增 `observeConversationSummaries(): Flow<List<ConversationModel>>`，从本地消息聚合，业务归档与骚扰条件在读取侧应用。
 - getMessagesByThread/getMessages 与普通/归档/骚扰会话读取核心路径切到镜像，继续显示名/服务号 enrichment；不让 MessageRepository 的详情查询回落到旧 Provider 简化 row。
 - 停止旧摘要同步器独立扫描 Provider，保留其兼容方法作为新同步/投影的委托；旧库中的服务号表继续保留。
 - 保留发送、删除、已读系统写操作；成功后持久标记失效并更新 Flow，不对镜像做猜测式最终写入。
-- MirrorMessageMapper 明确箱状态/方向映射并保留完整模型，不把草稿、失败状态丢弃。现有图片卡取 READY 的本地图片路径，其他附件保存在完整模型。
+- `MessageMirrorRepositoryImpl.kt` 中的 `toModel()` 与 `MirrorMessageModel.toMessageModel()` 明确箱状态/方向映射并保留完整模型，不把草稿、失败状态丢弃。现有图片卡取 READY 的本地图片路径，其他附件保存在完整模型。
 - 首次导入显示同步状态，后续同步显示旧数据与更新状态；附件未完成和无消息分开。无 thread 的消息支持按 SourceMessageKey 获取独立详情，不伪造 thread。
 - 独立详情路由使用 transport 与 sourceId，ViewModel 通过 getMessage 读取原始状态、正文、全部参与方和附件元数据；页面只读展示并提供待下载彩信下载入口，不实现草稿编辑/发送。消息不存在时显示已删除状态。
 - 检查验证码/骚扰独立后台任务尚用 Provider 的范围并记入交付说明；不因此把核心详情重新切回 Provider。

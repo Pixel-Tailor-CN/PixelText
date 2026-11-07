@@ -68,6 +68,13 @@ class WhitelistMessageSource(private val resolver: ContentResolver) {
 /** Provider 决策和镜像只读筛选共享同一身份算法。 */
 fun whitelistMessageFingerprint(id: Long, sender: String, date: Long, sent: Long): String {
     val raw = "$id:${sender.length}:$sender:$date:$sent"
-    return MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
-        .joinToString("") { byte -> "%02x".format(byte) }
+    val digest = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+    val digits = "0123456789abcdef"
+    val hex = CharArray(digest.size * 2)
+    digest.forEachIndexed { index, byte ->
+        val value = byte.toInt() and 0xff
+        hex[index * 2] = digits[value ushr 4]
+        hex[index * 2 + 1] = digits[value and 0x0f]
+    }
+    return hex.concatToString()
 }

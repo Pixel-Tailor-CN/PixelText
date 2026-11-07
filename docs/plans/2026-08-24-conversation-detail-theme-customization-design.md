@@ -1,5 +1,15 @@
 # 会话详情主题自定义设计
 
+## 当前实现核对（2026-11-07）
+
+核心配置、草稿、保存、预览和背景功能已有实现。下文保留最初任务划分与验收清单，不代表本轮重新完成了这些运行时验证。
+
+- `domain/theme/ThemeConfiguration.kt` 的 schemaVersion 仍为 1；默认提示文字为“请输入内容……”，缩放 1f（范围 0.85f..1.8f），显示 SIM 默认 true。
+- 当前新增 `useSameBackgroundImage=false`、`sharedBackgroundImageMode=LIGHT`、`generateColorsFromBackgroundImage=false`：可共用某一模式的背景，并可从背景生成页面色系；独立明暗配置仍保留。
+- `ui/theme/ConversationDetailStyle.kt` 是实际 resolver 文件；默认正文 onSurface、气泡 surfaceContainerHigh、输入区 surfaceContainer。`HighTextContrastMonitor` 通过 Settings.Secure 的 high_text_contrast_enabled 与 ContentObserver 监听，不使用原计划的 AccessibilityManager 监听 API。
+- `ThemeColorReferenceAdapter` 和 `ThemeImageReferenceAdapter` 负责字段级容错，不能用未注册适配器的 Moshi 示例替换当前初始化。保存通过 Repository.update 合并 base/draft/latest，仅覆盖草稿实际改动的字段，避免丢失同时发生的手势缩放；提交使用 NonCancellable + Mutex。
+- 背景原件目录为 filesDir/theme_assets，草稿为 cacheDir/theme_drafts/draft_<uuid>.webp，无 session 子目录；最大边 2160px、WebP 质量 88、过期草稿阈值 24 小时。备份恢复已经包含主题配置及图片，但尚无独立主题包分发功能。
+
 ## 背景
 
 Issue #9 要求改善会话详情页短信原文的可读性，并提供会话详情显示自定义能力。本期一次性实现 Issue 中 Phase 1 和 Phase 2 的内容，但不修改智能卡片配色。
@@ -83,8 +93,11 @@ data class ThemeConfiguration(
 data class ConversationDetailThemeModule(
     val light: ConversationDetailAppearance = ConversationDetailAppearance(),
     val dark: ConversationDetailAppearance = ConversationDetailAppearance(),
+    val useSameBackgroundImage: Boolean = false,
+    val sharedBackgroundImageMode: ThemeMode = ThemeMode.LIGHT,
+    val generateColorsFromBackgroundImage: Boolean = false,
     val showSimInfo: Boolean = true,
-    val inputPlaceholder: String = "请输入",
+    val inputPlaceholder: String = "请输入内容……",
     val textScale: Float = 1f,
 )
 
@@ -156,18 +169,18 @@ interface ThemeConfigurationRepository {
     val configuration: StateFlow<ThemeConfiguration>
 
     suspend fun save(configuration: ThemeConfiguration): Result<Unit>
-    suspend fun resetAll(): Result<Unit>
+    suspend fun update(transform: (ThemeConfiguration) -> ThemeConfiguration): Result<Unit>
 }
 
 interface ThemeAssetRepository {
     suspend fun createDraftBackground(
         mode: ThemeMode,
-        source: Uri,
-    ): ThemeImageDraft
+        sourceUri: String,
+    ): Result<ThemeImageDraft>
 
-    suspend fun commitDraft(draft: ThemeImageDraft): ThemeImageReference
-    suspend fun discardDraft(draft: ThemeImageDraft)
-    suspend fun deleteAsset(reference: ThemeImageReference)
+    suspend fun commitDraft(draft: ThemeImageDraft): Result<ThemeImageReference>
+    fun discardDraft(draft: ThemeImageDraft)
+    fun deleteAsset(reference: ThemeImageReference)
     fun resolve(reference: ThemeImageReference): File?
 }
 ```
@@ -217,18 +230,18 @@ data class ResolvedConversationDetailStyle(
 官方默认样式：
 
 - 接收、发送正文：`onSurface`，替代当前对比度偏低的 `onSurfaceVariant`。
-- 接收、发送气泡：`surfaceVariant`，保持现有整体视觉。
-- 输入区域：保持现有 `surfaceVariant` 风格。
+- 接收、发送气泡：`surfaceContainerHigh`。
+- 输入区域：`surfaceContainer`。
 - 无背景图片。
 - 显示 SIM 信息。
-- placeholder 为“请输入”。
+- placeholder 为“请输入内容……”。
 - 文字缩放为 `1f`。
 
 MD3 角色在渲染时从当前 `MaterialTheme.colorScheme` 解析，使动态取色在壁纸变化后继续生效。
 
 ## 高对比度模式
 
-通过 `AccessibilityManager.isHighTextContrastEnabled` 和状态变化监听暴露 `StateFlow<Boolean>`。
+通过 `Settings.Secure` 的 `high_text_contrast_enabled` 与 `ContentObserver` 暴露 `StateFlow<Boolean>`，见 `HighTextContrastMonitor.kt`；读取失败回退 false。
 
 开启时：
 
@@ -377,7 +390,7 @@ Material 3 角色采用明确白名单和稳定存储名，未知角色按默认
 1. 在 IO Dispatcher 读取图片头。
 2. 使用 `ImageDecoder` 处理方向并按目标尺寸采样。
 3. 最大边限制为 2160 px。
-4. 压缩为 WebP 写入 `cacheDir/theme_drafts/<session>/`。
+4. 压缩为 WebP 写入 `cacheDir/theme_drafts/`。
 5. 预览读取草稿图片。
 6. 点击保存后生成唯一 `assetId` 并复制到 `filesDir/theme_assets/`。
 7. 主题 JSON 成功指向新资源后才删除旧资源。
@@ -392,7 +405,7 @@ Material 3 角色采用明确白名单和稳定存储名，未知角色按默认
 1. 校验颜色引用、HEX、placeholder 和文字缩放范围。
 2. 将本次使用的草稿图片提交为具有唯一 ID 的正式资源。
 3. 构建引用正式资源 ID 的最终 `ThemeConfiguration`。
-4. 使用 `SharedPreferences.commit()` 保存完整主题 JSON。
+4. 通过 `ThemeConfigurationRepository.update` 在锁内合并草稿改动与最新配置，再使用 `SharedPreferences.commit()` 保存完整主题 JSON。
 5. 成功后更新 Repository 的 `StateFlow`。
 6. 删除不再被配置引用的旧图片和所有草稿文件。
 7. 失败时删除本次新生成的正式文件，旧配置和旧图片保持不变。
@@ -437,7 +450,7 @@ app/src/main/java/vip/mystery0/pixel/text/data/repository/
   ThemeAssetRepositoryImpl.kt
 
 app/src/main/java/vip/mystery0/pixel/text/ui/theme/
-  ConversationDetailStyleResolver.kt
+  ConversationDetailStyle.kt
   HighTextContrastMonitor.kt
 
 app/src/main/java/vip/mystery0/pixel/text/ui/screen/
