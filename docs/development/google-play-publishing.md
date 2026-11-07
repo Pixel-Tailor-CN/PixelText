@@ -8,6 +8,8 @@
 
 流程保留资源同步、完整 Git 历史和已有 Release 签名配置，执行 `:app:bundleRelease`，通过 `r0adkll/upload-google-play@v1` 将 AAB 发布到 `internal` 渠道，状态为 `completed`。此工作流不提取 APK，不创建 GitHub Release。原有 [标签 Release 工作流](../../.github/workflows/release.yml) 保持不变，推送 `v*` 标签仍会构建并创建 GitHub Release。
 
+Play Console 发布名称采用 `版本号 (versionCode) · CI 年月日时分秒`，例如 `1.3.1 (411) · CI 2026-11-07 14:07:30`。版本号读取 `gradle/libs.versions.toml`，versionCode 使用 Git 提交数，时间记录本次 CI 开始构建 AAB 前的北京时间（UTC+8）。此名称仅用于标识内部测试发布，不改变 AAB 内的版本信息。
+
 主分支发布任务共用并发组，不取消正在执行的发布，使用 `queue: max` 最多保留 100 个等待任务，超出平台上限的任务会被取消。此队列避免 Play 编辑事务并发，不解决重复上传同一版本号的问题。
 
 ## 一次性配置
