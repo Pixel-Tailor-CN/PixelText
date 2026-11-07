@@ -131,7 +131,7 @@ jobs:
           SIGN_KEY_STORE_PASSWORD: ${{ secrets.SIGN_KEY_STORE_PASSWORD }}
           SIGN_KEY_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
           SIGN_KEY_PASSWORD: ${{ secrets.SIGN_KEY_PASSWORD }}
-        run: chmod a+x ./gradlew && ./gradlew bundleRelease
+        run: ./gradlew bundleRelease
 
       - name: Download bundletool
         run: |
