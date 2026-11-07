@@ -23,6 +23,6 @@ enum class AppIconStyle(val storageValue: String, val label: String) {
 }
 
 data class AppIdentity(
-    val displayName: AppDisplayName = AppDisplayName.CHISU_FULL,
-    val iconStyle: AppIconStyle = AppIconStyle.VIOLET,
+    val displayName: AppDisplayName = AppDisplayName.PIXEL_TEXT,
+    val iconStyle: AppIconStyle = AppIconStyle.CLASSIC,
 )

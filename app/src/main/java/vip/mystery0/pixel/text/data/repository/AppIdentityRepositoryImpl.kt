@@ -72,13 +72,15 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
 
     private fun readSavedIdentity(): AppIdentity {
         val values = preferences.all
+        // 首装和未保存名称、图标的旧版升级均沿用经典默认组合。
+        val defaults = AppIdentity()
         return AppIdentity(
             displayName = AppDisplayName.entries.firstOrNull {
                 it.storageValue == values[KEY_NAME]
-            } ?: AppDisplayName.CHISU_FULL,
+            } ?: defaults.displayName,
             iconStyle = AppIconStyle.selectableEntries.firstOrNull {
                 it.storageValue == values[KEY_ICON]
-            } ?: AppIconStyle.VIOLET,
+            } ?: defaults.iconStyle,
         )
     }
 

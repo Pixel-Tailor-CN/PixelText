@@ -98,9 +98,9 @@ fun AppIdentitySettingsScreen(
     var nameValue by rememberSaveable { mutableStateOf(identity.displayName.storageValue) }
     var iconValue by rememberSaveable { mutableStateOf(identity.iconStyle.storageValue) }
     val displayName = AppDisplayName.entries.firstOrNull { it.storageValue == nameValue }
-        ?: AppDisplayName.CHISU_FULL
+        ?: AppIdentity().displayName
     val iconStyle = AppIconStyle.selectableEntries.firstOrNull { it.storageValue == iconValue }
-        ?: AppIconStyle.VIOLET
+        ?: AppIdentity().iconStyle
     val draft = AppIdentity(displayName, iconStyle)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -213,7 +213,7 @@ fun AppIdentitySettingsScreen(
             }
             item(key = "description", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    "系统通知名称保持「原点尺素」；主题图标配色跟随系统。",
+                    "系统通知名称保持「Pixel Text」；主题图标配色跟随系统。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
