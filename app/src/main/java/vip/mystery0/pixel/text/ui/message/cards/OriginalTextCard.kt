@@ -153,7 +153,8 @@ fun OriginalTextCard(
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = resolvedText,
                         fontWeight = FontWeight.Bold,
-                        fontSize = scaledSubjectFontSize
+                        fontSize = scaledSubjectFontSize,
+                        lineHeight = MaterialTheme.typography.titleMedium.lineHeight.scaledBy(textScale),
                     )
                 )
                 if (content.isNotBlank()) {
@@ -165,7 +166,8 @@ fun OriginalTextCard(
                     text = annotatedString,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         color = resolvedText,
-                        fontSize = scaledBodyFontSize
+                        fontSize = scaledBodyFontSize,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight.scaledBy(textScale),
                     )
                 )
             }
