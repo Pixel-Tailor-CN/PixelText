@@ -42,7 +42,7 @@ class MessageMirrorAttachmentWorker(context: Context, params: WorkerParameters) 
             } else Result.retry()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (error: SecurityException) {
+        } catch (_: SecurityException) {
             Log.w("MessageMirrorAttachmentWorker", "attachment permission unavailable")
             Result.success()
         } catch (error: Exception) {

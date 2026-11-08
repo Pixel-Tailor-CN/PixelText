@@ -55,7 +55,7 @@ fun rememberConversationBackgroundColorScheme(
 ): ConversationBackgroundColorSchemeResult {
     val cacheKey = file?.takeIf(File::isFile)?.let(::backgroundCacheKey)
     val cachedSeed = cacheKey?.let(seedColorCache::get)
-    val seedState by produceState<SeedColorState>(
+    val seedState by produceState(
         initialValue = when {
             !enabled || cacheKey == null -> SeedColorState.Disabled
             cachedSeed != null -> SeedColorState.Ready(cachedSeed)

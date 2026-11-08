@@ -24,7 +24,6 @@ import java.util.HashMap;
 public class CharacterSets {
     /**
      * IANA assigned MIB enum numbers.
-     *
      * From wap-230-wsp-20010705-a.pdf
      * Any-charset = <Octet 128>
      * Equivalent to the special RFC2616 charset value "*"
@@ -48,8 +47,7 @@ public class CharacterSets {
 
     /**
      * Extend charsets.
-     *
-     * From http://www.iana.org/assignments/character-sets/
+     * From <a href="http://www.iana.org/assignments/character-sets/">http://www.iana.org/assignments/character-sets/</a>
      */
     public static final int BIG5_HKSCS = 0x0835; //2101
     public static final int BOCU_1 = 0x03FC; //1020
@@ -179,8 +177,7 @@ public class CharacterSets {
 
     /**
      * Extend charsets.
-     *
-     * From http://www.iana.org/assignments/character-sets/
+     * From <a href="http://www.iana.org/assignments/character-sets/">http://www.iana.org/assignments/character-sets/</a>
      */
     public static final String MIMENAME_BIG5_HKSCS = "Big5-HKSCS";
     public static final String MIMENAME_BOCU_1 = "BOCU-1";
@@ -290,9 +287,8 @@ public class CharacterSets {
 
     static {
         // Create the HashMaps.
-        MIBENUM_TO_NAME_MAP = new HashMap<Integer, String>();
-        NAME_TO_MIBENUM_MAP = new HashMap<String, Integer>();
-        assert(MIBENUM_NUMBERS.length == MIME_NAMES.length);
+        MIBENUM_TO_NAME_MAP = new HashMap<>();
+        NAME_TO_MIBENUM_MAP = new HashMap<>();
         int count = MIBENUM_NUMBERS.length - 1;
         for(int i = 0; i <= count; i++) {
             MIBENUM_TO_NAME_MAP.put(MIBENUM_NUMBERS[i], MIME_NAMES[i]);
@@ -308,7 +304,7 @@ public class CharacterSets {
      *
      * @param mibEnumValue An IANA assigned MIBEnum number.
      * @return The name string of the charset.
-     * @throws UnsupportedEncodingException
+     * @throws UnsupportedEncodingException 字符集没有对应映射时抛出
      */
     public static String getMimeName(int mibEnumValue)
             throws UnsupportedEncodingException {
@@ -324,7 +320,7 @@ public class CharacterSets {
      *
      * @param mimeName The charset name.
      * @return The MIBEnum number assigned by IANA for this charset.
-     * @throws UnsupportedEncodingException
+     * @throws UnsupportedEncodingException 字符集没有对应映射时抛出
      */
     public static int getMibEnumValue(String mimeName)
             throws UnsupportedEncodingException {

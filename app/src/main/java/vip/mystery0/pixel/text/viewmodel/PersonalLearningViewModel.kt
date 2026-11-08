@@ -166,8 +166,8 @@ class PersonalLearningViewModel(
                     if (!settings.value.personalLearningEnabled) coordinator.setEnabled(true)
                 }
                 val key = LearningMessageKey.create(
-                    if (message.isMms) "MMS" else "SMS",
-                    if (message.isMms) -message.id else message.id,
+                    "SMS",
+                    message.id,
                     message.sender,
                     message.timestamp,
                     message.content,

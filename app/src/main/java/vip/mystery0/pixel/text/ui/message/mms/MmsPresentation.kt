@@ -72,11 +72,14 @@ fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPa
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         pages[currentPage].partIds.forEach { id ->
             model.parts.firstOrNull { it.key.partId == id }?.let { part ->
-                if (part.kind == MmsContentKind.IMAGE) MmsImageContent(part, { stop(); onOpenPart(part.key) }, visible = visible, interactionEnabled = enabled)
-                else if (part.kind == MmsContentKind.AUDIO || part.kind == MmsContentKind.VIDEO) {
-                    Text(part.displayName)
-                    MmsMediaContent(part, controller, interactionEnabled = enabled)
-                } else MmsContentPart(part, model.parts, isSelected, enabled) { stop(); onOpenPart(it) }
+                when (part.kind) {
+                    MmsContentKind.IMAGE -> MmsImageContent(part, { stop(); onOpenPart(part.key) }, visible = visible, interactionEnabled = enabled)
+                    MmsContentKind.AUDIO, MmsContentKind.VIDEO -> {
+                        Text(part.displayName)
+                        MmsMediaContent(part, controller, interactionEnabled = enabled)
+                    }
+                    else -> MmsContentPart(part, model.parts, isSelected, enabled) { stop(); onOpenPart(it) }
+                }
             }
         }
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

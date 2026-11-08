@@ -5,7 +5,7 @@
 以下以当前 Android 源码为准；服务端响应示例是协议约定，不代表本轮访问或验证了服务端。原设计中的损坏版本自动回退、资料变更自动刷新和更新时间展示尚未形成完整实现，不作为已交付能力。
 
 - `data/db/ConversationCacheDatabase.kt` 当前为 v3，保留资料 generation/state/profile/number 表；消息列表已由 `MessageMirrorDatabase` v7 的 `MirrorConversationQuery` 聚合，`MessageRepositoryImpl.enrichWithSenderProfiles()` 再批量查询资料并补充联系人名称。
-- 当前没有订阅资料表变化来触发上述列表投影；安装成功会更新设置页版本状态，列表在下一次查询时读取新资料。旧 `cached_conversation` 联表 DAO 仍在代码中，但不再是主列表数据源。
+- 当前没有订阅资料表变化来触发上述列表投影；安装成功会更新设置页版本状态，列表在下一次查询时读取新资料。旧会话缓存的 DAO、联表结果类型和转换函数已删除；为保持现有数据库结构兼容，仍保留 `cached_conversation` 与 `conversation_cache_metadata` 表及其实体。
 - `SenderProfileRepository` 保留 active/previous 两代，但没有启动校验或自动切换 previous 的路径。头像解码失败由 `SenderAvatar` 回退默认图标；不能据此声称整个损坏版本自动恢复。
 - `SenderProfileStore` 返回并入库的是私有头像**绝对路径**。ZIP 内引用仍为相对路径，号码逐字精确匹配，无全量常驻 Map。
 - 通知在已有异步链路中等待本地 `findByNumber()` 查询；没有独立的资料预加载就绪状态，也不会为资料更新重建已发通知。
@@ -41,6 +41,8 @@
 - [ ] 编译验证。
 
 ### Task 2: Room Schema、Migration 和联表 DAO
+
+本节为历史实施清单。当前查询入口为 `SenderProfileDao.findActiveByNumber()` 和 `findActiveByNumbers()`；旧会话缓存联表结果及主列表 Flow 已删除，现状以上方“当前实现核对”为准。
 
 **Files:**
 - Modify: `app/src/main/java/vip/mystery0/pixel/text/data/db/ConversationCacheDatabase.kt`

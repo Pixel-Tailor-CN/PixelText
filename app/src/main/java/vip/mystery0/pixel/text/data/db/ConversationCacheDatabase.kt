@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
-import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -16,8 +15,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import kotlinx.coroutines.flow.Flow
-import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.SenderProfileMatch
 
 @Entity(tableName = "cached_conversation")
@@ -125,68 +122,12 @@ data class SenderProfileNumberEntity(
     @ColumnInfo(name = "sender_profile_id") val senderProfileId: Long,
 )
 
-data class CachedConversationWithSenderProfile(
-    @Embedded val conversation: CachedConversationEntity,
-    @ColumnInfo(name = "cloud_display_name") val cloudDisplayName: String?,
-    @ColumnInfo(name = "cloud_avatar_path") val cloudAvatarPath: String?,
-    @ColumnInfo(name = "cloud_avatar_sha256") val cloudAvatarSha256: String?,
-)
-
 data class SenderProfileMatchRow(
     val number: String,
     @ColumnInfo(name = "display_name") val displayName: String,
     @ColumnInfo(name = "avatar_path") val avatarPath: String,
     @ColumnInfo(name = "avatar_sha256") val avatarSha256: String,
 )
-
-@Dao
-interface CachedConversationDao {
-    @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
-    suspend fun getConversations(limit: Int, offset: Int): List<CachedConversationEntity>
-
-    @Query("SELECT * FROM cached_conversation ORDER BY timestamp DESC")
-    suspend fun getAllConversations(): List<CachedConversationEntity>
-
-    @Query(
-        """
-        SELECT conversation.*,
-            profile.display_name AS cloud_display_name,
-            profile.avatar_path AS cloud_avatar_path,
-            profile.avatar_sha256 AS cloud_avatar_sha256
-        FROM cached_conversation AS conversation
-        LEFT JOIN sender_profile_state AS state ON state.id = 1
-        LEFT JOIN sender_profile_number AS number
-            ON number.generation_version = state.active_version
-            AND number.number = conversation.address
-        LEFT JOIN sender_profile AS profile
-            ON profile.id = number.sender_profile_id
-            AND profile.generation_version = number.generation_version
-        ORDER BY conversation.timestamp DESC
-        """
-    )
-    fun observeAllConversationsWithSenderProfile(): Flow<List<CachedConversationWithSenderProfile>>
-
-    @Query("SELECT thread_id FROM cached_conversation")
-    suspend fun getAllThreadIds(): List<Long>
-
-    @Query("SELECT COUNT(*) FROM cached_conversation")
-    suspend fun count(): Int
-
-    @Query("SELECT value FROM conversation_cache_metadata WHERE metadata_key = :key")
-    suspend fun getMetadataValue(key: String): Int?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(conversations: List<CachedConversationEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertMetadata(metadata: CacheMetadataEntity)
-
-    @Query("DELETE FROM cached_conversation WHERE thread_id IN (:threadIds)")
-    suspend fun delete(threadIds: Set<Long>)
-
-    @Query("DELETE FROM cached_conversation")
-    suspend fun deleteAll()
-}
 
 @Dao
 interface SenderProfileDao {
@@ -252,7 +193,6 @@ interface SenderProfileDao {
     exportSchema = false,
 )
 abstract class ConversationCacheDatabase : RoomDatabase() {
-    abstract fun cachedConversationDao(): CachedConversationDao
     abstract fun senderProfileDao(): SenderProfileDao
 
     companion object {
@@ -297,42 +237,8 @@ abstract class ConversationCacheDatabase : RoomDatabase() {
     }
 }
 
-fun CachedConversationWithSenderProfile.toConversationModel() = conversation.toConversationModel(
-    cloudDisplayName = cloudDisplayName,
-    avatarPath = cloudAvatarPath,
-    avatarSha256 = cloudAvatarSha256,
-)
-
-fun CachedConversationEntity.toConversationModel(
-    cloudDisplayName: String? = null,
-    avatarPath: String? = null,
-    avatarSha256: String? = null,
-) = ConversationModel(
-    threadId = threadId,
-    address = address,
-    displayName = displayName ?: cloudDisplayName,
-    snippet = snippet,
-    timestamp = timestamp,
-    unreadCount = unreadCount,
-    isMms = isMms == 1,
-    hasMms = hasMms == 1,
-    avatarPath = avatarPath,
-    avatarSha256 = avatarSha256,
-)
-
 fun SenderProfileMatchRow.toDomain() = SenderProfileMatch(
     displayName = displayName,
     avatarPath = avatarPath,
     avatarSha256 = avatarSha256,
-)
-
-fun ConversationModel.toCachedConversationEntity() = CachedConversationEntity(
-    threadId = threadId,
-    address = address,
-    displayName = displayName,
-    snippet = snippet,
-    timestamp = timestamp,
-    unreadCount = unreadCount,
-    isMms = if (isMms) 1 else 0,
-    hasMms = if (hasMms) 1 else 0,
 )

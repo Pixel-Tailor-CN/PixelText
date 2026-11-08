@@ -36,11 +36,6 @@ class ContactDataSource(
         }
     }
 
-    fun getCachedDisplayName(address: String): String? {
-        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return null
-        return contactLookupKeys(address).firstNotNullOfOrNull { contactNameCache[it] }
-    }
-
     /** 一次权限检查后批量读取缓存，避免会话列表逐条调用系统权限服务。 */
     fun getCachedDisplayNames(addresses: Collection<String>): Map<String, String> {
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return emptyMap()
@@ -64,13 +59,6 @@ class ContactDataSource(
             if (contactNameCache.containsKey(key)) return contactNameCache[key]
         }
         return null
-    }
-
-    fun matchesAddress(selectedAddress: String, candidateAddress: String): Boolean {
-        if (selectedAddress.isBlank() || candidateAddress.isBlank()) return false
-        val selectedKeys = contactLookupKeys(selectedAddress)
-        val candidateKeys = contactLookupKeys(candidateAddress)
-        return selectedKeys.any(candidateKeys::contains)
     }
 
     @Synchronized

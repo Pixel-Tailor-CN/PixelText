@@ -263,9 +263,6 @@ fun ConversationListScreen(
     }
 
     val uiState by viewModel.uiState.collectAsState()
-    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
-        "home", (uiState as? ConversationListUiState.Success)?.conversations?.size,
-    )
     val settings by viewModel.settings.collectAsState()
     val initialization by viewModel.initializationState.collectAsState()
     val initializationProgress by viewModel.initializationProgress.collectAsState()
@@ -844,11 +841,7 @@ private fun SwipeableConversationItem(
         val direction = dismissState.settledValue
         if (direction == SwipeToDismissBoxValue.Settled) return@LaunchedEffect
 
-        val action = when (direction) {
-            SwipeToDismissBoxValue.StartToEnd -> rightSwipeAction
-            SwipeToDismissBoxValue.EndToStart -> leftSwipeAction
-            SwipeToDismissBoxValue.Settled -> ConversationSwipeAction.NONE
-        }
+        val action = if (direction == SwipeToDismissBoxValue.StartToEnd) rightSwipeAction else leftSwipeAction
         onSwipeAction(action, conversation)
         if (action == ConversationSwipeAction.TOGGLE_READ ||
             action == ConversationSwipeAction.NONE

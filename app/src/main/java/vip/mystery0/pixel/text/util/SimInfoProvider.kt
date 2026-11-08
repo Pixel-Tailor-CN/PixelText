@@ -10,7 +10,6 @@ import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 
 /**
  * 简化版的 SIM 卡信息描述，剥离系统对象方便在 UI 层使用。

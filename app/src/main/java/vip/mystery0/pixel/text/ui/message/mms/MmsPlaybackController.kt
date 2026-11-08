@@ -151,7 +151,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
             contentKey = part.mediaCacheKey()
             mutableState.value = MmsPlaybackState(partKey = part.key)
             // 仅使用渐进式本地媒体；不根据扩展名或 MIME 启用 HLS/DASH 等清单网络源。
-            val source = ProgressiveMediaSource.Factory(DataSource.Factory { LocalDataSource(context) })
+            val source = ProgressiveMediaSource.Factory { LocalDataSource(context) }
                 .createMediaSource(MediaItem.fromUri(uri))
             player.setMediaSource(source)
             player.prepare()

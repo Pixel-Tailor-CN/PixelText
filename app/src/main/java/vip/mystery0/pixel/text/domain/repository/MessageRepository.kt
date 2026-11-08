@@ -21,7 +21,6 @@ interface MessageRepository {
     fun getAllConversations(): Flow<List<ConversationModel>>
     fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
     fun getSpamConversations(limit: Int, offset: Int): Flow<List<ConversationModel>>
-    fun searchConversations(query: String): Flow<List<ConversationModel>>
     fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch>
     fun getMessagesByThread(
         threadId: Long,
@@ -29,7 +28,6 @@ interface MessageRepository {
         offset: Int,
         contentFilter: ConversationContentFilter = ConversationContentFilter.ALL,
     ): Flow<List<MessageModel>>
-    fun getMessages(): Flow<List<MessageModel>>
     suspend fun archiveConversations(conversations: List<ConversationModel>)
     suspend fun unarchiveThreads(threadIds: Set<Long>)
     suspend fun deleteThreads(threadIds: Set<Long>)

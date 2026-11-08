@@ -41,6 +41,8 @@ class UnreadSmsComplicationSettingsRepository(context: Context) {
         }
     }
 
+    // 恢复流程需要检查同步落盘结果，KTX edit 不返回提交是否成功。
+    @Suppress("UseKtx")
     fun restoreDefaultSettings(settings: UnreadSmsComplicationSettings): Boolean = prefs.edit()
         .putBoolean(KEY_DEFAULT_INCLUDE_NORMAL_MESSAGES, settings.includeNormalMessages)
         .putBoolean(KEY_DEFAULT_INCLUDE_SPAM_MESSAGES, settings.includeSpamMessages)

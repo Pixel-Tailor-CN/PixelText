@@ -69,8 +69,10 @@ app/src/main/java/vip/mystery0/pixel/text/
 ├── notification/  # 短信通知与历史识别通知
 ├── receiver/      # SMS/MMS/通知操作 Receiver
 ├── service/       # 默认短信应用快速回复 Service
+├── smartspacer/   # Smartspacer 插件目标与数据源集成
 ├── ui/            # Compose UI、卡片、搜索、设置、会话页面
 ├── util/          # 工具类
+├── viewmodel/     # 页面状态与交互 ViewModel
 └── worker/        # 消息同步、骚扰识别、个人学习及其他后台任务
 ```
 

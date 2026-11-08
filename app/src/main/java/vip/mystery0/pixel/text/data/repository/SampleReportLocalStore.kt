@@ -99,7 +99,7 @@ class SampleReportLocalStore(context: Context) {
             if (it.channel.size() > 512 * 1024) corrupt("本机上报数据")
             it.readBytes().toString(Charsets.UTF_8)
         }
-    } catch (error: FileNotFoundException) {
+    } catch (_: FileNotFoundException) {
         if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()) {
             throw SampleReportException("LOCAL_READ", "无法读取本机上报数据，请检查存储后重试")
         }

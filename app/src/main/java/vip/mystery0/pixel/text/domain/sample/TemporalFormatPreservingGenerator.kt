@@ -365,15 +365,15 @@ class TemporalFormatPreservingGenerator(
     }
 
     private companion object {
-        private val chineseDateRegex = Regex("""^(\d{2,4})年(\d{1,2})月(\d{1,2})(日|号)$""")
-        private val chineseMonthDayRegex = Regex("""^(\d{1,2})月(\d{1,2})(日|号)$""")
+        private val chineseDateRegex = Regex("""^(\d{2,4})年(\d{1,2})月(\d{1,2})([日号])$""")
+        private val chineseMonthDayRegex = Regex("""^(\d{1,2})月(\d{1,2})([日号])$""")
         private val delimitedDateRegex = Regex("""^(\d{2,4})([-/.])(\d{1,2})\2(\d{1,2})$""")
         private val delimitedMonthDayRegex = Regex("""^(\d{1,2})([-/.])(\d{1,2})$""")
-        private val chineseTimeRegex = Regex("""^(\d{1,2})(时|点)(\d{1,2})分(?:(\d{1,2})秒)?$""")
+        private val chineseTimeRegex = Regex("""^(\d{1,2})([时点])(\d{1,2})分(?:(\d{1,2})秒)?$""")
         private val delimitedTimeRegex = Regex("""^(\d{1,2})([:：])(\d{1,2})(?:\2(\d{1,2}))?$""")
 
-        private val chineseDatePrefixRegex = Regex("""^(\d{2,4})年(\d{1,2})月(\d{1,2})(日|号)""")
-        private val chineseMonthDayPrefixRegex = Regex("""^(\d{1,2})月(\d{1,2})(日|号)""")
+        private val chineseDatePrefixRegex = Regex("""^(\d{2,4})年(\d{1,2})月(\d{1,2})([日号])""")
+        private val chineseMonthDayPrefixRegex = Regex("""^(\d{1,2})月(\d{1,2})([日号])""")
         private val delimitedDatePrefixRegex = Regex("""^(\d{2,4})([-/.])(\d{1,2})\2(\d{1,2})""")
         private val delimitedMonthDayPrefixRegex = Regex("""^(\d{1,2})([-/.])(\d{1,2})""")
     }

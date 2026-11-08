@@ -84,7 +84,7 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
             } else Result.retry()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (error: SecurityException) {
+        } catch (_: SecurityException) {
             Log.w("MessageMirrorWorker", "mirror permission unavailable")
             Result.failure()
         } catch (error: Exception) {

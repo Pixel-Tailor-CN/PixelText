@@ -35,9 +35,6 @@ abstract class MirrorDao {
     @Transaction @Query("SELECT * FROM mirror_message WHERE localId=:localId")
     abstract suspend fun getLocal(localId: Long): MirrorMessageRecord?
 
-    @Transaction @Query("SELECT * FROM mirror_message WHERE threadId=:threadId ORDER BY timestamp DESC, localId DESC LIMIT :limit OFFSET :offset")
-    abstract fun observeThread(threadId: Long, limit: Int, offset: Int): Flow<List<MirrorMessageRecord>>
-
     /** 过滤和分页都在 SQL 内完成，只加载当前页需要的正文与彩信关系。 */
     @Transaction
     @Query("""
@@ -51,23 +48,8 @@ abstract class MirrorDao {
     @Query("SELECT COUNT(*) FROM mirror_message m LEFT JOIN mirror_attachment a ON a.localId=m.localId LEFT JOIN mms_text_index tx ON tx.localId=m.localId WHERE m.threadId=:threadId")
     abstract fun observeThreadChanges(threadId: Long): Flow<Long>
 
-    @Transaction @Query("SELECT * FROM mirror_message ORDER BY timestamp DESC, localId DESC")
-    abstract fun observeAll(): Flow<List<MirrorMessageRecord>>
-
     @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' ORDER BY timestamp DESC, localId DESC")
     abstract fun observeMms(): Flow<List<MirrorMessageRecord>>
-
-    @Transaction @Query("SELECT * FROM mirror_message WHERE transport='MMS' AND threadId IN (:threadIds) ORDER BY timestamp DESC, localId DESC")
-    abstract suspend fun conversationMms(threadIds: List<Long>): List<MirrorMessageRecord>
-
-    @Query("""
-        SELECT m.localId, m.sourceId, m.threadId, m.timestamp, m.originalDate, m.revision,
-            m.subscriptionId, m.boxType, m.read, s.body, s.address, s.dateSent
-        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId
-        WHERE m.transport='SMS' AND m.threadId IN (:threadIds)
-        ORDER BY m.timestamp DESC, m.localId DESC
-    """)
-    abstract suspend fun conversationSms(threadIds: List<Long>): List<MirrorConversationSmsRow>
 
     @Query("""
         SELECT m.localId, m.sourceId, m.threadId, m.timestamp, m.originalDate, m.revision,
@@ -97,22 +79,6 @@ abstract class MirrorDao {
         MirrorMmsEntity::class, MirrorAddressEntity::class, MirrorPartEntity::class,
         MirrorAttachmentEntity::class, MmsTextIndexEntity::class, ArchivedConversationEntity::class])
     abstract fun observeConversationChanges(query: SupportSQLiteQuery): Flow<Int>
-
-    @Query("""
-        SELECT m.threadId AS threadId,
-          COALESCE(s.address, (SELECT a.address FROM mirror_mms_address a WHERE a.localId=m.localId
-            AND a.address != 'insert-address-token' AND a.type=(CASE WHEN m.boxType=1 THEN 137 ELSE 151 END) ORDER BY a.ordinal LIMIT 1),
-            (SELECT a.address FROM mirror_mms_address a WHERE a.localId=m.localId AND a.address != 'insert-address-token' ORDER BY a.ordinal LIMIT 1)) AS address,
-          COALESCE(s.body, tx.summary, mm.decodedSubject, mm.subject, '正在准备彩信内容') AS snippet,
-          m.timestamp AS timestamp,
-          (SELECT COUNT(*) FROM mirror_message u WHERE u.threadId=m.threadId AND u.read=0 AND u.boxType=1) AS unreadCount,
-          m.transport='MMS' AS latestIsMms,
-          EXISTS(SELECT 1 FROM mirror_message x WHERE x.threadId=m.threadId AND x.transport='MMS') AS containsMms
-        FROM mirror_message m LEFT JOIN mirror_sms s ON s.localId=m.localId LEFT JOIN mirror_mms mm ON mm.localId=m.localId LEFT JOIN mms_text_index tx ON tx.localId=m.localId
-        WHERE m.threadId > 0 AND m.localId=(SELECT n.localId FROM mirror_message n WHERE n.threadId=m.threadId ORDER BY n.timestamp DESC, n.localId DESC LIMIT 1)
-        ORDER BY m.timestamp DESC, m.localId DESC
-    """)
-    abstract fun observeConversations(): Flow<List<MirrorConversationRow>>
 
     @Query("SELECT * FROM mirror_message WHERE transport=:transport AND generation != :generation AND localId > :afterLocalId ORDER BY localId LIMIT 200")
     abstract suspend fun missingCandidates(transport: String, generation: Long, afterLocalId: Long): List<MirrorMessageEntity>
@@ -171,7 +137,7 @@ abstract class MirrorDao {
                     old.mms?.transactionId == mms?.transactionId && old.mms?.contentLocation == mms?.contentLocation &&
                     (!structure.childrenComplete || sameChildren)
             }
-        if (sameIdentity) root = root.copySpamStateFrom(requireNotNull(old).message)
+        if (sameIdentity) root = root.copySpamStateFrom(old.message)
         val sameRoot = old != null && old.sms == sms && old.mms == mms &&
             old.message.copy(generation = root.generation, revision = root.revision) == root
         val revision = if (old == null) 1 else if (sameRoot && (!structure.childrenComplete || sameChildren))

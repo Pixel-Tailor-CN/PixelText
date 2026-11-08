@@ -12,7 +12,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
@@ -110,6 +109,8 @@ class ConversationListViewModel(
                     isLoading = allConversations.isEmpty()
                     repository.getAllConversations()
                         .collect { conversations ->
+                            // 收到数据后重置退避；订阅随后抛错时，catch 之后的 delay 会读取此值。
+                            @Suppress("ASSIGNED_VALUE_IS_NEVER_READ")
                             retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
                             replaceConversations(conversations)
                             isLoading = false
@@ -172,14 +173,6 @@ class ConversationListViewModel(
                 }
                 isRefreshingLoaded = false
             }
-        }
-    }
-
-    fun markAsRead(threadId: Long) {
-        viewModelScope.launch {
-            repository.markThreadAsRead(threadId)
-            markLoadedConversationsAsRead(setOf(threadId))
-            refreshSilent()
         }
     }
 

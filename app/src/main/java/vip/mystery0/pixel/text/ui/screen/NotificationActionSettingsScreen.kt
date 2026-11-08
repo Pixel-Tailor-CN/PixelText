@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -226,7 +225,6 @@ fun NotificationActionSettingsScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>) {
     Surface(
@@ -374,7 +372,6 @@ private fun ReorderableNotificationActionList(
                                 change.consume()
                                 val state = dragState ?: return@detectDragGesturesAfterLongPress
                                 val actionsNow = latestActions
-                                val boundsNow = itemBounds
                                 val currentIndex =
                                     actionsNow.indexOfFirst { item -> item.type == state.type }
                                 if (currentIndex < 0) return@detectDragGesturesAfterLongPress
@@ -383,7 +380,7 @@ private fun ReorderableNotificationActionList(
 
                                 while (targetIndex > 0) {
                                     val previousType = actionsNow[targetIndex - 1].type
-                                    val previousBounds = boundsNow[previousType] ?: break
+                                    val previousBounds = itemBounds[previousType] ?: break
                                     if (newDraggedCenter < previousBounds.centerY) {
                                         targetIndex -= 1
                                     } else {
@@ -392,7 +389,7 @@ private fun ReorderableNotificationActionList(
                                 }
                                 while (targetIndex < actionsNow.lastIndex) {
                                     val nextType = actionsNow[targetIndex + 1].type
-                                    val nextBounds = boundsNow[nextType] ?: break
+                                    val nextBounds = itemBounds[nextType] ?: break
                                     if (newDraggedCenter > nextBounds.centerY) {
                                         targetIndex += 1
                                     } else {

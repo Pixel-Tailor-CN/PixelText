@@ -91,7 +91,6 @@ public class NotificationInd extends GenericPdu {
 
     /**
      * Get X-Mms-Expiry value.
-     *
      * Expiry-value = Value-length
      *      (Absolute-token Date-value | Relative-token Delta-seconds-value)
      *
@@ -111,16 +110,6 @@ public class NotificationInd extends GenericPdu {
         mPduHeaders.setLongInteger(value, PduHeaders.EXPIRY);
     }
 
-    /**
-     * Get From value.
-     * From-value = Value-length
-     *      (Address-present-token Encoded-string-value | Insert-address-token)
-     *
-     * @return the value
-     */
-    public EncodedStringValue getFrom() {
-       return mPduHeaders.getEncodedStringValue(PduHeaders.FROM);
-    }
 
     /**
      * Set From value.

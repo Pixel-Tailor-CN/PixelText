@@ -28,7 +28,6 @@ class MmsIncomingPduHandler(
     private val reports = MmsReceptionReports(context)
     private val queue = MmsIncomingPduQueue(context)
 
-    fun reportStates(mmsId: Long): List<MmsReceptionReportState> = reports.states(mmsId)
 
     suspend fun enqueue(data: ByteArray, subscriptionId: Int, received: Long) = withContext(Dispatchers.IO) {
         if (data.size !in 1..MmsIncomingPduQueue.MAX_PUSH_BYTES) {

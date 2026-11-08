@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-data class ResetValues(val parameters: FloatArray, val vocabSize: Int)
+class ResetValues(val parameters: FloatArray, val vocabSize: Int)
 
 /**
  * Java 运行库拒绝零输入签名；仅对已经证明为零算子、非变量常量图的 reset 读取原始数据。

@@ -29,7 +29,7 @@ class BackupSettingsMapper(
     private val adapter = Moshi.Builder().add(ThemeColorReferenceAdapter.FACTORY)
         .add(ThemeImageReferenceAdapter.FACTORY).build().adapter(BackupSettings::class.java)
 
-    suspend fun export(directory: File) {
+    fun export(directory: File) {
         val prefs = context.getSharedPreferences(AppSettingsKeys.PREFS_NAME, Context.MODE_PRIVATE)
         val entries = SPECS.map { spec ->
             val value = when (spec.type) {
@@ -85,8 +85,8 @@ class BackupSettingsMapper(
         backupRequire(settings.theme == settings.theme.normalized(), "主题配置超出允许范围")
         val expected = references(settings.theme).map { "${it.assetId}.webp" }.toSet()
         backupRequire(File(directory, "theme").listFiles().orEmpty().map { it.name }.toSet() == expected)
-        for (reference in references(settings.theme)) {
-            val image = File(directory, "theme/${reference.assetId}.webp")
+        for ((assetId) in references(settings.theme)) {
+            val image = File(directory, "theme/$assetId.webp")
             backupRequire(image.isFile && image.length() <= 32L * 1024 * 1024)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(image.path, bounds)

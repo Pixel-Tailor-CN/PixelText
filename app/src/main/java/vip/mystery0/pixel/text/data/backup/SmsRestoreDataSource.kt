@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.provider.Telephony
+import androidx.core.database.sqlite.transaction
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
@@ -44,8 +45,7 @@ class SmsRestoreDataSource(
             index.execSQL("CREATE TABLE candidates(id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0)")
             index.execSQL("CREATE INDEX candidate_key ON candidates(fingerprint,used,id)")
             index.execSQL("CREATE TABLE restored(backup_id INTEGER PRIMARY KEY, target_id INTEGER NOT NULL, thread_id INTEGER)")
-            index.beginTransaction()
-            try {
+            index.transaction {
                 val cursor = resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id", "address", "body", "date", "type"), null, null, "_id ASC")
                     ?: throw BackupException("无法读取目标短信")
                 cursor.use { c ->
@@ -55,8 +55,7 @@ class SmsRestoreDataSource(
                         index.execSQL("INSERT INTO candidates(id,fingerprint) VALUES(?,?)", arrayOf<Any?>(c.longOrNull("_id"), key))
                     }
                 }
-                index.setTransactionSuccessful()
-            } finally { index.endTransaction() }
+            }
             open(directory, "message_mirror.db").use { source ->
                 open(directory, "spam.db").use { states ->
                     open(directory, "conversation_archive.db").use { archived ->

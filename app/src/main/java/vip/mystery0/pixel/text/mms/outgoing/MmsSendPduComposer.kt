@@ -73,28 +73,28 @@ class MmsSendPduComposer(
         val request = SendReq().apply {
             setTransactionId(transactionId.toByteArray(Charsets.US_ASCII))
             setContentType(contentType.toByteArray(Charsets.US_ASCII))
-            setFrom(EncodedStringValue(CharacterSets.UTF_8, PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR.toByteArray(Charsets.US_ASCII)))
-            setTo(arrayOf(EncodedStringValue(CharacterSets.UTF_8, recipient.toByteArray(Charsets.US_ASCII))))
-            setDate(snapshot.createdAt / 1000)
-            setDeliveryReport(PduHeaders.VALUE_NO)
-            setReadReport(PduHeaders.VALUE_NO)
-            if (subjectBytes.isNotEmpty()) setSubject(EncodedStringValue(CharacterSets.UTF_8, subjectBytes))
-            setBody(PduBody().apply {
+            from = EncodedStringValue(CharacterSets.UTF_8, PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR.toByteArray(Charsets.US_ASCII))
+            to = arrayOf(EncodedStringValue(CharacterSets.UTF_8, recipient.toByteArray(Charsets.US_ASCII)))
+            date = snapshot.createdAt / 1000
+            deliveryReport = PduHeaders.VALUE_NO
+            readReport = PduHeaders.VALUE_NO
+            if (subjectBytes.isNotEmpty()) subject = EncodedStringValue(CharacterSets.UTF_8, subjectBytes)
+            body = PduBody().apply {
                 parts.forEach { part ->
                     addPart(PduPart().apply {
                         setContentType(part.mimeType.toByteArray(Charsets.US_ASCII))
                         setContentId(part.contentId.toByteArray(Charsets.US_ASCII))
                         setContentLocation(part.contentLocation.toByteArray(Charsets.US_ASCII))
                         setName(part.contentLocation.toByteArray(Charsets.US_ASCII))
-                        if (part.charset != 0) setCharset(part.charset)
+                        if (part.charset != 0) charset = part.charset
                         setData(part.bytes)
                     })
                 }
-            })
+            }
         }
         val bytes = try {
             PduComposer(context, request, limit).make() ?: throw MmsSendException("无法编码彩信，请检查内容")
-        } catch (exception: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             throw MmsSendException("完整彩信超出限额或编码无效，请减少内容")
         }
         if (bytes.isEmpty() || bytes.size > limit) throw MmsSendException("完整彩信超出所选 SIM 的发送限额")
@@ -136,7 +136,7 @@ class MmsSendPduComposer(
             if (result.isOverflow) throw MmsSendException("正文或主题超过所选 SIM 的字节限制")
             buffer.flip()
             ByteArray(buffer.remaining()).also { buffer.get(it) }
-        } catch (exception: java.nio.charset.CharacterCodingException) {
+        } catch (_: java.nio.charset.CharacterCodingException) {
             throw MmsSendException("正文或主题包含不完整字符，请重新编辑")
         }
     }

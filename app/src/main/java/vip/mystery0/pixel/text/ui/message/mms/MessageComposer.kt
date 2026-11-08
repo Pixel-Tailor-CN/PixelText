@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
+import androidx.core.content.edit
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.ThumbnailUtils
@@ -44,7 +45,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -52,7 +52,6 @@ import vip.mystery0.pixel.text.mms.outgoing.MmsRecipient
 import vip.mystery0.pixel.text.mms.outgoing.MmsPayloadStore
 import vip.mystery0.pixel.text.mms.outgoing.MmsAttachment
 import vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel
-import java.io.File
 import java.util.Locale
 
 /** 会话和系统分享共用同一份持久草稿，不再在弹窗间复制正文。 */
@@ -274,7 +273,7 @@ fun MessageComposer(
                     confirm = false
                     // 同一 UI 事件内提交，避免等待偏好写盘时又编辑了已确认的收件人或内容。
                     // 若异步保存失败，下次再次提示费用，不放宽发送权限。
-                    if (isMms) consent.edit().putBoolean("acknowledged", true).apply()
+                    if (isMms) consent.edit { putBoolean("acknowledged", true) }
                     viewModel.submit()
                 }) { Text(if (state.possibleDuplicateOf != null) "仍然发送" else "确认发送") }
             },

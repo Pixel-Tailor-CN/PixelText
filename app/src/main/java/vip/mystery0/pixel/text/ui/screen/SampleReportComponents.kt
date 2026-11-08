@@ -20,6 +20,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
 import vip.mystery0.pixel.text.domain.sample.SampleCategory
 import java.time.Instant
@@ -71,7 +72,7 @@ internal fun SampleReportField(label: String, value: String) {
 internal fun sampleReportRetrySeconds(retryAt: Long): Long {
     var now by remember(retryAt) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(retryAt) {
-        while (now < retryAt) { delay(1000); now = System.currentTimeMillis() }
+        while (now < retryAt) { delay(1.seconds); now = System.currentTimeMillis() }
     }
     return ((retryAt - now + 999) / 1000).coerceAtLeast(0)
 }
@@ -82,7 +83,7 @@ internal fun SampleReportError(message: String, retryAt: Long, onRetry: () -> Un
     Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(message, color = MaterialTheme.colorScheme.error)
         TextButton(onClick = onRetry, enabled = seconds == 0L) {
-            Text(if (seconds > 0) "${seconds} 秒后可重试" else "重试")
+            Text(if (seconds > 0) "$seconds 秒后可重试" else "重试")
         }
     }
 }

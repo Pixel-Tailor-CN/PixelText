@@ -89,7 +89,7 @@ fun AppNavigation(
             navController.navigate("sample_report/$id")
         }
     }
-    val backupRepository = org.koin.compose.koinInject<vip.mystery0.pixel.text.domain.backup.BackupRepository>()
+    val backupRepository = koinInject<vip.mystery0.pixel.text.domain.backup.BackupRepository>()
     val backupState by backupRepository.state.collectAsState()
     var showRestoreNotice by remember { mutableStateOf(backupState.restoreProtected) }
     if (showRestoreNotice) {

@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.notification
 
+import androidx.core.net.toUri
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -95,7 +96,7 @@ object SmsNotificationHelper {
         // 后台检测只能更新仍存在的同一条通知，不能复活已划掉的通知或覆盖新消息。
         if (messageUri?.startsWith("content://sms/") == true) {
             val unread = context.contentResolver.query(
-                android.net.Uri.parse(messageUri), arrayOf(Telephony.Sms.READ), null, null, null,
+                messageUri.toUri(), arrayOf(Telephony.Sms.READ), null, null, null,
             )?.use { it.moveToFirst() && it.getInt(0) == 0 } == true
             if (!unread) return
         }
@@ -185,7 +186,7 @@ object SmsNotificationHelper {
             ).build()
         }
 
-        val actionMap = buildMap<NotificationQuickActionType, NotificationCompat.Action> {
+        val actionMap = buildMap {
             put(NotificationQuickActionType.MARK_READ, markReadAction)
             put(NotificationQuickActionType.REPLY, replyAction)
             copyCodeAction?.let {

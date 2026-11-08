@@ -1,9 +1,6 @@
 package vip.mystery0.pixel.text.ui.message.cards.finance
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,7 +39,6 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolea
     } else {
         smartCardContainerColor(baseThemeColor)
     }
-    val onContainerColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface
     val onContainerVariantColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(

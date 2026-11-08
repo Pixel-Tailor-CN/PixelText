@@ -76,7 +76,7 @@ class SenderWhitelistViewModel(
             try {
                 operation()
                 _state.value = WhitelistUiState(message = success)
-                SmartspacerIntegration.notifyChanged(getApplication<Application>())
+                SmartspacerIntegration.notifyChanged(getApplication())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

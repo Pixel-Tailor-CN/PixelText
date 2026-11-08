@@ -18,7 +18,6 @@
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
 import android.net.Uri;
-import android.os.Build;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -108,7 +107,7 @@ public class PduPart {
      /**
       * Header of part.
       */
-     private Map<Integer, Object> mPartHeader = null;
+     private final Map<Integer, Object> mPartHeader;
 
      /**
       * Data uri.
@@ -129,13 +128,12 @@ public class PduPart {
      public String getMultipartIssue() { return mMultipartIssue; }
      public void setMultipartIssue(String issue) { mMultipartIssue = issue; }
 
-     private static final String TAG = "PduPart";
 
      /**
       * Empty Constructor.
       */
      public PduPart() {
-         mPartHeader = new HashMap<Integer, Object>();
+         mPartHeader = new HashMap<>();
      }
 
      /**
@@ -249,11 +247,7 @@ public class PduPart {
       */
      public int getCharset() {
          Integer charset = (Integer) mPartHeader.get(P_CHARSET);
-         if(charset == null) {
-             return 0;
-         } else {
-             return charset.intValue();
-         }
+         return java.util.Objects.requireNonNullElse(charset, 0);
      }
 
      /**
@@ -310,8 +304,7 @@ public class PduPart {
 
      /**
       *  Set Content-Type value.
-      *
-      *  @param value the value
+      *  @param contentType 内容类型
       *  @throws NullPointerException if the value is null.
       */
      public void setContentType(byte[] contentType) {
@@ -333,8 +326,7 @@ public class PduPart {
 
      /**
       * Set Content-Transfer-Encoding value
-      *
-      * @param contentId the content-id value
+      * @param contentTransferEncoding 内容传输编码
       * @throws NullPointerException if the value is null.
       */
      public void setContentTransferEncoding(byte[] contentTransferEncoding) {

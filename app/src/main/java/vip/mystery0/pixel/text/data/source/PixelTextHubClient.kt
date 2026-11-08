@@ -38,7 +38,7 @@ class PixelTextHubClient(
     }
 
     suspend fun fetchManifest(): HubResourceManifest = withContext(Dispatchers.IO) {
-        bodyOrThrow(service.fetchManifest(BuildConfig.VERSION_CODE, 2), "资源协议 v2 暂不可用").toDomain()
+        bodyOrThrow(service.fetchManifest(BuildConfig.VERSION_CODE, 2)).toDomain()
     }
 
     suspend fun submitReport(request: SampleReportRequest): SampleReportSubmission = withContext(Dispatchers.IO) {
@@ -72,10 +72,10 @@ class PixelTextHubClient(
             (response.headers()["Retry-After"]?.toLongOrNull() ?: 60L).coerceIn(1, 86400)
         } else null
         val message = when (response.code()) {
-            400 -> when {
-                operation == ReportOperation.LIST && code == "INVALID_CURSOR" -> "记录分页已失效，请下拉刷新后重试"
-                operation == ReportOperation.SUBMIT -> "提交信息不符合要求，请检查后重试"
-                else -> "查询信息不符合要求，请刷新后重试"
+            400 -> when (operation) {
+                ReportOperation.LIST -> if (code == "INVALID_CURSOR") "记录分页已失效，请下拉刷新后重试" else "查询信息不符合要求，请刷新后重试"
+                ReportOperation.SUBMIT -> "提交信息不符合要求，请检查后重试"
+                ReportOperation.DETAIL -> "查询信息不符合要求，请刷新后重试"
             }
             404 -> if (operation == ReportOperation.DETAIL) "无法查看这条上报记录" else "上报服务暂不可用，请稍后重试"
             409 -> "本次请求存在冲突，已保留原请求，请稍后重试或反馈问题"
@@ -187,12 +187,12 @@ class PixelTextHubClient(
         target.length()
     }
 
-    private fun <T : Any> bodyOrThrow(response: Response<T>, prefix: String): T {
+    private fun <T : Any> bodyOrThrow(response: Response<T>): T {
         response.errorBody()?.close()
         if (!response.isSuccessful) {
-            throw IllegalStateException("$prefix status=${response.code()}")
+            throw IllegalStateException("资源协议 v2 暂不可用 status=${response.code()}")
         }
-        return response.body() ?: throw IllegalStateException("$prefix empty body")
+        return response.body() ?: throw IllegalStateException("资源协议 v2 暂不可用 empty body")
     }
 
     private fun normalizeBaseUrl(url: String): String {

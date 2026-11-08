@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text
 
-import android.content.Intent
 import android.os.Bundle
 import android.provider.Telephony
 import androidx.activity.ComponentActivity

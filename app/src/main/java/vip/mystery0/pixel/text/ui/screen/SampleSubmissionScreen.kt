@@ -38,7 +38,6 @@ internal const val SAMPLE_SUBMISSION_DRAFT_CONTENT = "sample_submission_draft_co
 internal const val SAMPLE_SUBMISSION_DRAFT_SENDER = "sample_submission_draft_sender"
 internal const val SAMPLE_SUBMISSION_DRAFT_CATEGORY = "sample_submission_draft_category"
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SampleSubmissionScreen(
     viewModel: SampleSubmissionViewModel = koinViewModel(),
@@ -436,7 +435,7 @@ fun SampleSubmissionScreen(
                                 when {
                                     state.preparing -> "正在保存…"
                                     state.submitting -> "正在提交…"
-                                    seconds > 0 -> "${seconds} 秒后可重试"
+                                    seconds > 0 -> "$seconds 秒后可重试"
                                     state.pending -> "重试本次提交"
                                     else -> "确认并提交"
                                 }
@@ -582,7 +581,6 @@ fun SampleSubmissionScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubmissionStepHeader(confirmStep: Boolean) {
     FlowRow(
@@ -673,7 +671,6 @@ private fun SubmissionStepHeader(confirmStep: Boolean) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColumnScope.DesensitizationAssistantSheet(
     state: DesensitizationAssistantState,

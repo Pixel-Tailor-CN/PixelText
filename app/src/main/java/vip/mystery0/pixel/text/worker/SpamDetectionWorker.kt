@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
+import androidx.core.net.toUri
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -19,7 +20,6 @@ import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
-import vip.mystery0.pixel.text.domain.spam.SpamClassifier
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
@@ -38,7 +38,6 @@ class SpamDetectionWorker(
         const val ACTION_SPAM_DETECTED = "${BuildConfig.APPLICATION_ID}.action.SPAM_DETECTED"
         const val KEY_MESSAGE_ID = "message_id"
         const val KEY_THREAD_ID = "thread_id"
-        const val KEY_SENDER = "sender"
         const val KEY_CONTENT = "content"
         private const val KEY_MESSAGE_DATE = "message_date"
         const val KEY_SCORE = "score"
@@ -85,7 +84,7 @@ class SpamDetectionWorker(
         val messageUri = android.content.ContentUris.withAppendedId(android.provider.Telephony.Sms.CONTENT_URI, messageId).toString()
         // 正文保留在 Provider；既避免 Data 的 10KB 限制，也不使用已删除或替换的旧正文。
         val row = applicationContext.contentResolver.query(
-            android.net.Uri.parse(messageUri), arrayOf("thread_id", "address", "body", "date", "type"), null, null, null,
+            messageUri.toUri(), arrayOf("thread_id", "address", "body", "date", "type"), null, null, null,
         )?.use { cursor ->
             if (!cursor.moveToFirst() || cursor.getInt(4) != android.provider.Telephony.Sms.MESSAGE_TYPE_INBOX) null
             else IncomingSms(cursor.getLong(0), cursor.getString(1).orEmpty(), cursor.getString(2).orEmpty(), cursor.getLong(3))
@@ -101,8 +100,8 @@ class SpamDetectionWorker(
         val deferNotification = inputData.getBoolean(KEY_DEFER_NOTIFICATION, false)
 
         val allowedAtStart = whitelist.isAllowed(messageId)
-        val keywordMatched = if (allowedAtStart) false else runCatching {
-            keywordSpamRepository.updateMessageMatch(messageId, threadId, content)
+        val keywordMatched = !allowedAtStart && runCatching {
+            keywordSpamRepository.updateMessageMatch(messageId)
         }.getOrElse { error ->
             Log.e(TAG, "keyword spam match failed message_id=$messageId", error)
             false
@@ -129,7 +128,7 @@ class SpamDetectionWorker(
         val messageSource = vip.mystery0.pixel.text.data.source.LearningMessageSource(applicationContext.contentResolver)
         var stale = false
         restoreSafety.liveMessageEffects(messageId) { allowAutoAction ->
-            if (prediction != null && spamRepository.isEnabled() && !spamRepository.savePrediction(messageId, threadId, prediction, key)) {
+            if (prediction != null && spamRepository.isEnabled() && !spamRepository.savePrediction(messageId, prediction, key)) {
                 stale = true
                 return@liveMessageEffects
             }
@@ -140,7 +139,7 @@ class SpamDetectionWorker(
             }
             if (messageSource.keys(listOf(messageId))[messageId] != key) return@withDecision
             // 重新按当前规则匹配，避免推理前的关键词缓存直接驱动自动操作。
-            keywordSpamRepository.updateMessageMatch(messageId, threadId, content)
+            keywordSpamRepository.updateMessageMatch(messageId)
             val score = spamRepository.scoreForKey(key)
             whitelist.withMessageDecision(messageId) { allowed ->
                 if (messageSource.keys(listOf(messageId))[messageId] != key) return@withMessageDecision

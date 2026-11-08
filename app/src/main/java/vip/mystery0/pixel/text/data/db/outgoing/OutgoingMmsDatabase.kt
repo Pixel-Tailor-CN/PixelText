@@ -41,6 +41,8 @@ data class MmsRequestEntity(
 )
 
 @Entity(tableName = "send_attempt", indices = [Index(value = ["transactionId"], unique = true), Index("requestId")])
+// 响应字节仅作为持久化载荷保存，尝试身份由 token 标识，不参与内容去重。
+@Suppress("ArrayInDataClass")
 data class MmsAttemptEntity(
     @PrimaryKey val token: String,
     val requestId: String,
@@ -65,6 +67,8 @@ data class MmsAttemptEntity(
 )
 
 @Entity(tableName = "callback_fact", indices = [Index(value = ["attemptToken", "fingerprint"], unique = true)])
+// 回调去重使用已持久化的 fingerprint，不使用数组引用或实体相等性。
+@Suppress("ArrayInDataClass")
 data class MmsCallbackEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val attemptToken: String,
@@ -85,7 +89,6 @@ data class MmsCleanupEntity(@PrimaryKey val path: String)
 @Dao
 interface OutgoingMmsDao {
     @Query("SELECT * FROM draft WHERE id = :id") suspend fun draft(id: String): MmsDraftEntity?
-    @Query("SELECT * FROM draft WHERE id = :id") fun observeDraft(id: String): Flow<MmsDraftEntity?>
     @Query("SELECT * FROM draft WHERE accepted = 0 ORDER BY updatedAt DESC") fun observeDrafts(): Flow<List<MmsDraftEntity>>
     @Query("SELECT * FROM draft WHERE recipientAddress = :recipient AND accepted = 0 ORDER BY updatedAt DESC LIMIT 1")
     suspend fun latestDraft(recipient: String): MmsDraftEntity?

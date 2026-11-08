@@ -176,18 +176,18 @@ class MessageMirrorSynchronizer(
             if (SystemClock.elapsedRealtime() >= deadline) return@repeat
             val batch = sync.dirtyBatch().filter { it.transport != null }
             if (batch.isEmpty()) return@repeat
-            for (dirty in batch) {
+            for ((dirtyKey, transport, sourceId, token) in batch) {
                 if (SystemClock.elapsedRealtime() >= deadline) break
                 currentCoroutineContext().ensureActive()
                 val key = SourceMessageKey(
-                    MessageTransport.valueOf(requireNotNull(dirty.transport)),
-                    requireNotNull(dirty.sourceId)
+                    MessageTransport.valueOf(requireNotNull(transport)),
+                    requireNotNull(sourceId)
                 )
                 if (refreshOne(key)) {
-                    if (dirty.key.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
+                    if (dirtyKey.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
                         dao.invalidateAttachmentContent(key.sourceId)
                     }
-                    sync.acknowledge(dirty.key, dirty.token)
+                    sync.acknowledge(dirtyKey, token)
                 }
             }
         }
@@ -239,12 +239,12 @@ class MessageMirrorSynchronizer(
                 val dirty = sync.smsBackupDirtyBatch()
                 if (dirty.isEmpty()) break
                 check(++rounds <= 100) { "sms backup source is busy" }
-                for (row in dirty) {
+                for ((dirtyKey, _, sourceId, token) in dirty) {
                     currentCoroutineContext().ensureActive()
-                    check(refreshOne(SourceMessageKey(MessageTransport.SMS, requireNotNull(row.sourceId)))) {
+                    check(refreshOne(SourceMessageKey(MessageTransport.SMS, requireNotNull(sourceId)))) {
                         "sms backup targeted refresh failed"
                     }
-                    sync.acknowledge(row.key, row.token)
+                    sync.acknowledge(dirtyKey, token)
                 }
             }
             snapshot(requireNotNull(sync.state("SMS")?.lastSuccessTime))
@@ -294,7 +294,7 @@ class MessageMirrorSynchronizer(
                         columns = columns + structures.flatMap { it.sourceColumns }
                         var previousId = state.checkpoint
                         structures.forEach {
-                            check(previousId == null || it.message.sourceId > requireNotNull(previousId)) { "unordered_source_page" }
+                            check(previousId == null || it.message.sourceId > previousId) { "unordered_source_page" }
                             previousId = it.message.sourceId
                         }
                         val checkpoint = structures.last().message.sourceId

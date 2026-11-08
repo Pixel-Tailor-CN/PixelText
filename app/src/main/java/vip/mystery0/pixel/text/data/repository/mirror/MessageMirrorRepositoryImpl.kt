@@ -36,10 +36,6 @@ class MessageMirrorRepositoryImpl(
         dao.observeMessage(key.transport.name, key.sourceId).map { it?.toModel() }
             .distinctUntilChanged().flowOn(Dispatchers.IO)
 
-    override fun observeMessagesByThread(threadId: Long, limit: Int, offset: Int): Flow<List<MirrorMessageModel>> =
-        dao.observeThread(threadId, limit.coerceAtLeast(1), offset.coerceAtLeast(0))
-            .map { rows -> rows.map { it.toModel() } }.flowOn(Dispatchers.IO)
-
     override suspend fun queryThreadMessages(threadId: Long, limit: Int, offset: Int,
         filter: vip.mystery0.pixel.text.domain.repository.ConversationContentFilter): List<MirrorMessageModel> =
         withContext(Dispatchers.IO) {
@@ -52,23 +48,8 @@ class MessageMirrorRepositoryImpl(
             dao.threadPage(threadId, filterValue, limit, offset).map { it.toModel() }
         }
 
-    override fun observeAllMessages(): Flow<List<MirrorMessageModel>> =
-        dao.observeAll().map { rows -> rows.map { it.toModel() } }.flowOn(Dispatchers.IO)
-
     override fun observeMmsMessages(): Flow<List<MirrorMessageModel>> =
         dao.observeMms().map { rows -> rows.map { it.toModel() } }.flowOn(Dispatchers.IO)
-
-    override suspend fun getConversationMessages(threadIds: List<Long>): List<ConversationMessageSnapshot> =
-        withContext(Dispatchers.IO) {
-            buildList {
-                // 分批限制绑定参数数量；短信只读轻量字段，彩信保留完整派生校验语义。
-                for (batch in threadIds.distinct().chunked(500)) {
-                    currentCoroutineContext().ensureActive()
-                    addAll(dao.conversationSms(batch).map { it.toConversationSnapshot() })
-                    addAll(dao.conversationMms(batch).map { it.toConversationSnapshot() })
-                }
-            }.sortedWith(compareByDescending<ConversationMessageSnapshot> { it.message.timestamp }.thenByDescending { it.localId })
-        }
 
     override suspend fun getConversationMessagesByIds(
         messageIds: Collection<Long>,
@@ -92,7 +73,7 @@ class MessageMirrorRepositoryImpl(
         if (query.threadIds?.isEmpty() == true || query.limit == 0) return@withContext emptyList()
         database.withTransaction {
             val rows = dao.filteredConversations(sql)
-            val mms = buildMap<Long, MessageModel> {
+            val mms = buildMap {
                 // 聚合和最新彩信读取使用同一事务，避免两次查询之间删除或更新消息。
                 for (batch in rows.filter { it.latestIsMms }.map { it.localId }.chunked(500)) {
                     currentCoroutineContext().ensureActive()
@@ -147,12 +128,6 @@ class MessageMirrorRepositoryImpl(
 
     override fun observeConversationChanges(): Flow<Unit> =
         dao.observeConversationChanges(SimpleSQLiteQuery("SELECT 1")).map { }.flowOn(Dispatchers.IO)
-
-    override fun observeConversationSummaries(): Flow<List<ConversationModel>> =
-        dao.observeConversations().map { rows -> rows.map {
-            ConversationModel(it.threadId, it.address.orEmpty(), it.snippet.orEmpty(), it.timestamp ?: 0,
-                unreadCount = it.unreadCount, isMms = it.latestIsMms, hasMms = it.containsMms)
-        } }.flowOn(Dispatchers.IO)
 
     override fun observeSyncState(): Flow<MirrorSyncState> {
         val counts = combine(dao.observeIncompleteCount(), dao.observePendingDownloads(),

@@ -17,13 +17,10 @@
 
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
-import android.os.Build;
-import android.util.Log;
 
 import vip.mystery0.pixel.text.mms.vendor.InvalidHeaderValueException;
 
 public class SendReq extends MultimediaMessagePdu {
-    private static final String TAG = "SendReq";
     public SendReq() {
         super();
 
@@ -37,7 +34,6 @@ public class SendReq extends MultimediaMessagePdu {
             setTransactionId(generateTransactionId());
         } catch (InvalidHeaderValueException e) {
             // Impossible to reach here since all headers we set above are valid.
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(TAG, "Unexpected InvalidHeaderValueException.", e);
             throw new RuntimeException(e);
         }
     }
@@ -186,7 +182,6 @@ public class SendReq extends MultimediaMessagePdu {
 
     /**
      * Get X-Mms-Expiry value.
-     *
      * Expiry-value = Value-length
      *      (Absolute-token Date-value | Relative-token Delta-seconds-value)
      *
@@ -207,7 +202,6 @@ public class SendReq extends MultimediaMessagePdu {
 
     /**
      * Get X-Mms-MessageSize value.
-     *
      * Expiry-value = size of message
      *
      * @return the value

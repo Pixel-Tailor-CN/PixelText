@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 import vip.mystery0.pixel.text.domain.theme.ConversationDetailAppearance
 import vip.mystery0.pixel.text.domain.theme.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
@@ -346,9 +345,8 @@ class ConversationDetailCustomizationViewModel(
      */
     fun isBackgroundMissing(mode: ThemeMode): Boolean {
         val module = _uiState.value.draftTheme.conversationDetail
-        val reference = module.appearance(module.backgroundMode(mode)).backgroundImage
-            ?: return false
-        return resolvePreviewBackground(mode) == null
+        return module.appearance(module.backgroundMode(mode)).backgroundImage != null &&
+            resolvePreviewBackground(mode) == null
     }
 
     fun save(exitAfterSave: Boolean = false) {
@@ -661,22 +659,21 @@ class ConversationDetailCustomizationViewModel(
     ) {
         var nextBase = baseConfiguration
         var nextDraft = draftTheme
-        val nextPersisted = persistedTheme
 
         // Stale-clean rebase: draft matches the old base while persisted moved on (external
         // update while dirty, then user undid back to base). Do not treat stale base as clean.
         // Skip while saving so in-flight save publication is not disrupted.
-        if (!isSaving && nextDraft == nextBase && nextBase != nextPersisted) {
+        if (!isSaving && nextDraft == nextBase && nextBase != persistedTheme) {
             if (imageDrafts.isNotEmpty()) {
                 discardAllImageDrafts()
             }
-            nextBase = nextPersisted
-            nextDraft = nextPersisted
+            nextBase = persistedTheme
+            nextDraft = persistedTheme
             baseConfiguration = nextBase
         }
 
         _uiState.value = ConversationDetailCustomizationUiState(
-            persistedTheme = nextPersisted,
+            persistedTheme = persistedTheme,
             draftTheme = nextDraft,
             previewMode = previewMode,
             highTextContrastEnabled = highTextContrastEnabled,

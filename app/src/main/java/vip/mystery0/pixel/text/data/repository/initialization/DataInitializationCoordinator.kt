@@ -25,6 +25,8 @@ class DataInitializationCoordinator(
             val deadline = SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1)
             repository.prepare()
             var classifier: MirrorSpamScanSession? = null
+            // 会话在扫描阶段才异步创建；use 会提前捕获初始 null，无法关闭后来获得的会话。
+            @Suppress("ConvertTryFinallyToUseCall")
             try {
                 while (SystemClock.elapsedRealtime() < deadline) {
                     currentCoroutineContext().ensureActive()

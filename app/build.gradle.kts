@@ -79,7 +79,6 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles("proguard-rules.pro")
             versionNameSuffix = ".r$gitVersionCode.$gitVersionName"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -130,8 +129,6 @@ dependencies {
 
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.zhanghai.preference)
 
     implementation(libs.tensorflow.lite)
     implementation(libs.androidx.work.runtime.ktx)
@@ -150,6 +147,7 @@ dependencies {
 // 将仓库中已有原文转换成插件配置，避免再维护一份转义后的许可证正文。
 val generatedNotices = layout.buildDirectory.dir("generated/openSourceNotices")
 val generateOpenSourceNotices = tasks.register("generateOpenSourceNotices") {
+    description = "根据仓库许可原文生成开源声明资源"
     // doLast 只能捕获局部值；引用脚本顶层属性会让配置缓存序列化脚本对象。
     val noticeRoot = rootProject.layout.projectDirectory.asFile
     val noticeMetadata = rootProject.file("config/open-source/notices.json")

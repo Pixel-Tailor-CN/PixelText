@@ -1,12 +1,10 @@
 package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
-import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 
@@ -21,7 +19,6 @@ class ConversationCacheRepository(
     fun startObserving() {
         observer.start()
     }
-    fun stopObserving() = observer.stop()
     suspend fun isCacheReady(): Boolean {
         val state = mirror.observeSyncState().first()
         return state.completedCollections.containsAll(setOf("SMS", "MMS"))
@@ -58,14 +55,9 @@ class ConversationCacheRepository(
         )
         MessageMirrorScheduler(context).enqueueMetadata(reason = "incoming_sms")
     }
-    suspend fun syncThreads(threadIds: List<Long>) {
+    suspend fun syncLocalChanges() {
         synchronizer.markDirty(null)
         // 系统写入后的通知只持久排队，不让 Receiver 或用户操作等待整库扫描。
         MessageMirrorScheduler(context).enqueueMetadata(reason = "local_write")
     }
-    suspend fun getAllConversations(
-        archivedThreadIds: Set<Long>, hiddenThreadIds: Set<Long> = emptySet(),
-    ): List<ConversationModel> = mirror.observeConversationSummaries().first()
-        .filter { it.threadId !in archivedThreadIds && it.threadId !in hiddenThreadIds }
-    fun observeAllConversations(): Flow<List<ConversationModel>> = mirror.observeConversationSummaries()
 }

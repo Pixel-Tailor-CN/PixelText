@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.sms
 
+import androidx.core.net.toUri
 import android.app.Activity
 import android.app.PendingIntent
 import android.app.role.RoleManager
@@ -86,7 +87,7 @@ class SmsSendCoordinator(
                 val callbacks = ArrayList(parts.indices.map { index ->
                     PendingIntent.getBroadcast(context, 0,
                         Intent(context, SmsSentReceiver::class.java).apply {
-                            data = Uri.parse("pixeltext://sms-sent/$token/$index")
+                            data = "pixeltext://sms-sent/$token/$index".toUri()
                         }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 })
                 try {
@@ -99,7 +100,7 @@ class SmsSendCoordinator(
                     publish(record)
                 }
                 runCatching { syncProvider(record) }
-                runCatching { cache.syncThreads(listOf(record.getLong("thread"))) }
+                runCatching { cache.syncLocalChanges() }
                 id
             }
         }
@@ -127,7 +128,7 @@ class SmsSendCoordinator(
                     WorkManager.getInstance(context).cancelUniqueWork("sms-send-recovery-$token")
                 }
             }.onFailure { scheduleRecovery(30_000, token) }
-            runCatching { cache.syncThreads(listOf(record.getLong("thread"))) }
+            runCatching { cache.syncLocalChanges() }
         }
     }
 
@@ -196,7 +197,7 @@ class SmsSendCoordinator(
     }
 
     private fun publish(record: JSONObject) {
-        mutableStates.value = mutableStates.value + (record.getLong("id") to State.valueOf(record.getString("state")))
+        mutableStates.value += record.getLong("id") to State.valueOf(record.getString("state"))
     }
 
     private fun read(token: String): JSONObject? = runCatching {

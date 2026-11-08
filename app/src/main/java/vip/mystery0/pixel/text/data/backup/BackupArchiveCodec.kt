@@ -1,10 +1,13 @@
 package vip.mystery0.pixel.text.data.backup
 
 import android.content.Context
+import android.annotation.SuppressLint
 import androidx.core.net.toUri
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.model.ZipParameters
 import net.lingala.zip4j.model.enums.AesKeyStrength
@@ -53,6 +56,8 @@ class BackupArchiveCodec(private val context: Context) {
         }
     }
 
+    // 暂存校验需要实际可用空间，不主动回收其他缓存来为恢复腾出空间。
+    @SuppressLint("UsableSpace")
     suspend fun inspect(uri: String, password: CharArray?, directory: File): ValidatedBackup {
         val archive = File(directory, "input.zip")
         val input = context.contentResolver.openInputStream(uri.toUri()) ?: throw BackupException("无法读取所选文件")
@@ -97,28 +102,29 @@ class BackupArchiveCodec(private val context: Context) {
         val actual = directory.walkTopDown().filter { it.isFile && it != archive && it != manifestFile }
             .map { it.relativeTo(directory).invariantSeparatorsPath }.toSet()
         backupRequire(actual == listed.toSet(), "备份条目与清单不一致")
-        for (entry in manifest.entries) {
-            val file = File(directory, entry.name)
-            backupRequire(entry.name in actual && file.length() == entry.size && digest(file) == entry.sha256, "备份完整性校验失败")
+        for ((name, size, sha256) in manifest.entries) {
+            val file = File(directory, name)
+            backupRequire(name in actual && file.length() == size && digest(file) == sha256, "备份完整性校验失败")
         }
         archive.delete()
         return ValidatedBackup(directory, manifest)
     }
 
-    private suspend fun copyLimited(input: InputStream, output: OutputStream, limit: Long): Long {
+    private suspend fun copyLimited(input: InputStream, output: OutputStream, limit: Long): Long = withContext(Dispatchers.IO) {
         val buffer = ByteArray(64 * 1024)
         var total = 0L
         while (true) {
             currentCoroutineContext().ensureActive()
             val count = input.read(buffer)
-            if (count < 0) return total
+            if (count < 0) break
             total += count
             backupRequire(total <= limit, "备份超出大小限制")
             output.write(buffer, 0, count)
         }
+        total
     }
 
-    private suspend fun digest(file: File): String {
+    private suspend fun digest(file: File): String = withContext(Dispatchers.IO) {
         val hash = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
             val buffer = ByteArray(64 * 1024)
@@ -129,6 +135,6 @@ class BackupArchiveCodec(private val context: Context) {
                 hash.update(buffer, 0, read)
             }
         }
-        return hash.digest().joinToString("") { "%02x".format(it) }
+        hash.digest().joinToString("") { "%02x".format(it) }
     }
 }

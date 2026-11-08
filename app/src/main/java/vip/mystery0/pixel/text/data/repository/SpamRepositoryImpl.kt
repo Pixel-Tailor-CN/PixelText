@@ -18,7 +18,7 @@ import vip.mystery0.pixel.text.domain.spam.learning.*
 
 /** 最终分类直接读取镜像列；模型与消息身份仅在写入或后台扫描时校验。 */
 class SpamRepositoryImpl(
-    private val database: MessageMirrorDatabase,
+    database: MessageMirrorDatabase,
     private val settingsRepository: AppSettingsRepository,
     private val whitelist: SenderWhitelistRepositoryImpl,
     private val learning: PersonalLearningRepositoryImpl,
@@ -49,7 +49,6 @@ class SpamRepositoryImpl(
 
     override suspend fun savePrediction(
         messageId: Long,
-        threadId: Long,
         prediction: SpamPrediction,
         key: LearningMessageKey,
         allowDisabled: Boolean,
@@ -65,7 +64,7 @@ class SpamRepositoryImpl(
                 !prediction.score.isFinite() || prediction.score !in 0f..1f || !isPredictionCurrent(prediction)) {
                 return@withDecision false
             }
-            if (messageId > 0) keywords.updateMessageMatch(messageId, threadId, "")
+            if (messageId > 0) keywords.updateMessageMatch(messageId)
             whitelist.withMessageDecision(messageId) {
                 // 即使当前人工覆盖有效，也保留模型分数；DAO 保持人工／规则优先级。
                 dao.savePrediction(messageId, prediction.score, prediction.modelIdentity, prediction.revision,
@@ -77,11 +76,6 @@ class SpamRepositoryImpl(
     // 此方法用于已持有收信决策锁的副作用入口，调用者已校验 key，不重复获取锁。
     override suspend fun scoreForKey(key: LearningMessageKey): Float? = dao.getScore(key.sourceId)
 
-    override suspend fun scoresForKeys(keys: List<LearningMessageKey>): Map<Long, Float> = withContext(Dispatchers.IO) {
-        ensureReady()
-        dao.getScores(keys.map { it.sourceId })
-    }
-
     override suspend fun getScore(messageId: Long): Float? = withContext(Dispatchers.IO) {
         ensureReady()
         dao.getScore(messageId)
@@ -90,34 +84,6 @@ class SpamRepositoryImpl(
     override suspend fun getScores(messageIds: List<Long>): Map<Long, Float> = withContext(Dispatchers.IO) {
         ensureReady()
         dao.getScores(messageIds)
-    }
-
-    override suspend fun getIdentifiedMessageIds(messageIds: List<Long>): Set<Long> = withContext(Dispatchers.IO) {
-        ensureReady()
-        dao.identifiedMessageIds(messageIds)
-    }
-
-    override suspend fun getCurrentModelMessageIds(messageIds: List<Long>): Set<Long> = withContext(Dispatchers.IO) {
-        ensureReady()
-        val identity = identity()
-        val revision = learning.stateRevision()
-        val generation = generation(identity)
-        // 仅后台扫描使用版本字段；更新模型后旧标签继续可见，扫描逐条替换。
-        dao.rows(messageIds).filter {
-            it.spamAllowedSource != null || (it.spamScore != null && it.spamModelIdentity == identity &&
-                it.spamModelRevision == revision && it.spamModelGeneration == generation)
-        }.mapTo(mutableSetOf()) { it.messageId }
-    }
-
-    override suspend fun getSpamMessageIds(messageIds: List<Long>, threshold: Float): Set<Long> = withContext(Dispatchers.IO) {
-        ensureReady()
-        dao.spamMessageIds(messageIds, threshold)
-    }
-
-    override suspend fun getSpamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> = withContext(Dispatchers.IO) {
-        ensureReady()
-        require(limit >= 0 && offset >= 0)
-        dao.spamThreadIds(threshold, limit, offset)
     }
 
     override suspend fun delete(messageIds: Set<Long>) {

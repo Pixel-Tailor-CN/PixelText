@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
+import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,8 @@ class AppSettingsRepositoryImpl(context: Context) : AppSettingsRepository {
 
     // 学习设置独立存储，不随常规设置备份或迁移。
 
+    // 学习开关必须确认落盘成功；KTX edit 不返回 commit 的结果。
+    @SuppressLint("UseKtx")
     override fun setPersonalLearningEnabled(enabled: Boolean) {
         check(learningPrefs.edit().putBoolean("enabled", enabled).commit())
         refreshSettings()

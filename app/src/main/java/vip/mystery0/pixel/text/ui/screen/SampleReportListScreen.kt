@@ -19,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
@@ -45,7 +46,7 @@ fun SampleReportListScreen(
     LaunchedEffect(refreshRequested, state.retryAt, lifecycleState) {
         if (refreshRequested && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) {
             // 提交成功的刷新明确接线；限流结束前保留请求，离开前台时取消等待。
-            delay((state.retryAt - System.currentTimeMillis()).coerceAtLeast(0))
+            delay((state.retryAt - System.currentTimeMillis()).coerceAtLeast(0).milliseconds)
             if (viewModel.refreshAfterSubmission()) onRefreshRequestConsumed()
         }
     }
@@ -88,7 +89,7 @@ fun SampleReportListScreen(
                     }
                 }
                 state.pendingError?.let { message -> item(key = "pending_error") {
-                    SampleReportError(message, 0, { viewModel.refreshPending() })
+                    SampleReportError(message, 0) { viewModel.refreshPending() }
                 } }
                 state.error?.let { message -> item(key = "error") { SampleReportError(message, state.retryAt, viewModel::refresh) } }
                 if (state.loaded && state.items.isEmpty() && state.error == null) item(key = "empty") {

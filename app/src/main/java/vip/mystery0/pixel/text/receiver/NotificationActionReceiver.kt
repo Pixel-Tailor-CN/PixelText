@@ -205,13 +205,13 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
     /**
      * 将验证码写入系统剪贴板。
      */
+    // getter 可空而 setter 要求非空，当前 Kotlin 无法将它们映射为可写属性。
+    @Suppress("UsePropertyAccessSyntax")
     private fun copyVerificationCode(context: Context, code: String) {
         try {
             val clipboardManager =
                 context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboardManager.setPrimaryClip(
-                ClipData.newPlainText("verification code", code)
-            )
+            clipboardManager.setPrimaryClip(ClipData.newPlainText("verification code", code))
         } catch (e: Exception) {
             Log.e(TAG, "failed to copy verification code", e)
         }

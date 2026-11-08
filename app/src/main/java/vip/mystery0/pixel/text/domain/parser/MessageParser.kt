@@ -82,10 +82,6 @@ class MessageParser(
         }
     }
 
-    @Synchronized fun reloadRules() {
-        snapshot = compileRules(readRulesJson())
-    }
-
     fun extractSignature(content: String): String? {
         val startRegex = Regex("^【(.*?)】|^\\[(.*?)]")
         val endRegex = Regex("【(.*?)】$|\\[(.*?)]$")
@@ -291,7 +287,7 @@ class MessageParser(
     private fun getGroupOrNull(matcher: java.util.regex.Matcher, name: String): String? {
         return try {
             matcher.group(name)?.takeIf { it.isNotBlank() }
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             null
         }
     }

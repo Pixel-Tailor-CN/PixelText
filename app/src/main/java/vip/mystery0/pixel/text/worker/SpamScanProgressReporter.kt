@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class SpamScanProgress(
@@ -44,7 +45,7 @@ internal class SpamScanProgressReporter(
         }
 
         while (true) {
-            val signal = withTimeoutOrNull(1_000L) { signals.receiveCatching() }
+            val signal = withTimeoutOrNull(1.seconds) { signals.receiveCatching() }
             publishLatest()
             if (signal?.isClosed == true) break
         }

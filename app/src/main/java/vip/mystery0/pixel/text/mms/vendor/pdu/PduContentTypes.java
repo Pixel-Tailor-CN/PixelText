@@ -21,7 +21,7 @@ package vip.mystery0.pixel.text.mms.vendor.pdu;
 public class PduContentTypes {
     /**
      * All content types. From:
-     * http://www.openmobilealliance.org/tech/omna/omna-wsp-content-type.htm
+     * <a href="http://www.openmobilealliance.org/tech/omna/omna-wsp-content-type.htm">http://www.openmobilealliance.org/tech/omna/omna-wsp-content-type.htm</a>
      */
     static final String[] contentTypes = {
         "*/*",                                        /* 0x00 */

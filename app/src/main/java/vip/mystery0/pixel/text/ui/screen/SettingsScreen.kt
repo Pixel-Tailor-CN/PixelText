@@ -100,7 +100,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -773,8 +772,7 @@ fun SettingsScreen(
                             Icon(Icons.Rounded.DashboardCustomize, contentDescription = null)
                         },
                         onClick = {
-                            SmartspacerIntegration.notifyChanged(context)
-                            Toast.makeText(context, "已刷新 Smartspacer", Toast.LENGTH_SHORT).show()
+                            pendingAdvancedDataAction = AdvancedDataAction.RefreshSmartspacer
                         }
                     )
                 },
@@ -934,7 +932,7 @@ fun SettingsScreen(
             permissionItems.any { !it.granted } -> "${permissionItems.count { !it.granted }} 项权限待授权"
             else -> "已设为默认短信应用 · 权限齐全"
         }
-        SettingsCategory.ABOUT -> "${currentDisplayName} · ${BuildConfig.VERSION_NAME}"
+        SettingsCategory.ABOUT -> "$currentDisplayName · ${BuildConfig.VERSION_NAME}"
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -1930,7 +1928,7 @@ private fun Context.permissionItem(
     summary: String,
     permissions: List<String>
 ): PermissionItem {
-    val missingPermissions = permissions.filterNot(::isPermissionGranted)
+    val missingPermissions = permissions.filterNot { isPermissionGranted(it) }
     return PermissionItem(
         key = key,
         title = title,

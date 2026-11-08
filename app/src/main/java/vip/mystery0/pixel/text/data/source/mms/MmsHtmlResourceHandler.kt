@@ -23,7 +23,7 @@ class MmsHtmlResourceHandler(context: Context, private val document: MmsHtmlDocu
     private val loader = WebViewAssetLoader.Builder()
         .setDomain(document.origin.toUri().host!!)
         .setHttpAllowed(false)
-        .addPathHandler("/", WebViewAssetLoader.PathHandler { path -> registeredResponse("${document.origin}/$path") })
+        .addPathHandler("/") { path -> registeredResponse("${document.origin}/$path") }
         .build()
 
     fun intercept(uri: Uri): WebResourceResponse {

@@ -4,13 +4,14 @@ import vip.mystery0.pixel.text.mms.vendor.pdu.*
 
 sealed interface MmsIncomingEvent {
     data class Notification(val value: MmsNotificationInd) : MmsIncomingEvent
-    data class Report(val type: Int, val messageId: ByteArray, val date: Long,
+    class Report(val type: Int, val messageId: ByteArray, val date: Long,
         val from: String?, val to: List<String>, val status: Int, val version: Int) : MmsIncomingEvent
     data class Unsupported(val type: Int) : MmsIncomingEvent
     data object Invalid : MmsIncomingEvent
 }
 
-data class MmsNotificationInd(
+/** 原始头字段按载荷持有；事务身份使用解码后的 transactionId。 */
+class MmsNotificationInd(
     val transaction: ByteArray,
     val contentLocation: String,
     val from: String?,

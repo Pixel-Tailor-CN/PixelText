@@ -25,7 +25,6 @@ import vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel
 import java.util.UUID
 
 /** 外部分享与历史草稿的宿主，只复用统一编辑器，不再暴露底层准备表单。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MmsComposerDialog(
     sessionId: String, onClose: () -> Unit, initialRecipient: String = "", initialBody: String = "",

@@ -135,11 +135,11 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
 
 private fun formatPhoneNumber(phoneNumber: String): String {
     val digits = phoneNumber.filter(Char::isDigit)
-    return when {
-        digits.length == 11 -> "${digits.take(3)} ${digits.substring(3, 7)} ${digits.takeLast(4)}"
-        digits.length == 12 && digits.startsWith('0') -> {
+    return when (digits.length) {
+        11 -> "${digits.take(3)} ${digits.substring(3, 7)} ${digits.takeLast(4)}"
+        12 -> if (digits.startsWith('0')) {
             "${digits.take(4)} ${digits.substring(4, 8)} ${digits.takeLast(4)}"
-        }
+        } else phoneNumber
         else -> phoneNumber
     }
 }

@@ -1,15 +1,12 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import kotlin.time.Duration.Companion.milliseconds
-import androidx.compose.runtime.mutableLongStateOf
 
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.SystemClock
-import android.telephony.SubscriptionManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,10 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,19 +31,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Call
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -64,7 +51,6 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -84,19 +70,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -107,9 +83,7 @@ import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
-import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
-import vip.mystery0.pixel.text.domain.sample.sampleCategory
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MIN_CONVERSATION_DETAIL_TEXT_SCALE
@@ -123,15 +97,12 @@ import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
 import vip.mystery0.pixel.text.ui.theme.rememberConversationBackgroundColorScheme
 import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
-import vip.mystery0.pixel.text.util.SimInfo
-import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.DeleteMessageResultEvent
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel
 import vip.mystery0.pixel.text.domain.hub.LearningFeedback
 import vip.mystery0.pixel.text.viewmodel.MessageUiState
-import vip.mystery0.pixel.text.viewmodel.SendResultEvent
 
 @Composable
 fun ConversationDetailScreen(
@@ -159,7 +130,7 @@ fun ConversationDetailScreen(
     themeAssetRepository: ThemeAssetRepository = koinInject(),
     highTextContrastMonitor: HighTextContrastMonitor = koinInject(),
 ) {
-    vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackSession(org.koin.compose.koinInject())
+    vip.mystery0.pixel.text.ui.message.mms.MmsPlaybackSession(koinInject())
     val appSettings by settingsRepository.settings.collectAsState()
     val themeConfiguration by themeRepository.configuration.collectAsState()
     val highTextContrast by highTextContrastMonitor.enabled.collectAsState()
@@ -484,6 +455,8 @@ fun ConversationDetailScreen(
                                 val state = uiState as MessageUiState.Success
                                 val texts = state.messages.filter { it.id in selectedMessageIds }
                                     .map { it.content }
+                                // SDK 的 getter 可空而 setter 非空，Kotlin 无法使用属性赋值。
+                                @Suppress("UsePropertyAccessSyntax")
                                 clipboardManager.setPrimaryClip(
                                     ClipData.newPlainText(
                                         "Messages",
@@ -514,10 +487,9 @@ fun ConversationDetailScreen(
                                         text = { Text("详情信息") },
                                         enabled = selectedMessage != null,
                                         onClick = {
-                                            val message = selectedMessage
                                             showMoreMenu = false
                                             selectedMessageIds.clear()
-                                            if (message != null) openMessageDetail(message)
+                                            selectedMessage?.let(openMessageDetail)
                                         },
                                     )
                                     DropdownMenuItem(
@@ -862,5 +834,4 @@ fun ConversationDetailScreen(
 }
 
 
-private const val SPAM_THRESHOLD = 0.7f
 private const val TARGET_MESSAGE_HIGHLIGHT_DURATION_MILLIS = 1_100L

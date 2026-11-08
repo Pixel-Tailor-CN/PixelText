@@ -17,7 +17,6 @@
 
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
-import android.util.Log;
 
 import vip.mystery0.pixel.text.mms.vendor.ContentType;
 import vip.mystery0.pixel.text.mms.vendor.InvalidHeaderValueException;
@@ -25,7 +24,6 @@ import vip.mystery0.pixel.text.mms.vendor.InvalidHeaderValueException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
 import java.util.HashMap;
 
 public class PduParser {
@@ -52,43 +50,20 @@ public class PduParser {
     private static final int TYPE_QUOTED_STRING = 1;
     private static final int TYPE_TOKEN_STRING = 2;
 
-    /**
-     * Specify the part position.
-     */
-    private static final int THE_FIRST_PART = 0;
-    private static final int THE_LAST_PART = 1;
 
     /**
      * The pdu data.
      */
-    private ByteArrayInputStream mPduDataStream = null;
+    private final ByteArrayInputStream mPduDataStream;
 
-    /**
-     * Store pdu headers
-     */
-    private PduHeaders mHeaders = null;
 
     /**
      * Store pdu parts.
      */
     private PduBody mBody = null;
 
-    /**
-     * Store the "type" parameter in "Content-Type" header field.
-     */
-    private byte[] mTypeParam = null;
 
-    /**
-     * Store the "start" parameter in "Content-Type" header field.
-     */
-    private byte[] mStartParam = null;
 
-    /**
-     * The log tag.
-     */
-    private static final String LOG_TAG = "PduParser";
-    private static final boolean DEBUG = false;
-    private static final boolean LOCAL_LOGV = false;
 
     /**
      * Whether to parse content-disposition part header
@@ -102,8 +77,6 @@ public class PduParser {
      * @param parseContentDisposition whether to parse the Content-Disposition part header
      */
     public PduParser(byte[] pduDataStream, boolean parseContentDisposition) {
-        mTypeParam = null;
-        mStartParam = null;
         mPduDataStream = new ByteArrayInputStream(pduDataStream);
         mParseContentDisposition = parseContentDisposition;
     }
@@ -115,12 +88,8 @@ public class PduParser {
      *         null if parsing error happened or mandatory fields are not set.
      */
     public GenericPdu parse(){
-        if (mPduDataStream == null) {
-            return null;
-        }
-
         /* parse headers */
-        mHeaders = parseHeaders(mPduDataStream);
+        PduHeaders mHeaders = parseHeaders(mPduDataStream);
         if (null == mHeaders) {
             // Parse headers failed.
             return null;
@@ -130,8 +99,7 @@ public class PduParser {
         int messageType = mHeaders.getOctet(PduHeaders.MESSAGE_TYPE);
 
         /* check mandatory header fields */
-        if (false == checkMandatoryHeader(mHeaders)) {
-            log("check mandatory headers failed!");
+        if (!checkMandatoryHeader(mHeaders)) {
             return null;
         }
 
@@ -172,35 +140,14 @@ public class PduParser {
 
         switch (messageType) {
             case PduHeaders.MESSAGE_TYPE_SEND_REQ:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_SEND_REQ");
-                }
-                SendReq sendReq = new SendReq(mHeaders, mBody);
-                return sendReq;
+                return new SendReq(mHeaders, mBody);
             case PduHeaders.MESSAGE_TYPE_SEND_CONF:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_SEND_CONF");
-                }
-                SendConf sendConf = new SendConf(mHeaders);
-                return sendConf;
+                return new SendConf(mHeaders);
             case PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_NOTIFICATION_IND");
-                }
-                NotificationInd notificationInd =
-                    new NotificationInd(mHeaders);
-                return notificationInd;
+                return new NotificationInd(mHeaders);
             case PduHeaders.MESSAGE_TYPE_NOTIFYRESP_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_NOTIFYRESP_IND");
-                }
-                NotifyRespInd notifyRespInd =
-                    new NotifyRespInd(mHeaders);
-                return notifyRespInd;
+                return new NotifyRespInd(mHeaders);
             case PduHeaders.MESSAGE_TYPE_RETRIEVE_CONF:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_RETRIEVE_CONF");
-                }
                 RetrieveConf retrieveConf =
                     new RetrieveConf(mHeaders, mBody);
 
@@ -212,35 +159,14 @@ public class PduParser {
                 if (isMultipart(ctTypeStr)) return retrieveConf;
                 return null;
             case PduHeaders.MESSAGE_TYPE_DELIVERY_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_DELIVERY_IND");
-                }
-                DeliveryInd deliveryInd =
-                    new DeliveryInd(mHeaders);
-                return deliveryInd;
+                return new DeliveryInd(mHeaders);
             case PduHeaders.MESSAGE_TYPE_ACKNOWLEDGE_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_ACKNOWLEDGE_IND");
-                }
-                AcknowledgeInd acknowledgeInd =
-                    new AcknowledgeInd(mHeaders);
-                return acknowledgeInd;
+                return new AcknowledgeInd(mHeaders);
             case PduHeaders.MESSAGE_TYPE_READ_ORIG_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_READ_ORIG_IND");
-                }
-                ReadOrigInd readOrigInd =
-                    new ReadOrigInd(mHeaders);
-                return readOrigInd;
+                return new ReadOrigInd(mHeaders);
             case PduHeaders.MESSAGE_TYPE_READ_REC_IND:
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parse: MESSAGE_TYPE_READ_REC_IND");
-                }
-                ReadRecInd readRecInd =
-                    new ReadRecInd(mHeaders);
-                return readRecInd;
+                return new ReadRecInd(mHeaders);
             default:
-                log("Parser doesn't support this message type in this version!");
             return null;
         }
     }
@@ -264,10 +190,7 @@ public class PduParser {
             /* parse custom text header */
             if ((headerField >= TEXT_MIN) && (headerField <= TEXT_MAX)) {
                 pduDataStream.reset();
-                byte [] bVal = parseWapString(pduDataStream, TYPE_TEXT_STRING);
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "TextHeader: " + new String(bVal));
-                }
+                parseWapString(pduDataStream, TYPE_TEXT_STRING);
                 /* we should ignore it at the moment */
                 continue;
             }
@@ -275,9 +198,6 @@ public class PduParser {
                 case PduHeaders.MESSAGE_TYPE:
                 {
                     int messageType = extractByteValue(pduDataStream);
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: messageType: " + messageType);
-                    }
                     switch (messageType) {
                         // We don't support these kind of messages now.
                         case PduHeaders.MESSAGE_TYPE_FORWARD_REQ:
@@ -299,12 +219,7 @@ public class PduParser {
                     }
                     try {
                         headers.setOctet(messageType, headerField);
-                    } catch(InvalidHeaderValueException e) {
-                        log("Set invalid Octet value: " + messageType +
-                                " into the header filed: " + headerField);
-                        return null;
-                    } catch(RuntimeException e) {
-                        log(headerField + "is not Octet header field!");
+                    } catch (InvalidHeaderValueException | RuntimeException ignored) {
                         return null;
                     }
                     break;
@@ -331,7 +246,7 @@ public class PduParser {
                 case PduHeaders.CONTENT_CLASS:
                 case PduHeaders.RETRIEVE_STATUS:
                 case PduHeaders.STORE_STATUS:
-                    /**
+                    /*
                      * The following field has a different value when
                      * used in the M-Mbox-Delete.conf and M-Delete.conf PDU.
                      * For now we ignore this fact, since we do not support these PDUs
@@ -339,19 +254,10 @@ public class PduParser {
                 case PduHeaders.RESPONSE_STATUS:
                 {
                     int value = extractByteValue(pduDataStream);
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: byte: " + headerField + " value: " +
-                                value);
-                    }
 
                     try {
                         headers.setOctet(value, headerField);
-                    } catch(InvalidHeaderValueException e) {
-                        log("Set invalid Octet value: " + value +
-                                " into the header filed: " + headerField);
-                        return null;
-                    } catch(RuntimeException e) {
-                        log(headerField + "is not Octet header field!");
+                    } catch (InvalidHeaderValueException | RuntimeException ignored) {
                         return null;
                     }
                     break;
@@ -364,13 +270,8 @@ public class PduParser {
                 {
                     try {
                         long value = parseLongInteger(pduDataStream);
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: longint: " + headerField + " value: " +
-                                    value);
-                        }
                         headers.setLongInteger(value, headerField);
                     } catch(RuntimeException e) {
-                        log(headerField + "is not Long-Integer header field!");
                         return null;
                     }
                     break;
@@ -383,13 +284,8 @@ public class PduParser {
                 {
                     try {
                         long value = parseIntegerValue(pduDataStream);
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: int: " + headerField + " value: " +
-                                    value);
-                        }
                         headers.setLongInteger(value, headerField);
                     } catch(RuntimeException e) {
-                        log(headerField + "is not Long-Integer header field!");
                         return null;
                     }
                     break;
@@ -401,7 +297,7 @@ public class PduParser {
                 case PduHeaders.AUX_APPLIC_ID:
                 case PduHeaders.APPLIC_ID:
                 case PduHeaders.REPLY_APPLIC_ID:
-                    /**
+                    /*
                      * The next three header fields are email addresses
                      * as defined in RFC2822,
                      * not including the characters "<" and ">"
@@ -409,7 +305,7 @@ public class PduParser {
                 case PduHeaders.MESSAGE_ID:
                 case PduHeaders.REPLACE_ID:
                 case PduHeaders.CANCEL_ID:
-                    /**
+                    /*
                      * The following field has a different value when
                      * used in the M-Mbox-Delete.conf and M-Delete.conf PDU.
                      * For now we ignore this fact, since we do not support these PDUs
@@ -419,15 +315,10 @@ public class PduParser {
                     byte[] value = parseWapString(pduDataStream, TYPE_TEXT_STRING);
                     if (null != value) {
                         try {
-                            if (LOCAL_LOGV) {
-                                vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: string: " + headerField + " value: " +
-                                        new String(value));
-                            }
                             headers.setTextString(value, headerField);
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch(RuntimeException e) {
-                            log(headerField + "is not Text-String header field!");
                             return null;
                         }
                     }
@@ -448,15 +339,10 @@ public class PduParser {
                         parseEncodedStringValue(pduDataStream);
                     if (null != value) {
                         try {
-                            if (LOCAL_LOGV) {
-                                vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: encoded string: " + headerField
-                                        + " value: " + value.getString());
-                            }
                             headers.setEncodedStringValue(value, headerField);
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch (RuntimeException e) {
-                            log(headerField + "is not Encoded-String-Value header field!");
                             return null;
                         }
                     }
@@ -474,10 +360,6 @@ public class PduParser {
                         byte[] address = value.getTextString();
                         if (null != address) {
                             String str = new String(address);
-                            if (LOCAL_LOGV) {
-                                vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: (to/cc/bcc) address: " + headerField
-                                        + " value: " + str);
-                            }
                             int endIndex = str.indexOf("/");
                             if (endIndex > 0) {
                                 str = str.substring(0, endIndex);
@@ -485,17 +367,15 @@ public class PduParser {
                             try {
                                 value.setTextString(str.getBytes());
                             } catch(NullPointerException e) {
-                                log("null pointer error!");
                                 return null;
                             }
                         }
 
                         try {
                             headers.appendEncodedStringValue(value, headerField);
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch(RuntimeException e) {
-                            log(headerField + "is not Encoded-String-Value header field!");
                             return null;
                         }
                     }
@@ -519,7 +399,6 @@ public class PduParser {
                     try {
                         timeValue = parseLongInteger(pduDataStream);
                     } catch(RuntimeException e) {
-                        log(headerField + "is not Long-Integer header field!");
                         return null;
                     }
                     if (token != PduHeaders.VALUE_RELATIVE_TOKEN && token != PduHeaders.VALUE_ABSOLUTE_TOKEN) return null;
@@ -534,13 +413,8 @@ public class PduParser {
                     }
 
                     try {
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: time value: " + headerField
-                                    + " value: " + timeValue);
-                        }
                         headers.setLongInteger(timeValue, headerField);
                     } catch(RuntimeException e) {
-                        log(headerField + "is not Long-Integer header field!");
                         return null;
                     }
                     break;
@@ -551,7 +425,7 @@ public class PduParser {
                      * Value-length
                      * (Address-present-token Encoded-string-value | Insert-address-token)
                      */
-                    EncodedStringValue from = null;
+                    EncodedStringValue from;
                     parseValueLength(pduDataStream); /* parse value-length */
 
                     /* Address-present-token or Insert-address-token */
@@ -572,7 +446,6 @@ public class PduParser {
                                 try {
                                     from.setTextString(str.getBytes());
                                 } catch(NullPointerException e) {
-                                    log("null pointer error!");
                                     return null;
                                 }
                             }
@@ -582,21 +455,15 @@ public class PduParser {
                             from = new EncodedStringValue(
                                     PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR.getBytes());
                         } catch(NullPointerException e) {
-                            log(headerField + "is not Encoded-String-Value header field!");
                             return null;
                         }
                     }
 
                     try {
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: from address: " + headerField
-                                    + " value: " + from.getString());
-                        }
                         headers.setEncodedStringValue(from, PduHeaders.FROM);
-                    } catch(NullPointerException e) {
-                        log("null pointer error!");
-                    } catch(RuntimeException e) {
-                        log(headerField + "is not Encoded-String-Value header field!");
+                    } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
+                        } catch(RuntimeException e) {
                         return null;
                     }
                     break;
@@ -606,10 +473,6 @@ public class PduParser {
                     /* Message-class-value = Class-identifier | Token-text */
                     pduDataStream.mark(1);
                     int messageClass = extractByteValue(pduDataStream);
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: MESSAGE_CLASS: " + headerField
-                                + " value: " + messageClass);
-                    }
 
                     if (messageClass >= PduHeaders.MESSAGE_CLASS_PERSONAL) {
                         /* Class-identifier */
@@ -631,10 +494,9 @@ public class PduParser {
                                         PduHeaders.MESSAGE_CLASS_AUTO_STR.getBytes(),
                                         PduHeaders.MESSAGE_CLASS);
                             }
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch(RuntimeException e) {
-                            log(headerField + "is not Text-String header field!");
                             return null;
                         }
                     } else {
@@ -644,10 +506,9 @@ public class PduParser {
                         if (null != messageClassString) {
                             try {
                                 headers.setTextString(messageClassString, PduHeaders.MESSAGE_CLASS);
-                            } catch(NullPointerException e) {
-                                log("null pointer error!");
-                            } catch(RuntimeException e) {
-                                log(headerField + "is not Text-String header field!");
+                            } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
+                        } catch(RuntimeException e) {
                                 return null;
                             }
                         }
@@ -659,17 +520,8 @@ public class PduParser {
                     int version = parseShortInteger(pduDataStream);
 
                     try {
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: MMS_VERSION: " + headerField
-                                    + " value: " + version);
-                        }
                         headers.setOctet(version, PduHeaders.MMS_VERSION);
-                    } catch(InvalidHeaderValueException e) {
-                        log("Set invalid Octet value: " + version +
-                                " into the header filed: " + headerField);
-                        return null;
-                    } catch(RuntimeException e) {
-                        log(headerField + "is not Octet header field!");
+                    } catch (InvalidHeaderValueException | RuntimeException ignored) {
                         return null;
                     }
                     break;
@@ -685,7 +537,6 @@ public class PduParser {
                     try {
                         parseIntegerValue(pduDataStream);
                     } catch(RuntimeException e) {
-                        log(headerField + " is not Integer-Value");
                         return null;
                     }
 
@@ -694,16 +545,11 @@ public class PduParser {
                         parseEncodedStringValue(pduDataStream);
                     if (null != previouslySentBy) {
                         try {
-                            if (LOCAL_LOGV) {
-                                vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: PREVIOUSLY_SENT_BY: " + headerField
-                                        + " value: " + previouslySentBy.getString());
-                            }
                             headers.setEncodedStringValue(previouslySentBy,
                                     PduHeaders.PREVIOUSLY_SENT_BY);
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch(RuntimeException e) {
-                            log(headerField + "is not Encoded-String-Value header field!");
                             return null;
                         }
                     }
@@ -720,21 +566,15 @@ public class PduParser {
                     try {
                         parseIntegerValue(pduDataStream);
                     } catch(RuntimeException e) {
-                        log(headerField + " is not Integer-Value");
                         return null;
                     }
 
                     /* Date-value */
                     try {
                         long perviouslySentDate = parseLongInteger(pduDataStream);
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: PREVIOUSLY_SENT_DATE: " + headerField
-                                    + " value: " + perviouslySentDate);
-                        }
                         headers.setLongInteger(perviouslySentDate,
                                 PduHeaders.PREVIOUSLY_SENT_DATE);
                     } catch(RuntimeException e) {
-                        log(headerField + "is not Long-Integer header field!");
                         return null;
                     }
                     break;
@@ -746,10 +586,6 @@ public class PduParser {
                      * ( Add-token | Remove-token | Filter-token )
                      * Encoded-string-value
                      */
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: MM_FLAGS: " + headerField
-                                + " NOT REALLY SUPPORTED");
-                    }
 
                     /* parse Value-length */
                     parseValueLength(pduDataStream);
@@ -770,9 +606,6 @@ public class PduParser {
                 case PduHeaders.MBOX_TOTALS:
                 case PduHeaders.MBOX_QUOTAS:
                 {
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: MBOX_TOTALS: " + headerField);
-                    }
                     /* Value-length */
                     parseValueLength(pduDataStream);
 
@@ -783,7 +616,6 @@ public class PduParser {
                     try {
                         parseIntegerValue(pduDataStream);
                     } catch(RuntimeException e) {
-                        log(headerField + " is not Integer-Value");
                         return null;
                     }
 
@@ -793,9 +625,6 @@ public class PduParser {
                 }
 
                 case PduHeaders.ELEMENT_DESCRIPTOR: {
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: ELEMENT_DESCRIPTOR: " + headerField);
-                    }
                     parseContentType(pduDataStream, null);
 
                     /* not store this header filed in "headers",
@@ -805,30 +634,23 @@ public class PduParser {
 
                 case PduHeaders.CONTENT_TYPE: {
                     HashMap<Integer, Object> map =
-                        new HashMap<Integer, Object>();
+                        new HashMap<>();
                     byte[] contentType =
                         parseContentType(pduDataStream, map);
 
                     if (null != contentType) {
                         try {
-                            if (LOCAL_LOGV) {
-                                vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: CONTENT_TYPE: " + headerField +
-                                        Arrays.toString(contentType));
-                            }
                             headers.setTextString(contentType, PduHeaders.CONTENT_TYPE);
-                        } catch(NullPointerException e) {
-                            log("null pointer error!");
+                        } catch (NullPointerException ignored) {
+                            // 忽略缺失的可选头字段，继续解析其他字段。
                         } catch(RuntimeException e) {
-                            log(headerField + "is not Text-String header field!");
                             return null;
                         }
                     }
 
                     /* get start parameter */
-                    mStartParam = (byte[]) map.get(PduPart.P_START);
 
                     /* get charset parameter */
-                    mTypeParam= (byte[]) map.get(PduPart.P_TYPE);
 
                     keepParsing = false;
                     break;
@@ -838,10 +660,6 @@ public class PduParser {
                 case PduHeaders.ADDITIONAL_HEADERS:
                 case PduHeaders.ATTRIBUTES:
                 default: {
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "parseHeaders: Unknown header: " + headerField);
-                    }
-                    log("Unknown header");
                 }
             }
         }
@@ -918,7 +736,7 @@ public class PduParser {
             ByteArrayInputStream headerInput = new ByteArrayInputStream(headers);
             PduPart part = new PduPart();
             try {
-                HashMap<Integer, Object> map = new HashMap<Integer, Object>();
+                HashMap<Integer, Object> map = new HashMap<>();
                 byte[] type = parseContentType(headerInput, map);
                 if (type == null) return null;
                 part.setContentType(type);
@@ -967,16 +785,6 @@ public class PduParser {
         return input.available() == 0 ? body : null;
     }
 
-    /**
-     * Log status.
-     *
-     * @param text log information
-     */
-    private static void log(String text) {
-        if (LOCAL_LOGV) {
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, text);
-        }
-    }
 
     /**
      * Parse unsigned integer.
@@ -985,7 +793,7 @@ public class PduParser {
      * @return the integer, -1 when failed
      */
     protected static int parseUnsignedInt(ByteArrayInputStream pduDataStream) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * The maximum size of a uintvar is 32 bits.
          * So it will be encoded in no more than 5 octets.
@@ -1010,7 +818,7 @@ public class PduParser {
      * @return the integer
      */
     protected static int parseValueLength(ByteArrayInputStream pduDataStream) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Value-length = Short-length | (Length-quote Length)
          * Short-length = <Any octet 0-30>
@@ -1039,13 +847,13 @@ public class PduParser {
      * @return the EncodedStringValue
      */
     protected static EncodedStringValue parseEncodedStringValue(ByteArrayInputStream pduDataStream){
-        /**
+        /*
          * From OMA-TS-MMS-ENC-V1_3-20050927-C.pdf
          * Encoded-string-value = Text-string | Value-length Char-set Text-string
          */
         assert(null != pduDataStream);
         pduDataStream.mark(1);
-        EncodedStringValue returnValue = null;
+        EncodedStringValue returnValue;
         int charset = 0;
         int temp = pduDataStream.read();
         assert(-1 != temp);
@@ -1086,7 +894,7 @@ public class PduParser {
     protected static byte[] parseWapString(ByteArrayInputStream pduDataStream,
             int stringType) {
         assert(null != pduDataStream);
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Text-string = [Quote] *TEXT End-of-string
          * If the first character in the TEXT is in the range of 128-255,
@@ -1095,9 +903,7 @@ public class PduParser {
          * The Quote is not part of the contents.
          * Quote = <Octet 127>
          * End-of-string = <Octet 0>
-         *
          * Quoted-string = <Octet 34> *TEXT End-of-string
-         *
          * Token-text = Token End-of-string
          */
 
@@ -1122,7 +928,7 @@ public class PduParser {
         }
 
         // We are now definitely at the beginning of string
-        /**
+        /*
          * Return *TOKEN or *TEXT (Text-String without QUOTE,
          * Quoted-String without QUOTED_STRING_FLAG and without End-of-string)
          */
@@ -1135,7 +941,7 @@ public class PduParser {
      * @return true when ch is TOKEN, false when ch is not TOKEN
      */
     protected static boolean isTokenCharacter(int ch) {
-        /**
+        /*
          * Token      = 1*<any CHAR except CTLs or separators>
          * separators = "("(40) | ")"(41) | "<"(60) | ">"(62) | "@"(64)
          *            | ","(44) | ";"(59) | ":"(58) | "\"(92) | <">(34)
@@ -1151,28 +957,10 @@ public class PduParser {
             return false;
         }
 
-        switch(ch) {
-            case '"': /* '"' */
-            case '(': /* '(' */
-            case ')': /* ')' */
-            case ',': /* ',' */
-            case '/': /* '/' */
-            case ':': /* ':' */
-            case ';': /* ';' */
-            case '<': /* '<' */
-            case '=': /* '=' */
-            case '>': /* '>' */
-            case '?': /* '?' */
-            case '@': /* '@' */
-            case '[': /* '[' */
-            case '\\': /* '\' */
-            case ']': /* ']' */
-            case '{': /* '{' */
-            case '}': /* '}' */
-                return false;
-        }
-
-        return true;
+        return switch (ch) {
+            case '"', '(', ')', ',', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '{', '}' -> false;
+            default -> true;
+        };
     }
 
     /**
@@ -1181,7 +969,7 @@ public class PduParser {
      * @return true when ch is TEXT, false when ch is not TEXT
      */
     protected static boolean isText(int ch) {
-        /**
+        /*
          * TEXT = <any OCTET except CTLs,
          *      but including LWS>
          * CTL  = <any US-ASCII control character
@@ -1195,14 +983,10 @@ public class PduParser {
             return true;
         }
 
-        switch(ch) {
-            case '\t': /* '\t' */
-            case '\n': /* '\n' */
-            case '\r': /* '\r' */
-                return true;
-        }
-
-        return false;
+        return switch (ch) {
+            case '\t', '\n', '\r' -> true;
+            default -> false;
+        };
     }
 
     protected static byte[] getWapString(ByteArrayInputStream pduDataStream,
@@ -1210,8 +994,8 @@ public class PduParser {
         assert(null != pduDataStream);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int temp = pduDataStream.read();
-        assert(-1 != temp);
-        while((-1 != temp) && ('\0' != temp)) {
+        while ('\0' != temp) {
+            if (temp < 0) throw new IllegalArgumentException("unterminated wap string");
             // check each of the character
             if (stringType == TYPE_TOKEN_STRING) {
                 if (isTokenCharacter(temp)) {
@@ -1224,10 +1008,8 @@ public class PduParser {
             }
 
             temp = pduDataStream.read();
-            assert(-1 != temp);
         }
 
-        if (temp == -1) throw new IllegalArgumentException("unterminated wap string");
         if (out.size() > 0) {
             return out.toByteArray();
         }
@@ -1255,7 +1037,7 @@ public class PduParser {
      * @return the byte
      */
     protected static int parseShortInteger(ByteArrayInputStream pduDataStream) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Short-integer = OCTET
          * Integers in range 0-127 shall be encoded as a one
@@ -1275,7 +1057,7 @@ public class PduParser {
      * @return long integer
      */
     protected static long parseLongInteger(ByteArrayInputStream pduDataStream) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Long-integer = Short-length Multi-octet-integer
          * The Short-length indicates the length of the Multi-octet-integer
@@ -1313,7 +1095,7 @@ public class PduParser {
      * @return long integer
      */
     protected static long parseIntegerValue(ByteArrayInputStream pduDataStream) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Integer-Value = Short-integer | Long-integer
          */
@@ -1352,7 +1134,7 @@ public class PduParser {
      */
     protected static void parseContentTypeParams(ByteArrayInputStream pduDataStream,
             HashMap<Integer, Object> map, Integer length) {
-        /**
+        /*
          * From wap-230-wsp-20010705-a.pdf
          * Parameter = Typed-parameter | Untyped-parameter
          * Typed-parameter = Well-known-parameter-token Typed-value
@@ -1374,7 +1156,7 @@ public class PduParser {
         assert(length > 0);
 
         int startPos = pduDataStream.available();
-        int tempPos = 0;
+        int tempPos;
         int lastLen = length;
         while(0 < lastLen) {
             int param = pduDataStream.read();
@@ -1382,14 +1164,13 @@ public class PduParser {
             lastLen--;
 
             switch (param) {
-                /**
+                /*
                  * From rfc2387, chapter 3.1
                  * The type parameter must be specified and its value is the MIME media
                  * type of the "root" body part. It permits a MIME user agent to
                  * determine the content-type without reference to the enclosed body
                  * part. If the value of the type parameter and the root body part's
                  * content-type differ then the User Agent's behavior is undefined.
-                 *
                  * From wap-230-wsp-20010705-a.pdf
                  * type = Constrained-encoding
                  * Constrained-encoding = Extension-Media | Short-integer
@@ -1406,9 +1187,7 @@ public class PduParser {
 
                         if (index < PduContentTypes.contentTypes.length) {
                             byte[] type = (PduContentTypes.contentTypes[index]).getBytes();
-                            map.put(PduPart.P_TYPE, type);
-                        } else {
-                            //not support this type, ignore it.
+                            if (map != null) map.put(PduPart.P_TYPE, type);
                         }
                     } else {
                         // Text-String (extension-media)
@@ -1422,16 +1201,14 @@ public class PduParser {
                     lastLen = length - (startPos - tempPos);
                     break;
 
-                    /**
+                    /*
                      * From oma-ts-mms-conf-v1_3.pdf, chapter 10.2.3.
                      * Start Parameter Referring to Presentation
-                     *
                      * From rfc2387, chapter 3.2
                      * The start parameter, if given, is the content-ID of the compound
                      * object's "root". If not present the "root" is the first body part in
                      * the Multipart/Related entity. The "root" is the element the
                      * applications processes first.
-                     *
                      * From wap-230-wsp-20010705-a.pdf
                      * start = Text-String
                      */
@@ -1446,12 +1223,11 @@ public class PduParser {
                     lastLen = length - (startPos - tempPos);
                     break;
 
-                    /**
+                    /*
                      * From oma-ts-mms-conf-v1_3.pdf
                      * In creation, the character set SHALL be either us-ascii
                      * (IANA MIBenum 3) or utf-8 (IANA MIBenum 106)[Unicode].
                      * In retrieval, both us-ascii and utf-8 SHALL be supported.
-                     *
                      * From wap-230-wsp-20010705-a.pdf
                      * charset = Well-known-charset|Text-String
                      * Well-known-charset = Any-charset | Integer-value
@@ -1472,11 +1248,10 @@ public class PduParser {
                         try {
                             int charsetInt = CharacterSets.getMibEnumValue(
                                     new String(charsetStr));
-                            map.put(PduPart.P_CHARSET, charsetInt);
+                            if (map != null) map.put(PduPart.P_CHARSET, charsetInt);
                         } catch (UnsupportedEncodingException e) {
                             // Not a well-known charset, use "*".
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, Arrays.toString(charsetStr), e);
-                            map.put(PduPart.P_CHARSET, CharacterSets.ANY_CHARSET);
+                            if (map != null) map.put(PduPart.P_CHARSET, CharacterSets.ANY_CHARSET);
                         }
                     } else {
                         //Well-known-charset
@@ -1490,11 +1265,10 @@ public class PduParser {
                     lastLen = length - (startPos - tempPos);
                     break;
 
-                    /**
+                    /*
                      * From oma-ts-mms-conf-v1_3.pdf
                      * A name for multipart object SHALL be encoded using name-parameter
                      * for Content-Type header in WSP multipart headers.
-                     *
                      * From wap-230-wsp-20010705-a.pdf
                      * name = Text-String
                      */
@@ -1509,27 +1283,18 @@ public class PduParser {
                     lastLen = length - (startPos - tempPos);
                     break;
                 default:
-                    if (LOCAL_LOGV) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "Not supported Content-Type parameter");
-                    }
-                if (-1 == skipWapValue(pduDataStream, lastLen)) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt Content-Type");
-                } else {
+                if (-1 != skipWapValue(pduDataStream, lastLen)) {
                     lastLen = 0;
                 }
                 break;
             }
         }
 
-        if (0 != lastLen) {
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt Content-Type");
-        }
     }
 
     /**
      * Parse content type.
-     *
-     * @param pduDataStream pdu data input stream
+     * @param input PDU 数据输入流
      * @param map to store parameters in Content-Type header field
      * @return Content-Type value
      */
@@ -1573,7 +1338,7 @@ public class PduParser {
         assert(null != part);
         assert(length > 0);
 
-        /**
+        /*
          * From oma-ts-mms-conf-v1_3.pdf, chapter 10.2.
          * A name for multipart object SHALL be encoded using name-parameter
          * for Content-Type header in WSP multipart headers.
@@ -1583,14 +1348,13 @@ public class PduParser {
          * If neither name-parameter of Content-Type header nor filename parameter
          * of Content-Disposition header is available,
          * Content-Location header SHALL be used if available.
-         *
          * Within SMIL part the reference to the media object parts SHALL use
          * either Content-ID or Content-Location mechanism [RFC2557]
          * and the corresponding WSP part headers in media object parts
          * contain the corresponding definitions.
          */
         int startPos = pduDataStream.available();
-        int tempPos = 0;
+        int tempPos;
         int lastLen = length;
         while(0 < lastLen) {
             pduDataStream.mark(1);
@@ -1602,7 +1366,7 @@ public class PduParser {
                 // Number assigned headers.
                 switch (header) {
                     case PduPart.P_CONTENT_LOCATION:
-                        /**
+                        /*
                          * From wap-230-wsp-20010705-a.pdf, chapter 8.4.2.21
                          * Content-location-value = Uri-value
                          */
@@ -1615,7 +1379,7 @@ public class PduParser {
                         lastLen = length - (startPos - tempPos);
                         break;
                     case PduPart.P_CONTENT_ID:
-                        /**
+                        /*
                          * From wap-230-wsp-20010705-a.pdf, chapter 8.4.2.21
                          * Content-ID-value = Quoted-string
                          */
@@ -1629,7 +1393,7 @@ public class PduParser {
                         break;
                     case PduPart.P_DEP_CONTENT_DISPOSITION:
                     case PduPart.P_CONTENT_DISPOSITION:
-                        /**
+                        /*
                          * From wap-230-wsp-20010705-a.pdf, chapter 8.4.2.21
                          * Content-disposition-value = Value-length Disposition *(Parameter)
                          * Disposition = Form-data | Attachment | Inline | Token-text
@@ -1642,12 +1406,12 @@ public class PduParser {
                          * some carrier mmsc servers do not support content_disposition
                          * field correctly
                          */
+                        int len = parseValueLength(pduDataStream);
                         if (mParseContentDisposition) {
-                            int len = parseValueLength(pduDataStream);
                             if (len <= 0 || len > pduDataStream.available()) return false;
                             pduDataStream.mark(1);
                             int thisStartPos = pduDataStream.available();
-                            int thisEndPos = 0;
+                            int thisEndPos;
                             int value = pduDataStream.read();
 
                             if (value == PduPart.P_DISPOSITION_FROM_DATA ) {
@@ -1684,95 +1448,40 @@ public class PduParser {
                             tempPos = pduDataStream.available();
                             lastLen = length - (startPos - tempPos);
                         } else {
-                            int len = parseValueLength(pduDataStream);
                             if (skipWapValue(pduDataStream, len) != len) return false;
                             lastLen = length - (startPos - pduDataStream.available());
                         }
                         break;
                     default:
-                        if (LOCAL_LOGV) {
-                            vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "Not supported Part headers: " + header);
-                        }
                     if (-1 == skipWapValue(pduDataStream, lastLen)) {
-                        vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt Part headers");
                         return false;
                     }
                     lastLen = 0;
                     break;
                 }
-            } else if ((header >= TEXT_MIN) && (header <= TEXT_MAX)) {
+            } else if (header >= TEXT_MIN) {
                 // 文本字段名要从首字符开始解析。
                 pduDataStream.reset();
                 byte[] tempHeader = parseWapString(pduDataStream, TYPE_TEXT_STRING);
                 byte[] tempValue = parseWapString(pduDataStream, TYPE_TEXT_STRING);
 
                 // Check the header whether it is "Content-Transfer-Encoding".
-                if (true ==
-                    PduPart.CONTENT_TRANSFER_ENCODING.equalsIgnoreCase(new String(tempHeader))) {
+                if (PduPart.CONTENT_TRANSFER_ENCODING.equalsIgnoreCase(new String(tempHeader))) {
                     part.setContentTransferEncoding(tempValue);
                 }
 
                 tempPos = pduDataStream.available();
                 lastLen = length - (startPos - tempPos);
             } else {
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(LOG_TAG, "Not supported Part headers: " + header);
-                }
                 // Skip all headers of this part.
                 if (-1 == skipWapValue(pduDataStream, lastLen)) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt Part headers");
                     return false;
                 }
                 lastLen = 0;
             }
         }
 
-        if (0 != lastLen) {
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(LOG_TAG, "Corrupt Part headers");
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check the position of a specified part.
-     *
-     * @param part the part to be checked
-     * @return part position, THE_FIRST_PART when it's the
-     * first one, THE_LAST_PART when it's the last one.
-     */
-    private int checkPartPosition(PduPart part) {
-        assert(null != part);
-        if ((null == mTypeParam) &&
-                (null == mStartParam)) {
-            return THE_LAST_PART;
-        }
-
-        /* check part's content-id */
-        if (null != mStartParam) {
-            byte[] contentId = part.getContentId();
-            if (null != contentId) {
-                if (true == Arrays.equals(mStartParam, contentId)) {
-                    return THE_FIRST_PART;
-                }
-            }
-            // This is not the first part, so append to end (keeping the original order)
-            // Check b/19607294 for details of this change
-            return THE_LAST_PART;
-        }
-
-        /* check part's content-type */
-        if (null != mTypeParam) {
-            byte[] contentType = part.getContentType();
-            if (null != contentType) {
-                if (true == Arrays.equals(mTypeParam, contentType)) {
-                    return THE_FIRST_PART;
-                }
-            }
-        }
-
-        return THE_LAST_PART;
+        return lastLen == 0;
     }
 
     /**

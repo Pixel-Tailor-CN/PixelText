@@ -141,7 +141,7 @@ private fun CategoryList(
     ) {
         if (notice != null) {
             item(key = "notice") {
-                SettingsRowContainer(true, true) {
+                SettingsRowContainer(first = true, last = true) {
                     SettingsPreference(
                         title = { Text("完成短信应用设置") }, summary = { Text(notice) },
                         icon = { Icon(Icons.Rounded.Security, null) }, onClick = onNoticeClick,

@@ -2,8 +2,8 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.Manifest
 import android.content.Context
+import androidx.core.net.toUri
 import android.content.pm.PackageManager
-import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,7 +94,7 @@ class BackupRepositoryImpl(
                 mutable.update { it.copy(phase = BackupPhase.COMPLETED, processed = count, total = count) }
             } finally {
                 directory.deleteRecursively()
-                if (!exported) runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, android.net.Uri.parse(uri)) }
+                if (!exported) runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri.toUri()) }
             }
         }) secret?.fill('\u0000')
     }
@@ -217,7 +217,7 @@ class BackupRepositoryImpl(
             } finally {
                 secret?.fill('\u0000')
                 if (failedOutputUri != null && mutable.value.phase != BackupPhase.COMPLETED) runCatching {
-                    android.provider.DocumentsContract.deleteDocument(context.contentResolver, android.net.Uri.parse(failedOutputUri))
+                    android.provider.DocumentsContract.deleteDocument(context.contentResolver, failedOutputUri.toUri())
                 }
             }
         }
@@ -240,9 +240,9 @@ class BackupRepositoryImpl(
     }
     private suspend fun rebuildKeywords() {
         val cursor = context.contentResolver.query(android.provider.Telephony.Sms.CONTENT_URI,
-            arrayOf("_id", "thread_id", "body"), null, null, "_id ASC") ?: throw BackupException("无法重建关键词索引")
+            arrayOf("_id"), null, null, "_id ASC") ?: throw BackupException("无法重建关键词索引")
         cursor.use { c ->
-            while (c.moveToNext()) { currentCoroutineContext().ensureActive(); keywords.updateMessageMatch(c.getLong(0), c.getLong(1), c.getString(2).orEmpty()) }
+            while (c.moveToNext()) { currentCoroutineContext().ensureActive(); keywords.updateMessageMatch(c.getLong(0)) }
         }
     }
 }

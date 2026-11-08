@@ -13,6 +13,8 @@ import java.security.MessageDigest
 
 /** 每次从明确订阅读取有效政策，不回退默认卡，也不虚构运营商字节限额。 */
 class MmsSendPolicyResolver(private val context: Context) {
+    // Android 12、13 的运营商识别配置仍需兼容旧入口。
+    @Suppress("DEPRECATION")
     fun resolve(subId: Int): MmsSendPolicy {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             throw MmsSendException("请允许读取 SIM 信息后重试")
@@ -49,9 +51,9 @@ class MmsSendPolicyResolver(private val context: Context) {
                 .joinToString("") { "%02x".format(it) }
             return MmsSendPolicy(subId, boundedBytes, width, height, subject,
                 if (text == -1) boundedBytes else minOf(text, boundedBytes), fingerprint)
-        } catch (exception: SecurityException) {
+        } catch (_: SecurityException) {
             throw MmsSendException("SIM 读取权限已变化，请重新授权后重试")
-        } catch (exception: UnsupportedOperationException) {
+        } catch (_: UnsupportedOperationException) {
             throw MmsSendException("此设备不支持读取彩信配置")
         }
     }

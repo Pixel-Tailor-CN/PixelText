@@ -121,28 +121,28 @@ class MmsContentRepositoryImpl(
         }
         val parts = restoredParts.map { part ->
             context.ensureActive()
-            when {
-                part.kind == MmsContentKind.HTML -> part.copy(
+            when (part.kind) {
+                MmsContentKind.HTML -> part.copy(
                     htmlSummary = htmlDocuments[part.key]?.plainText?.take(320),
                     issue = part.issue ?: htmlDocuments[part.key]?.issue,
                 )
-                part.kind == MmsContentKind.CONTACT && part.text != null -> part.copy(
+                MmsContentKind.CONTACT if part.text != null -> part.copy(
                     contacts = contactParser.parse(part.text) { context.ensureActive() }.map { contact ->
                         val reference = contact.photoReference
                         if (reference == null) contact else {
-                            val target = restoredParts.filter { candidate ->
+                            val target = restoredParts.singleOrNull { candidate ->
                                 candidate.kind == MmsContentKind.IMAGE && candidate.localUri != null &&
                                     candidate.byteCount?.let { it in 1..MmsContactParser.MAX_PHOTO_BYTES.toLong() } == true &&
                                     if (reference.startsWith("cid:", true)) {
                                         candidate.contentId?.trim()?.removeSurrounding("<", ">") == reference.substring(4)
                                     } else candidate.contentLocation == reference
-                            }.singleOrNull()
+                            }
                             contact.copy(photoPartId = target?.key?.partId, photoReference = null,
                                 importWarning = contact.importWarning ?: if (target == null) "名片照片无法在本消息内读取，请核对原件" else null)
                         }
                     },
                 )
-                part.kind == MmsContentKind.CALENDAR && part.text != null -> part.copy(
+                MmsContentKind.CALENDAR if part.text != null -> part.copy(
                     calendarEvents = calendarParser.parse(part.text) { context.ensureActive() },
                 )
                 else -> part
@@ -199,9 +199,7 @@ class MmsContentRepositoryImpl(
         }
         val textParts = parts.filter { it.kind == MmsContentKind.TEXT || it.kind == MmsContentKind.HTML }
         val searchReady = (snapshot.structureComplete || pending) && textParts.all { part ->
-            if (pending && part.state == MirrorAttachmentState.PENDING_DOWNLOAD) {
-                true
-            } else when (part.kind) {
+            (pending && part.state == MirrorAttachmentState.PENDING_DOWNLOAD) || when (part.kind) {
                 MmsContentKind.TEXT -> part.text != null && part.issue == null
                 MmsContentKind.HTML -> part.text != null && part.issue == null && htmlDocuments[part.key]?.issue == null
                 else -> true
@@ -273,9 +271,9 @@ class MmsContentRepositoryImpl(
             staged[parentId] = children
             return true
         }
-        for (container in parts.filter { it.kind == MmsContentKind.MULTIPART }) {
+        for ((key) in parts.filter { it.kind == MmsContentKind.MULTIPART }) {
             currentCoroutineContext().ensureActive()
-            val id = container.key.partId
+            val id = key.partId
             if (id in relations) continue
             val read = reader.readBytes(sources.getValue(id), budget)
             if (read.bytes == null) {

@@ -11,7 +11,7 @@ import java.util.UUID
 /** 广播只持久化有界原事件，不等待解析、Provider 或正文保存的锁。 */
 internal class MmsIncomingPduQueue(context: Context) {
     private val root = File(context.filesDir, "mms-incoming").apply { mkdirs() }
-    data class Event(val data: ByteArray, val sub: Int, val received: Long, val auto: Boolean)
+    class Event(val data: ByteArray, val sub: Int, val received: Long, val auto: Boolean)
 
     fun enqueue(event: Event) {
         require(event.data.size in 1..MAX_PUSH_BYTES)

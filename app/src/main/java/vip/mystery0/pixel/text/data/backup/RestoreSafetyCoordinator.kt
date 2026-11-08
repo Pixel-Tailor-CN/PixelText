@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.data.backup
 
 import android.content.Context
+import android.annotation.SuppressLint
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import vip.mystery0.pixel.text.domain.backup.BackupSummary
@@ -44,10 +45,14 @@ class RestoreSafetyCoordinator(private val context: Context) {
         return java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 
+    // 恢复保护必须确认落盘成功，KTX edit 无法提供 commit 结果。
+    @SuppressLint("UseKtx")
     suspend fun begin() = deletionGate.withLock {
         if (!active) history.execSQL("DELETE FROM historical")
         backupRequire(prefs.edit().putBoolean("active", true).commit(), "无法保存恢复保护状态")
     }
+    // 仅在保护开关落盘成功后清理历史记录。
+    @SuppressLint("UseKtx")
     suspend fun finish() = deletionGate.withLock {
         backupRequire(prefs.edit().clear().commit(), "无法结束恢复保护，请重试")
         history.execSQL("DELETE FROM historical")
@@ -55,6 +60,8 @@ class RestoreSafetyCoordinator(private val context: Context) {
     suspend fun cleanupBatch(action: suspend () -> Int): Int = deletionGate.withLock {
         if (active) 0 else action()
     }
+    // 进度保存失败需要明确通知调用方，不能忽略 commit 结果。
+    @SuppressLint("UseKtx")
     fun record(summary: BackupSummary) {
         backupRequire(prefs.edit().putLong("inserted", summary.inserted).putLong("existing", summary.existing)
             .putLong("remaining", summary.remaining).putLong("failed", summary.failed)

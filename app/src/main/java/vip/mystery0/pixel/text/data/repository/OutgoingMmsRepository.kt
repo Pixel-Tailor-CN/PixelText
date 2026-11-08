@@ -26,7 +26,6 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         if (request.lateSuccess) "旧尝试后来报告成功，可能重复发送" else attempt.error,
         request.providerSyncPending, request.deleted, request.possibleDuplicateOf,
     )
-    fun observeDraft(id: String): Flow<MmsDraft?> = dao.observeDraft(id).map { it?.takeUnless { row -> row.accepted }?.model() }
     fun observeDrafts(): Flow<List<MmsDraft>> = dao.observeDrafts().map { rows -> rows.map { it.model() } }
     fun observeMessages(): Flow<List<OutgoingMmsMessage>> = combine(dao.observeRequests(), dao.observeAttempts()) { requests, attempts ->
         val byToken = attempts.associateBy { it.token }
@@ -103,7 +102,6 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
     }
     suspend fun all(): List<OutgoingMmsMessage> = dao.requests().mapNotNull { get(it.id) }
     suspend fun attempt(token: String) = dao.attempt(token)
-    suspend fun attemptsForRequest(id: String) = dao.attempts().filter { it.requestId == id }
     suspend fun pendingCallbacks(id: String) = dao.pendingCallbacks(id)
     suspend fun previousTransaction(token: String) = dao.attempt(token)?.previousTransactionId
     suspend fun previousProviderReady(token: String): Boolean {

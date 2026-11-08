@@ -83,7 +83,7 @@ class KeywordSpamRepositoryImpl(
         }
     }
 
-    override suspend fun updateMessageMatch(messageId: Long, threadId: Long, content: String): Boolean {
+    override suspend fun updateMessageMatch(messageId: Long): Boolean {
         importer.ensureImported()
         // 此入口也在学习决策锁内部调用，不递归获取同一锁。
         return whitelist.withMessageDecision(messageId) { allowed ->
@@ -103,7 +103,7 @@ class KeywordSpamRepositoryImpl(
         return learning.withDecision {
             withContext(Dispatchers.IO) {
                 // 先批量比较正文，只同步差异，避免历史扫描逐条重写几千条未变化短信。
-                val existing = messages.map { it.messageId }.filter { it > 0 }.chunked(500)
+                val existing = messages.asSequence().map { it.messageId }.filter { it > 0 }.chunked(500).toList()
                     .flatMap { mirror.mirrorDao().conversationSmsByIds(it) }.associateBy { it.sourceId }
                 messages.filter { it.messageId > 0 }.forEach { message ->
                     val row = existing[message.messageId]

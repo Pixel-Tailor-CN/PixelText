@@ -3,7 +3,6 @@ package vip.mystery0.pixel.text.mms
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.net.Uri
-import android.provider.Telephony
 import androidx.core.net.toUri
 import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
 import vip.mystery0.pixel.text.mms.vendor.pdu.EncodedStringValue

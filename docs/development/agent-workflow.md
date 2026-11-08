@@ -14,8 +14,6 @@ GitHub Actions 定义放在 `.github/workflows/`。正式设计和执行计划�
 缺失信息会改变范围或外部影响时询问，常规可逆决策自行推进；用户已有授权无需被技能中的通用审批模板重复确认。
 独立子任务可并行，指定文件归属和交付目标，避免共享文件写入冲突。验证与影响范围匹配，已有充分证据后不重复全量检查。
 
-以上选择对应 [GPT-6 Astra 官方指导](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra) 中的自主推进、指令敏感性、委派和验证建议，是本仓库的应用方式，不是性能提升的量化保证。
-
 ## 外部技能与历史约束
 
 项目使用的通用技能来自用户个人目录及插件；仓库内的编码与验证要求作为文档维护，不复制或改写个人技能。
@@ -26,20 +24,14 @@ GitHub Actions 定义放在 `.github/workflows/`。正式设计和执行计划�
 
 ## CI 维护
 
-- `auto-assign-issue.yml` 仅响应新 Issue 并使用 `issues: write`；职责明确，维持原状。
+- `auto-assign-issue.yml` 与 `auto-assign-pr.yml` 分别响应新 Issue 和新 PR 并自动指派维护者；职责明确，维持原状。
 - `release.yml` 仅由 `v*` 标签触发。完整 Git 历史用于计算版本；远程资源继续校验大小和 SHA-256；JDK 21、AAB/APK 输出、CHANGELOG 正文和签名清理保持原流程。
 - GitHub Release 发布 job 显式使用 `contents: write`；Google Play 内部测试和运行检测只需 `contents: read`，避免依赖仓库默认 Token 权限。签名秘密通过步骤环境变量传入 Shell 并加引号，避免特殊字符改变命令含义。
 - `google-play-internal.yml` 仅对 `main` 推送且最后提交信息包含 `ci` 时发布签名 AAB 到 Play 内部测试，不创建 GitHub Release；配置见 [发布说明](google-play-publishing.md)。
 - `release-runtime.yml` 在 PR 打开、更新、重新打开或手动触发时，仅检查混淆后的 vCard 解析和 TensorFlow Lite 原生库初始化，不包含 MMS、备份或界面回归。
 - 工作流修改先做 YAML/Actions 静态检查；真实签名与发布结果仍需实际 CI 运行确认。审计或静态验证不自动触发发布。
 
-## 官方依据
+## 参考资料
 
-以下文档于 2026-09-12 查阅，后续按实际问题重新核对，不把模型名或推理档位固定为项目要求。
-
-- [GPT-6 Astra 模型指导](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra)：行为与提示优化。
-- [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)：项目指令发现与作用范围。
-- [构建技能](https://learn.chatgpt.com/docs/build-skills)：精确触发、按需加载和仓库技能目录。
-- [Codex 最佳实践](https://learn.chatgpt.com/guides/best-practices)：简洁项目指南、合理规划与可验证交付。
 - [GitHub Actions 工作流语法](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)：job 权限与 Release 所需的 `contents: write`。
 - [GitHub Actions secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)：环境变量与 Shell 引用。

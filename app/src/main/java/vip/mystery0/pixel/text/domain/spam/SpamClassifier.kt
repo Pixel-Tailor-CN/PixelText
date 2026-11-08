@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.domain.spam
 
-import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -54,8 +53,5 @@ class SpamClassifier(private val engine: SpamModelEngine,
         currentCoroutineContext().ensureActive()
         return SpamPrediction(score, if (parameters == null) "public" else "personal", engine.identity, parameters?.generation, revision)
     }
-    suspend fun classify(text: String): Float = try { predict(text).score }
-    catch (error: CancellationException) { throw error }
-    catch (_: Exception) { Log.e("SpamClassifier", "inference failed"); -1f }
     override fun close() = engine.close()
 }

@@ -60,7 +60,7 @@ class SpamConversationListViewModel(
         observeHistoricalScans()
     }
 
-    @OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     fun startObserving() {
         if (observationJob?.isActive == true) return
         observationJob = viewModelScope.launch {

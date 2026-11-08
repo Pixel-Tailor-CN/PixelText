@@ -49,7 +49,8 @@ data class MmsSendSnapshot(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
-data class MmsPayloadPart(
+/** 二进制载荷按实例传递，不参与值比较或用作集合键。 */
+class MmsPayloadPart(
     val contentId: String,
     val contentLocation: String,
     val mimeType: String,
@@ -57,7 +58,7 @@ data class MmsPayloadPart(
     val charset: Int = 0,
 )
 
-data class ComposedMms(
+class ComposedMms(
     val bytes: ByteArray,
     val parts: List<MmsPayloadPart>,
     val contentType: String,

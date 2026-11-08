@@ -55,7 +55,7 @@ class MmsContactExporter(private val context: Context) {
                 phase = "encode"
                 val card = VCard().apply {
                     setFormattedName(name)
-                    setStructuredName(StructuredName())
+                    structuredName = StructuredName()
                     numbers.forEach { addTelephoneNumber(it) }
                 }
                 val encoded = Ezvcard.write(card).version(VCardVersion.V3_0).prodId(false).go()

@@ -21,7 +21,6 @@ package vip.mystery0.pixel.text.mms.vendor.pdu;
 import java.io.ByteArrayOutputStream;
 
 public class QuotedPrintable {
-    private static byte ESCAPE_CHAR = '=';
 
     /**
      * Decodes an array quoted-printable characters into an array of original bytes.
@@ -37,14 +36,14 @@ public class QuotedPrintable {
      * @return array of original bytes,
      *         null if quoted-printable decoding is unsuccessful.
      */
-    public static final byte[] decodeQuotedPrintable(byte[] bytes) {
+    public static byte[] decodeQuotedPrintable(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         for (int i = 0; i < bytes.length; i++) {
             int b = bytes[i];
-            if (b == ESCAPE_CHAR) {
+            if (b == '=') {
                 try {
                     if('\r' == (char)bytes[i + 1] &&
                             '\n' == (char)bytes[i + 2]) {

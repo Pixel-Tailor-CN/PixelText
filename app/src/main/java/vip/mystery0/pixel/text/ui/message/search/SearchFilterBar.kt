@@ -105,9 +105,9 @@ fun SearchFilterBar(
 
         // 3. 结果类型
         val hasTransport = filter.effectiveTransports.isNotEmpty()
-        val transportLabel = when {
-            filter.transports.size == 1 && filter.transports.contains(MessageTransport.SMS) -> "短信"
-            filter.transports.size == 1 && filter.transports.contains(MessageTransport.MMS) -> "彩信"
+        val transportLabel = when (filter.transports.singleOrNull()) {
+            MessageTransport.SMS -> "短信"
+            MessageTransport.MMS -> "彩信"
             else -> "结果类型"
         }
         FilterChip(

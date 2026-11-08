@@ -63,7 +63,7 @@ internal fun DataInitializationProgressContent(
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Text(
-                    text = "已处理 ${formatInitializationCount(completed)} / ${formatInitializationCount(requireNotNull(total))} 条",
+                    text = "已处理 ${formatInitializationCount(completed)} / ${formatInitializationCount(total)} 条",
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

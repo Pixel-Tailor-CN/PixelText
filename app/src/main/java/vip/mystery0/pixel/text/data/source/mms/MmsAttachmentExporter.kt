@@ -204,7 +204,7 @@ class MmsAttachmentExporter(
         }
     }
 
-    private suspend fun copyBytes(input: InputStream, output: OutputStream) {
+    private suspend fun copyBytes(input: InputStream, output: OutputStream) = withContext(Dispatchers.IO) {
         val buffer = ByteArray(COPY_BUFFER_SIZE)
         while (true) {
             currentCoroutineContext().ensureActive()
@@ -217,7 +217,7 @@ class MmsAttachmentExporter(
         output.flush()
     }
 
-    private suspend fun writeUtf8(text: String, output: OutputStream) {
+    private suspend fun writeUtf8(text: String, output: OutputStream) = withContext(Dispatchers.IO) {
         val writer = OutputStreamWriter(output, StandardCharsets.UTF_8)
         var offset = 0
         while (offset < text.length) {
@@ -253,7 +253,7 @@ class MmsAttachmentExporter(
     }
 
     private fun classifyWriteFailure(failure: Throwable): MmsAttachmentExportException {
-        val causes = generateSequence(failure) { it.cause }.toList()
+        val causes: List<Throwable> = generateSequence(failure) { it.cause }.toList()
         val reason = when {
             causes.any { it is SecurityException } -> MmsAttachmentFailureReason.PERMISSION_DENIED
             causes.any { it is ErrnoException && it.errno == OsConstants.ENOSPC } ||
@@ -286,7 +286,7 @@ class MmsAttachmentExporter(
         const val COPY_BUFFER_SIZE = 64 * 1024
         const val TEXT_CHUNK_SIZE = 8 * 1024
         const val SHARE_MAX_AGE_MILLIS = 24 * 60 * 60 * 1000L
-        val activeShareDirectories = ConcurrentHashMap.newKeySet<String>()
+        val activeShareDirectories: MutableSet<String> = ConcurrentHashMap.newKeySet()
     }
 }
 

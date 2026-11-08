@@ -102,7 +102,7 @@ class SearchViewModel(
                 _selectionState.value = _selectionState.value.copy(feedback = feedback)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _selectionState.value = _selectionState.value.copy(
                     feedback = "删除未完成，部分消息可能已删除，请检查搜索结果后重试",
                 )
@@ -196,7 +196,7 @@ class SearchViewModel(
                 }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Throwable) {
+        } catch (_: Throwable) {
             if (generation == requestGeneration) {
                 _uiState.value = SearchUiState.Error("搜索失败，请稍后重试")
             }

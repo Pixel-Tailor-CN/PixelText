@@ -182,7 +182,7 @@ class SenderProfileRepository(
             error("不支持的发件方资料格式：${manifest.schemaVersion}")
         }
         if (manifest.version.isBlank()) error("发件方资料版本为空")
-        if (manifest.sizeBytes <= 0L || manifest.sizeBytes > MAX_BUNDLE_BYTES) {
+        if (manifest.sizeBytes !in 1..MAX_BUNDLE_BYTES) {
             error("发件方资料大小不合法")
         }
         if (!SHA256.matches(manifest.sha256)) error("发件方资料哈希不合法")

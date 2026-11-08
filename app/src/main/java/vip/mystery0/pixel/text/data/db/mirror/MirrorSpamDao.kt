@@ -93,19 +93,18 @@ data class KeywordDecisionCandidate(
 
 @Dao
 abstract class MirrorSpamDao {
-    @Query("SELECT COUNT(*)" + SCAN_TABLES + " AND m.localId <= :upperLocalId")
+    @Query("SELECT COUNT(*)${SCAN_TABLES} AND m.localId <= :upperLocalId")
     abstract suspend fun scanTotal(upperLocalId: Long): Int
 
-    @Query("SELECT COUNT(*)" + SCAN_TABLES + SCAN_PENDING)
+    @Query("SELECT COUNT(*)$SCAN_TABLES$SCAN_PENDING")
     abstract suspend fun scanCount(upperLocalId: Long, modelEnabled: Boolean, identity: String?,
         revision: Long?, generation: Long?): Int
 
-    @Query("SELECT " + SCAN_COLUMNS + SCAN_TABLES + SCAN_PENDING +
-        " AND m.localId > :afterLocalId ORDER BY m.localId LIMIT :limit")
+    @Query("SELECT $SCAN_COLUMNS$SCAN_TABLES$SCAN_PENDING AND m.localId > :afterLocalId ORDER BY m.localId LIMIT :limit")
     abstract suspend fun scanBatch(afterLocalId: Long, upperLocalId: Long, limit: Int,
         modelEnabled: Boolean, identity: String?, revision: Long?, generation: Long?): List<MirrorSpamScanRow>
 
-    @Query("SELECT " + SCAN_COLUMNS + SCAN_TABLES + " AND m.localId IN (:localIds)")
+    @Query("SELECT $SCAN_COLUMNS${SCAN_TABLES} AND m.localId IN (:localIds)")
     abstract suspend fun scanRows(localIds: List<Long>): List<MirrorSpamScanRow>
 
     /** 调用方在事务中复核消息版本，只批量更新分类列，不覆盖已读和同步字段。 */
@@ -122,14 +121,14 @@ abstract class MirrorSpamDao {
     @Query("SELECT CASE WHEN transport='MMS' THEN -sourceId ELSE sourceId END FROM mirror_message WHERE spamAllowedSource=2")
     abstract suspend fun whitelistMessageIds(): List<Long>
 
-    @Query("SELECT " + SPAM_COLUMNS + " FROM mirror_message WHERE (transport='SMS' AND sourceId IN (:smsIds)) OR (transport='MMS' AND sourceId IN (:mmsIds))")
+    @Query("SELECT $SPAM_COLUMNS FROM mirror_message WHERE (transport='SMS' AND sourceId IN (:smsIds)) OR (transport='MMS' AND sourceId IN (:mmsIds))")
     abstract suspend fun rowsBySource(smsIds: List<Long>, mmsIds: List<Long>): List<MirrorSpamStateRow>
 
     open suspend fun rows(ids: List<Long>): List<MirrorSpamStateRow> = ids.distinct().chunked(400).flatMap { batch ->
         rowsBySource(batch.filter { it > 0 }, batch.filter { it < 0 && it != Long.MIN_VALUE }.map { -it })
     }
 
-    @Query("SELECT " + SPAM_COLUMNS + " FROM mirror_message")
+    @Query("SELECT $SPAM_COLUMNS FROM mirror_message")
     abstract suspend fun allRows(): List<MirrorSpamStateRow>
 
     @Query("SELECT COUNT(*) FROM mirror_message")
@@ -169,7 +168,7 @@ abstract class MirrorSpamDao {
             .forEach { persist(it, it.copy(spamKeywordId = keywordId)) }
     }
 
-    @Query("SELECT " + SPAM_COLUMNS + " FROM mirror_message WHERE spamKeywordId=:keywordId")
+    @Query("SELECT $SPAM_COLUMNS FROM mirror_message WHERE spamKeywordId=:keywordId")
     protected abstract suspend fun keywordRows(keywordId: Long): List<MirrorSpamStateRow>
 
     @Transaction
@@ -227,35 +226,4 @@ abstract class MirrorSpamDao {
     open suspend fun getScores(ids: List<Long>): Map<Long, Float> = buildMap {
         rows(ids).forEach { row -> row.effectiveScore?.let { put(row.messageId, it) } }
     }
-
-    open suspend fun spamMessageIds(ids: List<Long>, threshold: Float = MessageSpamSource.THRESHOLD): Set<Long> =
-        rows(ids).filter { (it.effectiveScore ?: -1f) >= threshold }.mapTo(mutableSetOf()) { it.messageId }
-
-    open suspend fun identifiedMessageIds(ids: List<Long>): Set<Long> =
-        rows(ids).filter { it.isSpam != null }.mapTo(mutableSetOf()) { it.messageId }
-
-    @Query("SELECT CASE WHEN transport='MMS' THEN -sourceId ELSE sourceId END FROM mirror_message WHERE isSpam=1")
-    protected abstract suspend fun markedSpamIds(): List<Long>
-
-    open suspend fun allSpamMessageIds(threshold: Float = MessageSpamSource.THRESHOLD): Set<Long> =
-        if (threshold == MessageSpamSource.THRESHOLD) markedSpamIds().toSet()
-        else allRows().filter { (it.effectiveScore ?: -1f) >= threshold }.mapTo(mutableSetOf()) { it.messageId }
-
-    @Query("""
-        SELECT threadId FROM mirror_message
-        WHERE threadId > 0 AND
-            CASE WHEN spamSource=1 THEN spamScore WHEN isSpam=1 THEN 1.0 WHEN isSpam=0 THEN 0.0 ELSE -1.0 END >= :threshold
-        GROUP BY threadId ORDER BY MAX(timestamp) DESC, MAX(localId) DESC LIMIT :limit OFFSET :offset
-    """)
-    protected abstract suspend fun scoredThreadIds(threshold: Float, limit: Int, offset: Int): List<Long>
-
-    @Query("""
-        SELECT threadId FROM mirror_message WHERE isSpam=1 AND threadId > 0
-        GROUP BY threadId ORDER BY MAX(timestamp) DESC, MAX(localId) DESC LIMIT :limit OFFSET :offset
-    """)
-    protected abstract suspend fun markedSpamThreadIds(limit: Int, offset: Int): List<Long>
-
-    open suspend fun spamThreadIds(threshold: Float, limit: Int, offset: Int): List<Long> =
-        if (threshold == MessageSpamSource.THRESHOLD) markedSpamThreadIds(limit, offset)
-        else scoredThreadIds(threshold, limit, offset)
 }

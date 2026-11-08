@@ -99,7 +99,7 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
                                     if (messageId != null) {
                                         conversationCacheRepository.syncIncomingSms(messageId)
                                     } else {
-                                        conversationCacheRepository.syncThreads(listOf(threadId))
+                                        conversationCacheRepository.syncLocalChanges()
                                     }
                                 } catch (error: CancellationException) {
                                     throw error
@@ -153,13 +153,13 @@ class SmsReceiver : BroadcastReceiver(), KoinComponent {
                                 if (canScheduleSpamCheck) {
                                     try {
                                         SpamDetectionWorker.schedule(
-                                            context, requireNotNull(messageId), threadId, timestamp,
+                                            context, messageId, threadId, timestamp,
                                             deferNotification, insertedUri.toString(),
                                         )
                                     } catch (error: Exception) {
                                         Log.e(TAG, "spam scheduling failed message_id=$messageId", error)
                                         if (deferNotification) runCatching {
-                                            SmsNotificationHelper.showSmsNotification(context, sender, body, threadId, insertedUri?.toString())
+                                            SmsNotificationHelper.showSmsNotification(context, sender, body, threadId, insertedUri.toString())
                                         }
                                     }
                                 }

@@ -25,13 +25,12 @@ import vip.mystery0.pixel.text.viewmodel.BackupViewModel
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel = koinViewModel()) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
-    var selection by rememberSaveable(stateSaver = listSaver<Set<BackupSection>, String>(
+    var selection by rememberSaveable(stateSaver = listSaver(
         save = { it.map { section -> section.name } }, restore = { it.map(BackupSection::valueOf).toSet() },
     )) { mutableStateOf(BackupSection.entries.toSet()) }
     var selectionToken by rememberSaveable { mutableStateOf<String?>(null) }
@@ -140,7 +139,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         )
                         Button(
                             onClick = { if (encrypt) createFile() else warning = true },
-                            enabled = selection.isNotEmpty() && !state.restoreProtected &&
+                            enabled = selection.isNotEmpty() &&
                                 (BackupSection.SMS !in selection || readable) &&
                                 (!encrypt || (password.isNotEmpty() && password == confirmation)),
                             modifier = Modifier.fillMaxWidth(),
@@ -234,7 +233,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     if (finishConfirm) AlertDialog(onDismissRequest = { finishConfirm = false }, title = { Text("结束恢复保护") },
         text = { Column {
             Text("恢复保护结束后，已启用的常规验证码清理可能删除刚恢复的过期验证码。中断后的计数以最后持久化进度为准，重新导入会再次去重。")
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = disableCleanup, onCheckedChange = { disableCleanup = it }); Text("关闭验证码自动删除")
             }
         } }, confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge(disableCleanup) }) { Text("确认结束") } },

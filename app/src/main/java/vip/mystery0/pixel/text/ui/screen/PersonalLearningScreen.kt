@@ -498,7 +498,7 @@ private fun LearningSampleDetailSheet(
                     Text(sample.text, style = MaterialTheme.typography.bodyLarge)
                 }
                 ListItem(
-                    headlineContent = { Text("短信分类") },
+                    content = { Text("短信分类") },
                     supportingContent = {
                         Text(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
                     },

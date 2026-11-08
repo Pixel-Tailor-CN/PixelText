@@ -46,7 +46,7 @@ class MmsPartReader(private val openLocalStream: (String) -> InputStream? = { Fi
         } ?: TextResult(null, result.byteCount, result.issue)
     }
 
-    data class BytesResult(val bytes: ByteArray?, val byteCount: Long?, val issue: String?)
+    class BytesResult(val bytes: ByteArray?, val byteCount: Long?, val issue: String?)
 
     /** 容器与文本共享本次消息读取预算；原件过大时保留 URI，不做截断解析。 */
     suspend fun readBytes(part: MirrorPartModel, budget: Budget): BytesResult = withContext(Dispatchers.IO) {

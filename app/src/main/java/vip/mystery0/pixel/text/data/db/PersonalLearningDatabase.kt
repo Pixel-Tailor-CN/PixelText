@@ -13,6 +13,8 @@ data class LearningLinkEntity(val sourceType: String, val sourceId: Long, val fi
 data class LearningStateEntity(@PrimaryKey val id: Int = 1, val revision: Long = 0,
     val status: String = "IDLE", val error: String? = null)
 @Entity(tableName = "learning_parameters")
+// 参数载荷按 identity 与 revision 校验，不通过实体相等性判断模型版本。
+@Suppress("ArrayInDataClass")
 data class LearningParametersEntity(@PrimaryKey val identity: String, val revision: Long, val payload: ByteArray)
 data class LearningSampleRow(@Embedded val sample: LearningSampleEntity, val linkedMessageCount: Int)
 data class LearningCorrectionRow(val sourceType: String, val sourceId: Long, val fingerprint: String,

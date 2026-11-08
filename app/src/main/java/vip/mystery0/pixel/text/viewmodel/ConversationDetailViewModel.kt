@@ -1,16 +1,15 @@
 package vip.mystery0.pixel.text.viewmodel
 
 import android.content.BroadcastReceiver
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.SystemClock
-import android.provider.Telephony
-import android.telephony.SubscriptionManager
 import android.util.Log
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -34,7 +33,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.source.ContactDataSource
-import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -44,12 +42,10 @@ import vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration
 import vip.mystery0.pixel.text.worker.SpamDetectionWorker
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * 单次性的发送结果事件，供 UI 用 Snackbar 等方式提示用户。
- */
-sealed interface SendResultEvent {
-    data class Submitted(val text: String) : SendResultEvent
-    data class Failure(val reason: String) : SendResultEvent
+sealed class MessageUiState {
+    data object Loading : MessageUiState()
+    data class Success(val messages: List<MessageModel>) : MessageUiState()
+    data class Error(val message: String) : MessageUiState()
 }
 
 sealed interface DeleteMessageResultEvent {
@@ -65,29 +61,21 @@ sealed interface ManualSpamCheckState {
 
 class ConversationDetailViewModel(
     private val repository: MessageRepository,
-    private val telephonyDataSource: TelephonyDataSource,
     private val contactDataSource: ContactDataSource,
-    private val context: Context,
+    application: Application,
     private val senderProfileRepository: vip.mystery0.pixel.text.data.repository.SenderProfileRepository,
     private val spamClassifierFactory: SpamClassifierFactory,
     private val spamRepository: SpamRepository,
     private val mirror: vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository,
     private val whitelist: vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository,
-    private val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator,
-) : ViewModel() {
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<MessageUiState>(MessageUiState.Loading)
     val uiState: StateFlow<MessageUiState> = _uiState.asStateFlow()
 
-    private val _address = MutableStateFlow<String>("")
+    private val _address = MutableStateFlow("")
     val address: StateFlow<String> = _address.asStateFlow()
     private val _conversationTitle = MutableStateFlow("")
     val conversationTitle: StateFlow<String> = _conversationTitle.asStateFlow()
-
-    private val _sending = MutableStateFlow(false)
-    val sending: StateFlow<Boolean> = _sending.asStateFlow()
-
-    private val _sendResultEvents = Channel<SendResultEvent>(Channel.BUFFERED)
-    val sendResultEvents = _sendResultEvents.receiveAsFlow()
 
     private val _deleteMessageResultEvents =
         Channel<DeleteMessageResultEvent>(Channel.BUFFERED)
@@ -143,7 +131,7 @@ class ConversationDetailViewModel(
             0
         }
         ContextCompat.registerReceiver(
-            context,
+            getApplication(),
             spamDetectionReceiver,
             IntentFilter(SpamDetectionWorker.ACTION_SPAM_DETECTED),
             flags
@@ -156,10 +144,10 @@ class ConversationDetailViewModel(
     private val readRequested = mutableSetOf<Long>()
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
-    fun startObservingTelephony(): Boolean {
+    fun startObservingTelephony() {
         reading = true
         markDisplayedMessagesRead(_messages)
-        if (mirrorObservationJob?.isActive == true) return true
+        if (mirrorObservationJob?.isActive == true) return
         mirrorObservationJob = viewModelScope.launch {
             var initialSnapshot = true
             merge(
@@ -172,14 +160,12 @@ class ConversationDetailViewModel(
                 if (fromMirror) initialSnapshot = false
             }
         }
-        return true
     }
 
-    fun stopObservingTelephony(): Boolean {
+    fun stopObservingTelephony() {
         reading = false
         mirrorObservationJob?.cancel()
         mirrorObservationJob = null
-        return true
     }
     fun loadThread(
         threadId: Long,
@@ -234,7 +220,7 @@ class ConversationDetailViewModel(
     }
 
     fun consumeNewMessageKeys(keys: Set<String>) {
-        _newMessageKeys.value = _newMessageKeys.value - keys
+        _newMessageKeys.value -= keys
     }
 
     suspend fun loadUntilMessage(messageId: Long): Int? {
@@ -358,43 +344,13 @@ class ConversationDetailViewModel(
         startMessageLoad(refresh)
     }
 
-    /**
-     * @param subId 指定发送使用的 SIM 卡。传 [SubscriptionManager.INVALID_SUBSCRIPTION_ID] 表示使用默认 SIM。
-     */
-    fun sendMessage(
-        address: String,
-        message: String,
-        subId: Int = SubscriptionManager.INVALID_SUBSCRIPTION_ID,
-    ) {
-        if (_sending.value) return
-        _sending.value = true
-
-        viewModelScope.launch {
-            try {
-                val id = smsSender.send(address, message, subId, currentThreadId)
-                val pendingUri = android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id)
-                val resolvedThreadId = runCatching { telephonyDataSource.queryThreadIdFromUri(pendingUri) }.getOrNull() ?: currentThreadId
-                if (currentThreadId == -1L && resolvedThreadId != -1L) {
-                    loadThread(resolvedThreadId, address, currentContentFilter)
-                }
-
-                _sendResultEvents.trySend(SendResultEvent.Submitted(message))
-                refreshMessages(preserveLoadedHistory = true, reportInsertions = true)
-            } catch (e: Exception) {
-                _sendResultEvents.trySend(SendResultEvent.Failure(e.message ?: "未知错误"))
-            } finally {
-                _sending.value = false
-            }
-        }
-    }
-
     fun deleteMessages(messageIds: Set<Long>) {
         if (messageIds.isEmpty()) return
         viewModelScope.launch {
             runCatching {
                 repository.deleteMessages(messageIds)
             }.onSuccess { deletedCount ->
-                _manualSpamChecks.value = _manualSpamChecks.value - messageIds
+                _manualSpamChecks.value -= messageIds
                 refreshMessages()
                 _deleteMessageResultEvents.trySend(
                     DeleteMessageResultEvent.Success(deletedCount)
@@ -426,7 +382,7 @@ class ConversationDetailViewModel(
                     manualClassificationMutex.withLock {
                         spamClassifierFactory.create().use { classifier ->
                             val prediction = classifier.predict(message.content)
-                            check(spamRepository.savePrediction(message.id, message.threadId, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
+                            check(spamRepository.savePrediction(message.id, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
                                 if (message.isMms) "MMS" else "SMS", message.id, message.sender, message.timestamp, message.content), allowDisabled = true)) { "模型已更新，请重新检测" }
                             prediction.score
                         }
@@ -436,7 +392,7 @@ class ConversationDetailViewModel(
             val state = if (result.isSuccess) {
                 val score = result.getOrThrow()
                 if (score >= 0f) {
-                    SmartspacerIntegration.notifyChanged(context)
+                    SmartspacerIntegration.notifyChanged(getApplication())
                     val effectiveScore = spamRepository.getScore(message.id) ?: score
                     updateMessageSpamScore(message.id, effectiveScore)
                     ManualSpamCheckState.Result(effectiveScore)
@@ -507,8 +463,7 @@ class ConversationDetailViewModel(
 
     override fun onCleared() {
         runCatching { stopObservingTelephony() }
-        runCatching { context.unregisterReceiver(spamDetectionReceiver) }
-        super.onCleared()
+        runCatching { getApplication<Application>().unregisterReceiver(spamDetectionReceiver) }
     }
 
     companion object {

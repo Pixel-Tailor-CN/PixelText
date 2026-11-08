@@ -117,12 +117,13 @@ private const val BACKUP_MESSAGE_TABLE = "CREATE TABLE IF NOT EXISTS `mirror_mes
 private const val BACKUP_ALLOWED_TABLE = "CREATE TABLE IF NOT EXISTS `spam_allowed_message` (`message_id` INTEGER NOT NULL, `fingerprint` TEXT NOT NULL, `allowed_at` INTEGER NOT NULL, PRIMARY KEY(`message_id`))"
 private const val BACKUP_ARCHIVED_TABLE = "CREATE TABLE IF NOT EXISTS `archived_conversation` (`thread_id` INTEGER NOT NULL, `address` TEXT NOT NULL, `display_name` TEXT, `snippet` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `unread_count` INTEGER NOT NULL, `is_mms` INTEGER NOT NULL, `has_mms` INTEGER NOT NULL, `archived_at` INTEGER NOT NULL, PRIMARY KEY(`thread_id`))"
 
-internal fun snapshotTableSql(definition: SnapshotDefinition, table: String): String = when {
-    definition.name == "message_mirror.db" && table == "mirror_message" -> BACKUP_MESSAGE_TABLE
-    definition.name == "spam.db" && table == "spam_allowed_message" -> BACKUP_ALLOWED_TABLE
-    definition.name == "conversation_archive.db" && table == "archived_conversation" -> BACKUP_ARCHIVED_TABLE
-    else -> tableSql(definition.database.openHelper.readableDatabase, table)
-}
+internal fun snapshotTableSql(definition: SnapshotDefinition, table: String): String =
+    when (definition.name to table) {
+        "message_mirror.db" to "mirror_message" -> BACKUP_MESSAGE_TABLE
+        "spam.db" to "spam_allowed_message" -> BACKUP_ALLOWED_TABLE
+        "conversation_archive.db" to "archived_conversation" -> BACKUP_ARCHIVED_TABLE
+        else -> tableSql(definition.database.openHelper.readableDatabase, table)
+    }
 
 internal fun tableSql(database: SupportSQLiteDatabase, table: String): String =
     database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", arrayOf(table)).use {

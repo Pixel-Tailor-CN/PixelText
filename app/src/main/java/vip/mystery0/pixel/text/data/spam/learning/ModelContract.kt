@@ -7,9 +7,9 @@ import java.security.MessageDigest
 /** 仅接受当前客户端实现的公开契约，未知预处理不能猜测兼容。 */
 class ModelContract private constructor(private val json: JSONObject, raw: String) {
     val contractVersion = json.getInt("modelContractVersion")
-    val preprocessingVersion = json.getString("preprocessingVersion")
-    val personalParameterVersion = json.getString("personalParameterVersion")
-    val featureCompatibilityId = json.getString("featureCompatibilityId")
+    val preprocessingVersion: String = json.getString("preprocessingVersion")
+    val personalParameterVersion: String = json.getString("personalParameterVersion")
+    val featureCompatibilityId: String = json.getString("featureCompatibilityId")
     val identity = digest(raw.toByteArray(Charsets.UTF_8))
     val signatures: JSONObject = json.getJSONObject("signatures")
     val parameterCount = signatures.getJSONObject("reset_personal").getJSONObject("outputs")

@@ -47,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -526,11 +527,15 @@ fun ConversationDetailCustomizationScreen(
                             text = "文字缩放 ${"%.2f".format(Locale.US, scale)}x",
                             style = MaterialTheme.typography.bodyLarge,
                         )
+                        val sliderState = remember {
+                            SliderState(
+                                value = scale,
+                                trackRange = MIN_CONVERSATION_DETAIL_TEXT_SCALE..MAX_CONVERSATION_DETAIL_TEXT_SCALE,
+                            )
+                        }.apply { value = scale }
                         Slider(
-                            value = scale,
+                            state = sliderState,
                             onValueChange = viewModel::setTextScale,
-                            valueRange =
-                                MIN_CONVERSATION_DETAIL_TEXT_SCALE..MAX_CONVERSATION_DETAIL_TEXT_SCALE,
                             enabled = !state.isSaving,
                         )
                     }

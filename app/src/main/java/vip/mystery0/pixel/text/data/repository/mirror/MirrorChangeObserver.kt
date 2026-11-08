@@ -17,10 +17,10 @@ class MirrorChangeObserver(
     context: Context,
     private val synchronizer: MessageMirrorSynchronizer,
     private val incrementalSynchronizer: MessageMirrorIncrementalSynchronizer,
+    private val source: TelephonyMirrorSource,
     private val scope: CoroutineScope,
 ) {
     private val resolver = context.applicationContext.contentResolver
-    private val source = TelephonyMirrorSource(context)
     private var started = false
     /** 可由接入层安排唯一 WorkManager 任务；观察回调自身只持久化提示。 */
     var onDirty: (() -> Unit)? = null
@@ -48,13 +48,6 @@ class MirrorChangeObserver(
         resolver.registerContentObserver("content://mms".toUri(), true, observer)
         resolver.registerContentObserver("content://mms-sms".toUri(), true, observer)
         started = true
-
-    }
-
-    fun stop() {
-        if (!started) return
-        resolver.unregisterContentObserver(observer)
-        started = false
     }
 
     private suspend fun resolveKey(uri: Uri?): SourceMessageKey? {

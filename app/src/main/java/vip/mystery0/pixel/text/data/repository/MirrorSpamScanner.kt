@@ -237,10 +237,10 @@ class MirrorSpamScanner(
         val updates = mutableListOf<MirrorSpamUpdate>()
         var stale = false
         var spamCount = 0
-        for (original in scanned) {
+        for ((originalState) in scanned) {
             currentCoroutineContext().ensureActive()
-            val row = current[original.state.localId] ?: continue
-            if (row.state.messageRevision != original.state.messageRevision || row.state.messageId != original.state.messageId) {
+            val row = current[originalState.localId] ?: continue
+            if (row.state.messageRevision != originalState.messageRevision || row.state.messageId != originalState.messageId) {
                 stale = true
                 continue
             }

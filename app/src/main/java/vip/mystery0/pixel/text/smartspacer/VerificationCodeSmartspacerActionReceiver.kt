@@ -40,13 +40,13 @@ class VerificationCodeSmartspacerActionReceiver : BroadcastReceiver(), KoinCompo
         }
     }
 
+    // getter 可空而 setter 要求非空，当前 Kotlin 无法将它们映射为可写属性。
+    @Suppress("UsePropertyAccessSyntax")
     private fun copyVerificationCode(context: Context, code: String) {
         runCatching {
             val clipboardManager =
                 context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboardManager.setPrimaryClip(
-                ClipData.newPlainText("verification code", code)
-            )
+            clipboardManager.setPrimaryClip(ClipData.newPlainText("verification code", code))
         }.onFailure {
             Log.e(TAG, "failed to copy verification code", it)
         }

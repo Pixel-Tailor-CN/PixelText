@@ -130,15 +130,15 @@ class MirrorAttachmentCopier(
                 val batch = dao.cleanupTasks(afterPath)
                 if (batch.isEmpty()) break
                 // 使用路径键集翻页，本次失败任务不阻塞后续文件，也不在本轮忙重试。
-                for (task in batch) {
+                for ((relativePath) in batch) {
                     currentCoroutineContext().ensureActive()
                     if (SystemClock.elapsedRealtime() >= deadline) break
-                    if (store.isActive(task.relativePath)) continue
-                    if (dao.referenceCount(task.relativePath) > 0) {
-                        dao.removeCleanup(task.relativePath)
+                    if (store.isActive(relativePath)) continue
+                    if (dao.referenceCount(relativePath) > 0) {
+                        dao.removeCleanup(relativePath)
                     } else {
-                        val deleted = runCatching { store.delete(task.relativePath) }.getOrDefault(false)
-                        if (deleted) dao.removeCleanup(task.relativePath) else dao.failedCleanup(task.relativePath)
+                        val deleted = runCatching { store.delete(relativePath) }.getOrDefault(false)
+                        if (deleted) dao.removeCleanup(relativePath) else dao.failedCleanup(relativePath)
                     }
                 }
                 afterPath = batch.last().relativePath

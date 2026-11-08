@@ -75,7 +75,7 @@ class MmsCalendarParser {
         if (properties.any { it.name !in SUPPORTED }) warnings += "部分日历属性请核对原件"
         if (title == null) warnings += "事件缺少标题"
         var start: EventTime? = null
-        var end: Instant? = null
+        var end: Instant?
         var valid = true
         try {
             // 自定义规则可能覆盖同名 IANA 时区；不以设备规则静默替代发送方规则。
@@ -117,7 +117,7 @@ class MmsCalendarParser {
         val allDay = property.parameters["VALUE"]?.equals("DATE", true) == true || property.value.matches(Regex("\\d{8}"))
         if (allDay) {
             if (property.parameters.containsKey("TZID")) error("date with timezone")
-            return EventTime(LocalDate.parse(property.value, DATE).atStartOfDay(ZoneOffset.UTC), true, false)
+            return EventTime(LocalDate.parse(property.value, DATE).atStartOfDay(ZoneOffset.UTC), allDay = true, floating = false)
         }
         val utc = property.value.endsWith('Z')
         val tz = property.parameters["TZID"]

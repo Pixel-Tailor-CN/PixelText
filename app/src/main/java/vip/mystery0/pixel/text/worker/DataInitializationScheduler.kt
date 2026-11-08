@@ -24,12 +24,14 @@ class DataInitializationScheduler(
     fun retry() = schedule(true)
 
     /** 正常预算让出接续当前唯一任务链，不使用失败重试的指数退避。 */
-    suspend fun enqueueContinuation() = withContext(Dispatchers.IO) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
-            OneTimeWorkRequestBuilder<DataInitializationWorker>().build(),
-        ).result.get()
+    suspend fun enqueueContinuation() {
+        withContext(Dispatchers.IO) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                OneTimeWorkRequestBuilder<DataInitializationWorker>().build(),
+            ).result.get()
+        }
     }
 
     private fun schedule(retry: Boolean) {
@@ -47,8 +49,8 @@ class DataInitializationScheduler(
                         return@withLock
                     }
                     val work = WorkManager.getInstance(context)
-                    val running = if (retry) work.getWorkInfosForUniqueWork(UNIQUE_WORK_NAME).get()
-                        .any { it.state == androidx.work.WorkInfo.State.RUNNING } else false
+                    val running = retry && work.getWorkInfosForUniqueWork(UNIQUE_WORK_NAME).get()
+                        .any { it.state == androidx.work.WorkInfo.State.RUNNING }
                     work.enqueueUniqueWork(
                         UNIQUE_WORK_NAME,
                         if (retry && !running) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,

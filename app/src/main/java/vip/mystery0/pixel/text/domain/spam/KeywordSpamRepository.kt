@@ -9,6 +9,6 @@ interface KeywordSpamRepository {
     fun observeKeywords(): Flow<List<BlockedKeyword>>
     suspend fun save(id: Long?, keyword: String): KeywordSaveResult
     suspend fun delete(id: Long): Boolean
-    suspend fun updateMessageMatch(messageId: Long, threadId: Long, content: String): Boolean
+    suspend fun updateMessageMatch(messageId: Long): Boolean
     suspend fun rebuildMatches(messages: List<KeywordSpamMessage>): Int
 }

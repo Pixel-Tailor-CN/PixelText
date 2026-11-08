@@ -17,6 +17,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 import java.io.File
 import java.util.UUID
 
@@ -139,7 +140,7 @@ fun rememberComposerCapture(
     LaunchedEffect(controller.recording) {
         while (controller.recording) {
             controller.seconds = ((SystemClock.elapsedRealtime() - controller.startedAt) / 1000).toInt()
-            delay(200)
+            delay(200.milliseconds)
         }
     }
     DisposableEffect(owner, controller) {

@@ -3,7 +3,6 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -17,10 +16,6 @@ import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.domain.model.mirror.ConversationArchiveFilter
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
 import vip.mystery0.pixel.text.data.source.ContactDataSource
-import vip.mystery0.pixel.text.data.source.MmsConversationRow
-import vip.mystery0.pixel.text.data.source.MmsMessageRow
-import vip.mystery0.pixel.text.data.source.SmsConversationRow
-import vip.mystery0.pixel.text.data.source.SmsMessageRow
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -46,12 +41,11 @@ class MessageRepositoryImpl(
     private val messageParser: MessageParser,
     private val spamRepository: SpamRepository,
     private val settingsRepository: AppSettingsRepository,
-    private val database: MessageMirrorDatabase,
+    database: MessageMirrorDatabase,
     val conversationCacheRepository: ConversationCacheRepository,
     private val senderProfileRepository: SenderProfileRepository,
     private val verificationCodeRepository: VerificationCodeRepository,
     private val mirror: MessageMirrorRepository,
-    private val mmsTextIndexer: vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer,
     private val context: Context
 ) : MessageRepository {
 
@@ -87,8 +81,7 @@ class MessageRepositoryImpl(
                 .conflate()
                 .map { isolationEnabled ->
                     // 表变化只触发一次聚合，避免先读取整张摘要列表再重新过滤分组。
-                    val preparationStarted = android.os.SystemClock.elapsedRealtime()
-                    val visibleConversations = enrichWithSenderProfiles(
+                    enrichWithSenderProfiles(
                         mirror.queryConversations(
                             ConversationListQuery(
                                 contentFilter = if (isolationEnabled) {
@@ -99,10 +92,6 @@ class MessageRepositoryImpl(
                             )
                         )
                     )
-                    if (vip.mystery0.pixel.text.BuildConfig.DEBUG) {
-                        android.util.Log.d("ConversationLoad", "conversation load published count=${visibleConversations.size} elapsed_ms=${android.os.SystemClock.elapsedRealtime() - preparationStarted}")
-                    }
-                    visibleConversations
                 }
         )
     }.flowOn(Dispatchers.IO)
@@ -123,7 +112,6 @@ class MessageRepositoryImpl(
         flow {
             require(limit >= 0 && offset >= 0)
             spamRepository.ensureReady()
-            val started = android.os.SystemClock.elapsedRealtime()
             // SQL 先按有效骚扰消息选会话页，再按隔离设置汇总可见消息。
             val conversations = mirror.queryConversations(
                 ConversationListQuery(
@@ -135,31 +123,9 @@ class MessageRepositoryImpl(
                     offset = offset,
                 )
             )
-            val aggregatedAt = android.os.SystemClock.elapsedRealtime()
             val enriched = enrichWithSenderProfiles(conversations).sortedByDescending { it.timestamp }
-            if (vip.mystery0.pixel.text.BuildConfig.DEBUG) {
-                val finishedAt = android.os.SystemClock.elapsedRealtime()
-                android.util.Log.d(
-                    "SpamListLoad",
-                    "spam list loaded page_count=${enriched.size} " +
-                        "aggregate_ms=${aggregatedAt - started} " +
-                        "profiles_ms=${finishedAt - aggregatedAt} total_ms=${finishedAt - started}",
-                )
-            }
             emit(enriched)
         }.flowOn(Dispatchers.IO)
-
-    override fun searchConversations(query: String): Flow<List<ConversationModel>> = flow {
-        val threadIds = localMessages().filter { it.sender.contains(query, true) || it.content.contains(query, true) }.map { it.threadId }.distinct()
-        if (threadIds.isEmpty()) {
-            emit(emptyList())
-            return@flow
-        }
-
-        val sorted = enrichWithSenderProfiles(fetchConversationDetails(threadIds))
-            .sortedByDescending { it.timestamp }
-        emit(sorted)
-    }.flowOn(Dispatchers.IO)
 
     override suspend fun archiveConversations(conversations: List<ConversationModel>) {
         if (conversations.isEmpty()) return
@@ -187,7 +153,7 @@ class MessageRepositoryImpl(
             val existingSmsThreadIds = telephonyDataSource.existingSmsThreadIds(threadIds)
             verificationCodeRepository.deleteThreadIds(threadIds - existingSmsThreadIds)
             archiveDao.unarchive(threadIds)
-            conversationCacheRepository.syncThreads(threadIds.toList())
+            conversationCacheRepository.syncLocalChanges()
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
         }
@@ -202,7 +168,7 @@ class MessageRepositoryImpl(
             val existingSmsIds = telephonyDataSource.existingSmsMessageIds(requestedSmsIds)
             verificationCodeRepository.deleteMessageIds(requestedSmsIds - existingSmsIds)
             spamRepository.delete(messageIds)
-            conversationCacheRepository.syncThreads(threadIds.toList())
+            conversationCacheRepository.syncLocalChanges()
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
             deletedCount
@@ -214,7 +180,7 @@ class MessageRepositoryImpl(
         return withContext(Dispatchers.IO) {
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val updatedCount = telephonyDataSource.markMessagesAsRead(messageIds)
-            conversationCacheRepository.syncThreads(threadIds.toList())
+            conversationCacheRepository.syncLocalChanges()
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
             updatedCount
@@ -248,13 +214,6 @@ class MessageRepositoryImpl(
         })
     }.flowOn(Dispatchers.IO)
 
-    override fun getMessages(): Flow<List<MessageModel>> = flow {
-        emit(localMessages().map { it.copy(parsedResult = parseMessage(it.sender, it.content)) })
-    }.flowOn(Dispatchers.IO)
-
-    private suspend fun localMessages(): List<MessageModel> = mirror.observeAllMessages().first().map {
-        it.toMessageModel().let { message -> message.copy(simName = telephonyDataSource.getSimName(message.subId)) }
-    }.sortedByDescending { it.timestamp }
     override suspend fun markThreadAsRead(threadId: Long) {
         markThreadsAsRead(setOf(threadId))
     }
@@ -263,7 +222,7 @@ class MessageRepositoryImpl(
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
             telephonyDataSource.markThreadsAsRead(threadIds)
-            conversationCacheRepository.syncThreads(threadIds.toList())
+            conversationCacheRepository.syncLocalChanges()
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
             SmartspacerIntegration.notifyChanged(context)
         }
@@ -273,7 +232,7 @@ class MessageRepositoryImpl(
         if (threadId < 0) return
         withContext(Dispatchers.IO) {
             telephonyDataSource.markLatestIncomingMessageAsUnread(threadId)
-            conversationCacheRepository.syncThreads(listOf(threadId))
+            conversationCacheRepository.syncLocalChanges()
             SmartspacerIntegration.notifyChanged(context)
         }
     }
@@ -293,14 +252,6 @@ class MessageRepositoryImpl(
                 avatarSha256 = profile?.avatarSha256,
             )
         }
-    }
-
-    private suspend fun fetchConversationDetails(
-        threadIds: List<Long>,
-    ): List<ConversationModel> {
-        if (threadIds.isEmpty()) return emptyList()
-        // 归档等入口只读取每个线程最终展示的正文，历史消息只参与 SQL 聚合。
-        return mirror.queryConversations(ConversationListQuery(threadIds = threadIds))
     }
 
     private fun parseMessage(address: String, content: String): ParsedResult {

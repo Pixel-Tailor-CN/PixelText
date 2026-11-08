@@ -10,15 +10,11 @@ interface MessageMirrorRepository {
     fun observeSyncState(): Flow<MirrorSyncState>
     suspend fun getMessage(key: SourceMessageKey): MirrorMessageModel?
     fun observeMessage(key: SourceMessageKey): Flow<MirrorMessageModel?>
-    fun observeMessagesByThread(threadId: Long, limit: Int, offset: Int): Flow<List<MirrorMessageModel>>
     suspend fun queryThreadMessages(threadId: Long, limit: Int, offset: Int, filter: ConversationContentFilter): List<MirrorMessageModel>
     fun observeThreadChanges(threadId: Long): Flow<Unit>
-    fun observeAllMessages(): Flow<List<MirrorMessageModel>>
     fun observeMmsMessages(): Flow<List<MirrorMessageModel>>
-    suspend fun getConversationMessages(threadIds: List<Long>): List<ConversationMessageSnapshot>
     suspend fun getConversationMessagesByIds(messageIds: Collection<Long>): List<ConversationMessageSnapshot>
     suspend fun queryConversations(query: ConversationListQuery): List<ConversationModel>
     fun observeConversationChanges(): Flow<Unit>
-    fun observeConversationSummaries(): Flow<List<ConversationModel>>
     fun searchMessages(request: MessageSearchRequest): Flow<MessageSearchBatch>
 }

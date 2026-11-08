@@ -4,14 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -70,7 +68,7 @@ class VerificationCodeViewModel(
     private val repository: VerificationCodeRepository,
     private val savedStateHandle: SavedStateHandle,
     private val scheduler: VerificationCodeIndexScheduler,
-    private val settingsRepository: AppSettingsRepository,
+    settingsRepository: AppSettingsRepository,
 ) : ViewModel() {
     private val loadedMonthCount = MutableStateFlow(1)
     private val refreshing = MutableStateFlow(false)
@@ -169,7 +167,6 @@ class VerificationCodeViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VerificationCodeUiState())
 
-    private var refreshJob: Job? = null
     private val bodyCache = object : LinkedHashMap<Long, String>(BODY_CACHE_SIZE, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, String>?): Boolean =
             size > BODY_CACHE_SIZE
@@ -212,12 +209,6 @@ class VerificationCodeViewModel(
     fun refresh() {
         refreshing.value = true
         scheduler.scheduleReconcile()
-    }
-
-    fun rebuildAll() {
-        rebuilding.value = true
-        scheduler.scheduleFullRebuild()
-        eventsMutable.tryEmit(VerificationCodeEvent.ShowMessage("已安排重新识别全部短信"))
     }
 
     fun toggleMessageMode(messageId: Long) {

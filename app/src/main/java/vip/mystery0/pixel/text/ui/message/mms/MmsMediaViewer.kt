@@ -17,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -88,12 +89,14 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
         val duration = if (selected) playback.durationMillis else 0
         val position = if (selected) playback.positionMillis else 0
         if (selected) {
+            val sliderState = remember(duration) {
+                SliderState(trackRange = 0f..duration.coerceAtLeast(1).toFloat())
+            }.apply { value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()) }
             Slider(
-                value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()),
+                state = sliderState,
                 onValueChange = { dragPosition = it },
                 onValueChangeFinished = { dragPosition?.let { controller.seekTo(it.toLong()) }; dragPosition = null },
-                enabled = interactionEnabled && selected && duration > 0 && player?.isCurrentMediaItemSeekable == true,
-                valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
+                enabled = interactionEnabled && duration > 0 && player?.isCurrentMediaItemSeekable == true,
                 modifier = Modifier.semantics { contentDescription = "播放进度" },
             )
             Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")

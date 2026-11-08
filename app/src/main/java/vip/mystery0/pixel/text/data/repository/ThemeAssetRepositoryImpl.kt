@@ -152,7 +152,7 @@ class ThemeAssetRepositoryImpl(
                     return@forEach
                 }
                 val lastModified = file.lastModified()
-                if (lastModified > 0L && lastModified < cutoff) {
+                if (lastModified in 1 until cutoff) {
                     if (!file.delete() && file.exists()) {
                         Log.w(TAG, "theme stale draft delete failed path=${file.name}")
                     }
@@ -215,11 +215,7 @@ class ThemeAssetRepositoryImpl(
                 throw error
             }
         } finally {
-            scaled?.let { extra ->
-                if (extra !== bitmap) {
-                    extra.recycle()
-                }
-            }
+            scaled?.recycle()
             bitmap?.recycle()
         }
     }

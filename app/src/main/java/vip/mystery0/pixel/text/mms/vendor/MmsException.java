@@ -17,12 +17,14 @@
 
 package vip.mystery0.pixel.text.mms.vendor;
 
-import android.os.Build;
+import java.io.Serial;
+
 
 /**
  * A generic exception that is thrown by the Mms client.
  */
 public class MmsException extends Exception {
+    @Serial
     private static final long serialVersionUID = -7323249827281485390L;
 
     /**

@@ -18,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -52,7 +52,6 @@ import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.util.SimInfoProvider
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = koinViewModel(),
@@ -61,9 +60,6 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    vip.mystery0.pixel.text.ui.component.ListLoadTrace(
-        "search", (uiState as? SearchUiState.Success)?.results?.size, searchQuery,
-    )
     val domainFilter by viewModel.domainFilter.collectAsState()
     val selectionState by viewModel.selectionState.collectAsState()
     val context = LocalContext.current
@@ -91,7 +87,7 @@ fun SearchScreen(
 
     val focusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
-    var lastScrolledGeneration by rememberSaveable { mutableStateOf(0L) }
+    var lastScrolledGeneration by rememberSaveable { mutableLongStateOf(0L) }
 
     var inPhoneSubScreen by rememberSaveable { mutableStateOf(false) }
     var showSimSheet by rememberSaveable { mutableStateOf(false) }

@@ -107,14 +107,12 @@ class PersonalLearningCoordinator(
                     val parameters = train(engine, snapshot)
                     val applied = repository.withDecision {
                         currentCoroutineContext().ensureActive()
-                        if (!settings.settings.value.personalLearningEnabled || repository.stateRevision() != snapshot.revision) {
-                            false
-                        } else {
+                        settings.settings.value.personalLearningEnabled &&
+                            repository.stateRevision() == snapshot.revision &&
                             // 基础组合更换后，旧解释器得到的候选不可激活。
                             engineFactory().use { current ->
                                 current.identity == engine.identity && repository.commitParameters(snapshot.revision, parameters)
                             }
-                        }
                     }
                     if (applied) onChanged()
                 }
@@ -166,12 +164,12 @@ class PersonalLearningCoordinator(
         repeat(engine.epochs) {
             // 同一快照以固定种子逐轮洗牌，重建结果可复现。
             val ordered = snapshot.samples.toMutableList()
-            java.util.Collections.shuffle(ordered, random)
-            for (sample in ordered) {
+            ordered.shuffle(random)
+            for ((_, text, label) in ordered) {
                 currentCoroutineContext().ensureActive()
                 check(settings.settings.value.personalLearningEnabled) { "personal learning disabled" }
                 check(repository.stateRevision() == snapshot.revision) { "stale learning snapshot" }
-                payload = engine.train(sample.text, if (sample.label == LearningLabel.SPAM) 1f else 0f, payload)
+                payload = engine.train(text, if (label == LearningLabel.SPAM) 1f else 0f, payload)
                 require(payload.size == engine.parameterCount && payload.all { it.isFinite() })
             }
         }

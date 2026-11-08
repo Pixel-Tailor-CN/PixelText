@@ -74,7 +74,7 @@ internal class MmsReceptionReports(private val context: Context) {
         val providerReports = context.contentResolver.query(Telephony.Mms.CONTENT_URI, arrayOf("_id", statusColumn),
             "m_id = ? AND sub_id = ? AND m_type = ? AND date = ?",
             arrayOf(id, sub.toString(), record.getInt("type").toString(), record.getLong("date").toString()), null)
-            ?.use { cursor -> buildList<Long> {
+            ?.use { cursor -> buildList {
                 while (cursor.moveToNext()) if (cursor.getInt(1) == record.getInt("status")) add(cursor.getLong(0))
             } }.orEmpty().filter { reportId ->
                 val role = if (record.getInt("type") == 136) 137 else 151

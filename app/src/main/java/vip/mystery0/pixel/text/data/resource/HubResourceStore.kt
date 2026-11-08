@@ -24,20 +24,12 @@ class HubResourceStore(
 
     private data class FileStamp(val size: Long, val modifiedAt: Long)
 
-    fun activeModelFile(): File = currentModelBundle().modelFile
-    fun activeVocabFile(): File = currentModelBundle().vocabFile
-    fun activeContractFile(): File = currentModelBundle().contractFile
     fun tempFile(name: String): File = File(root, "tmp/$name")
-
-    fun hasActiveRules(): Boolean = activeRulesFile().isFile
-
-    fun hasActiveModelAndVocab(): Boolean =
-        activeModelBundle() != null
 
     fun activateRules(tempFile: File) {
         val target = activeRulesFile()
         target.parentFile?.mkdirs()
-        val atomic = android.util.AtomicFile(target)
+        val atomic = AtomicFile(target)
         val output = atomic.startWrite()
         try {
             tempFile.inputStream().use { it.copyTo(output) }
@@ -216,10 +208,6 @@ class HubResourceStore(
 
     fun deleteActiveRules() {
         activeRulesFile().deleteIfExists()
-    }
-
-    fun deleteActiveModelAndVocab() {
-        activateModelBundle(builtInModelBundle())
     }
 
     fun verifySha256(file: File, expected: String) {

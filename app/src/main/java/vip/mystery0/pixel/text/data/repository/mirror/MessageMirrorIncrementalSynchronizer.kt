@@ -113,13 +113,13 @@ class MessageMirrorIncrementalSynchronizer(
                     columns = columns + structures.flatMap { it.sourceColumns }
                     var previousId = checkpoint
                     structures.forEach { structure ->
-                        check(previousId == null || structure.message.sourceId > requireNotNull(previousId)) {
+                        check(previousId == null || structure.message.sourceId > previousId) {
                             "unordered_source_page"
                         }
                         previousId = structure.message.sourceId
                     }
                     val nextCheckpoint = structures.last().message.sourceId
-                    check(checkpoint == null || nextCheckpoint > requireNotNull(checkpoint)) {
+                    check(checkpoint == null || nextCheckpoint > checkpoint) {
                         "non_advancing_page"
                     }
                     state = state.copy(
@@ -152,14 +152,14 @@ class MessageMirrorIncrementalSynchronizer(
             if (batch.isEmpty()) return DirtyResult(requiresFullReconcile)
 
             var progressed = false
-            for (dirty in batch) {
+            for ((dirtyKey, transport, sourceId, token) in batch) {
                 currentCoroutineContext().ensureActive()
                 if (SystemClock.elapsedRealtime() >= deadline) {
                     return DirtyResult(requiresFullReconcile)
                 }
                 val key = SourceMessageKey(
-                    MessageTransport.valueOf(requireNotNull(dirty.transport)),
-                    requireNotNull(dirty.sourceId),
+                    MessageTransport.valueOf(requireNotNull(transport)),
+                    requireNotNull(sourceId),
                 )
                 when (val sourceResult = source.readMessage(key)) {
                     is SourceRead.Failure -> Unit
@@ -176,10 +176,10 @@ class MessageMirrorIncrementalSynchronizer(
                             present.copy(message = present.message.copy(generation = generation))
                         )
                         if (!present.childrenComplete) continue
-                        if (dirty.key.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
+                        if (dirtyKey.startsWith("attachments:") && key.transport == MessageTransport.MMS) {
                             dao.invalidateAttachmentContent(key.sourceId)
                         }
-                        sync.acknowledge(dirty.key, dirty.token)
+                        sync.acknowledge(dirtyKey, token)
                         val previous = sync.state("TARGETED") ?: MirrorSyncStateEntity("TARGETED")
                         sync.putState(
                             previous.copy(

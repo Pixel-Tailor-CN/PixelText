@@ -11,5 +11,5 @@ import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 fun MirrorPartModel.usesInlineTextCopy(): Boolean {
     if (text == null || !MmsMimeTypes.canExportInlineText(mimeType)) return false
     val originalReady = attachment?.state == MirrorAttachmentState.READY && attachment.localUri != null
-    return !originalReady || (attachment?.byteCount == 0L && text.isNotEmpty())
+    return !originalReady || (attachment.byteCount == 0L && text.isNotEmpty())
 }

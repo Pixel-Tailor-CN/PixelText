@@ -27,6 +27,8 @@ internal object MmsAddresses {
         return PhoneNumberUtils.areSamePhoneNumber(left, right, countryIso)
     }
 
+    // 本机号码仅用于区分彩信参与方，不用于设备识别或上传。
+    @android.annotation.SuppressLint("HardwareIds")
     @Suppress("DEPRECATION")
     fun local(context: Context, subscriptionId: Int): LocalIdentity = try {
         val manager = context.getSystemService(SubscriptionManager::class.java)

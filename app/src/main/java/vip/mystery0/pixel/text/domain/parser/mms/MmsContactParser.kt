@@ -78,8 +78,8 @@ class MmsContactParser {
                 }),
                 emails = values(card.emails.mapNotNull { email -> clean(email.value)?.let { MmsContactValue(it, email.types.joinToString("/") { type -> type.value }) } }),
                 addresses = values(card.addresses.mapNotNull { address ->
-                    clean(address.label ?: listOf(address.poBox, address.extendedAddress, address.streetAddress, address.locality,
-                        address.region, address.postalCode, address.country).filterNotNull().filter(String::isNotBlank).joinToString(" "))?.let {
+                    clean(address.label ?: listOfNotNull(address.poBox, address.extendedAddress, address.streetAddress, address.locality,
+                        address.region, address.postalCode, address.country).filter(String::isNotBlank).joinToString(" "))?.let {
                         MmsContactValue(it, address.types.joinToString("/") { type -> type.value })
                     }
                 }),

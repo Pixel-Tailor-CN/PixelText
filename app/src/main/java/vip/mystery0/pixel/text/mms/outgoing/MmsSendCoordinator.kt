@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.mms.outgoing
 
+import androidx.core.net.toUri
 import android.Manifest
 import android.app.PendingIntent
 import android.app.role.RoleManager
@@ -203,7 +204,7 @@ class MmsSendCoordinator(
             val pduUri = FileProvider.getUriForFile(context, "${context.packageName}.mms.send", pdu)
             val callback = PendingIntent.getBroadcast(context, 0,
                 Intent(context, MmsSentReceiver::class.java).setAction(MmsSentReceiver.ACTION)
-                    .setData(Uri.parse("pixeltext://mms-send/${message.attemptToken}")),
+                    .setData("pixeltext://mms-send/${message.attemptToken}".toUri()),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
             transport.send(context, message.snapshot.subscriptionId, pduUri, callback)
             repository.awaiting(message.attemptToken)

@@ -17,11 +17,14 @@
 
 package vip.mystery0.pixel.text.mms.vendor;
 
+import java.io.Serial;
+
 
 /**
  * Thrown when an invalid header value was set.
  */
 public class InvalidHeaderValueException extends MmsException {
+    @Serial
     private static final long serialVersionUID = -2053384496042052262L;
 
     /**

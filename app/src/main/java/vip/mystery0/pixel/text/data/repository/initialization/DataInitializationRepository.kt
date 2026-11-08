@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.data.repository.initialization
 
+import kotlin.time.Duration.Companion.seconds
 import androidx.room.withTransaction
 import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +51,7 @@ class DataInitializationRepository(
                 if (!pending) flowOf(SystemClock.elapsedRealtime()) else flow {
                     while (true) {
                         emit(SystemClock.elapsedRealtime())
-                        delay(1_000)
+                        delay(1.seconds)
                     }
                 }
             }

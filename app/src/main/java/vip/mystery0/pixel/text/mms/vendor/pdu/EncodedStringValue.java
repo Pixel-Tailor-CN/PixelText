@@ -17,21 +17,17 @@
 
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
-import android.os.Build;
-import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import androidx.annotation.NonNull;
 
 /**
  * Encoded-string-value = Text-string | Value-length Char-set Text-string
  */
 public class EncodedStringValue implements Cloneable {
-    private static final String TAG = "EncodedStringValue";
-    private static final boolean DEBUG = false;
-    private static final boolean LOCAL_LOGV = false;
 
     /**
      * The Char-set value.
@@ -71,12 +67,8 @@ public class EncodedStringValue implements Cloneable {
         this(CharacterSets.DEFAULT_CHARSET, data);
     }
     public EncodedStringValue(String data) {
-        try {
-            mData = data.getBytes(CharacterSets.DEFAULT_CHARSET_NAME);
-            mCharacterSet = CharacterSets.DEFAULT_CHARSET;
-        } catch (UnsupportedEncodingException e) {
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(TAG, "Default encoding must be supported.", e);
-        }
+        mData = data.getBytes(StandardCharsets.UTF_8);
+        mCharacterSet = CharacterSets.DEFAULT_CHARSET;
     }
 
     /**
@@ -139,15 +131,8 @@ public class EncodedStringValue implements Cloneable {
             try {
                 String name = CharacterSets.getMimeName(mCharacterSet);
                 return new String(mData, name);
-            } catch (UnsupportedEncodingException e) {
-                if (LOCAL_LOGV) {
-                    vip.mystery0.pixel.text.mms.vendor.ParserLog.v(TAG, e.getMessage(), e);
-                }
-                try {
-                    return new String(mData, CharacterSets.MIMENAME_ISO_8859_1);
-                } catch (UnsupportedEncodingException e2) {
-                    return new String(mData); // system default encoding.
-                }
+            } catch (UnsupportedEncodingException ignored) {
+                return new String(mData, StandardCharsets.ISO_8859_1);
             }
         }
     }
@@ -156,8 +141,7 @@ public class EncodedStringValue implements Cloneable {
      * Append to Text-string.
      *
      * @param textString the textString to append
-     * @throws NullPointerException if the text String is null
-     *                      or an IOException occurred.
+     * @throws NullPointerException 文本为空时抛出
      */
     public void appendTextString(byte[] textString) {
         if(null == textString) {
@@ -169,14 +153,8 @@ public class EncodedStringValue implements Cloneable {
             System.arraycopy(textString, 0, mData, 0, textString.length);
         } else {
             ByteArrayOutputStream newTextString = new ByteArrayOutputStream();
-            try {
-                newTextString.write(mData);
-                newTextString.write(textString);
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new NullPointerException(
-                        "appendTextString: failed when write a new Text-string");
-            }
+            newTextString.write(mData, 0, mData.length);
+            newTextString.write(textString, 0, textString.length);
 
             mData = newTextString.toByteArray();
         }
@@ -187,18 +165,11 @@ public class EncodedStringValue implements Cloneable {
      * @see java.lang.Object#clone()
      */
     @Override
-    public Object clone() throws CloneNotSupportedException {
-        int len = mData.length;
-        byte[] dstBytes = new byte[len];
-        System.arraycopy(mData, 0, dstBytes, 0, len);
-
-        try {
-            return new EncodedStringValue(mCharacterSet, dstBytes);
-        } catch (Exception e) {
-            vip.mystery0.pixel.text.mms.vendor.ParserLog.e(TAG, "failed to clone an EncodedStringValue: " + this);
-            e.printStackTrace();
-            throw new CloneNotSupportedException(e.getMessage());
-        }
+    @NonNull
+    public EncodedStringValue clone() throws CloneNotSupportedException {
+        EncodedStringValue copy = (EncodedStringValue) super.clone();
+        copy.mData = mData.clone();
+        return copy;
     }
 
     /**
@@ -229,10 +200,10 @@ public class EncodedStringValue implements Cloneable {
     public static EncodedStringValue[] extract(String src) {
         String[] values = src.split(";");
 
-        ArrayList<EncodedStringValue> list = new ArrayList<EncodedStringValue>();
-        for (int i = 0; i < values.length; i++) {
-            if (values[i].length() > 0) {
-                list.add(new EncodedStringValue(values[i]));
+        ArrayList<EncodedStringValue> list = new ArrayList<>();
+        for (String value : values) {
+            if (!value.isEmpty()) {
+                list.add(new EncodedStringValue(value));
             }
         }
 

@@ -75,7 +75,6 @@ import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailCustomizationViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailViewModel
 import vip.mystery0.pixel.text.viewmodel.ConversationListViewModel
-import vip.mystery0.pixel.text.viewmodel.MessageViewModel
 import vip.mystery0.pixel.text.viewmodel.KeywordSpamViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleSubmissionViewModel
 import vip.mystery0.pixel.text.viewmodel.SampleReportListViewModel
@@ -101,7 +100,7 @@ val appModule = module {
     single { vip.mystery0.pixel.text.mms.outgoing.MmsOutgoingProviderWriter(androidContext()) }
     single<vip.mystery0.pixel.text.mms.outgoing.MmsPlatformTransport> { vip.mystery0.pixel.text.mms.outgoing.AndroidMmsPlatformTransport() }
     single { vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel(androidContext(), get(), get(), get(), get(), get(), get()) }
+    viewModel { vip.mystery0.pixel.text.viewmodel.MmsComposerViewModel(androidApplication(), get(), get(), get(), get(), get()) }
 
     single { AppSettingsRepositoryImpl(androidContext()) }
     single<AppSettingsRepository> { get<AppSettingsRepositoryImpl>() }
@@ -195,7 +194,7 @@ val appModule = module {
         MessageMirrorSynchronizer(get(), get(), get()).apply {
             onMessageDeletionCommitted = { key ->
                 if (key.transport == MessageTransport.MMS) {
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    CoroutineScope(Dispatchers.IO).launch {
                         val outgoing = get<vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository>()
                         outgoing.all().filter { it.sourceId == key.sourceId }.forEach { outgoing.markDeleted(it.requestId) }
                         get<vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator>().scheduleRecovery()
@@ -205,7 +204,6 @@ val appModule = module {
                 get<MmsPlaybackController>().onMessageDeleted(key)
             }
             onMessageDeleted = { key ->
-                get<MmsContentRepositoryImpl>().invalidate(key)
                 val id = if (key.transport == MessageTransport.SMS) key.sourceId else -key.sourceId
                 get<SpamRepository>().delete(setOf(id))
                 if (key.transport == MessageTransport.SMS) {
@@ -237,7 +235,7 @@ val appModule = module {
     }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
-        MirrorChangeObserver(androidContext(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
+        MirrorChangeObserver(androidContext(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
             onDirty = { get<MessageMirrorScheduler>().schedule() }
         }
     }
@@ -246,7 +244,7 @@ val appModule = module {
         vip.mystery0.pixel.text.data.repository.PersonalLearningRepositoryImpl(get(), get(), get(), get(), get(),
             refreshKeywords = { ids ->
                 // 延迟解析关键词仓库，避免训练仓库和规则仓库互相构造。
-                ids.filter { it > 0 }.forEach { id -> get<KeywordSpamRepository>().updateMessageMatch(id, 0, "") }
+                ids.filter { it > 0 }.forEach { id -> get<KeywordSpamRepository>().updateMessageMatch(id) }
             })
     }
     single<vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningRepository> {
@@ -301,11 +299,9 @@ val appModule = module {
             get(),
             get(),
             get(),
-            get(),
             androidContext()
         )
     }
-    viewModel { MessageViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel(get()) }
     viewModel { vip.mystery0.pixel.text.viewmodel.MmsContentViewModel(get()) }
     viewModel { KeywordSpamViewModel(get(), get()) }
@@ -313,7 +309,7 @@ val appModule = module {
     viewModel { ConversationListViewModel(get(), get(), get(), get()) }
     viewModel { ArchivedConversationListViewModel(get()) }
     viewModel { SpamConversationListViewModel(get(), get(), get(), androidContext()) }
-    viewModel { ConversationDetailViewModel(get(), get(), get(), androidContext(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ConversationDetailViewModel(get(), get(), androidApplication(), get(), get(), get(), get(), get()) }
     viewModel {
         ConversationDetailCustomizationViewModel(get(), get(), get())
     }

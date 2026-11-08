@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.data.repository
 
 import android.content.ComponentName
 import android.content.Context
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -92,6 +93,8 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
         )
     }
 
+    // 入口切换失败时依赖 commit 结果回滚，不能丢弃持久化状态。
+    @SuppressLint("UseKtx")
     private fun persist(identity: AppIdentity): Boolean = preferences.edit()
         .putString(KEY_NAME, identity.displayName.storageValue)
         .putString(KEY_ICON, identity.iconStyle.storageValue)

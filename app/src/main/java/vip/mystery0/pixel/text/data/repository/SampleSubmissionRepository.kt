@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.data.repository
 
 import android.content.Context
+import android.annotation.SuppressLint
 import android.provider.Settings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -24,6 +25,8 @@ class SampleSubmissionRepository(
     private val submitMutex = Mutex()
     private var submitRetryAt = 0L
 
+    // 本人上报记录协议使用应用签名范围内的 ANDROID_ID，不读取硬件标识。
+    @SuppressLint("HardwareIds")
     suspend fun identity(): SampleReportIdentity {
         val id = try {
             Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID).orEmpty()

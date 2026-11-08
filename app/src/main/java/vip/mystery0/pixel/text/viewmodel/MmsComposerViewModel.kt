@@ -1,9 +1,9 @@
 package vip.mystery0.pixel.text.viewmodel
 
-import android.content.Context
+import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -21,14 +21,13 @@ import vip.mystery0.pixel.text.util.SimInfoProvider
 
 /** 页面只编辑持久草稿与接纳命令；平台发送生命周期由 Worker/Receiver 管理。 */
 class MmsComposerViewModel(
-    private val context: Context,
+    application: Application,
     private val savedState: SavedStateHandle,
     private val repository: OutgoingMmsRepository,
     private val preparer: MmsAttachmentPreparer,
-    private val payloads: MmsPayloadStore,
     private val coordinator: MmsSendCoordinator,
     private val smsSender: vip.mystery0.pixel.text.sms.SmsSendCoordinator,
-) : ViewModel() {
+) : AndroidViewModel(application) {
     data class State(val draft: MmsDraft? = null, val busy: Boolean = false, val error: String? = null,
         val prepared: MmsSendSnapshot? = null, val pduBytes: Int? = null, val accepted: Boolean = false,
         val sims: List<SimInfo> = emptyList(), val possibleDuplicateOf: String? = null, val importBlocked: Boolean = false, val unsaved: Boolean = false, val discarded: Boolean = false)
@@ -52,13 +51,13 @@ class MmsComposerViewModel(
                     else -> repository.openDraft(recipient)
                 }
                 savedState["mmsDraftId"] = draft.id
-                val sims = SimInfoProvider.getActiveSimList(context)
+                val sims = SimInfoProvider.getActiveSimList(getApplication())
                 // 已存的无效订阅绝不换卡；仅全新草稿应用有效系统默认或唯一激活卡。
                 if (draft.revision == 0L && draft.subscriptionId < 0) {
                     val default = SimInfoProvider.getDefaultSmsSubscriptionId()
                     val subId = preferredSubId ?: (sims.firstOrNull { it.subscriptionId == default }?.subscriptionId
                         ?: sims.singleOrNull()?.subscriptionId ?: -1)
-                    draft = repository.saveDraft(draft.copy(body = body, subject = subject, subscriptionId = subId, importError = inputError?.takeIf { it.contains("附件") }), draft.revision) ?: draft
+                    draft = repository.saveDraft(draft.copy(body = body, subject = subject, subscriptionId = subId, importError = inputError?.takeIf { it.contains("附件") }), 0L) ?: draft
                 }
                 mutableState.value = State(draft = draft, sims = sims, error = inputError,
                     possibleDuplicateOf = draft.possibleDuplicateOf,
@@ -71,7 +70,7 @@ class MmsComposerViewModel(
     }
     fun refreshSims() {
         viewModelScope.launch {
-            val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(context) }
+            val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(getApplication()) }
             val current = mutableState.value
             mutableState.value = current.copy(sims = sims,
                 prepared = if (current.draft?.subscriptionId in sims.map { it.subscriptionId }) current.prepared else null)
@@ -137,7 +136,7 @@ class MmsComposerViewModel(
                 }
             }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) {
+            catch (_: Exception) {
                 mutableState.value = mutableState.value.copy(busy = false, importBlocked = true,
                     error = "附件尚未保存，请检查存储空间后重新选择；已有内容已保留")
             }
@@ -199,7 +198,7 @@ class MmsComposerViewModel(
                 mutableState.value = mutableState.value.copy(busy = true, error = null)
                 try {
                     val recipient = MmsRecipient.normalize(latest.recipientAddress) ?: throw MmsSendException("请确认一个有效电话号码")
-                    val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(context) }
+                    val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(getApplication()) }
                     if (sims.none { it.subscriptionId == latest.subscriptionId }) throw MmsSendException("所选 SIM 已失效，请重新选卡")
                     withContext(kotlinx.coroutines.NonCancellable) {
                         smsSender.send(recipient, latest.body.trim(), latest.subscriptionId, draftKey = "${latest.id}:${latest.revision}")
@@ -259,7 +258,6 @@ class MmsComposerViewModel(
             else onClosed()
         }
     }
-    fun cancelPreparation() { work?.cancel() }
     fun acknowledgeImportRemoval() { edit { it.copy(importError = null) } }
     private fun safeError(error: Exception) = (error as? MmsSendException)?.userMessage ?: "彩信准备失败，草稿已保留，请重试"
 }

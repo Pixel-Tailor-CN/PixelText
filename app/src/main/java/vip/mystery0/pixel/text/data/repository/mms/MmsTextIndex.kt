@@ -78,7 +78,7 @@ class MmsTextIndexer(
             var previousInputs: List<Pair<SourceMessageKey, String>>? = null
             var previousMissing = emptySet<SourceMessageKey>()
             mirror.observeMmsMessages().map { rows ->
-                rows.map { snapshot -> ensureActive(); snapshot to mmsContentFingerprint(snapshot) } }
+                rows.map { snapshot -> currentCoroutineContext().ensureActive(); snapshot to mmsContentFingerprint(snapshot) } }
                 .transform { rows ->
                     val inputs = rows.map { it.first.key to it.second }
                     val missing = rows.filter { it.first.mmsSummary == null }.mapTo(mutableSetOf()) { it.first.key }
@@ -91,7 +91,7 @@ class MmsTextIndexer(
                 }
                 .collectLatest { rows ->
                     for ((snapshot, fingerprint) in rows) {
-                        ensureActive()
+                        currentCoroutineContext().ensureActive()
                         try {
                             indexSnapshot(snapshot, fingerprint, strict = false)
                         } catch (e: CancellationException) {
@@ -118,7 +118,7 @@ class MmsTextIndexer(
         val rows = dao.initializationBatch("MMS", afterLocalId, upperLocalId, limit)
         var checkpoint = afterLocalId
         var unavailable = 0
-        for (row in rows) {
+        rows.forEach { row ->
             ensureActive()
             if (!row.message.structureComplete) {
                 synchronizer.refreshInitializationMessage(
@@ -136,7 +136,7 @@ class MmsTextIndexer(
             }
             // 取消/进程死亡后的 COPYING 由既有恢复逻辑释放；活跃复制不会被重置。
             if (row.attachments.any { it.state == "COPYING" }) copier.recover()
-            for (attachment in row.attachments) {
+            row.attachments.forEach { attachment ->
                 if (attachment.state in setOf("SOURCE_PRESENT", "COPY_FAILED", "COPYING") ||
                     attachment.state == "SOURCE_UNREADABLE" && attachment.error != "source_unreadable"
                 ) {
@@ -201,8 +201,7 @@ class MmsTextIndexer(
             throw IOException("mms_text_not_ready")
         }
         return database.withTransaction {
-            val latest = mirror.getMessage(snapshot.key)
-            if (latest == null) return@withTransaction true
+            val latest = mirror.getMessage(snapshot.key) ?: return@withTransaction true
             if (mmsContentFingerprint(latest) != fingerprint) return@withTransaction false
             dao.putMmsText(
                 MmsTextIndexEntity(

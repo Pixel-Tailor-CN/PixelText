@@ -11,7 +11,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -28,8 +27,6 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 import vip.mystery0.pixel.text.ui.message.MirrorSyncBanner
-import vip.mystery0.pixel.text.ui.message.cards.MmsDownloadCard
-import vip.mystery0.pixel.text.ui.message.cards.MmsImageCard
 import vip.mystery0.pixel.text.viewmodel.MirrorMessageDetailViewModel
 
 @Composable
@@ -84,7 +81,7 @@ fun MirrorMessageDetailScreen(key: SourceMessageKey, onBack: () -> Unit,
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     if (key.transport == vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS) {
-                        content?.let { vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, false, true, onOpenPart, detailMode = true) }
+                        content?.let { vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected = false, interactionEnabled = true, onOpenPart, detailMode = true) }
                             ?: Text("正在读取彩信")
                     } else current.body?.let { SelectionContainer { Text(it) } }
 

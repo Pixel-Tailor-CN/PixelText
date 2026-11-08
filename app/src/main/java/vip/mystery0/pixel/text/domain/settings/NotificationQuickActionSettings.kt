@@ -8,11 +8,6 @@ enum class NotificationQuickActionType(val storageValue: String) {
     COPY_CODE("copy_code"),
     REPLY("reply");
 
-    companion object {
-        fun fromStorageValue(value: String?): NotificationQuickActionType {
-            return entries.firstOrNull { it.storageValue == value } ?: MARK_READ
-        }
-    }
 }
 
 data class NotificationQuickActionConfig(

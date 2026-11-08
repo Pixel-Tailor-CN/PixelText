@@ -203,6 +203,8 @@ private fun ContactLink(value: String, color: Color, enabled: Boolean, openLabel
 private fun MmsContactModel.hasFields() = name != null || organization != null || phones.isNotEmpty() || emails.isNotEmpty() || addresses.isNotEmpty() || title != null || notes != null
 
 private fun copyContactText(context: Context, value: String, feedback: (String) -> Unit) {
+    // SDK 的 getter 可空而 setter 非空，Kotlin 无法使用属性赋值。
+    @Suppress("UsePropertyAccessSyntax")
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("联系人", value))
     feedback("已复制")
 }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest

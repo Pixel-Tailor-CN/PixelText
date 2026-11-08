@@ -111,7 +111,6 @@ fun MmsHtmlViewer(
                                     blockNetworkImage = false
                                     mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                                     domStorageEnabled = false
-                                    databaseEnabled = false
                                     cacheMode = WebSettings.LOAD_NO_CACHE
                                     setSupportMultipleWindows(false)
                                     mediaPlaybackRequiresUserGesture = true

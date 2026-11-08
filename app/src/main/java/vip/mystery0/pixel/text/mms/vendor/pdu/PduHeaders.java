@@ -154,7 +154,7 @@ public class PduHeaders {
     public static final int MMS_VERSION_1_3                 = ((1 << 4) | 3);
     public static final int MMS_VERSION_1_2                 = ((1 << 4) | 2);
     public static final int MMS_VERSION_1_1                 = ((1 << 4) | 1);
-    public static final int MMS_VERSION_1_0                 = ((1 << 4) | 0);
+    public static final int MMS_VERSION_1_0                 = (1 << 4);
 
     // Current version is 1.2.
     public static final int CURRENT_MMS_VERSION             = MMS_VERSION_1_2;
@@ -323,13 +323,13 @@ public class PduHeaders {
     /**
      * The map contains the value of all headers.
      */
-    private HashMap<Integer, Object> mHeaderMap = null;
+    private final HashMap<Integer, Object> mHeaderMap;
 
     /**
      * Constructor of PduHeaders.
      */
     public PduHeaders() {
-        mHeaderMap = new HashMap<Integer, Object>();
+        mHeaderMap = new HashMap<>();
     }
 
     /**
@@ -358,7 +358,7 @@ public class PduHeaders {
      */
     protected void setOctet(int value, int field)
             throws InvalidHeaderValueException{
-        /**
+        /*
          * Check whether this field can be set for specific
          * header and check validity of the field.
          */
@@ -509,12 +509,10 @@ public class PduHeaders {
      *
      * @param value the value
      * @param field the field
-     * @return the TextString value of the pdu header
-     *          with specified header field
      * @throws NullPointerException if the value is null.
      */
     protected void setTextString(byte[] value, int field) {
-        /**
+        /*
          * Check whether this field can be set for specific
          * header and check validity of the field.
          */
@@ -560,6 +558,8 @@ public class PduHeaders {
      * @return the EncodeStringValue array of the pdu header
      *          with specified header field
      */
+    // 编码字符串列表仅由本类的同类型写入入口维护。
+    @SuppressWarnings("unchecked")
     public EncodedStringValue[] getEncodedStringValues(int field) {
         ArrayList<EncodedStringValue> list =
                 (ArrayList<EncodedStringValue>) mHeaderMap.get(field);
@@ -575,12 +575,10 @@ public class PduHeaders {
      *
      * @param value the value
      * @param field the field
-     * @return the EncodedStringValue value of the pdu header
-     *          with specified header field
      * @throws NullPointerException if the value is null.
      */
     protected void setEncodedStringValue(EncodedStringValue value, int field) {
-        /**
+        /*
          * Check whether this field can be set for specific
          * header and check validity of the field.
          */
@@ -612,12 +610,10 @@ public class PduHeaders {
      *
      * @param value the value
      * @param field the field
-     * @return the EncodedStringValue value array of the pdu header
-     *          with specified header field
      * @throws NullPointerException if the value is null.
      */
     protected void setEncodedStringValues(EncodedStringValue[] value, int field) {
-        /**
+        /*
          * Check whether this field can be set for specific
          * header and check validity of the field.
          */
@@ -635,10 +631,7 @@ public class PduHeaders {
                 throw new RuntimeException("Invalid header field!");
         }
 
-        ArrayList<EncodedStringValue> list = new ArrayList<EncodedStringValue>();
-        for (int i = 0; i < value.length; i++) {
-            list.add(value[i]);
-        }
+        ArrayList<EncodedStringValue> list = new ArrayList<>(java.util.Arrays.asList(value));
         mHeaderMap.put(field, list);
     }
 
@@ -649,6 +642,8 @@ public class PduHeaders {
      * @param field the field
      * @throws NullPointerException if the value is null.
      */
+    // 字段校验限定 TO、CC、BCC；这些字段只保存编码字符串列表。
+    @SuppressWarnings("unchecked")
     protected void appendEncodedStringValue(EncodedStringValue value,
                                     int field) {
         if (null == value) {
@@ -667,7 +662,7 @@ public class PduHeaders {
         ArrayList<EncodedStringValue> list =
             (ArrayList<EncodedStringValue>) mHeaderMap.get(field);
         if (null == list) {
-            list  = new ArrayList<EncodedStringValue>();
+            list  = new ArrayList<>();
         }
         list.add(value);
         mHeaderMap.put(field, list);
@@ -687,7 +682,7 @@ public class PduHeaders {
             return -1;
         }
 
-        return longInteger.longValue();
+        return longInteger;
     }
 
     /**
@@ -697,7 +692,7 @@ public class PduHeaders {
      * @param field the field
      */
     protected void setLongInteger(long value, int field) {
-        /**
+        /*
          * Check whether this field can be set for specific
          * header and check validity of the field.
          */

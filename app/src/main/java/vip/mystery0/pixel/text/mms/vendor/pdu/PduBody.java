@@ -17,30 +17,29 @@
 
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
-import android.os.Build;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Vector;
 
 public class PduBody {
-    private Vector<PduPart> mParts = null;
+    private final Vector<PduPart> mParts;
 
-    private Map<String, PduPart> mPartMapByContentId = null;
-    private Map<String, PduPart> mPartMapByContentLocation = null;
-    private Map<String, PduPart> mPartMapByName = null;
-    private Map<String, PduPart> mPartMapByFileName = null;
+    private final Map<String, PduPart> mPartMapByContentId;
+    private final Map<String, PduPart> mPartMapByContentLocation;
+    private final Map<String, PduPart> mPartMapByName;
+    private final Map<String, PduPart> mPartMapByFileName;
 
     /**
      * Constructor.
      */
     public PduBody() {
-        mParts = new Vector<PduPart>();
+        mParts = new Vector<>();
 
-        mPartMapByContentId = new HashMap<String, PduPart>();
-        mPartMapByContentLocation  = new HashMap<String, PduPart>();
-        mPartMapByName = new HashMap<String, PduPart>();
-        mPartMapByFileName = new HashMap<String, PduPart>();
+        mPartMapByContentId = new HashMap<>();
+        mPartMapByContentLocation  = new HashMap<>();
+        mPartMapByName = new HashMap<>();
+        mPartMapByFileName = new HashMap<>();
     }
 
     private void putPartToMaps(PduPart part) {
@@ -163,8 +162,7 @@ public class PduBody {
     /**
      * Get pdu part by Content-Location. Content-Location of part is
      * the same as filename and name(param of content-type).
-     *
-     * @param fileName the value of filename.
+     * @param contentLocation 内容位置
      * @return the pdu part.
      */
     public PduPart getPartByContentLocation(String contentLocation) {
@@ -173,8 +171,7 @@ public class PduBody {
 
     /**
      * Get pdu part by name.
-     *
-     * @param fileName the value of filename.
+     * @param name 内容名称
      * @return the pdu part.
      */
     public PduPart getPartByName(String name) {
@@ -183,8 +180,7 @@ public class PduBody {
 
     /**
      * Get pdu part by filename.
-     *
-     * @param fileName the value of filename.
+     * @param filename 文件名称
      * @return the pdu part.
      */
     public PduPart getPartByFileName(String filename) {

@@ -1,6 +1,5 @@
 package vip.mystery0.pixel.text.smartspacer
 
-import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -68,7 +67,7 @@ class UnreadSmsComplicationConfigActivity : ComponentActivity() {
                             UnreadSmsComplicationProvider::class.java,
                             smartspacerId
                         )
-                        setResult(Activity.RESULT_OK)
+                        setResult(RESULT_OK)
                         finish()
                     }
                 )
@@ -121,19 +120,16 @@ private fun UnreadSmsComplicationConfigScreen(
             Spacer(modifier = Modifier.size(0.dp))
             UnreadSmsComplicationSwitchRow(
                 title = "正常短信",
-                summary = "",
                 checked = includeNormalMessages,
                 onCheckedChange = { includeNormalMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
                 title = "骚扰短信",
-                summary = "",
                 checked = includeSpamMessages,
                 onCheckedChange = { includeSpamMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
                 title = "归档短信",
-                summary = "",
                 checked = includeArchivedMessages,
                 onCheckedChange = { includeArchivedMessages = it }
             )
@@ -167,7 +163,6 @@ private fun UnreadSmsComplicationConfigScreen(
 @Composable
 private fun UnreadSmsComplicationSwitchRow(
     title: String,
-    summary: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -190,11 +185,6 @@ private fun UnreadSmsComplicationSwitchRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium
-                )
-                if (summary.isNotBlank()) Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Row(

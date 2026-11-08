@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.mms.outgoing
 
+import androidx.core.graphics.scale
+import androidx.core.graphics.createBitmap
+import java.util.concurrent.atomic.AtomicReference
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -29,7 +32,7 @@ class MmsAttachmentPreparer(
     private val payloadStore: MmsPayloadStore,
 ) {
     suspend fun importAttachment(uri: Uri): MmsAttachment {
-        var ownedResult: File? = null
+        val ownedResult = AtomicReference<File?>()
         try {
             return withContext(Dispatchers.IO) {
                 if (uri.scheme != "content" || uri.authority.isNullOrBlank()) throw MmsSendException("只支持通过系统选择器选择的附件")
@@ -49,7 +52,7 @@ class MmsAttachmentPreparer(
                     val declaredMime = normalizeMime(context.contentResolver.getType(uri))
                     original = context.contentResolver.openInputStream(uri)?.use { payloadStore.importOriginal(it) }
                         ?: throw MmsSendException("无法打开附件，请重新选择")
-                    ownedResult = original
+                    ownedResult.set(original)
                     currentCoroutineContext().ensureActive()
                     val magicMime = sniffImageMime(original)
                     var mime = magicMime ?: declaredMime ?: "application/octet-stream"
@@ -69,7 +72,7 @@ class MmsAttachmentPreparer(
             }
         } catch (exception: CancellationException) {
             // withContext 返回调度器时也可能丢弃结果，不能遗留刚创建的原件。
-            ownedResult?.delete()
+            ownedResult.get()?.delete()
             throw exception
         }
     }
@@ -84,7 +87,7 @@ class MmsAttachmentPreparer(
     }
 
     suspend fun prepare(attachment: MmsAttachment, policy: MmsSendPolicy, budget: Int): MmsAttachment {
-        var ownedResult: File? = null
+        val ownedResult = AtomicReference<File?>()
         try {
             return withContext(Dispatchers.IO) {
                 val maxBytes = minOf(budget, policy.maxMessageBytes, MmsPayloadStore.MAX_PDU_BYTES)
@@ -129,7 +132,7 @@ class MmsAttachmentPreparer(
                     }
                     currentCoroutineContext().ensureActive()
                     prepared = payloadStore.writePrepared(encoded)
-                    ownedResult = prepared
+                    ownedResult.set(prepared)
                     currentCoroutineContext().ensureActive()
                     attachment.copy(preparedPath = prepared.path, preparedMime = preparedMime,
                         preparedSize = encoded.size.toLong(), preparedSha256 = payloadStore.sha256(encoded), preparationNote = note, error = null)
@@ -143,7 +146,7 @@ class MmsAttachmentPreparer(
                 }
             }
         } catch (exception: CancellationException) {
-            ownedResult?.delete()
+            ownedResult.get()?.delete()
             throw exception
         }
     }
@@ -167,7 +170,7 @@ class MmsAttachmentPreparer(
         throw MmsSendException("无法读取图片")
     }
 
-    private data class EncodedImage(val bytes: ByteArray, val mime: String, val note: String)
+    private class EncodedImage(val bytes: ByteArray, val mime: String, val note: String)
 
     private suspend fun encodeStaticImage(file: File, policy: MmsSendPolicy, budget: Int): EncodedImage {
         var bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
@@ -188,7 +191,7 @@ class MmsAttachmentPreparer(
                 compressBounded(bitmap, Bitmap.CompressFormat.PNG, 100, budget)?.let {
                     return EncodedImage(it, "image/png", "已按所选 SIM 调整图片尺寸和方向，移除原始元数据，保留透明背景")
                 }
-                val opaque = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+                val opaque = createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
                 try {
                     Canvas(opaque).apply { drawColor(Color.WHITE); drawBitmap(bitmap, 0f, 0f, null) }
                 } catch (exception: Exception) {
@@ -210,7 +213,7 @@ class MmsAttachmentPreparer(
                 if (round == 3 || maxOf(bitmap.width, bitmap.height) <= 160) {
                     throw MmsSendException("图片压缩后仍超出预算，请减少附件或更换图片")
                 }
-                val smaller = Bitmap.createScaledBitmap(bitmap, maxOf(1, bitmap.width * 3 / 4), maxOf(1, bitmap.height * 3 / 4), true)
+                val smaller = bitmap.scale(maxOf(1, bitmap.width * 3 / 4), maxOf(1, bitmap.height * 3 / 4))
                 bitmap.recycle()
                 bitmap = smaller
             }

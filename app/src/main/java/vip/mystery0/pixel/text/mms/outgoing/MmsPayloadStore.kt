@@ -12,12 +12,16 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** 附件不进入缓存；只有独立 PDU 目录可经 FileProvider 对外授权。 */
+// 发送预算只计实际可用空间并保留余量，不把可回收缓存计入可用容量。
+@android.annotation.SuppressLint("UsableSpace")
 class MmsPayloadStore(context: Context) {
     private val attachments = File(context.noBackupFilesDir, "mms-outgoing").canonicalFile
     private val pduDirectory = File(context.filesDir, "mms-send-pdu").canonicalFile
     // 当前进程写入但尚未入库的文件不能当孤儿；重启后只有数据库引用继续保护。
     private val currentProcessFiles = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    // 唯一调用方在 Dispatchers.IO 内读取流；不增加返回调度边界，避免取消时丢失原件清理句柄。
+    @Suppress("BlockingMethodInNonBlockingContext")
     suspend fun importOriginal(input: InputStream): File {
         val directory = directory(attachments)
         val target = File(directory, "original-${UUID.randomUUID()}.bin")
@@ -117,9 +121,9 @@ class MmsPayloadStore(context: Context) {
     fun deleteOrphan(path: String): Boolean {
         val file = File(path)
         val parent = file.parentFile?.canonicalFile ?: return false
-        if (path in currentProcessFiles || file.absoluteFile != file.canonicalFile ||
-            parent !in setOf(attachments.canonicalFile, pduDirectory.canonicalFile)) return false
-        return !file.exists() || file.delete()
+        return path !in currentProcessFiles && file.absoluteFile == file.canonicalFile &&
+            parent in setOf(attachments.canonicalFile, pduDirectory.canonicalFile) &&
+            (!file.exists() || file.delete())
     }
 
     private fun directory(file: File): File {

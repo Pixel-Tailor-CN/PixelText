@@ -39,7 +39,7 @@ class PickedPhoneSourceImpl(
                     null
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

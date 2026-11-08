@@ -1,8 +1,8 @@
 package vip.mystery0.pixel.text.mms.outgoing
 
+import androidx.core.net.toUri
 import android.content.ContentValues
 import android.content.Context
-import android.net.Uri
 import android.provider.Telephony
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduHeaders
 import java.security.MessageDigest
@@ -13,8 +13,8 @@ class MmsProviderConflict : Exception()
 /** 只管理有私有请求身份的单人 SendReq；从不写 OUTBOX，不接管历史失败消息。 */
 class MmsOutgoingProviderWriter(private val context: Context) {
     private val resolver get() = context.contentResolver
-    private val root = Uri.parse("content://mms")
-    private fun uri(id: Long) = Uri.parse("content://mms/$id")
+    private val root = "content://mms".toUri()
+    private fun uri(id: Long) = "content://mms/$id".toUri()
     private data class Header(val id: Long, val transaction: String, val subId: Int, val type: Int, val subject: String, val date: Long, val contentType: String, val box: Int)
     // 查询为空与 Cursor 不可用必须区分；前者才证明已删除。
     private fun header(id: Long): Header? {
@@ -82,7 +82,7 @@ class MmsOutgoingProviderWriter(private val context: Context) {
         return resolver.insert(root, values)?.lastPathSegment?.toLongOrNull() ?: error("mms insert unavailable")
     }
     private fun addressRows(id: Long): List<Pair<Int, String>> {
-        val cursor = resolver.query(Uri.parse("content://mms/$id/addr"), arrayOf("type", "address"), null, null, null)
+        val cursor = resolver.query("content://mms/$id/addr".toUri(), arrayOf("type", "address"), null, null, null)
             ?: error("mms address query unavailable")
         return cursor.use { c -> buildList { while (c.moveToNext()) add(c.getInt(0) to c.getString(1).orEmpty()) } }
     }
@@ -92,14 +92,14 @@ class MmsOutgoingProviderWriter(private val context: Context) {
         if (existing.any { it !in target } || existing.distinct().size != existing.size) throw MmsProviderConflict()
         target.filterNot { it in existing }.forEach { (type, value) ->
             ensureOwner()
-            resolver.insert(Uri.parse("content://mms/$id/addr"), ContentValues().apply {
+            resolver.insert("content://mms/$id/addr".toUri(), ContentValues().apply {
                 put("type", type); put("address", value); put("charset", 106)
             }) ?: error("mms address insert unavailable")
         }
     }
     private data class PartRow(val id: Long, val seq: Int, val mime: String, val cid: String, val location: String, val charset: Int, val text: String?)
     private fun parts(id: Long): List<PartRow> {
-        val cursor = resolver.query(Uri.parse("content://mms/$id/part"), arrayOf("_id", "seq", "ct", "cid", "cl", "chset", "text"), null, null, "seq ASC")
+        val cursor = resolver.query("content://mms/$id/part".toUri(), arrayOf("_id", "seq", "ct", "cid", "cl", "chset", "text"), null, null, "seq ASC")
             ?: error("mms part query unavailable")
         return cursor.use { c -> buildList { while (c.moveToNext()) add(PartRow(c.getLong(0), c.getInt(1), c.getString(2).orEmpty(), c.getString(3).orEmpty(), c.getString(4).orEmpty(), c.getInt(5), c.getString(6))) } }
     }
@@ -108,7 +108,7 @@ class MmsOutgoingProviderWriter(private val context: Context) {
     private fun metadataMatches(row: PartRow, index: Int, part: MmsPayloadPart): Boolean = row.seq == seq(index, part) &&
         row.mime == part.mimeType && row.cid == part.contentId && row.location == part.contentLocation && row.charset == part.charset
     private fun assertPartOwner(parentId: Long, partId: Long, index: Int, expected: MmsPayloadPart) {
-        val cursor = resolver.query(Uri.parse("content://mms/part/$partId"), arrayOf("mid", "seq", "ct", "cid", "cl", "chset"), null, null, null)
+        val cursor = resolver.query("content://mms/part/$partId".toUri(), arrayOf("mid", "seq", "ct", "cid", "cl", "chset"), null, null, null)
             ?: error("mms part identity query unavailable")
         cursor.use { c ->
             if (!c.moveToFirst() || c.getLong(0) != parentId) throw MmsProviderConflict()
@@ -118,7 +118,7 @@ class MmsOutgoingProviderWriter(private val context: Context) {
     }
     private fun readPart(row: PartRow, max: Int): ByteArray {
         if (row.mime in setOf("text/plain", "application/smil")) return row.text.orEmpty().toByteArray(Charsets.UTF_8)
-        return resolver.openInputStream(Uri.parse("content://mms/part/${row.id}"))?.use { input ->
+        return resolver.openInputStream("content://mms/part/${row.id}".toUri())?.use { input ->
             val output = java.io.ByteArrayOutputStream(minOf(max, 8192)); val buffer = ByteArray(8192)
             while (true) { val count = input.read(buffer); if (count < 0) break; if (output.size().toLong() + count > max) throw MmsProviderConflict(); output.write(buffer, 0, count) }
             output.toByteArray()
@@ -138,7 +138,7 @@ class MmsOutgoingProviderWriter(private val context: Context) {
             val partUri = if (row == null) {
                 // 不允许 Provider 将不可信名称用作磁盘路径。
                 val insertValues = ContentValues(values).apply { if (!inline(part)) remove("cl") }
-                resolver.insert(Uri.parse("content://mms/$id/part"), insertValues) ?: error("mms part insert unavailable")
+                resolver.insert("content://mms/$id/part".toUri(), insertValues) ?: error("mms part insert unavailable")
             } else {
                 // 插入binary part后尚未写回cl是本功能可恢复的中间态。
                 if (!metadataMatches(row, index, part) && !(row.location.isEmpty() && metadataMatches(row.copy(location = part.contentLocation), index, part))) throw MmsProviderConflict()
@@ -146,7 +146,7 @@ class MmsOutgoingProviderWriter(private val context: Context) {
                 val bytes = readPart(row, part.bytes.size)
                 if (bytes.size == part.bytes.size && !MessageDigest.isEqual(bytes, part.bytes)) throw MmsProviderConflict()
                 if (MessageDigest.isEqual(bytes, part.bytes) && metadataMatches(row, index, part)) return@forEachIndexed
-                Uri.parse("content://mms/part/${row.id}")
+                "content://mms/part/${row.id}".toUri()
             }
             ensureOwner()
             val partId = partUri.lastPathSegment?.toLongOrNull() ?: throw MmsProviderConflict()

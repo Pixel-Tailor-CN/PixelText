@@ -17,7 +17,6 @@
 
 package vip.mystery0.pixel.text.mms.vendor.pdu;
 
-import android.os.Build;
 
 import vip.mystery0.pixel.text.mms.vendor.InvalidHeaderValueException;
 

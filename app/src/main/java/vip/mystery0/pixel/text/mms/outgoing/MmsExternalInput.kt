@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.mms.outgoing
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 
@@ -18,7 +19,7 @@ data class MmsExternalInput(val recipient: String, val body: String, val subject
             val scheme = data?.scheme?.lowercase()
             val allowedScheme = scheme in setOf("sms", "smsto", "mms", "mmsto")
             val query = if (allowedScheme) data?.encodedSchemeSpecificPart?.substringAfter('?', "").orEmpty() else ""
-            val queryUri = Uri.parse("content://compose/?$query")
+            val queryUri = "content://compose/?$query".toUri()
             val rawAddress = if (allowedScheme) Uri.decode(data?.encodedSchemeSpecificPart?.substringBefore('?').orEmpty()).removePrefix("//") else ""
             val candidates = buildList {
                 if (rawAddress.isNotBlank()) add(rawAddress)
@@ -41,7 +42,7 @@ data class MmsExternalInput(val recipient: String, val body: String, val subject
             val declaredMime = intent.type?.substringBefore(';')?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
             val attachmentExpected = shares && (intent.action == Intent.ACTION_SEND_MULTIPLE || intent.hasExtra(Intent.EXTRA_STREAM) ||
                 data?.scheme in setOf("content", "file") || declaredMime.isNotEmpty() && declaredMime !in setOf("text/plain", "text/html"))
-            val uris = if (shares) buildList<Uri> {
+            val uris = if (shares) buildList {
                 if (intent.hasExtra(Intent.EXTRA_STREAM)) {
                     if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
                         val entries = intent.getParcelableArrayListExtra<android.os.Parcelable>(Intent.EXTRA_STREAM)

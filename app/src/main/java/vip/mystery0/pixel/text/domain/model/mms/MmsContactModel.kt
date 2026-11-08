@@ -17,4 +17,16 @@ data class MmsContactModel(
     /** 仅用于仓库在本消息中唯一匹配 CID/Content-Location。 */
     val photoReference: String? = null,
     val importWarning: String? = null,
-)
+) {
+    override fun equals(other: Any?): Boolean = this === other || other is MmsContactModel &&
+        name == other.name && organization == other.organization && phones == other.phones &&
+        emails == other.emails && addresses == other.addresses && title == other.title &&
+        notes == other.notes && photoPartId == other.photoPartId &&
+        photoBytes.contentEquals(other.photoBytes) && photoReference == other.photoReference &&
+        importWarning == other.importWarning
+
+    override fun hashCode(): Int = listOf(
+        name, organization, phones, emails, addresses, title, notes, photoPartId,
+        photoBytes?.contentHashCode(), photoReference, importWarning,
+    ).hashCode()
+}

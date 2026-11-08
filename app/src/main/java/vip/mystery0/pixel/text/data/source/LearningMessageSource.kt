@@ -14,24 +14,6 @@ class LearningMessageSource(
     private val resolver: ContentResolver,
     private val mirror: MessageMirrorRepository? = null,
 ) {
-    fun threadIdsByRecent(ids: Collection<Long>): List<Long> {
-        val dates = mutableMapOf<Long, Long>()
-        for (mms in listOf(false, true)) {
-            val sourceIds = ids.filter { if (mms) it < 0 else it > 0 }.map { if (mms) -it else it }
-            for (batch in sourceIds.chunked(500)) {
-                resolver.query(if (mms) Telephony.Mms.CONTENT_URI else Telephony.Sms.CONTENT_URI,
-                    arrayOf("thread_id", "date"), "_id IN (${batch.joinToString(",") { "?" }})",
-                    batch.map(Long::toString).toTypedArray(), null)?.use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val timestamp = cursor.getLong(1) * if (mms) 1000L else 1L
-                        dates.merge(cursor.getLong(0), timestamp, ::maxOf)
-                    }
-                }
-            }
-        }
-        return dates.entries.sortedByDescending { it.value }.map { it.key }
-    }
-
     suspend fun keys(ids: Collection<Long>): Map<Long, LearningMessageKey> = buildMap {
         for (batch in ids.filter { it > 0 }.chunked(500)) {
             resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id", "address", "date", "body"),

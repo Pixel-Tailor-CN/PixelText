@@ -58,7 +58,7 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (error: SecurityException) {
+        } catch (_: SecurityException) {
             failure("permission_required", InitializationStatus.WAITING_PERMISSION)
             Result.failure()
         } catch (error: Exception) {

@@ -30,7 +30,8 @@ data class LearningSample(val id: String, val text: String, val label: LearningL
 data class LearningSnapshot(val revision: Long, val samples: List<LearningSample>)
 data class LearningState(val revision: Long = 0, val status: LearningStatus = LearningStatus.IDLE,
     val sampleCount: Int = 0, val error: String? = null, val hasActiveParameters: Boolean = false)
-data class PersonalParameters(val identity: String, val generation: Long, val payload: FloatArray)
+/** 参数数组按独立快照持有，有效性由模型身份和代次判断。 */
+class PersonalParameters(val identity: String, val generation: Long, val payload: FloatArray)
 
 interface PersonalLearningRepository {
     fun observeSamples(): Flow<List<LearningSample>>
