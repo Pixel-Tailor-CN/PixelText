@@ -58,6 +58,9 @@ import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Star
+import vip.mystery0.pixel.text.util.openAppReview
+import vip.mystery0.pixel.text.viewmodel.EngagementPromptViewModel
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Lock
@@ -157,6 +160,7 @@ private enum class AdvancedDataAction(val title: String, val description: String
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel(),
+    engagementPromptViewModel: EngagementPromptViewModel = koinViewModel(),
     keywordSpamViewModel: KeywordSpamViewModel = koinViewModel(),
     backupViewModel: BackupViewModel = koinViewModel(),
     whitelistViewModel: SenderWhitelistViewModel = koinViewModel(),
@@ -816,12 +820,26 @@ fun SettingsScreen(
                 },
             )))
             add(SettingsSection("about_community", "社区与帮助改进", listOf(
+                SettingsEntry("app_review") {
+                    Preference(
+                        external = true,
+                        title = { Text("评价应用") },
+                        icon = { Icon(Icons.Rounded.Star, contentDescription = null) },
+                        onClick = {
+                            engagementPromptViewModel.dismissThen {
+                                if (!context.openAppReview()) {
+                                    Toast.makeText(context, "无法打开 Google Play，请稍后重试", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                    )
+                },
                 SettingsEntry("developer_support") {
                     Preference(
                         title = { Text("支持开发者") },
                         summary = { Text("自愿赞助，支持持续维护") },
                         icon = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
-                        onClick = onNavigateToDeveloperSupport,
+                        onClick = { engagementPromptViewModel.dismissThen(onNavigateToDeveloperSupport) },
                     )
                 },
                 SettingsEntry("pixel_tailor") {

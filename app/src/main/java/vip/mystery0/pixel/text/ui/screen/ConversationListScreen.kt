@@ -88,6 +88,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -107,6 +108,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import vip.mystery0.pixel.text.ui.component.EngagementPromptCard
+import vip.mystery0.pixel.text.ui.component.AppEmptyState
+import vip.mystery0.pixel.text.viewmodel.EngagementPromptViewModel
+import vip.mystery0.pixel.text.util.openAppReview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -150,10 +156,19 @@ fun ConversationListScreen(
     onNavigateToArchive: () -> Unit,
     onNavigateToSpam: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToDeveloperSupport: () -> Unit = {},
+    allowEngagementPrompt: Boolean = true,
+    engagementPromptViewModel: EngagementPromptViewModel = koinViewModel(),
     onScrollDirectionChanged: (isScrollingDown: Boolean) -> Unit = {},
     onFloatingActionButtonVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val promptEntryToken by engagementPromptViewModel.entryToken.collectAsState()
+    val promptVisible by engagementPromptViewModel.visible.collectAsState()
+    LifecycleResumeEffect(allowEngagementPrompt) {
+        engagementPromptViewModel.prepareEntry(allowEngagementPrompt)
+        onPauseOrDispose { engagementPromptViewModel.suspendEntry() }
+    }
     val appDisplayName = currentAppDisplayName()
     val showDebugMenu = isDebugModeEnabled()
     var hasPermission by remember {
@@ -293,7 +308,7 @@ fun ConversationListScreen(
                 ?: -1
             if (
                 previousFirstThreadIndex > 0 &&
-                listState.firstVisibleItemIndex == previousFirstThreadIndex
+                listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key == previousFirstThreadId
             ) {
                 listState.scrollToItem(0)
             }
@@ -306,6 +321,35 @@ fun ConversationListScreen(
     var transientSnackbarJob by remember { mutableStateOf<Job?>(null) }
     var showMenuSheet by remember { mutableStateOf(false) }
     var deleteCandidateThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    val promptAllowedNow = allowEngagementPrompt && hasPermission && !selectionMode &&
+        !showReadSmsPermissionDialog && !showMenuSheet && deleteCandidateThreadIds.isEmpty() && markAllReadProgress == null &&
+        (initialization?.isCurrent != false) && uiState is ConversationListUiState.Success
+    LaunchedEffect(promptEntryToken, promptAllowedNow) {
+        if (promptEntryToken > 0 && promptAllowedNow) engagementPromptViewModel.showIfEligible()
+    }
+    val showPrompt = promptVisible && promptAllowedNow
+    LaunchedEffect(showPrompt, listState) {
+        if (showPrompt) snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.any { it.key == "engagement_prompt" && it.size > 0 }
+        }.collect { inViewport ->
+            if (inViewport) engagementPromptViewModel.confirmShown()
+        }
+    }
+    val promptCard: @Composable () -> Unit = {
+        EngagementPromptCard(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            onDismiss = { engagementPromptViewModel.dismissThen() },
+            onReview = {
+                engagementPromptViewModel.dismissThen {
+                    if (!context.openAppReview()) {
+                        Toast.makeText(context, "无法打开 Google Play，请稍后重试", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onSupport = { engagementPromptViewModel.dismissThen(onNavigateToDeveloperSupport) },
+        )
+    }
 
     LaunchedEffect(hasPermission, selectionMode) {
         onFloatingActionButtonVisibilityChanged(hasPermission && !selectionMode)
@@ -469,24 +513,14 @@ fun ConversationListScreen(
 
                         is ConversationListUiState.Success -> {
                             if (state.conversations.isEmpty()) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                                    ) {
-                                        Image(
-                                            painter = painterResource(R.drawable.illustration_conversation_empty),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(220.dp)
-                                        )
-                                        Text(
-                                            "暂无会话",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                if (showPrompt) {
+                                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                                        item(key = "engagement_prompt") { promptCard() }
+                                        item(key = "empty_conversations") { AppEmptyState("暂无会话") }
+                                    }
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        AppEmptyState("暂无会话")
                                     }
                                 }
                                 return@Box
@@ -503,6 +537,9 @@ fun ConversationListScreen(
                                     state = listState,
                                     modifier = Modifier.fillMaxSize(),
                                 ) {
+                                    if (showPrompt) {
+                                        item(key = "engagement_prompt") { promptCard() }
+                                    }
                                     items(
                                         state.conversations,
                                         key = { it.threadId }) { conversation ->

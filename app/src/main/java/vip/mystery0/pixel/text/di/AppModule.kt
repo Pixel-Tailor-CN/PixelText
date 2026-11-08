@@ -89,6 +89,10 @@ import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 val appModule = module {
+    single<vip.mystery0.pixel.text.domain.repository.EngagementPromptRepository> {
+        vip.mystery0.pixel.text.data.repository.EngagementPromptRepositoryImpl(androidContext())
+    }
+    viewModel { vip.mystery0.pixel.text.viewmodel.EngagementPromptViewModel(get()) }
     single<vip.mystery0.pixel.text.domain.repository.DeveloperSupportRepository> {
         vip.mystery0.pixel.text.data.repository.DeveloperSupportRepositoryImpl(androidContext())
     }

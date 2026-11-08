@@ -5,6 +5,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
+import vip.mystery0.pixel.text.domain.repository.EngagementPromptRepository
+import vip.mystery0.pixel.text.domain.support.EngagementPromptPolicy
+import java.time.LocalDate
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,6 +22,8 @@ import vip.mystery0.pixel.text.ui.SettingsDeepLink
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class MainActivity : ComponentActivity() {
+    private val engagementRepository: EngagementPromptRepository by inject()
+    private var engagementSessionJob: Job? = null
 
     companion object {
         const val EXTRA_THREAD_ID = "extra_thread_id"
@@ -56,6 +66,21 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         parseDeepLink(intent)?.let { pendingDeepLink = it }
         parseSettingsDeepLink(intent)?.let { pendingSettingsDeepLink = it }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        engagementSessionJob?.cancel()
+        engagementSessionJob = lifecycleScope.launch {
+            engagementRepository.noteForegroundStarted(System.currentTimeMillis())
+            delay(EngagementPromptPolicy.MIN_SESSION_MILLIS)
+            engagementRepository.recordQualifiedSession(System.currentTimeMillis(), LocalDate.now().toEpochDay())
+        }
+    }
+
+    override fun onPause() {
+        engagementSessionJob?.cancel()
+        super.onPause()
     }
 
     private fun parseDeepLink(intent: Intent?): ConversationDeepLink? {

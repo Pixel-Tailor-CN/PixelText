@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="engagement_prompt.xml" />
         <exclude domain="database" path="personal_learning.db" />
         <exclude domain="database" path="personal_learning.db-wal" />
         <exclude domain="database" path="personal_learning.db-shm" />
@@ -20,6 +21,7 @@
         <exclude domain="root" path="." />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="engagement_prompt.xml" />
         <exclude domain="database" path="personal_learning.db" />
         <exclude domain="database" path="personal_learning.db-wal" />
         <exclude domain="database" path="personal_learning.db-shm" />

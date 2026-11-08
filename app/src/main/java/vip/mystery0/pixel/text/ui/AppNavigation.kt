@@ -35,6 +35,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.ui.message.search.SearchScreen
@@ -78,6 +79,7 @@ fun AppNavigation(
     onSettingsDeepLinkConsumed: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val currentEntry by navController.currentBackStackEntryAsState()
     val settingsRepository = koinInject<AppSettingsRepository>()
     val settings by settingsRepository.settings.collectAsState()
     val reportSnackbarHost = remember { SnackbarHostState() }
@@ -155,6 +157,9 @@ fun AppNavigation(
         ) {
             composable("home") {
                 HomeScreen(
+                    allowEngagementPrompt = currentEntry?.destination?.route == "home" &&
+                        pendingDeepLink == null && pendingSettingsDeepLink == null && !showRestoreNotice,
+                    onNavigateToDeveloperSupport = { navController.navigate("developer_support") },
                     onNavigateToDetail = { threadId, address ->
                         navController.navigate(conversationDetailRoute(threadId, address))
                     },

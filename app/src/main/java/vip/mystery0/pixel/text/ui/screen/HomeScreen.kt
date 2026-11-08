@@ -71,6 +71,8 @@ fun HomeScreen(
     onNavigateToArchive: () -> Unit,
     onNavigateToSpam: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToDeveloperSupport: () -> Unit,
+    allowEngagementPrompt: Boolean = true,
 ) {
     val conversationListViewModel: ConversationListViewModel = koinViewModel()
     val unreadBadgeViewModel: UnreadBadgeViewModel = koinViewModel()
@@ -211,6 +213,8 @@ fun HomeScreen(
         ) {
             composable(CONVERSATIONS_ROUTE) {
                 ConversationListScreen(
+                    allowEngagementPrompt = allowEngagementPrompt && !showNewChatSheet,
+                    onNavigateToDeveloperSupport = onNavigateToDeveloperSupport,
                     viewModel = conversationListViewModel,
                     snackbarHostState = snackbarHostState,
                     onNavigateToDetail = onNavigateToDetail,
