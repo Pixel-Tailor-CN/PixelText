@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Lock
@@ -169,6 +170,7 @@ fun SettingsScreen(
     onNavigateToKeywordSpam: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToOpenSource: () -> Unit = {},
+    onNavigateToDeveloperSupport: () -> Unit = {},
     onNavigateToSenderWhitelist: () -> Unit = {},
     onNavigateToConversationDetailCustomization: () -> Unit = {},
     resourceUpdateCheckRequestId: Long? = null,
@@ -814,6 +816,14 @@ fun SettingsScreen(
                 },
             )))
             add(SettingsSection("about_community", "社区与帮助改进", listOf(
+                SettingsEntry("developer_support") {
+                    Preference(
+                        title = { Text("支持开发者") },
+                        summary = { Text("自愿赞助，支持持续维护") },
+                        icon = { Icon(Icons.Rounded.Favorite, contentDescription = null) },
+                        onClick = onNavigateToDeveloperSupport,
+                    )
+                },
                 SettingsEntry("pixel_tailor") {
                     Preference(
                         external = true,

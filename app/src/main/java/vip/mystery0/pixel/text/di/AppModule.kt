@@ -89,6 +89,10 @@ import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 val appModule = module {
+    single<vip.mystery0.pixel.text.domain.repository.DeveloperSupportRepository> {
+        vip.mystery0.pixel.text.data.repository.DeveloperSupportRepositoryImpl(androidContext())
+    }
+    viewModel { vip.mystery0.pixel.text.viewmodel.DeveloperSupportViewModel(get()) }
     single<ContentResolver> { androidContext().contentResolver }
     single { vip.mystery0.pixel.text.data.db.outgoing.OutgoingMmsDatabase.create(androidContext()) }
     single { vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository(get()) }
