@@ -48,6 +48,9 @@ class ConversationListViewModel(
 
     fun retryInitialization() = initializationScheduler.retry()
 
+    /** 权限变化后确保初始化已排队；保留等待中的任务，不重置退避。 */
+    fun ensureInitialization() = initializationScheduler.checkOnLaunch()
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -104,6 +107,8 @@ class ConversationListViewModel(
         isLoading = true
         conversationSubscriptionJob = viewModelScope.launch {
             var retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
+            val subscribedAt = android.os.SystemClock.elapsedRealtime()
+            var firstPublished = false
             while (true) {
                 try {
                     isLoading = allConversations.isEmpty()
@@ -114,6 +119,12 @@ class ConversationListViewModel(
                             retryDelayMillis = INITIAL_SUBSCRIPTION_RETRY_DELAY_MILLIS
                             replaceConversations(conversations)
                             isLoading = false
+                            if (!firstPublished) {
+                                firstPublished = true
+                                if (vip.mystery0.pixel.text.BuildConfig.DEBUG) Log.d(
+                                    TAG, "conversation first publish count=${conversations.size} elapsed_ms=${android.os.SystemClock.elapsedRealtime() - subscribedAt}",
+                                )
+                            }
                         }
                     throw IllegalStateException("conversation flow completed")
                 } catch (error: CancellationException) {

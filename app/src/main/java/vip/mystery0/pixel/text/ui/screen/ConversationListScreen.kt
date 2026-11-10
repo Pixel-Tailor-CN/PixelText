@@ -249,7 +249,7 @@ fun ConversationListScreen(
     LaunchedEffect(hasPermission, isDefaultSmsRoleHeld) {
         selectedThreadIds = emptySet()
         if (hasPermission && isDefaultSmsRoleHeld) {
-            viewModel.retryInitialization()
+            viewModel.ensureInitialization()
         }
     }
 

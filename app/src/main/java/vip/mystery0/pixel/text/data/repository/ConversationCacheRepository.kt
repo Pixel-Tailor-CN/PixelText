@@ -32,24 +32,24 @@ class ConversationCacheRepository(
         synchronizer.reconcile()
         MessageMirrorScheduler(context).schedule(reason = "manual_repair")
     }
-    suspend fun refreshIncremental(requireComplete: Boolean = false) {
+    /**
+     * 推动镜像追平系统短信。调用方不应以此阻塞首屏：镜像写入会触发会话表变化并重新发布。
+     * [reconcileIfRequired] 为 true 时，增量无法确认的变更（如删除）在本次调用内完成全量对账。
+     */
+    suspend fun refreshIncremental(reconcileIfRequired: Boolean = false) {
         // 展示已有镜像不要求系统权限，也不向 Provider 发起查询。
         if (context.smsAccessState() != SmsAccessState.READY) return
         if (!isCacheReady()) {
             synchronizer.reconcile()
         }
         var result = incrementalSynchronizer.syncRecent()
-        if (requireComplete && result.requiresFullReconcile) {
+        if (reconcileIfRequired && result.requiresFullReconcile) {
             synchronizer.reconcile()
             result = incrementalSynchronizer.syncRecent()
         }
         if (result.remaining) incrementalSynchronizer.markWake()
         // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
-        // 首次发布前必须确认新消息已追平；失败交给订阅重试，不能把旧镜像当作新结果。
-        if (requireComplete && context.smsAccessState() == SmsAccessState.READY) check(!result.remaining && !result.requiresFullReconcile) {
-            "message synchronization incomplete"
-        }
     }
     suspend fun syncIncomingSms(messageId: Long) {
         // 新收短信已有确切身份，按消息排队即可；全量对账会让新消息等待历史扫描。

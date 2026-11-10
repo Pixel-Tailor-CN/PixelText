@@ -39,6 +39,22 @@ class TelephonyMirrorSource(context: Context) {
 
     fun requireAccess() = appContext.requireSmsAccess()
 
+    /** 只读取 _id 列统计行数，用于低成本发现增量同步无法感知的删除。 */
+    suspend fun count(transport: MessageTransport): SourceRead<Long> = withContext(Dispatchers.IO) {
+        try {
+            requireAccess()
+            val cursor = resolver.query("content://${transport.name.lowercase()}".toUri(), arrayOf("_id"), null, null)
+                ?: return@withContext SourceRead.Failure("null_cursor")
+            val count = cursor.use { it.count.toLong() }
+            requireAccess()
+            SourceRead.Success(count, emptySet())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            SourceRead.Failure(if (error is SecurityException) "permission_denied" else error.javaClass.simpleName)
+        }
+    }
+
     suspend fun readSmsPage(afterId: Long?, limit: Int = 200): SourceRead<List<ProviderRowSnapshot>> =
         readPage("sms", afterId, limit)
 

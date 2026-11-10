@@ -2,7 +2,12 @@ package vip.mystery0.pixel.text.data.repository
 
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -66,34 +71,45 @@ class MessageRepositoryImpl(
     }
 
     override suspend fun refreshConversations() = withContext(Dispatchers.IO) {
-        conversationCacheRepository.refreshIncremental()
+        // 用户主动刷新等待完整确认，包括增量无法识别的删除。
+        conversationCacheRepository.refreshIncremental(reconcileIfRequired = true)
     }
 
-    override fun getAllConversations(): Flow<List<ConversationModel>> = flow {
-        conversationCacheRepository.refreshIncremental(requireComplete = true)
-        spamRepository.ensureReady()
-        emitAll(
-            combine(
-                mirror.observeConversationChanges(),
-                settingsRepository.settings,
-                contactDataSource.changes,
-            ) { _, settings, _ -> settings.spamIsolationEnabled }
-                .conflate()
-                .map { isolationEnabled ->
-                    // 表变化只触发一次聚合，避免先读取整张摘要列表再重新过滤分组。
-                    enrichWithSenderProfiles(
-                        mirror.queryConversations(
-                            ConversationListQuery(
-                                contentFilter = if (isolationEnabled) {
-                                    ConversationContentFilter.NORMAL
-                                } else ConversationContentFilter.ALL,
-                                archiveFilter = ConversationArchiveFilter.UNARCHIVED,
-                                incomingUnreadOnly = !isolationEnabled,
-                            )
+    override fun getAllConversations(): Flow<List<ConversationModel>> = channelFlow {
+        // 首屏只读本地镜像，不等待 Provider 同步；同步写入镜像后会话表变化会自动重新发布。
+        launch {
+            try {
+                spamRepository.ensureReady()
+                conversationCacheRepository.refreshIncremental(reconcileIfRequired = true)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // 同步失败不影响已有数据展示，由镜像 Worker 退避重试。
+                Log.w("MessageRepository", "conversation background sync failed error=${error.javaClass.simpleName}")
+                MessageMirrorScheduler(context).schedule()
+            }
+        }
+        combine(
+            mirror.observeConversationChanges(),
+            settingsRepository.settings,
+            contactDataSource.changes,
+        ) { _, settings, _ -> settings.spamIsolationEnabled }
+            .conflate()
+            .map { isolationEnabled ->
+                // 表变化只触发一次聚合，避免先读取整张摘要列表再重新过滤分组。
+                enrichWithSenderProfiles(
+                    mirror.queryConversations(
+                        ConversationListQuery(
+                            contentFilter = if (isolationEnabled) {
+                                ConversationContentFilter.NORMAL
+                            } else ConversationContentFilter.ALL,
+                            archiveFilter = ConversationArchiveFilter.UNARCHIVED,
+                            incomingUnreadOnly = !isolationEnabled,
                         )
                     )
-                }
-        )
+                )
+            }
+            .collect { send(it) }
     }.flowOn(Dispatchers.IO)
 
     override fun getArchivedConversations(limit: Int, offset: Int): Flow<List<ConversationModel>> =

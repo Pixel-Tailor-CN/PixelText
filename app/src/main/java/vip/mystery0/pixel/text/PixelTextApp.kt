@@ -11,6 +11,7 @@ import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.data.source.smsAccessState
+import vip.mystery0.pixel.text.data.source.recordSmsAccessTransition
 import android.util.Log
 import vip.mystery0.pixel.text.domain.settings.AppIdentityRepository
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
@@ -27,7 +28,6 @@ import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 class PixelTextApp : Application() {
-    private var mirrorAccessReady = false
     private val smsRoleReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Telephony.Sms.Intents.ACTION_DEFAULT_SMS_PACKAGE_CHANGED) startMirror()
@@ -78,16 +78,15 @@ class PixelTextApp : Application() {
         getKoin().get<vip.mystery0.pixel.text.data.source.ContactDataSource>().warmUp()
         val observer = getKoin().get<MirrorChangeObserver>()
         val accessReady = smsAccessState() == SmsAccessState.READY
+        val accessRestored = recordSmsAccessTransition(accessReady)
         if (!accessReady) {
-            mirrorAccessReady = false
             observer.stop()
             return
         }
         getKoin().get<vip.mystery0.pixel.text.worker.DataInitializationScheduler>().checkOnLaunch()
-        val observationStarted = observer.start()
-        if (!mirrorAccessReady || observationStarted) {
-            mirrorAccessReady = true
-            // 角色重新取得后补齐暂停期间的消息与删除，不能只等下一个 Provider 事件。
+        observer.start()
+        if (accessRestored) {
+            // 只在访问权限真正恢复时补齐暂停期间的消息与删除；普通冷启动只做增量同步。
             getKoin().get<MessageMirrorScheduler>().schedule(forceReconcile = true, reason = "sms_access_restored")
         }
     }

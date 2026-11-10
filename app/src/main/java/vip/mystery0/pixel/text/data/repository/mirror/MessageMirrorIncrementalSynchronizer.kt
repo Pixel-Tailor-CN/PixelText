@@ -83,9 +83,12 @@ class MessageMirrorIncrementalSynchronizer(
                 if (appendedAll && wakeToken != null) {
                     sync.acknowledge(INCREMENTAL_WAKE_KEY, wakeToken)
                 }
+                // 增量只追加新消息；应用未运行期间的删除用行数差异发现并交给全量对账。
+                val countMismatch = appendedAll && hasCountMismatch()
                 result = Result(
                     remaining = !appendedAll || sync.dirtyCount() > 0,
-                    requiresFullReconcile = dirtyResult.requiresFullReconcile || sync.dirty("collection") != null,
+                    requiresFullReconcile = dirtyResult.requiresFullReconcile || countMismatch ||
+                        sync.dirty("collection") != null,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -203,6 +206,16 @@ class MessageMirrorIncrementalSynchronizer(
             if (!progressed) return DirtyResult(requiresFullReconcile)
         }
         return DirtyResult(requiresFullReconcile)
+    }
+
+    private suspend fun hasCountMismatch(): Boolean = MessageTransport.entries.any { transport ->
+        when (val source = source.count(transport)) {
+            // 统计失败不推断删除，由下一次触发重新核对。
+            is SourceRead.Failure -> false
+            is SourceRead.Success -> (source.value != dao.transportCount(transport.name)).also { mismatch ->
+                if (mismatch) Log.i(TAG, "count mismatch collection=${transport.name}")
+            }
+        }
     }
 
     private suspend fun markDirty(key: SourceMessageKey) {

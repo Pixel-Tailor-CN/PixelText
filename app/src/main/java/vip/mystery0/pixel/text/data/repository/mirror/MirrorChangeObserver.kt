@@ -33,10 +33,7 @@ class MirrorChangeObserver(
     var onDirty: (() -> Unit)? = null
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
-            if (appContext.smsAccessState() != SmsAccessState.READY) {
-                stop()
-                return
-            }
+            // 主线程只做状态判断；角色与权限的跨进程核对放到后台协程。
             val callbackJob = synchronized(this@MirrorChangeObserver) {
                 if (!started) return
                 callbacks
@@ -48,10 +45,6 @@ class MirrorChangeObserver(
                         return@launch
                     }
                     val key = resolveKey(uri)
-                    if (appContext.smsAccessState() != SmsAccessState.READY) {
-                        stop()
-                        return@launch
-                    }
                     if (key == null) incrementalSynchronizer.markWake()
                     else synchronizer.markDirty(
                         key,

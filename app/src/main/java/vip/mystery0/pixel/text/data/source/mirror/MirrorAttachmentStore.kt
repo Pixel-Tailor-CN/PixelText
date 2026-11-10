@@ -69,7 +69,6 @@ class MirrorAttachmentStore(context: Context) {
                     val buffer = ByteArray(64 * 1024)
                     while (true) {
                         currentCoroutineContext().ensureActive()
-                        appContext.requireSmsAccess()
                         val count = source.read(buffer)
                         if (count < 0) break
                         if (count == 0) continue
@@ -80,6 +79,8 @@ class MirrorAttachmentStore(context: Context) {
                     output.fd.sync()
                 }
             }
+            // 读取期间撤权则丢弃本次副本；不在每个缓冲块上发起跨进程核对。
+            appContext.requireSmsAccess()
             currentCoroutineContext().ensureActive()
             try {
                 Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)

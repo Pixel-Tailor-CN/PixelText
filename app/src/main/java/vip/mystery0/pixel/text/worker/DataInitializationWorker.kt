@@ -58,6 +58,11 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
             throw cancelled
         } catch (pending: InitializationSpamPendingException) {
             val state = repository.read()
+            if (runAttemptCount + 1 >= MAX_PENDING_ATTEMPTS) {
+                // 长时间未就绪时转为可见的可重试状态，不让对话框无限显示“正在准备”。
+                failure(pending.category, InitializationStatus.FAILED)
+                return Result.failure()
+            }
             if (!state.isCurrent && !state.isNewerVersion) {
                 repository.save(state.epoch, state.copy(status = InitializationStatus.RUNNING, errorCategory = null))
             }
@@ -84,5 +89,10 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
             "DataInitialization",
             "initialization incomplete phase=${state.nextPhase} category=$category attempt=$runAttemptCount"
         )
+    }
+
+    private companion object {
+        /** 指数退避（30s 起）累计约 7.5 分钟后交由用户重试。 */
+        const val MAX_PENDING_ATTEMPTS = 5
     }
 }
