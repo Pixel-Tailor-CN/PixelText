@@ -9,6 +9,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationCoordinator
 import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository
+import vip.mystery0.pixel.text.data.repository.initialization.InitializationSpamPendingException
 import vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer
 import vip.mystery0.pixel.text.data.source.requireSmsAccess
 import vip.mystery0.pixel.text.domain.model.InitializationStatus
@@ -55,11 +56,19 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (pending: InitializationSpamPendingException) {
+            val state = repository.read()
+            if (!state.isCurrent && !state.isNewerVersion) {
+                repository.save(state.epoch, state.copy(status = InitializationStatus.RUNNING, errorCategory = null))
+            }
+            Log.i("DataInitialization", "initialization waiting phase=${state.nextPhase} reason=${pending.category} attempt=$runAttemptCount")
+            Result.retry()
         } catch (_: SecurityException) {
             failure("permission_required", InitializationStatus.WAITING_PERMISSION)
             Result.failure()
         } catch (error: Exception) {
-            failure(error.javaClass.simpleName, InitializationStatus.FAILED)
+            val category = if (error is java.io.IOException) "io_error" else error.javaClass.simpleName
+            failure(category, InitializationStatus.FAILED)
             Result.retry()
         } finally {
             repository.pauseProgress()
@@ -73,7 +82,7 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
         }
         Log.w(
             "DataInitialization",
-            "initialization incomplete category=$category attempt=$runAttemptCount"
+            "initialization incomplete phase=${state.nextPhase} category=$category attempt=$runAttemptCount"
         )
     }
 }

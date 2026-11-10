@@ -51,16 +51,23 @@ class MessageMirrorIncrementalSynchronizer(
     }
 
     suspend fun syncRecent(timeBudgetMillis: Long = 10_000): Result = withContext(Dispatchers.IO) {
-        val baseReady = listOf("ROUND", MessageTransport.SMS.name, MessageTransport.MMS.name)
-            .all { sync.state(it)?.complete == true }
-        if (!baseReady) {
-            return@withContext Result(remaining = true, requiresFullReconcile = true)
-        }
-
-        val deadline = SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1)
         var result = Result(remaining = false, requiresFullReconcile = false)
         try {
             MirrorSynchronizationLock.mutex.withLock {
+                // 等待正在运行的对账完成后再检查，避免读取 ROUND/SMS 的中间状态。
+                val baseReady = listOf("ROUND", MessageTransport.SMS.name, MessageTransport.MMS.name)
+                    .all { sync.state(it)?.complete == true }
+                if (!baseReady) {
+                    result = Result(remaining = true, requiresFullReconcile = true)
+                    return@withLock
+                }
+                // 集合级变更可能包含删除，增量扫描不能确认，必须交给全量对账。
+                if (sync.dirty("collection") != null) {
+                    result = Result(remaining = true, requiresFullReconcile = true)
+                    return@withLock
+                }
+                // 锁等待不消耗实际扫描预算。
+                val deadline = SystemClock.elapsedRealtime() + timeBudgetMillis.coerceAtLeast(1)
                 // 只确认扫描开始前已经看到的 wake。扫描期间的新事件会写入新 token，
                 // acknowledge 的 token 条件会让它保留下来继续下一轮，避免丢更新。
                 val wakeToken = sync.dirty(INCREMENTAL_WAKE_KEY)?.token
@@ -78,7 +85,7 @@ class MessageMirrorIncrementalSynchronizer(
                 }
                 result = Result(
                     remaining = !appendedAll || sync.dirtyCount() > 0,
-                    requiresFullReconcile = dirtyResult.requiresFullReconcile,
+                    requiresFullReconcile = dirtyResult.requiresFullReconcile || sync.dirty("collection") != null,
                 )
             }
         } catch (cancelled: CancellationException) {

@@ -79,6 +79,8 @@ class DataInitializationCoordinator(
                                     skipReason = "spam_disabled"
                                 )
                             } else {
+                                // 首次授权后主动完成迁移与投影恢复，不等待独立维护任务的退避重试。
+                                if (classifier == null) spamRepository.ensureReady()
                                 val session = classifier ?: spam.openSession().also { classifier = it }
                                 val batch = spam.scanBatch(
                                     state.afterLocalId,

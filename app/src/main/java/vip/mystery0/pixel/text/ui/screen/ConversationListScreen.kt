@@ -674,7 +674,13 @@ fun ConversationListScreen(
                 when {
                     initialization.isNewerVersion -> Text("这些数据由较新版本创建，请更新应用后再使用。")
                     permission -> Text("请授予短信权限后重试，已有数据不会被清除。")
-                    failed -> Text("数据准备未完成，可重试继续。错误类别：${initialization.errorCategory.orEmpty()}")
+                    failed -> Text(
+                        when (initialization.errorCategory) {
+                            "io_error", "IOException" -> "读取或保存应用数据失败，请重试。"
+                            "spam_projection_not_ready", "stale_spam_prediction" -> "短信识别数据尚未准备完成，请重试。"
+                            else -> "数据准备未完成，请重试。"
+                        }
+                    )
                     else -> DataInitializationProgressContent(
                         phase = initialization.nextPhase,
                         progress = initializationProgress,
