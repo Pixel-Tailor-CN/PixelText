@@ -1,10 +1,8 @@
 package vip.mystery0.pixel.text.data.backup
 
-import android.Manifest
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
-import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.provider.Telephony
@@ -15,6 +13,7 @@ import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
 import vip.mystery0.pixel.text.domain.backup.BackupSummary
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
@@ -31,10 +30,7 @@ class SmsRestoreDataSource(
     private val safety: RestoreSafetyCoordinator,
 ) {
     private val resolver get() = context.contentResolver
-    fun requireAccess() {
-        backupRequire(context.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED, "请授予读取短信权限")
-        backupRequire(context.getSystemService(android.app.role.RoleManager::class.java).isRoleHeld(android.app.role.RoleManager.ROLE_SMS), "请先将本应用设置为默认短信应用")
-    }
+    fun requireAccess() = context.requireSmsAccess()
 
     suspend fun restore(directory: File, initial: BackupSummary, progress: (BackupSummary) -> Unit): BackupSummary {
         requireAccess()

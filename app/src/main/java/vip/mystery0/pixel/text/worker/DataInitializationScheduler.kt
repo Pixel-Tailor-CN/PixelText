@@ -1,8 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -11,6 +9,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.domain.model.InitializationStatus
 
 class DataInitializationScheduler(
@@ -41,7 +41,7 @@ class DataInitializationScheduler(
                     val state = repository.read()
                     if (state.isCurrent || state.isNewerVersion) return@withLock
                     val pending = repository.prepare()
-                    if (context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+                    if (context.smsAccessState() != SmsAccessState.READY) {
                         repository.save(
                             pending.epoch,
                             pending.copy(status = InitializationStatus.WAITING_PERMISSION)

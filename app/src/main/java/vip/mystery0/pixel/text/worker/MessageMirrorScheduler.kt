@@ -20,10 +20,13 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import java.util.concurrent.TimeUnit
 
 class MessageMirrorScheduler(context: Context) : KoinComponent {
-    private val work = WorkManager.getInstance(context)
+    private val appContext = context.applicationContext
+    private val work = WorkManager.getInstance(appContext)
     private val synchronizer: MessageMirrorSynchronizer by inject()
     private val database: MessageMirrorDatabase by inject()
 
@@ -43,6 +46,7 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
         forceReconcile: Boolean = false,
         reason: String = "provider_event"
     ) = withContext(Dispatchers.IO) {
+        if (appContext.smsAccessState() != SmsAccessState.READY) return@withContext
         // 强制对账也先持久化，合并到已排队任务时不会丢失调用者的刷新意图。
         if (forceReconcile) synchronizer.markDirty(null)
         schedulingMutex.withLock {
@@ -63,6 +67,7 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
     }
 
     suspend fun enqueueAttachments() = withContext(Dispatchers.IO) {
+        if (appContext.smsAccessState() != SmsAccessState.READY) return@withContext
         schedulingMutex.withLock {
             val existing = work.getWorkInfosForUniqueWork(ATTACHMENT_WORK).get().filterNot { it.state.isFinished }
             val running = existing.any { it.state == WorkInfo.State.RUNNING }

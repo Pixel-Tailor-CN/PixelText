@@ -16,7 +16,6 @@ import vip.mystery0.pixel.text.data.db.VerificationCodeIndexEntity
 import vip.mystery0.pixel.text.data.db.VerificationCodeMetadataEntity
 import vip.mystery0.pixel.text.data.db.SmsScanStateEntity
 import vip.mystery0.pixel.text.data.source.SmsIndexSummaryRow
-import vip.mystery0.pixel.text.data.source.TelephonyDataSource
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
@@ -30,7 +29,6 @@ import java.time.format.DateTimeFormatter
 
 class VerificationCodeRepositoryImpl(
     private val database: MessageMirrorDatabase,
-    private val telephonyDataSource: TelephonyDataSource,
     private val parser: MessageParser,
     private val settings: AppSettingsRepository,
     private val contactDataSource: ContactDataSource,
@@ -99,7 +97,7 @@ class VerificationCodeRepositoryImpl(
             dao.deleteGeneration(generation)
             dao.deleteScanGeneration(generation)
             var processedCount = 0L
-            var totalCount = if (onProgress != null) telephonyDataSource.getSmsIndexCount() else null
+            var totalCount = if (onProgress != null) dao.mirrorSmsCount() else null
             onProgress?.invoke(processedCount, totalCount)
             forEachSmsSummaryPage { summaries ->
                 processPage(summaries, generation, ruleVersion, null)
@@ -167,7 +165,7 @@ class VerificationCodeRepositoryImpl(
         var beforeMessageId: Long? = null
         while (true) {
             currentCoroutineContext().ensureActive()
-            val summaries = telephonyDataSource.getSmsIndexSummaries(
+            val summaries = dao.mirrorSmsSummaries(
                 beforeMessageId = beforeMessageId,
                 limit = SMS_SCAN_BATCH_SIZE,
             )
@@ -209,11 +207,11 @@ class VerificationCodeRepositoryImpl(
     private suspend fun forEachSmsSummaryPage(
         block: suspend (List<SmsIndexSummaryRow>) -> Unit,
     ) {
-        // 扫描任务可能早于镜像同步，仍以系统原件为准，避免把尚未同步的短信当作已删除。
+        // 索引只消费已经同步的本地镜像，角色和系统权限变化不阻断已有数据浏览。
         var beforeMessageId: Long? = null
         while (true) {
             currentCoroutineContext().ensureActive()
-            val summaries = telephonyDataSource.getSmsIndexSummaries(
+            val summaries = dao.mirrorSmsSummaries(
                 beforeMessageId = beforeMessageId,
                 limit = SMS_SCAN_BATCH_SIZE,
             )
@@ -286,7 +284,8 @@ class VerificationCodeRepositoryImpl(
                 old.address == summary.address && old.timestamp == summary.date &&
                 old.metadataFingerprint == fingerprints.getValue(summary.id)
         }.mapTo(mutableSetOf()) { it.id }
-        val bodies = telephonyDataSource.getSmsBodies(ids.filterNot { it in unchangedIds })
+        val bodies = dao.mirrorSmsBodies(ids.filterNot { it in unchangedIds })
+            .associate { it.messageId to it.body }
         val entries = mutableListOf<VerificationCodeIndexEntity>()
         val scanStates = summaries.map { summary ->
             currentCoroutineContext().ensureActive()
@@ -315,7 +314,7 @@ class VerificationCodeRepositoryImpl(
     }
 
     /**
-     * SMS 在写入后按正文不可变处理。增量扫描只使用 Provider 元数据定位候选，
+     * SMS 在写入后按正文不可变处理。增量扫描使用镜像元数据定位候选，
      * 同 ID 正文若被外部篡改，需要通过完整重建重新识别。
      */
     private fun SmsIndexSummaryRow.metadataFingerprint(): String {

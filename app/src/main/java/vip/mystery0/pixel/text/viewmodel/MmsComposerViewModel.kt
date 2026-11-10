@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.viewmodel
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
@@ -30,7 +33,8 @@ class MmsComposerViewModel(
 ) : AndroidViewModel(application) {
     data class State(val draft: MmsDraft? = null, val busy: Boolean = false, val error: String? = null,
         val prepared: MmsSendSnapshot? = null, val pduBytes: Int? = null, val accepted: Boolean = false,
-        val sims: List<SimInfo> = emptyList(), val possibleDuplicateOf: String? = null, val importBlocked: Boolean = false, val unsaved: Boolean = false, val discarded: Boolean = false)
+        val sims: List<SimInfo> = emptyList(), val simPermissionGranted: Boolean = false,
+        val possibleDuplicateOf: String? = null, val importBlocked: Boolean = false, val unsaved: Boolean = false, val discarded: Boolean = false)
     private val mutableState = MutableStateFlow(State())
     val state = mutableState.asStateFlow()
     private val edits = Mutex()
@@ -59,7 +63,7 @@ class MmsComposerViewModel(
                         ?: sims.singleOrNull()?.subscriptionId ?: -1)
                     draft = repository.saveDraft(draft.copy(body = body, subject = subject, subscriptionId = subId, importError = inputError?.takeIf { it.contains("附件") }), 0L) ?: draft
                 }
-                mutableState.value = State(draft = draft, sims = sims, error = inputError,
+                mutableState.value = State(draft = draft, sims = sims, simPermissionGranted = hasSimPermission(), error = inputError,
                     possibleDuplicateOf = draft.possibleDuplicateOf,
                     importBlocked = draft.importError != null)
                 // 重建页面不重复导入分享，也不重建发送命令。
@@ -68,12 +72,22 @@ class MmsComposerViewModel(
             catch (error: Exception) { mutableState.value = mutableState.value.copy(error = safeError(error), busy = false) }
         }
     }
+    private fun hasSimPermission() = ContextCompat.checkSelfPermission(
+        getApplication(), Manifest.permission.READ_PHONE_STATE,
+    ) == PackageManager.PERMISSION_GRANTED
+
     fun refreshSims() {
         viewModelScope.launch {
             val sims = withContext(Dispatchers.IO) { SimInfoProvider.getActiveSimList(getApplication()) }
             val current = mutableState.value
-            mutableState.value = current.copy(sims = sims,
+            mutableState.value = current.copy(sims = sims, simPermissionGranted = hasSimPermission(),
                 prepared = if (current.draft?.subscriptionId in sims.map { it.subscriptionId }) current.prepared else null)
+            // 授权后为尚未选卡的草稿补齐首次默认卡；不替换已有的明确订阅。
+            if (current.draft?.subscriptionId?.let { it < 0 } == true) {
+                val default = SimInfoProvider.getDefaultSmsSubscriptionId()
+                val selected = sims.firstOrNull { it.subscriptionId == default } ?: sims.singleOrNull()
+                if (selected != null) edit { it.copy(subscriptionId = selected.subscriptionId) }
+            }
         }
     }
     fun edit(transform: (MmsDraft) -> MmsDraft) {

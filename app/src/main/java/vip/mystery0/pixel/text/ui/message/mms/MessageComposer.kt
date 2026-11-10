@@ -1,7 +1,14 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
 import androidx.core.content.edit
+import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.net.toUri
 import android.media.MediaPlayer
 import android.media.ThumbnailUtils
 import android.net.Uri
@@ -83,6 +90,23 @@ fun MessageComposer(
     var simMenu by remember { mutableStateOf(false) }
     var confirm by rememberSaveable { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
+    var simPermissionRequested by rememberSaveable { mutableStateOf(false) }
+    val simPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        viewModel.refreshSims()
+    }
+    fun authorizeSim() {
+        var ownerContext: Context = context
+        while (ownerContext is ContextWrapper && ownerContext !is Activity) ownerContext = ownerContext.baseContext
+        val activity = ownerContext as? Activity
+        val permanentlyDenied = simPermissionRequested && activity != null &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_PHONE_STATE)
+        if (permanentlyDenied) {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+        } else {
+            simPermissionRequested = true
+            simPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+        }
+    }
     val latestSubmitted by rememberUpdatedState(onSubmitted)
     val capture = rememberComposerCapture(
         onCaptured = { uri, cleanup -> viewModel.importAttachments(listOf(uri), cleanup) },
@@ -215,11 +239,19 @@ fun MessageComposer(
             Spacer(Modifier.weight(1f))
             Box {
                 val sim = state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }
-                TextButton(onClick = { simMenu = true }, enabled = enabled, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) {
+                TextButton(onClick = {
+                    if (state.simPermissionGranted) simMenu = true else authorizeSim()
+                }, enabled = enabled && (!state.simPermissionGranted || state.sims.isNotEmpty()),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.heightIn(min = 48.dp)) {
                     Icon(Icons.Default.SimCard, null, Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(sim?.displayName ?: "选择 SIM", style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                    Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp))
+                    Text(when {
+                        !state.simPermissionGranted -> "尚未授权"
+                        state.sims.isEmpty() -> "未检测到可用 SIM"
+                        else -> sim?.displayName ?: "选择 SIM"
+                    }, style = MaterialTheme.typography.labelSmall)
+                    if (state.simPermissionGranted && state.sims.isNotEmpty()) Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp))
+                    else if (!state.simPermissionGranted) Text(" · 授权", style = MaterialTheme.typography.labelSmall)
                 }
                 DropdownMenu(expanded = simMenu, onDismissRequest = { simMenu = false }) {
                     state.sims.forEach { card ->

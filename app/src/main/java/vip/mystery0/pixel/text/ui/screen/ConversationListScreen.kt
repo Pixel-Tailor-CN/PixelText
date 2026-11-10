@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -104,6 +105,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.PermissionChecker
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -173,13 +175,13 @@ fun ConversationListScreen(
     val showDebugMenu = isDebugModeEnabled()
     var hasPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
+            PermissionChecker.checkSelfPermission(
                 context,
                 Manifest.permission.READ_SMS
-            ) == PackageManager.PERMISSION_GRANTED
+            ) == PermissionChecker.PERMISSION_GRANTED
         )
     }
-    var hasShownReadSmsPermissionDialog by remember { mutableStateOf(false) }
+    var showDefaultSmsSuggestion by rememberSaveable { mutableStateOf(true) }
     var showReadSmsPermissionDialog by remember { mutableStateOf(false) }
     var pendingPermissionsAfterDefaultPrompt by remember { mutableStateOf<List<String>>(emptyList()) }
     var hasLoadedConversationsAfterPermission by remember { mutableStateOf(false) }
@@ -190,10 +192,10 @@ fun ConversationListScreen(
     }
 
     fun isPermissionGranted(permission: String): Boolean {
-        return ContextCompat.checkSelfPermission(
+        return PermissionChecker.checkSelfPermission(
             context,
             permission
-        ) == PackageManager.PERMISSION_GRANTED
+        ) == PermissionChecker.PERMISSION_GRANTED
     }
 
     fun missingStartupPermissions(): Array<String> {
@@ -218,9 +220,10 @@ fun ConversationListScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         isDefaultSmsRoleHeld = context.isDefaultSmsApp()
-        val permissions = pendingPermissionsAfterDefaultPrompt
+        refreshPermissionState()
+        val permissions = pendingPermissionsAfterDefaultPrompt.filterNot(::isPermissionGranted)
         pendingPermissionsAfterDefaultPrompt = emptyList()
-        if (permissions.isNotEmpty()) {
+        if (isDefaultSmsRoleHeld && permissions.isNotEmpty()) {
             startupPermissionLauncher.launch(permissions.toTypedArray())
         }
     }
@@ -235,11 +238,18 @@ fun ConversationListScreen(
         }
     }
 
-    LaunchedEffect(hasPermission, hasShownReadSmsPermissionDialog) {
+    LaunchedEffect(isDefaultSmsRoleHeld) {
+        if (!isDefaultSmsRoleHeld) showDefaultSmsSuggestion = true
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshOrLoadConversations()
+    }
+
+    LaunchedEffect(hasPermission, isDefaultSmsRoleHeld) {
         selectedThreadIds = emptySet()
-        if (!hasPermission && !hasShownReadSmsPermissionDialog) {
-            hasShownReadSmsPermissionDialog = true
-            showReadSmsPermissionDialog = true
+        if (hasPermission && isDefaultSmsRoleHeld) {
+            viewModel.retryInitialization()
         }
     }
 
@@ -266,9 +276,7 @@ fun ConversationListScreen(
                     }
                 }
                 refreshPermissionState()
-                if (currentHasPermission) {
-                    viewModel.refreshOrLoadConversations()
-                }
+                viewModel.refreshOrLoadConversations()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -351,8 +359,8 @@ fun ConversationListScreen(
         )
     }
 
-    LaunchedEffect(hasPermission, selectionMode) {
-        onFloatingActionButtonVisibilityChanged(hasPermission && !selectionMode)
+    LaunchedEffect(hasPermission, isDefaultSmsRoleHeld, selectionMode) {
+        onFloatingActionButtonVisibilityChanged(hasPermission && isDefaultSmsRoleHeld && !selectionMode)
     }
     ObserveListScrollDirection(listState, onScrollDirectionChanged = onScrollDirectionChanged)
 
@@ -461,32 +469,48 @@ fun ConversationListScreen(
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0.dp),
         ) { paddingValues ->
-            if (!hasPermission) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text("需要读取短信权限", style = MaterialTheme.typography.bodyLarge)
-                        Button(
-                            onClick = {
-                                showReadSmsPermissionDialog = true
-                            }
-                        ) {
-                            Text("授予权限")
-                        }
-                    }
-                }
-                return@Scaffold
-            }
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .consumeWindowInsets(paddingValues)
             ) {
-                vip.mystery0.pixel.text.ui.message.MirrorSyncBanner()
+                if (!isDefaultSmsRoleHeld && showDefaultSmsSuggestion) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "尚未设为默认短信应用",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text("设为默认后，可接收、发送并同步短信。", style = MaterialTheme.typography.bodyMedium)
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                TextButton(onClick = {
+                                    showDefaultSmsSuggestion = false
+                                    viewModel.refreshOrLoadConversations()
+                                }) { Text("暂不设置") }
+                                Button(onClick = {
+                                    requestPermissionsAfterDefaultPrompt(arrayOf(Manifest.permission.READ_SMS))
+                                }) { Text("设为默认") }
+                            }
+                        }
+                    }
+                } else if (isDefaultSmsRoleHeld && !hasPermission) {
+                    ListItem(
+                        trailingContent = { TextButton(onClick = { showReadSmsPermissionDialog = true }) { Text("授权") } },
+                        content = { Text("尚未授予短信读取权限") },
+                    )
+                }
+                if (isDefaultSmsRoleHeld && hasPermission) vip.mystery0.pixel.text.ui.message.MirrorSyncBanner()
                 vip.mystery0.pixel.text.ui.message.mms.MmsDraftsAndPendingButton()
                 Box(modifier = Modifier.weight(1f)) {
                     when (val state = uiState) {
@@ -638,7 +662,7 @@ fun ConversationListScreen(
         )
     }
 
-    initialization?.takeUnless { it.isCurrent || !hasPermission }?.let { initialization ->
+    initialization?.takeUnless { it.isCurrent || !hasPermission || !isDefaultSmsRoleHeld }?.let { initialization ->
         val failed =
             initialization.status == vip.mystery0.pixel.text.domain.model.InitializationStatus.FAILED
         val permission =

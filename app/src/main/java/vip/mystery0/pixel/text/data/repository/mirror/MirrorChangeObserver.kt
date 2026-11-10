@@ -1,17 +1,23 @@
 package vip.mystery0.pixel.text.data.repository.mirror
 
-import androidx.core.net.toUri
-
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import androidx.core.net.toUri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.data.source.mirror.SourceRead
 import vip.mystery0.pixel.text.data.source.mirror.TelephonyMirrorSource
-import vip.mystery0.pixel.text.domain.model.mirror.*
+import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
+import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 
 class MirrorChangeObserver(
     context: Context,
@@ -20,34 +26,78 @@ class MirrorChangeObserver(
     private val source: TelephonyMirrorSource,
     private val scope: CoroutineScope,
 ) {
-    private val resolver = context.applicationContext.contentResolver
-    private var started = false
-    /** 可由接入层安排唯一 WorkManager 任务；观察回调自身只持久化提示。 */
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+    @Volatile private var started = false
+    private var callbacks: Job = SupervisorJob(scope.coroutineContext[Job])
     var onDirty: (() -> Unit)? = null
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
-            scope.launch {
-                val key = resolveKey(uri)
-                if (key == null) {
-                    incrementalSynchronizer.markWake()
-                } else {
-                    synchronizer.markDirty(
+            if (appContext.smsAccessState() != SmsAccessState.READY) {
+                stop()
+                return
+            }
+            val callbackJob = synchronized(this@MirrorChangeObserver) {
+                if (!started) return
+                callbacks
+            }
+            scope.launch(callbackJob) {
+                try {
+                    if (appContext.smsAccessState() != SmsAccessState.READY) {
+                        stop()
+                        return@launch
+                    }
+                    val key = resolveKey(uri)
+                    if (appContext.smsAccessState() != SmsAccessState.READY) {
+                        stop()
+                        return@launch
+                    }
+                    if (key == null) incrementalSynchronizer.markWake()
+                    else synchronizer.markDirty(
                         key,
                         verifyAttachments = key.transport == MessageTransport.MMS &&
                             uri?.pathSegments?.contains("part") == true,
                     )
+                    onDirty?.invoke()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: SecurityException) {
+                    stop()
+                } catch (error: Exception) {
+                    Log.w("MirrorChangeObserver", "mirror callback failed category=${error.javaClass.simpleName}")
                 }
-                onDirty?.invoke()
             }
         }
     }
 
-    fun start() {
-        if (started) return
-        resolver.registerContentObserver("content://sms".toUri(), true, observer)
-        resolver.registerContentObserver("content://mms".toUri(), true, observer)
-        resolver.registerContentObserver("content://mms-sms".toUri(), true, observer)
-        started = true
+    @Synchronized
+    fun start(): Boolean {
+        if (appContext.smsAccessState() != SmsAccessState.READY) {
+            stop()
+            return false
+        }
+        if (started) return false
+        callbacks = SupervisorJob(scope.coroutineContext[Job])
+        return try {
+            listOf("sms", "mms", "mms-sms").forEach {
+                resolver.registerContentObserver("content://$it".toUri(), true, observer)
+            }
+            started = true
+            Log.i("MirrorChangeObserver", "mirror observation started")
+            true
+        } catch (_: SecurityException) {
+            stop()
+            false
+        }
+    }
+
+    @Synchronized
+    fun stop() {
+        callbacks.cancel()
+        // 注册到一半时撤权，也清理已成功注册的 URI。
+        runCatching { resolver.unregisterContentObserver(observer) }
+        if (started) Log.i("MirrorChangeObserver", "mirror observation paused")
+        started = false
     }
 
     private suspend fun resolveKey(uri: Uri?): SourceMessageKey? {

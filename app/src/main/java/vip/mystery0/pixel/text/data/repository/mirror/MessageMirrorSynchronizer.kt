@@ -14,6 +14,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import vip.mystery0.pixel.text.data.source.SmsAccessException
+import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.data.db.mirror.*
 import vip.mystery0.pixel.text.data.source.mirror.*
 import vip.mystery0.pixel.text.domain.model.mirror.*
@@ -228,9 +230,16 @@ class MessageMirrorSynchronizer(
 
     /** 备份只等待 SMS；同一锁内完成新对账和快照，避免普通同步删除备份源。 */
     suspend fun <T> withSmsBackupSnapshot(snapshot: suspend (Long) -> T): T = withContext(Dispatchers.IO) {
+        source.requireAccess()
         MirrorSynchronizationLock.mutex.withLock {
+            source.requireAccess()
             val fresh = MirrorSyncStateEntity("SMS", generation = (sync.state("SMS")?.generation ?: 0) + 1, running = true)
-            check(scanPass(MessageTransport.SMS, fresh, canDelete = true, deadline = Long.MAX_VALUE)) {
+            val synchronized = scanPass(MessageTransport.SMS, fresh, canDelete = true, deadline = Long.MAX_VALUE)
+            source.requireAccess()
+            if (!synchronized && sync.state("SMS")?.error in BACKUP_PERMISSION_FAILURES) {
+                throw SmsAccessException(SmsAccessState.READ_PERMISSION_REQUIRED)
+            }
+            check(synchronized) {
                 "sms backup synchronization failed"
             }
             // 精确事件有独立 token，不能确认扫描期间新产生的不同事件。
@@ -241,12 +250,17 @@ class MessageMirrorSynchronizer(
                 check(++rounds <= 100) { "sms backup source is busy" }
                 for ((dirtyKey, _, sourceId, token) in dirty) {
                     currentCoroutineContext().ensureActive()
-                    check(refreshOne(SourceMessageKey(MessageTransport.SMS, requireNotNull(sourceId)))) {
-                        "sms backup targeted refresh failed"
+                    source.requireAccess()
+                    val refreshed = refreshOne(SourceMessageKey(MessageTransport.SMS, requireNotNull(sourceId)))
+                    source.requireAccess()
+                    if (!refreshed && sync.state("TARGETED")?.error in BACKUP_PERMISSION_FAILURES) {
+                        throw SmsAccessException(SmsAccessState.READ_PERMISSION_REQUIRED)
                     }
+                    check(refreshed) { "sms backup targeted refresh failed" }
                     sync.acknowledge(dirtyKey, token)
                 }
             }
+            source.requireAccess()
             snapshot(requireNotNull(sync.state("SMS")?.lastSuccessTime))
         }
     }
@@ -419,6 +433,10 @@ class MessageMirrorSynchronizer(
                 }
             }
         }
+    }
+
+    companion object {
+        private val BACKUP_PERMISSION_FAILURES = setOf("permission_denied", "read_permission_required", "default_app_required", "SmsAccessException", "SecurityException")
     }
 
     private fun parseColumns(value: String): Set<String> {

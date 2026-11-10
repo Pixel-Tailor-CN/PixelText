@@ -1,8 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -11,6 +9,8 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 class MessageMirrorWorker(context: Context, params: WorkerParameters) :
@@ -25,7 +25,7 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
     private val database: vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase by inject()
 
     override suspend fun doWork(): Result {
-        if (applicationContext.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+        if (applicationContext.smsAccessState() != SmsAccessState.READY) {
             return Result.success()
         }
         return try {
@@ -68,10 +68,12 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
                     }
                 }
             }
+            getKoin().get<VerificationCodeIndexScheduler>().scheduleReconcile()
             notifications.refresh()
             // reconcile 的总返回值也包含文件清理；清理失败由附件链退避，不阻塞元数据链。
             val moreMetadata = sync.dirtyCount() > 0 ||
                 listOf("ROUND", "SMS", "MMS").any { sync.state(it)?.complete != true }
+            if (applicationContext.smsAccessState() != SmsAccessState.READY) return Result.success()
             scheduler.enqueueAttachments()
             if (!moreMetadata) return Result.success()
             val yielded = listOf("SMS", "MMS").any {

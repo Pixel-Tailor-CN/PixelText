@@ -280,14 +280,14 @@ val appModule = module {
     single<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository> {
         get<vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl>()
     }
-    single<SpamRepository> { SpamRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single<SpamRepository> { SpamRepositoryImpl(get(), get(), get(), get(), get(), get(), get(), get(), get(), androidContext()) }
     single { vip.mystery0.pixel.text.data.repository.MirrorSpamScanner(get(), get(), get(), get(), get()) }
     single { KeywordSpamRepositoryImpl(get(), get(), get(), get(), get()) }
     single<KeywordSpamRepository> { get<KeywordSpamRepositoryImpl>() }
     single(createdAtStart = true) { vip.mystery0.pixel.text.worker.SpamModelRefreshObserver(androidContext(), get(), get()) }
     single { UnreadSmsCounter(get(), get(), get()) }
     single<VerificationCodeRepository> {
-        VerificationCodeRepositoryImpl(get(), get(), get(), get(), get())
+        VerificationCodeRepositoryImpl(get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
     factory { MockMessageFactory(get()) }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Password
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -82,7 +83,7 @@ fun HomeScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: CONVERSATIONS_ROUTE
     var areNavigationControlsVisible by remember { mutableStateOf(true) }
-    var isConversationFloatingActionButtonVisible by remember { mutableStateOf(true) }
+    var isConversationFloatingActionButtonVisible by remember { mutableStateOf(false) }
     var showNewChatSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val startChat = { showNewChatSheet = true }
@@ -158,7 +159,16 @@ fun HomeScreen(
                                     )
                                 }
                             },
-                            label = { Text(destination.label) },
+                            label = {
+                                Text(
+                                    destination.label,
+                                    style = if (currentRoute == destination.route) {
+                                        MaterialTheme.typography.labelMediumEmphasized
+                                    } else {
+                                        MaterialTheme.typography.labelMedium
+                                    },
+                                )
+                            },
                         )
                     }
                 }
@@ -199,6 +209,7 @@ fun HomeScreen(
                         )
                     },
                     onClick = startChat,
+                    elevation = FloatingActionButtonDefaults.loweredElevation(),
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 )

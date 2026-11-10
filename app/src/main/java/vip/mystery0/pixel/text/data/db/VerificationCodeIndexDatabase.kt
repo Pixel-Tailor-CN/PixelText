@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomWarnings
 import kotlinx.coroutines.flow.Flow
+import vip.mystery0.pixel.text.data.source.SmsIndexSummaryRow
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 
@@ -59,8 +60,30 @@ data class SmsScanStateEntity(
     @ColumnInfo(name = "metadata_fingerprint") val metadataFingerprint: String,
 )
 
+data class VerificationCodeBodyRow(val messageId: Long, val body: String?)
+
 @Dao
 interface VerificationCodeIndexDao {
+    @Query("SELECT COUNT(*) FROM mirror_message WHERE transport='SMS'")
+    suspend fun mirrorSmsCount(): Long
+
+    @Query("""
+        SELECT m.sourceId AS id, COALESCE(m.threadId, 0) AS threadId,
+            COALESCE(s.address, '') AS address, COALESCE(m.originalDate, m.timestamp, 0) AS date,
+            COALESCE(s.dateSent, 0) AS dateSent, COALESCE(m.boxType, 1) AS type
+        FROM mirror_message m INNER JOIN mirror_sms s ON s.localId=m.localId
+        WHERE m.transport='SMS' AND (:beforeMessageId IS NULL OR m.sourceId < :beforeMessageId)
+        ORDER BY m.sourceId DESC LIMIT :limit
+    """)
+    suspend fun mirrorSmsSummaries(beforeMessageId: Long?, limit: Int): List<SmsIndexSummaryRow>
+
+    @Query("""
+        SELECT m.sourceId AS messageId, s.body FROM mirror_message m
+        INNER JOIN mirror_sms s ON s.localId=m.localId
+        WHERE m.transport='SMS' AND m.sourceId IN (:messageIds)
+    """)
+    suspend fun mirrorSmsBodies(messageIds: List<Long>): List<VerificationCodeBodyRow>
+
     // 只展示已同步的原消息；时间和地址校验避免 Provider 复用 ID 时关联旧验证码。
     // 镜像暂缺只影响可见结果，不据此删除索引，后续同步由 Room 自动刷新。
     @Query(

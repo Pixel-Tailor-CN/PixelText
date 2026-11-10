@@ -232,7 +232,7 @@ fun SettingsScreen(
             permissionRefreshKey++
             val permissions = pendingPermissionRequest
             pendingPermissionRequest = emptyList()
-            if (permissions.isNotEmpty()) {
+            if (context.isDefaultSmsApp() && permissions.isNotEmpty()) {
                 permissionLauncher.launch(permissions.toTypedArray())
             }
         }

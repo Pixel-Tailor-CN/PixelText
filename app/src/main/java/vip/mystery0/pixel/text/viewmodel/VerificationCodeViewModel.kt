@@ -184,7 +184,7 @@ class VerificationCodeViewModel(
         viewModelScope.launch {
             scheduler.observeLatestState().collect { state ->
                 error.value = if (state == WorkInfo.State.FAILED) {
-                    "无法访问短信数据，请检查短信权限和默认短信应用设置"
+                    "验证码索引更新失败，请稍后重试"
                 } else {
                     null
                 }

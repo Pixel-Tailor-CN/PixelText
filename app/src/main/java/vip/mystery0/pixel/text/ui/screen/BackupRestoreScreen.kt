@@ -1,7 +1,12 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import android.Manifest
-import android.app.role.RoleManager
+import android.content.Intent
+import android.provider.Settings
+import androidx.core.net.toUri
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.backup.*
 import vip.mystery0.pixel.text.viewmodel.BackupViewModel
+import vip.mystery0.pixel.text.ui.isDefaultSmsApp
+import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import java.text.DateFormat
 import java.util.Date
 
@@ -45,7 +52,27 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     var disableCleanup by remember { mutableStateOf(true) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
-    val role = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { permissionVersion++ }
+    val role = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        permissionVersion++
+        if (context.isDefaultSmsApp() && context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissions.launch(Manifest.permission.READ_SMS)
+        }
+    }
+    LifecycleResumeEffect(Unit) {
+        permissionVersion++
+        onPauseOrDispose { }
+    }
+    val authorizationNeeded = remember(permissionVersion, state.authorizationRequired) {
+        state.authorizationRequired && context.smsAccessState() != SmsAccessState.READY
+    }
+    fun authorize() {
+        if (!context.isDefaultSmsApp()) role.launch(context.createDefaultSmsAppRequestIntent())
+        else if (context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissions.launch(Manifest.permission.READ_SMS)
+        } else {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+        }
+    }
     val create = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) viewModel.exportTo(uri.toString(), selection, if (encrypt) password.toCharArray() else null)
         password = ""; confirmation = ""
@@ -64,8 +91,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             selectionToken = state.preview?.token
         }
     }
-    val readable = remember(permissionVersion) { context.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED }
-    val defaultSms = remember(permissionVersion) { context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_SMS) }
     val preview = state.preview
     fun createFile() { create.launch("PixelText-${System.currentTimeMillis()}.ptbackup") }
 
@@ -80,7 +105,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             state.errorMessage?.let {
-                BackupFeedbackCard(title = "操作失败", description = it, isError = true)
+                BackupFeedbackCard(title = "操作失败", description = if (state.authorizationRequired && !authorizationNeeded) {
+                    "权限已恢复，请重新创建备份或重试恢复"
+                } else it, isError = true)
+                if (authorizationNeeded) {
+                    FilledTonalButton(onClick = ::authorize, enabled = !state.busy) { Text("授权") }
+                }
             }
             if (state.restoreProtected) {
                 BackupFeedbackCard(
@@ -88,13 +118,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                     description = "自动验证码清理暂缓。已写入的短信不会因取消而撤销。",
                 )
             }
-            if (!readable) OutlinedButton(
-                onClick = { permissions.launch(Manifest.permission.READ_SMS) }, enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("授予读取短信权限") }
-            if (!defaultSms) OutlinedButton(onClick = {
-                role.launch(context.getSystemService(RoleManager::class.java).createRequestRoleIntent(RoleManager.ROLE_SMS))
-            }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("设为默认短信应用（恢复短信需要）") }
 
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
@@ -140,7 +163,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         Button(
                             onClick = { if (encrypt) createFile() else warning = true },
                             enabled = selection.isNotEmpty() &&
-                                (BackupSection.SMS !in selection || readable) &&
                                 (!encrypt || (password.isNotEmpty() && password == confirmation)),
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("创建备份") }
@@ -173,8 +195,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
-                            onClick = { restoreConfirm = true }, enabled = selection.isNotEmpty() &&
-                                (BackupSection.SMS !in selection || (readable && defaultSms)),
+                            onClick = { restoreConfirm = true }, enabled = selection.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("恢复所选内容") }
                         TextButton(onClick = viewModel::cancel) { Text("关闭预览") }

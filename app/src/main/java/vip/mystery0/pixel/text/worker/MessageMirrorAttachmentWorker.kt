@@ -1,8 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -11,6 +9,8 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 /** 附件与下载恢复使用独立任务链，退避不会占住新短信的元数据同步队列。 */
@@ -25,7 +25,7 @@ class MessageMirrorAttachmentWorker(context: Context, params: WorkerParameters) 
     private val scheduler: MessageMirrorScheduler by inject()
 
     override suspend fun doWork(): Result {
-        if (applicationContext.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+        if (applicationContext.smsAccessState() != SmsAccessState.READY) {
             return Result.success()
         }
         return try {

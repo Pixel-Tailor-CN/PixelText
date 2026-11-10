@@ -1,14 +1,16 @@
 package vip.mystery0.pixel.text.data.repository
 
-import android.Manifest
 import android.content.Context
 import androidx.core.net.toUri
-import android.content.pm.PackageManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
+import vip.mystery0.pixel.text.data.source.smsAccessState
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.SmsAccessException
 import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.backup.*
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
@@ -65,7 +67,7 @@ class BackupRepositoryImpl(
             try {
                 var syncedAt: Long? = null
                 if (BackupSection.SMS in sections) {
-                    requireReadPermission()
+                    context.requireSmsAccess()
                     phase(BackupPhase.SYNCING_MIRROR)
                     // 导入器也需要镜像同步锁，必须在快照锁之前完成旧放行状态迁移。
                     spamImporter.ensureImported()
@@ -208,12 +210,17 @@ class BackupRepositoryImpl(
             } catch (error: Exception) {
                 // 不显示底层异常文本，避免数据库/URI/正文进入界面或日志。
                 val message = when (error) {
+                    is SmsAccessException -> error.state.userMessage
                     is BackupException -> error.message
-                    is SecurityException -> "权限或默认短信资格不可用，请检查后重试"
+                    is SecurityException -> if (context.smsAccessState() != SmsAccessState.READY) {
+                        context.smsAccessState().userMessage
+                    } else "无法访问所选文件，请重新选择文件后重试"
                     is net.lingala.zip4j.exception.ZipException -> "密码错误或备份文件损坏"
                     else -> "操作失败（${error.javaClass.simpleName}），已写入的数据会保留，请检查权限、文件和空间"
                 }
-                mutable.update { it.copy(phase = BackupPhase.FAILED, restoreProtected = safety.active, errorMessage = message) }
+                mutable.update { it.copy(phase = BackupPhase.FAILED, restoreProtected = safety.active, errorMessage = message,
+                    authorizationRequired = error is SmsAccessException ||
+                        (error is SecurityException && context.smsAccessState() != SmsAccessState.READY)) }
             } finally {
                 secret?.fill('\u0000')
                 if (failedOutputUri != null && mutable.value.phase != BackupPhase.COMPLETED) runCatching {
@@ -231,8 +238,7 @@ class BackupRepositoryImpl(
     }
     private fun newDirectory(): File = File(root, UUID.randomUUID().toString()).also { backupRequire(it.mkdirs(), "无法创建暂存目录") }
     private fun discardPreview() { inspected?.directory?.deleteRecursively(); inspected = null }
-    private fun hasReadPermission() = context.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-    private fun requireReadPermission() { backupRequire(hasReadPermission(), "请授予读取短信权限后重试") }
+    private fun hasReadPermission() = context.smsAccessState() == SmsAccessState.READY
     private fun smsCount(directory: File): Long {
         val file = File(directory, "databases/message_mirror.db")
         if (!file.exists()) return 0

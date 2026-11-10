@@ -1,8 +1,6 @@
 package vip.mystery0.pixel.text.worker
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -12,6 +10,7 @@ import org.koin.core.component.inject
 import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationCoordinator
 import vip.mystery0.pixel.text.data.repository.initialization.DataInitializationRepository
 import vip.mystery0.pixel.text.data.repository.mms.MmsTextIndexer
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
 import vip.mystery0.pixel.text.domain.model.InitializationStatus
 import vip.mystery0.pixel.text.domain.model.InitializationStepResult
 
@@ -27,9 +26,7 @@ class DataInitializationWorker(context: Context, parameters: WorkerParameters) :
         val initial = repository.read()
         if (initial.isCurrent || initial.isNewerVersion) return Result.success()
         return try {
-            if (applicationContext.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-                throw SecurityException("sms_permission_required")
-            }
+            applicationContext.requireSmsAccess()
             when (val result = coordinator.runSlice()) {
                 InitializationStepResult.Complete -> {
                     indexer.start()

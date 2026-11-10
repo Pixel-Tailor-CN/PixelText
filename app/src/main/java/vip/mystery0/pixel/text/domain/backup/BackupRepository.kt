@@ -20,6 +20,7 @@ data class BackupOperationState(
     val processed: Long = 0, val total: Long? = null,
     val preview: BackupPreview? = null, val summary: BackupSummary = BackupSummary(),
     val errorMessage: String? = null, val restoreProtected: Boolean = false,
+    val authorizationRequired: Boolean = false,
 ) {
     val busy: Boolean get() = phase in setOf(BackupPhase.SYNCING_MIRROR, BackupPhase.SNAPSHOTTING,
         BackupPhase.EXPORTING, BackupPhase.VALIDATING, BackupPhase.RESTORING, BackupPhase.REBUILDING)

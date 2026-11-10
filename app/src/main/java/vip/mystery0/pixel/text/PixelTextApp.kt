@@ -3,8 +3,14 @@ package vip.mystery0.pixel.text
 import android.app.Application
 import android.app.Activity
 import android.os.Bundle
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.provider.Telephony
+import androidx.core.content.ContextCompat
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import android.util.Log
 import vip.mystery0.pixel.text.domain.settings.AppIdentityRepository
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
@@ -21,6 +27,13 @@ import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
 class PixelTextApp : Application() {
+    private var mirrorAccessReady = false
+    private val smsRoleReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Telephony.Sms.Intents.ACTION_DEFAULT_SMS_PACKAGE_CHANGED) startMirror()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         SmsNotificationHelper.createNotificationChannel(this)
@@ -41,6 +54,11 @@ class PixelTextApp : Application() {
 
         getKoin().get<VerificationCodeCleanupScheduler>().sync()
         getKoin().get<MessageMirrorScheduler>().cancelLegacyPeriodic()
+        ContextCompat.registerReceiver(
+            this, smsRoleReceiver,
+            IntentFilter(Telephony.Sms.Intents.ACTION_DEFAULT_SMS_PACKAGE_CHANGED),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
         startMirror()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) = startMirror()
@@ -58,9 +76,19 @@ class PixelTextApp : Application() {
         getKoin().get<vip.mystery0.pixel.text.sms.SmsSendCoordinator>().scheduleRecovery()
         getKoin().get<vip.mystery0.pixel.text.mms.outgoing.MmsSendCoordinator>().scheduleRecovery()
         getKoin().get<vip.mystery0.pixel.text.data.source.ContactDataSource>().warmUp()
+        val observer = getKoin().get<MirrorChangeObserver>()
+        val accessReady = smsAccessState() == SmsAccessState.READY
+        if (!accessReady) {
+            mirrorAccessReady = false
+            observer.stop()
+            return
+        }
         getKoin().get<vip.mystery0.pixel.text.worker.DataInitializationScheduler>().checkOnLaunch()
-        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
-        getKoin().get<MirrorChangeObserver>().start()
-
+        val observationStarted = observer.start()
+        if (!mirrorAccessReady || observationStarted) {
+            mirrorAccessReady = true
+            // 角色重新取得后补齐暂停期间的消息与删除，不能只等下一个 Provider 事件。
+            getKoin().get<MessageMirrorScheduler>().schedule(forceReconcile = true, reason = "sms_access_restored")
+        }
     }
 }

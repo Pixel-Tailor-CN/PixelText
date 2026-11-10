@@ -15,6 +15,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,7 +23,8 @@ data class CopiedMirrorFile(val relativePath: String, val byteCount: Long, val s
 
 /** 源文件名仅作元数据；所有文件均使用随机名，且位于不参与备份的私有目录。 */
 class MirrorAttachmentStore(context: Context) {
-    private val resolver = context.applicationContext.contentResolver
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
     private val root = File(context.noBackupFilesDir, "message-mirror").apply { mkdirs() }.canonicalFile
 
     fun file(relativePath: String): File {
@@ -59,6 +61,7 @@ class MirrorAttachmentStore(context: Context) {
         try {
             val digest = MessageDigest.getInstance("SHA-256")
             var total = 0L
+            appContext.requireSmsAccess()
             val input = resolver.openInputStream("content://mms/part/$partId".toUri())
                 ?: throw FileNotFoundException("null_attachment_stream")
             input.use { source ->
@@ -66,6 +69,7 @@ class MirrorAttachmentStore(context: Context) {
                     val buffer = ByteArray(64 * 1024)
                     while (true) {
                         currentCoroutineContext().ensureActive()
+                        appContext.requireSmsAccess()
                         val count = source.read(buffer)
                         if (count < 0) break
                         if (count == 0) continue

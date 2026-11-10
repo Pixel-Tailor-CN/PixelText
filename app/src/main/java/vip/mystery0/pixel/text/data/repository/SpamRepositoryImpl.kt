@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.data.repository
 
+import android.content.Context
+import vip.mystery0.pixel.text.data.source.SmsAccessState
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -27,10 +30,13 @@ class SpamRepositoryImpl(
     private val synchronizer: MessageMirrorSynchronizer,
     private val importer: MirrorSpamLegacyImporter,
     private val keywords: KeywordSpamRepositoryImpl,
+    private val context: Context,
 ) : SpamRepository {
     private val dao = database.spamDao()
 
     override suspend fun ensureReady() = withContext(Dispatchers.IO) {
+        // 旧版恢复可能查询系统原件；暂停期间直接展示已保存的本地判定。
+        if (context.smsAccessState() != SmsAccessState.READY) return@withContext
         importer.ensureImported()
         whitelist.reconcileMessageWhitelistIfNeeded()
         learning.reconcileMessageCorrectionsIfNeeded()

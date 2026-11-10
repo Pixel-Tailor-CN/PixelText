@@ -6,6 +6,9 @@ import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorIncrementalSy
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.data.repository.mirror.MirrorChangeObserver
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
+import vip.mystery0.pixel.text.data.source.smsAccessState
+import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 
 /** 兼容旧接口；会话是本地消息的投影，不再独立扫描系统摘要。 */
@@ -24,11 +27,14 @@ class ConversationCacheRepository(
         return state.completedCollections.containsAll(setOf("SMS", "MMS"))
     }
     suspend fun fullSync() {
+        context.requireSmsAccess()
         synchronizer.requestAttachmentVerification()
         synchronizer.reconcile()
         MessageMirrorScheduler(context).schedule(reason = "manual_repair")
     }
     suspend fun refreshIncremental(requireComplete: Boolean = false) {
+        // 展示已有镜像不要求系统权限，也不向 Provider 发起查询。
+        if (context.smsAccessState() != SmsAccessState.READY) return
         if (!isCacheReady()) {
             synchronizer.reconcile()
         }
@@ -41,7 +47,7 @@ class ConversationCacheRepository(
         // 唤醒通知/附件后处理；若增量同步留下需要完整确认的 dirty，Worker 会接管。
         MessageMirrorScheduler(context).schedule()
         // 首次发布前必须确认新消息已追平；失败交给订阅重试，不能把旧镜像当作新结果。
-        if (requireComplete) check(!result.remaining && !result.requiresFullReconcile) {
+        if (requireComplete && context.smsAccessState() == SmsAccessState.READY) check(!result.remaining && !result.requiresFullReconcile) {
             "message synchronization incomplete"
         }
     }

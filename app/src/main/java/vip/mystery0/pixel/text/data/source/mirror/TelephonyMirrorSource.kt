@@ -16,6 +16,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.data.db.mirror.*
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
+import vip.mystery0.pixel.text.data.source.SmsAccessException
 import vip.mystery0.pixel.text.domain.model.mirror.*
 import java.nio.charset.Charset
 
@@ -32,7 +34,10 @@ data class ThreadSources(
 
 /** 只读取授权的 Telephony Provider；任何失败都不会伪装成空集合。 */
 class TelephonyMirrorSource(context: Context) {
-    private val resolver = context.applicationContext.contentResolver
+    private val appContext = context.applicationContext
+    private val resolver = appContext.contentResolver
+
+    fun requireAccess() = appContext.requireSmsAccess()
 
     suspend fun readSmsPage(afterId: Long?, limit: Int = 200): SourceRead<List<ProviderRowSnapshot>> =
         readPage("sms", afterId, limit)
@@ -144,6 +149,7 @@ class TelephonyMirrorSource(context: Context) {
             val signal = CancellationSignal()
             continuation.invokeOnCancellation { signal.cancel() }
             try {
+                requireAccess()
                 val queryArgs = Bundle().apply {
                     selection?.let { putString(ContentResolver.QUERY_ARG_SQL_SELECTION, it) }
                     args?.let { putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, it) }
@@ -160,6 +166,7 @@ class TelephonyMirrorSource(context: Context) {
                         if (!continuation.isActive) throw CancellationException()
                         rows += ProviderRowSnapshot.fromCursor(it)
                     }
+                    requireAccess()
                     if (continuation.isActive) continuation.resumeWith(Result.success(SourceRead.Success(rows, columns)))
                 }
             } catch (error: Exception) {
@@ -167,6 +174,7 @@ class TelephonyMirrorSource(context: Context) {
                     continuation.cancel(error)
                 } else {
                     val category = when (error) {
+                        is SmsAccessException -> error.state.name.lowercase()
                         is SecurityException -> "permission_denied"
                         is IllegalStateException -> if (error.message == "null_cursor") "null_cursor" else "provider_state"
                         else -> error.javaClass.simpleName

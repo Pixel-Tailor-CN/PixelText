@@ -2,10 +2,8 @@ package vip.mystery0.pixel.text.ui.screen
 
 import androidx.compose.runtime.mutableIntStateOf
 
-import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
-import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -98,20 +96,11 @@ fun VerificationCodeScreen(
     val menuSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val context = LocalContext.current
     var accessRefreshKey by remember { mutableIntStateOf(0) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        accessRefreshKey++
-        if (granted) viewModel.refresh()
-    }
     val roleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
         accessRefreshKey++
-        if (context.isDefaultSmsApp()) viewModel.refresh()
-    }
-    val hasReadSms = remember(accessRefreshKey) {
-        context.checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        viewModel.refresh()
     }
     val isDefaultSms = remember(accessRefreshKey) {
         context.isDefaultSmsApp()
@@ -188,20 +177,6 @@ fun VerificationCodeScreen(
                 .consumeWindowInsets(padding),
         ) {
             when {
-                !hasReadSms -> CenterMessage(
-                    message = "需要短信读取权限才能识别验证码",
-                    loading = false,
-                    actionLabel = "授予权限",
-                    onAction = { permissionLauncher.launch(Manifest.permission.READ_SMS) },
-                )
-
-                !isDefaultSms -> CenterMessage(
-                    message = "请将本应用设为默认短信应用后重试",
-                    loading = false,
-                    actionLabel = "设为默认",
-                    onAction = { requestDefaultSmsRole(context, roleLauncher::launch) },
-                )
-
                 state.isInitializing -> CenterMessage("正在识别验证码…", true)
                 state.errorMessage != null && state.pages.isEmpty() -> CenterMessage(
                     message = state.errorMessage!!,
