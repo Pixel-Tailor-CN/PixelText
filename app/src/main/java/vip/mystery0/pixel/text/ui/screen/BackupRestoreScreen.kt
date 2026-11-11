@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
@@ -143,16 +145,23 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
 
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
-                    BackupTaskCard(title = "导出与安全") {
+                    BackupTaskCard(title = "导出备份") {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .toggleable(value = encrypt, role = Role.Switch, onValueChange = { encrypt = it }),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text("加密导出", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    if (encrypt) "使用密码保护备份文件" else "文件不加密，持有者可直接读取短信",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                            Switch(checked = encrypt, onCheckedChange = { encrypt = it })
+                            Switch(checked = encrypt, onCheckedChange = null)
                         }
                         if (encrypt) {
                             BackupPasswordField(password = password, onPasswordChange = { password = it })
@@ -161,7 +170,9 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                                 value = confirmation,
                                 onValueChange = { confirmation = it },
                                 label = { Text("确认密码") },
-                                supportingText = if (mismatch) ({ Text("两次输入的密码不一致") }) else null,
+                                supportingText = {
+                                    Text(if (mismatch) "两次输入的密码不一致" else "建议至少 12 位，丢失后无法找回")
+                                },
                                 isError = mismatch,
                                 visualTransformation = PasswordVisualTransformation(),
                                 singleLine = true,
@@ -169,7 +180,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             )
                         }
                         Text(
-                            "建议使用至少 12 位强密码，丢失无法找回。文件大小和条目名称等元信息仍可能可见。系统文件选择器可能包含云盘，请自行选择保存位置。",
+                            "不含彩信、附件及应用名称与图标。文件大小和条目名称仍可能可见，保存位置由你自己选择。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -178,13 +189,18 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("导出备份") }
                     }
-                    BackupTaskCard(title = "从文件恢复") {
+                    BackupTaskCard(title = "恢复备份") {
+                        Text(
+                            "选择备份文件后会先显示预览，确认后才开始恢复。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         BackupPasswordField(
                             password = restorePassword,
                             onPasswordChange = { restorePassword = it },
                             label = "文件密码（未加密可留空）",
                         )
-                        OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
                             Text("选择备份文件")
                         }
                     }
