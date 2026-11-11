@@ -54,13 +54,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import vip.mystery0.pixel.text.ui.screen.settings.SettingsPreference as Preference
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.AppDisplayName
 import vip.mystery0.pixel.text.domain.settings.AppIconStyle
 import vip.mystery0.pixel.text.domain.settings.AppIdentity
 import vip.mystery0.pixel.text.viewmodel.AppIdentityViewModel
+import vip.mystery0.pixel.text.ui.screen.settings.SettingsPreference as Preference
 
 @Composable
 fun AppIdentitySettingsPreference(
@@ -129,7 +129,8 @@ fun AppIdentitySettingsScreen(
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column(
-                    modifier = Modifier.navigationBarsPadding()
+                    modifier = Modifier
+                        .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -153,7 +154,10 @@ fun AppIdentitySettingsScreen(
     ) { paddingValues ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize().consumeWindowInsets(paddingValues).selectableGroup(),
+            modifier = Modifier
+                .fillMaxSize()
+                .consumeWindowInsets(paddingValues)
+                .selectableGroup(),
             contentPadding = PaddingValues(
                 start = 20.dp,
                 top = paddingValues.calculateTopPadding() + 20.dp,
@@ -169,7 +173,9 @@ fun AppIdentitySettingsScreen(
                     shape = RoundedCornerShape(20.dp),
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -230,9 +236,11 @@ private fun AppIconStyleCard(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().selectable(
-            selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick,
-        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick,
+            ),
         shape = RoundedCornerShape(20.dp),
         color = if (selected) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceContainer,
@@ -240,7 +248,9 @@ private fun AppIconStyleCard(
     ) {
         Box {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -249,7 +259,10 @@ private fun AppIconStyleCard(
             }
             if (selected) {
                 Surface(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).size(24.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(24.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                 ) {
@@ -267,6 +280,7 @@ private fun AppIdentityIcon(style: AppIconStyle, modifier: Modifier = Modifier) 
         AppIconStyle.VIOLET, AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_violet
         AppIconStyle.BLUE -> R.mipmap.ic_launcher_identity_blue
         AppIconStyle.GREEN -> R.mipmap.ic_launcher_identity_green
+        AppIconStyle.AZURE -> R.mipmap.ic_launcher_identity_message
         AppIconStyle.CLASSIC -> R.mipmap.ic_launcher
     }
     // 使用平台的自适应图标蒙版，避免 Compose 直接读取 adaptive-icon XML。

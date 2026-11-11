@@ -15,6 +15,7 @@ enum class AppIconStyle(val storageValue: String, val label: String) {
     VIOLET("violet", "叠语"),
     BLUE("blue", "原点"),
     GREEN("green", "小零"),
+    AZURE("azure", "信息"),
     // 保留旧标识以关闭升级前启用的启动器别名，不再提供该选项。
     APRICOT("apricot", "叠语"),
     CLASSIC("classic", "经典");
