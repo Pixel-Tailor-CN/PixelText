@@ -56,7 +56,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     var showExportContentDialog by remember { mutableStateOf(false) }
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
-    var disableCleanup by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
@@ -360,18 +359,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         confirmButton = { TextButton(onClick = { restoreConfirm = false; viewModel.restore(preview.token, selection) }) { Text("开始恢复") } },
         dismissButton = { TextButton(onClick = { restoreConfirm = false }) { Text("取消") } })
     if (finishConfirm) AlertDialog(onDismissRequest = { finishConfirm = false }, title = { Text("结束恢复保护") },
-        text = { Column {
-            Text("恢复保护结束后，已启用的常规验证码清理可能删除刚恢复的过期验证码。中断后的计数以最后持久化进度为准，重新导入会再次去重。")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = disableCleanup, onCheckedChange = { disableCleanup = it })
-                Text("暂停验证码自动删除")
-            }
-            Text(
-                "勾选后，本次恢复结束时不会恢复验证码自动清理；之后可在设置中手动开启。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } }, confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge(disableCleanup) }) { Text("确认结束") } },
+        text = { Text("会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。已写入的短信保留，重新导入会去重。") },
+        confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge() }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { finishConfirm = false }) { Text("取消") } })
 }
 

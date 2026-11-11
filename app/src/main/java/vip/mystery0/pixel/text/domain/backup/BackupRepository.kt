@@ -31,5 +31,5 @@ interface BackupRepository {
     fun inspect(uri: String, password: CharArray?)
     fun restore(token: String, sections: Set<BackupSection>)
     fun cancel()
-    fun acknowledgeResult(disableVerificationCleanup: Boolean)
+    fun acknowledgeResult()
 }

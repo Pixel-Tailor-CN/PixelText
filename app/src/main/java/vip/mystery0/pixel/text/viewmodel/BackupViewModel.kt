@@ -10,5 +10,5 @@ class BackupViewModel(private val repository: BackupRepository) : ViewModel() {
     fun inspect(uri: String, password: CharArray?) = repository.inspect(uri, password)
     fun restore(token: String, sections: Set<BackupSection>) = repository.restore(token, sections)
     fun cancel() = repository.cancel()
-    fun acknowledge(disableCleanup: Boolean) = repository.acknowledgeResult(disableCleanup)
+    fun acknowledge() = repository.acknowledgeResult()
 }

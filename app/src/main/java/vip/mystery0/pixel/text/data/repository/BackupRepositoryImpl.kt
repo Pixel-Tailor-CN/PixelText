@@ -184,7 +184,7 @@ class BackupRepositoryImpl(
                     }
                 }
                 // 恢复和最终对账都成功后自动结束保护；中断或失败时仍保留保护等待用户确认。
-                safety.finish()
+                finishProtection()
                 mutable.update {
                     it.copy(
                         phase = BackupPhase.COMPLETED,
@@ -211,14 +211,19 @@ class BackupRepositoryImpl(
         }
     }
 
-    override fun acknowledgeResult(disableVerificationCleanup: Boolean) {
+    override fun acknowledgeResult() {
         start(BackupPhase.REBUILDING) {
-            if (disableVerificationCleanup) backupRequire(appSettings.restorePortablePreferences(listOf(
-                PortablePreference("verification_code_auto_delete_enabled", "boolean", "false"))), "无法关闭验证码清理")
-            safety.finish()
+            finishProtection()
             discardPreview()
             mutable.value = BackupOperationState()
         }
+    }
+
+    /** 结束保护时总会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。 */
+    private suspend fun finishProtection() {
+        backupRequire(appSettings.restorePortablePreferences(listOf(
+            PortablePreference("verification_code_auto_delete_enabled", "boolean", "false"))), "无法暂停验证码清理")
+        safety.finish()
     }
 
     @Synchronized private fun start(phase: BackupPhase, secret: CharArray? = null, failedOutputUri: String? = null, action: suspend () -> Unit): Boolean {
