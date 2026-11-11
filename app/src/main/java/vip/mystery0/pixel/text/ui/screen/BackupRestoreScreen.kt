@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -30,13 +31,14 @@ import vip.mystery0.pixel.text.domain.backup.*
 import vip.mystery0.pixel.text.viewmodel.BackupViewModel
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
 
 @Composable
 fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel = koinViewModel()) {
     val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
     val state by viewModel.state.collectAsState()
     val scrollState = rememberScrollState()
     var selection by rememberSaveable(stateSaver = listSaver(
@@ -192,11 +194,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             onPasswordChange = { restorePassword = it },
                             label = "文件密码（未加密可留空）",
                         )
-                        Text(
-                            "备份文件通常位于 Downloads 文件夹。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                         OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
                             Text("选择备份文件")
                         }
@@ -206,7 +203,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("短信数量 ${preview.smsCount}", style = MaterialTheme.typography.titleLarge)
                             Text(
-                                "备份时间：${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}",
+                                "备份时间：${SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", locale).format(Date(preview.createdAt))}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
