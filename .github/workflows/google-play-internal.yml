@@ -190,6 +190,8 @@ jobs:
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
           tracks: internal
           status: completed
+          # 内部测试无需审核；自动送审会被 Play 拒绝并导致提交渠道失败。
+          changesNotSentForReview: true
           releaseName: ${{ steps.release-metadata.outputs.name }}
 
       - name: Cleanup Keystore

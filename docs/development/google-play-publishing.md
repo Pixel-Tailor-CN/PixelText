@@ -66,6 +66,8 @@ Get-Content -Raw -LiteralPath 'C:\secure\pixeltext-publisher.json' | gh secret s
 
 当前上传步骤不自动跳过已上传版本：若上传已经成功，重复上传会明确失败。若只是凭据校验或构建阶段失败，修复配置后可以重跑；若包已经上传但提交渠道失败，应先在 Play Console 确认状态，必要时复用已上传的包完成发布，不盲目重新上传。
 
+上传步骤使用 `changesNotSentForReview: true`。内部测试轨道不需要审核，若省略该参数，Play 会以 `Changes cannot be sent for review automatically. Please set the query parameter changesNotSentForReview to true.` 拒绝提交，表现为“包已上传但发布失败”。使用该参数后编辑会直接提交到内部测试轨道，不自动送审；需要审核的变更在 Console 中手动送审。
+
 `status: completed` 表示发布到内部测试，不会推广到生产。已有正式版本仍可能存在待处理编辑、审核或权限状态，须以实际 API 返回和 Console 状态为准。
 
 常见失败：
