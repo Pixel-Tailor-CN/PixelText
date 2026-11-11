@@ -128,18 +128,27 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            state.errorMessage?.let {
-                BackupFeedbackCard(title = "操作失败", description = if (state.authorizationRequired && !authorizationNeeded) {
-                    "权限已恢复，请重新创建备份或重试恢复"
-                } else it, isError = true)
+            // 恢复中断时下方的保护提示已说明保留与后续操作，不再重复一条停止提示。
+            val suppressInterruptedNotice =
+                state.phase == BackupPhase.INTERRUPTED && state.restoreProtected && !state.busy
+            state.errorMessage?.takeIf { !suppressInterruptedNotice }?.let {
+                BackupFeedbackCard(
+                    // 用户主动停止不是失败，标题按阶段区分。
+                    title = if (state.phase == BackupPhase.INTERRUPTED) "操作已停止" else "操作失败",
+                    description = if (state.authorizationRequired && !authorizationNeeded) {
+                        "权限已恢复，请重新创建备份或重试恢复"
+                    } else it,
+                    isError = state.phase != BackupPhase.INTERRUPTED,
+                )
                 if (authorizationNeeded) {
                     FilledTonalButton(onClick = ::authorize, enabled = !state.busy) { Text("授权") }
                 }
             }
-            if (state.restoreProtected) {
+            // 保护只在恢复中断时提示；进行中和已完成时都不应显示“上次恢复未完成”。
+            if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
                 BackupFeedbackCard(
-                    title = "恢复保护已开启",
-                    description = "自动验证码清理暂缓。已写入的短信不会因取消而撤销；确认结果后才会恢复常规清理。",
+                    title = "上次恢复未完成",
+                    description = "已写入的短信会保留，验证码自动清理暂缓。可以重新导入继续，或确认结果后结束保护。",
                 )
             }
 
@@ -281,14 +290,17 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 }
             }
             if (state.phase == BackupPhase.COMPLETED) {
-                Text("操作完成", style = MaterialTheme.typography.titleMedium)
+                BackupFeedbackCard(
+                    title = "恢复完成",
+                    description = "短信已写入并完成同步，可以直接返回使用。",
+                )
             }
             if (state.restoreProtected || state.summary.inserted + state.summary.existing > 0) {
                 BackupTaskCard(title = "恢复结果", cornerRadius = 28.dp) {
                     BackupResultDetails(state.summary)
-                    if (!state.busy) {
+                    if (!state.busy && state.restoreProtected) {
                         Button(onClick = { finishConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("确认结果并结束恢复保护")
+                            Text("确认结果并结束保护")
                         }
                         if (preview == null) {
                             BackupPasswordField(
@@ -297,9 +309,11 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                                 label = "文件密码（未加密可留空）",
                             )
                             OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                                Text("重新选择文件并预览恢复")
+                                Text("重新选择文件继续恢复")
                             }
                         }
+                    } else if (!state.busy) {
+                        TextButton(onClick = viewModel::cancel) { Text("完成") }
                     }
                 }
             }

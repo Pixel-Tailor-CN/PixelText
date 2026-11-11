@@ -52,7 +52,8 @@ class BackupRepositoryImpl(
     private val mutable = MutableStateFlow(BackupOperationState(
         phase = if (safety.active) BackupPhase.INTERRUPTED else BackupPhase.IDLE,
         summary = safety.summary(), restoreProtected = safety.active,
-        errorMessage = if (safety.active) "上次恢复未结束。已写入的短信会保留，可重新导入或确认结束保护。" else null,
+        // 中断不是失败，由页面上的保护提示说明，避免同时出现两个相似提示。
+        errorMessage = null,
     ))
     override val state: StateFlow<BackupOperationState> = mutable.asStateFlow()
 
@@ -182,11 +183,13 @@ class BackupRepositoryImpl(
                         throw SmsAccessException(SmsAccessState.READ_PERMISSION_REQUIRED)
                     }
                 }
+                // 恢复和最终对账都成功后自动结束保护；中断或失败时仍保留保护等待用户确认。
+                safety.finish()
                 mutable.update {
                     it.copy(
                         phase = BackupPhase.COMPLETED,
                         preview = null,
-                        restoreProtected = true
+                        restoreProtected = false
                     )
                 }
                 }
@@ -227,7 +230,11 @@ class BackupRepositoryImpl(
                 action()
             } catch (_: CancellationException) {
                 mutable.update { it.copy(phase = BackupPhase.INTERRUPTED, restoreProtected = safety.active,
-                    errorMessage = "操作已取消，已恢复的数据不会撤销；若曾开始导出，请检查目标文件是否完整") }
+                    errorMessage = if (phase == BackupPhase.EXPORTING) {
+                        "操作已停止，请检查已保存的备份文件是否完整"
+                    } else {
+                        "操作已停止，已写入的短信会保留，重新导入会自动去重"
+                    }) }
             } catch (error: Exception) {
                 // 不显示底层异常文本，避免数据库/URI/正文进入界面或日志。
                 val message = when (error) {
