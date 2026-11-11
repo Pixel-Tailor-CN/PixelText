@@ -143,18 +143,6 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
 
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
-                    BackupTaskCard(title = "备份内容") {
-                        Text(
-                            "不含彩信、附件及应用名称与图标。点击导出时选择要备份的内容。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            "当前已选 ${selection.size} 项",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
                     BackupTaskCard(title = "导出与安全") {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
