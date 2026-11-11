@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,7 +89,7 @@ fun MessageComposer(
     val owner = LocalLifecycleOwner.current
     val consent = remember(context) { context.getSharedPreferences("mms_send_consent", Context.MODE_PRIVATE) }
     var menu by remember { mutableStateOf(false) }
-    var simMenu by remember { mutableStateOf(false) }
+    var simSheet by remember { mutableStateOf(false) }
     var confirm by rememberSaveable { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
     var simPermissionRequested by rememberSaveable { mutableStateOf(false) }
@@ -234,30 +236,44 @@ fun MessageComposer(
                 }
             }
         }
+        // 只有一张卡时不需要选择，直接显示当前 SIM，避免多点一次。
+        val currentSim = state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }
+        val canChooseSim = state.simPermissionGranted && state.sims.size > 1
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (isMms) "MMS · 彩信" else "SMS · 短信", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
-            Box {
-                val sim = state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }
-                TextButton(onClick = {
-                    if (state.simPermissionGranted) simMenu = true else authorizeSim()
-                }, enabled = enabled && (!state.simPermissionGranted || state.sims.isNotEmpty()),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp), modifier = Modifier.heightIn(min = 48.dp)) {
+            when {
+                !state.simPermissionGranted -> TextButton(
+                    onClick = ::authorizeSim,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
                     Icon(Icons.Default.SimCard, null, Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(when {
-                        !state.simPermissionGranted -> "尚未授权"
-                        state.sims.isEmpty() -> "未检测到可用 SIM"
-                        else -> sim?.displayName ?: "选择 SIM"
-                    }, style = MaterialTheme.typography.labelSmall)
-                    if (state.simPermissionGranted && state.sims.isNotEmpty()) Icon(Icons.Default.ArrowDropDown, null, Modifier.size(16.dp))
-                    else if (!state.simPermissionGranted) Text(" · 授权", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.width(6.dp))
+                    Text("授权使用 SIM", style = MaterialTheme.typography.labelSmall)
                 }
-                DropdownMenu(expanded = simMenu, onDismissRequest = { simMenu = false }) {
-                    state.sims.forEach { card ->
-                        DropdownMenuItem(text = { Text(card.displayName) }, onClick = { simMenu = false; viewModel.edit { it.copy(subscriptionId = card.subscriptionId) } })
-                    }
-                    if (state.sims.isEmpty()) DropdownMenuItem(text = { Text("未检测到可用 SIM") }, enabled = false, onClick = {})
+                state.sims.isEmpty() -> Text(
+                    "未检测到可用 SIM",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+                )
+                else -> TextButton(
+                    onClick = { if (enabled) simSheet = true },
+                    // 单卡没有可选项，保留同一个位置展示当前卡即可。
+                    enabled = enabled && canChooseSim,
+                    contentPadding = PaddingValues(start = 10.dp, end = if (canChooseSim) 4.dp else 10.dp, top = 0.dp, bottom = 0.dp),
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Default.SimCard, null, Modifier.size(14.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        currentSim?.displayName ?: "选择 SIM",
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (canChooseSim) Icon(Icons.Default.ArrowDropDown, null, Modifier.size(18.dp))
                 }
             }
         }
@@ -289,6 +305,66 @@ fun MessageComposer(
                 AttachmentAction("联系人", Icons.Default.Person) { menu = false; localError = null; contactPicker.launch() }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        }
+    }
+    if (simSheet) {
+        val currentId = draft?.subscriptionId
+        ModalBottomSheet(onDismissRequest = { simSheet = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text(
+                    "选择发送 SIM",
+                    Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    "短信会通过所选 SIM 发送，选择只影响当前会话。",
+                    Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.sims.forEach { card ->
+                    val selected = card.subscriptionId == currentId
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .toggleable(
+                                value = selected,
+                                role = Role.RadioButton,
+                                onValueChange = { checked ->
+                                    if (checked) {
+                                        simSheet = false
+                                        viewModel.edit { it.copy(subscriptionId = card.subscriptionId) }
+                                    }
+                                },
+                            )
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+                            )
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Icon(
+                            Icons.Default.SimCard,
+                            null,
+                            Modifier.size(20.dp),
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(card.displayName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                "卡槽 ${card.slotIndex + 1}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (selected) {
+                            Text("当前使用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
         }
     }
     if (confirm) {
