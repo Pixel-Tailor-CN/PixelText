@@ -10,5 +10,6 @@ interface KeywordSpamRepository {
     suspend fun save(id: Long?, keyword: String): KeywordSaveResult
     suspend fun delete(id: Long): Boolean
     suspend fun updateMessageMatch(messageId: Long): Boolean
+    suspend fun rebuildAllMatches(): Int
     suspend fun rebuildMatches(messages: List<KeywordSpamMessage>): Int
 }

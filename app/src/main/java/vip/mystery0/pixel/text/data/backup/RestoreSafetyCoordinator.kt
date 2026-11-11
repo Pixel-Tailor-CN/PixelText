@@ -24,6 +24,22 @@ class RestoreSafetyCoordinator(private val context: Context) {
         action()
     }
 
+    /** 先批量持久化历史消息身份，再一次性写入 Provider，覆盖批量写入的中断窗口。 */
+    suspend fun <T> insertHistoricalBatch(values: List<android.content.ContentValues>, action: () -> T): T =
+        deletionGate.withLock {
+            check(active)
+            history.beginTransaction()
+            try {
+                values.forEach { value ->
+                    history.execSQL("INSERT OR IGNORE INTO historical VALUES(?)", arrayOf(identity(value)))
+                }
+                history.setTransactionSuccessful()
+            } finally {
+                history.endTransaction()
+            }
+            action()
+        }
+
     /** 不重放历史消息的通知；恢复期间仅暂停新收信的自动操作，不阻断其通知。 */
     suspend fun liveMessageEffects(messageId: Long, action: suspend (allowAutoAction: Boolean) -> Unit) = deletionGate.withLock {
         if (active) {

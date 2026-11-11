@@ -15,8 +15,9 @@ import vip.mystery0.pixel.text.BuildConfig
 import vip.mystery0.pixel.text.data.backup.*
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
+import vip.mystery0.pixel.text.data.repository.mirror.RestoreSyncCoordinator
+import vip.mystery0.pixel.text.worker.MessageMirrorScheduler
 import vip.mystery0.pixel.text.domain.backup.*
-import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.spam.KeywordSpamRepository
 import java.io.File
@@ -34,10 +35,11 @@ class BackupRepositoryImpl(
     private val synchronizer: MessageMirrorSynchronizer,
     private val appSettings: AppSettingsRepositoryImpl,
     private val verification: VerificationCodeRepository,
-    private val messages: MessageRepository,
     private val keywords: KeywordSpamRepository,
     private val initializationGuard: vip.mystery0.pixel.text.data.repository.initialization.DataInitializationGuard,
     private val spamImporter: MirrorSpamLegacyImporter,
+    private val restoreSync: RestoreSyncCoordinator,
+    private val mirrorScheduler: MessageMirrorScheduler,
 ) : BackupRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var job: Job? = null
@@ -124,7 +126,11 @@ class BackupRepositoryImpl(
     override fun restore(token: String, sections: Set<BackupSection>) {
         val preview = inspected
         start(BackupPhase.RESTORING) {
-            initializationGuard.withInputMutation {
+            var paused = false
+            try {
+                restoreSync.acquireRestore()
+                paused = true
+                initializationGuard.withInputMutation {
                 backupRequire(
                     preview != null && preview.directory.name == token,
                     "预览已过期，请重新选择文件"
@@ -162,9 +168,8 @@ class BackupRepositoryImpl(
                     if (hasReadPermission()) {
                         phase(BackupPhase.REBUILDING)
                         if (BackupSection.SMS in sections) synchronizer.withSmsBackupSnapshot { Unit }
-                        rebuildKeywords()
+                        keywords.rebuildAllMatches()
                         verification.rebuildAll()
-                        messages.forceSyncConversations()
                     }
                     mutable.update {
                         it.copy(
@@ -175,6 +180,12 @@ class BackupRepositoryImpl(
                     }
                 } finally {
                     discardPreview()
+                }
+                }
+            } finally {
+                if (paused) {
+                    restoreSync.releaseRestore()
+                    mirrorScheduler.schedule(forceReconcile = true, reason = "restore_finished")
                 }
             }
         }
@@ -243,12 +254,5 @@ class BackupRepositoryImpl(
         val file = File(directory, "databases/message_mirror.db")
         if (!file.exists()) return 0
         return reader.open(file).use { db -> db.rawQuery("SELECT COUNT(*) FROM mirror_message", null).use { it.moveToFirst(); it.getLong(0) } }
-    }
-    private suspend fun rebuildKeywords() {
-        val cursor = context.contentResolver.query(android.provider.Telephony.Sms.CONTENT_URI,
-            arrayOf("_id"), null, null, "_id ASC") ?: throw BackupException("无法重建关键词索引")
-        cursor.use { c ->
-            while (c.moveToNext()) { currentCoroutineContext().ensureActive(); keywords.updateMessageMatch(c.getLong(0)) }
-        }
     }
 }

@@ -123,21 +123,22 @@ val appModule = module {
     single { vip.mystery0.pixel.text.data.backup.SmsRestoreDataSource(androidContext(), get(), get(), get(), get()) }
     single<vip.mystery0.pixel.text.domain.backup.BackupRepository> {
         vip.mystery0.pixel.text.data.repository.BackupRepositoryImpl(
-            androidContext(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get()
+            context = androidContext(),
+            codec = get(),
+            snapshots = get(),
+            reader = get(),
+            settings = get(),
+            rules = get(),
+            sms = get(),
+            safety = get(),
+            synchronizer = get(),
+            appSettings = get(),
+            verification = get(),
+            keywords = get(),
+            initializationGuard = get(),
+            spamImporter = get(),
+            restoreSync = get(),
+            mirrorScheduler = get(),
         )
     }
     viewModel { vip.mystery0.pixel.text.viewmodel.BackupViewModel(get()) }
@@ -194,6 +195,7 @@ val appModule = module {
     single { MirrorAttachmentStore(androidContext()) }
     single { MirrorAttachmentCopier(get(), get()) }
     single { MessageMirrorScheduler(androidContext()) }
+    single { vip.mystery0.pixel.text.data.repository.mirror.RestoreSyncCoordinator() }
     single { vip.mystery0.pixel.text.mms.MmsReceptionResponseSender(androidContext()) }
     single { vip.mystery0.pixel.text.mms.MmsReceptionNotifications(androidContext(), get(), get(), get()) }
     single { MmsDownloadCoordinator(androidContext(), get(), get()) }
@@ -243,7 +245,7 @@ val appModule = module {
     }
     single<MmsContentRepository> { get<MmsContentRepositoryImpl>() }
     single {
-        MirrorChangeObserver(androidContext(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
+        MirrorChangeObserver(androidContext(), get(), get(), get(), get(), CoroutineScope(SupervisorJob() + Dispatchers.IO)).apply {
             onDirty = { get<MessageMirrorScheduler>().schedule() }
         }
     }
@@ -293,7 +295,7 @@ val appModule = module {
     factory { MockMessageFactory(get()) }
     single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
     single {
-        ConversationCacheRepository(androidContext(), get(), get(), get(), get())
+        ConversationCacheRepository(androidContext(), get(), get(), get(), get(), get())
     }
     single<MessageRepository> {
         MessageRepositoryImpl(

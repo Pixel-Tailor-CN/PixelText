@@ -23,8 +23,12 @@ class MessageMirrorWorker(context: Context, params: WorkerParameters) :
     private val notifications: vip.mystery0.pixel.text.mms.MmsReceptionNotifications by inject()
     private val scheduler: MessageMirrorScheduler by inject()
     private val database: vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase by inject()
+    private val restoreSync: vip.mystery0.pixel.text.data.repository.mirror.RestoreSyncCoordinator by inject()
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        restoreSync.runIfAllowed { doWorkInternal() } ?: Result.retry()
+
+    private suspend fun doWorkInternal(): Result {
         if (applicationContext.smsAccessState() != SmsAccessState.READY) {
             return Result.success()
         }

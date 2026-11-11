@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.ui.screen
 
 import android.Manifest
+import android.os.SystemClock
 import android.content.Intent
 import android.provider.Settings
 import androidx.core.net.toUri
@@ -31,6 +32,7 @@ import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.delay
 
 @Composable
 fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel = koinViewModel()) {
@@ -50,6 +52,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
     var disableCleanup by remember { mutableStateOf(true) }
+    var elapsedSeconds by remember { mutableLongStateOf(0L) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
     val role = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -85,6 +88,17 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         // 错误反馈位于页首，失败后无需用户在长表单或恢复结果中查找。
         if (!state.errorMessage.isNullOrEmpty()) scrollState.scrollTo(0)
     }
+    LaunchedEffect(state.busy) {
+        if (!state.busy) {
+            elapsedSeconds = 0L
+            return@LaunchedEffect
+        }
+        val startedAt = SystemClock.elapsedRealtime()
+        while (true) {
+            elapsedSeconds = (SystemClock.elapsedRealtime() - startedAt) / 1_000L
+            delay(1_000L)
+        }
+    }
     LaunchedEffect(state.preview?.token) {
         if (selectionToken != state.preview?.token) {
             state.preview?.let { selection = it.sections }
@@ -104,6 +118,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 .verticalScroll(scrollState).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text("备份与恢复", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "导出短信与设置，或从备份文件合并恢复。现有短信不会被清空。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             state.errorMessage?.let {
                 BackupFeedbackCard(title = "操作失败", description = if (state.authorizationRequired && !authorizationNeeded) {
                     "权限已恢复，请重新创建备份或重试恢复"
@@ -115,7 +135,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             if (state.restoreProtected) {
                 BackupFeedbackCard(
                     title = "恢复保护已开启",
-                    description = "自动验证码清理暂缓。已写入的短信不会因取消而撤销。",
+                    description = "自动验证码清理暂缓。已写入的短信不会因取消而撤销；确认结果后才会恢复常规清理。",
                 )
             }
 
@@ -179,10 +199,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                     }
                 } else {
                     BackupTaskCard(title = "恢复文件预览", cornerRadius = 28.dp) {
-                        Text(
-                            "备份时间：${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}\n短信数量：${preview.smsCount}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("短信数量 ${preview.smsCount}", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                "备份时间：${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text("选择恢复内容", style = MaterialTheme.typography.titleSmall)
                         BackupSectionSelection(
                             sections = BackupSection.entries.filter { it in preview.sections },
@@ -205,8 +229,34 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             if (state.busy) {
                 Text("请保持应用在前台", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                BackupTaskCard(title = "操作进度") {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                BackupTaskCard(title = "正在处理") {
+                    val progress = state.total?.takeIf { it > 0 }?.let {
+                        (state.processed.toFloat() / it).coerceIn(0f, 1f)
+                    }
+                    if (progress != null) {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "${state.processed} / ${state.total}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    val remainingSeconds = state.total?.takeIf { state.processed > 0 && elapsedSeconds > 0 }?.let {
+                        (elapsedSeconds * (it - state.processed).coerceAtLeast(0) / state.processed).coerceAtLeast(0)
+                    }
+                    Text(
+                        buildString {
+                            append("已用时 ").append(formatDuration(elapsedSeconds))
+                            remainingSeconds?.let { append(" · 预计还需 ").append(formatDuration(it)) }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(when (state.phase) {
                         BackupPhase.SYNCING_MIRROR -> "正在同步短信镜像…"
                         BackupPhase.SNAPSHOTTING -> "正在创建应用数据库快照…"
@@ -259,4 +309,10 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             }
         } }, confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge(disableCleanup) }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { finishConfirm = false }) { Text("取消") } })
+}
+
+private fun formatDuration(seconds: Long): String {
+    val minutes = seconds / 60
+    val remaining = seconds % 60
+    return "%02d:%02d".format(minutes, remaining)
 }

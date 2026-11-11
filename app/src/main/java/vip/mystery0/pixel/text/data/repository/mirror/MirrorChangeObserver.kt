@@ -24,6 +24,7 @@ class MirrorChangeObserver(
     private val synchronizer: MessageMirrorSynchronizer,
     private val incrementalSynchronizer: MessageMirrorIncrementalSynchronizer,
     private val source: TelephonyMirrorSource,
+    private val restoreSync: RestoreSyncCoordinator,
     private val scope: CoroutineScope,
 ) {
     private val appContext = context.applicationContext
@@ -44,6 +45,8 @@ class MirrorChangeObserver(
                         stop()
                         return@launch
                     }
+                    // 恢复会连续写入大量短信，统一由恢复结束后的单次对账处理。
+                    if (restoreSync.isRestorePaused()) return@launch
                     val key = resolveKey(uri)
                     if (key == null) incrementalSynchronizer.markWake()
                     else synchronizer.markDirty(

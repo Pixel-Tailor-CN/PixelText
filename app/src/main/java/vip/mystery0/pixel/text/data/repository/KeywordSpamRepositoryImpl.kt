@@ -98,6 +98,15 @@ class KeywordSpamRepositoryImpl(
         }
     }
 
+    override suspend fun rebuildAllMatches(): Int {
+        importer.ensureImported()
+        return learning.withDecision {
+            withContext(Dispatchers.IO) {
+                rebuildCurrentMatches()
+            }
+        }
+    }
+
     override suspend fun rebuildMatches(messages: List<KeywordSpamMessage>): Int {
         importer.ensureImported()
         return learning.withDecision {
