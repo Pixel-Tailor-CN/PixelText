@@ -11,4 +11,5 @@ class BackupViewModel(private val repository: BackupRepository) : ViewModel() {
     fun restore(token: String, sections: Set<BackupSection>) = repository.restore(token, sections)
     fun cancel() = repository.cancel()
     fun acknowledge() = repository.acknowledgeResult()
+    fun dismissResult() = repository.dismissResult()
 }

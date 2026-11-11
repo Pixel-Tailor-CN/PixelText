@@ -280,43 +280,75 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         BackupPhase.REBUILDING -> "正在对账和重建索引…"
                         else -> "正在恢复… ${state.processed} / ${state.total ?: "—"}"
                     }, style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "已写入的短信不会撤销；停止后可以重新导入，重复内容会自动跳过。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // 导出与恢复的中断影响不同，提示和按钮按当前操作区分。
+                    val exporting = state.phase in setOf(
+                        BackupPhase.SYNCING_MIRROR, BackupPhase.SNAPSHOTTING, BackupPhase.EXPORTING,
                     )
-                    OutlinedButton(onClick = viewModel::cancel, modifier = Modifier.fillMaxWidth()) { Text("停止恢复") }
+                    if (state.restoreProtected || !exporting) {
+                        Text(
+                            "已写入的短信不会撤销；停止后可以重新导入，重复内容会自动跳过。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text(
+                            "停止后已写入的文件可能不完整。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    OutlinedButton(onClick = viewModel::cancel, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            when (state.phase) {
+                                BackupPhase.SYNCING_MIRROR, BackupPhase.SNAPSHOTTING,
+                                BackupPhase.EXPORTING -> "停止导出"
+                                BackupPhase.VALIDATING -> "取消"
+                                else -> "停止恢复"
+                            },
+                        )
+                    }
                 }
             }
-            if (state.phase == BackupPhase.COMPLETED) {
-                BackupFeedbackCard(
-                    title = "恢复完成",
-                    description = "短信已写入并完成同步，可以直接返回使用。",
-                )
-            }
-            if (state.restoreProtected || state.summary.inserted + state.summary.existing > 0) {
+            // 完成结果统一用对话框呈现；页面只保留中断态的结果与处理入口。
+            if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
                 BackupTaskCard(title = "恢复结果", cornerRadius = 28.dp) {
                     BackupResultDetails(state.summary)
-                    if (!state.busy && state.restoreProtected) {
-                        Button(onClick = { finishConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("确认结果并结束保护")
+                    Button(onClick = { finishConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("确认结果并结束保护")
+                    }
+                    if (preview == null) {
+                        BackupPasswordField(
+                            password = restorePassword,
+                            onPasswordChange = { restorePassword = it },
+                            label = "文件密码（未加密可留空）",
+                        )
+                        OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("重新选择文件继续恢复")
                         }
-                        if (preview == null) {
-                            BackupPasswordField(
-                                password = restorePassword,
-                                onPasswordChange = { restorePassword = it },
-                                label = "文件密码（未加密可留空）",
-                            )
-                            OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                                Text("重新选择文件继续恢复")
-                            }
-                        }
-                    } else if (!state.busy) {
-                        TextButton(onClick = viewModel::cancel) { Text("完成") }
                     }
                 }
             }
         }
+    }
+    // 导出和恢复完成后都用对话框告知结果，关闭后页面回到初始状态。
+    if (state.phase == BackupPhase.COMPLETED && !state.busy && !state.restoreProtected) {
+        val restored = state.summary.completedSections.isNotEmpty()
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResult,
+            title = { Text(if (restored) "恢复完成" else "导出完成") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (restored) {
+                        Text("短信已写入并完成同步，可以直接返回使用。")
+                        BackupResultDetails(state.summary)
+                    } else {
+                        Text("备份文件已保存到你选择的位置，请妥善保管。")
+                        if (encrypt) Text("文件使用你设置的密码加密，忘记密码将无法恢复。")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = viewModel::dismissResult) { Text("完成") } },
+        )
     }
     if (showExportContentDialog) AlertDialog(
         onDismissRequest = { showExportContentDialog = false },

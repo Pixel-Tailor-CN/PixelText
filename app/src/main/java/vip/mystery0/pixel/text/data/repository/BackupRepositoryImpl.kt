@@ -219,6 +219,11 @@ class BackupRepositoryImpl(
         }
     }
 
+    override fun dismissResult() {
+        discardPreview()
+        mutable.value = BackupOperationState()
+    }
+
     /** 结束保护时总会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。 */
     private suspend fun finishProtection() {
         backupRequire(appSettings.restorePortablePreferences(listOf(

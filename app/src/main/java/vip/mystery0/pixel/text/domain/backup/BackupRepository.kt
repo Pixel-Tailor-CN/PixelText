@@ -32,4 +32,7 @@ interface BackupRepository {
     fun restore(token: String, sections: Set<BackupSection>)
     fun cancel()
     fun acknowledgeResult()
+
+    /** 关闭完成结果提示，回到初始状态。 */
+    fun dismissResult()
 }
