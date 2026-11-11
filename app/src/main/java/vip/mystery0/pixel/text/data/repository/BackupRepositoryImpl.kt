@@ -224,6 +224,10 @@ class BackupRepositoryImpl(
         mutable.value = BackupOperationState()
     }
 
+    override fun clearError() {
+        mutable.update { it.copy(errorMessage = null, authorizationRequired = false) }
+    }
+
     /** 结束保护时总会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。 */
     private suspend fun finishProtection() {
         backupRequire(appSettings.restorePortablePreferences(listOf(
@@ -240,10 +244,11 @@ class BackupRepositoryImpl(
                 action()
             } catch (_: CancellationException) {
                 mutable.update { it.copy(phase = BackupPhase.INTERRUPTED, restoreProtected = safety.active,
-                    errorMessage = if (phase == BackupPhase.EXPORTING) {
-                        "操作已停止，请检查已保存的备份文件是否完整"
-                    } else {
-                        "操作已停止，已写入的短信会保留，重新导入会自动去重"
+                    // 恢复中断由中断对话框说明，避免同时弹出两个提示；导出没有这类状态，需要单独告知。
+                    errorMessage = when {
+                        safety.active -> null
+                        phase == BackupPhase.EXPORTING -> "请检查已保存的备份文件是否完整"
+                        else -> "操作已停止"
                     }) }
             } catch (error: Exception) {
                 // 不显示底层异常文本，避免数据库/URI/正文进入界面或日志。

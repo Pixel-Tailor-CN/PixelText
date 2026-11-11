@@ -48,12 +48,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     )) { mutableStateOf(BackupSection.entries.toSet()) }
     var selectionToken by rememberSaveable { mutableStateOf<String?>(null) }
     var encrypt by rememberSaveable { mutableStateOf(true) }
+    var restoreEncrypted by rememberSaveable { mutableStateOf(true) }
     // 密码禁止使用 rememberSaveable，配置变化时由用户重新输入。
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var restorePassword by remember { mutableStateOf("") }
     var warning by remember { mutableStateOf(false) }
     var showExportContentDialog by remember { mutableStateOf(false) }
+    var showInterruptedDialog by remember { mutableStateOf(false) }
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
@@ -85,8 +87,19 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         password = ""; confirmation = ""
     }
     val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) viewModel.inspect(uri.toString(), restorePassword.takeIf { it.isNotEmpty() }?.toCharArray())
-        restorePassword = ""
+        if (uri != null) {
+            viewModel.inspect(
+                uri.toString(),
+                restorePassword.takeIf { restoreEncrypted && it.isNotEmpty() }?.toCharArray(),
+            )
+        }
+        // 校验失败时保留密码方便重试，成功预览后再清除。
+    }
+    LaunchedEffect(state.restoreProtected, state.busy, state.phase) {
+        // 中断后立即用对话框告知，用户选择“稍后处理”后不再自动弹出。
+        if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
+            showInterruptedDialog = true
+        }
     }
     LaunchedEffect(state.errorMessage, scrollState) {
         // 错误反馈位于页首，失败后无需用户在长表单或恢复结果中查找。
@@ -107,6 +120,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         if (selectionToken != state.preview?.token) {
             state.preview?.let { selection = it.sections }
             selectionToken = state.preview?.token
+            // 预览生成说明密码已经验证，不再保留明文密码。
+            restorePassword = ""
         }
     }
     val preview = state.preview
@@ -127,30 +142,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            // 恢复中断时下方的保护提示已说明保留与后续操作，不再重复一条停止提示。
-            val suppressInterruptedNotice =
-                state.phase == BackupPhase.INTERRUPTED && state.restoreProtected && !state.busy
-            state.errorMessage?.takeIf { !suppressInterruptedNotice }?.let {
-                BackupFeedbackCard(
-                    // 用户主动停止不是失败，标题按阶段区分。
-                    title = if (state.phase == BackupPhase.INTERRUPTED) "操作已停止" else "操作失败",
-                    description = if (state.authorizationRequired && !authorizationNeeded) {
-                        "权限已恢复，请重新创建备份或重试恢复"
-                    } else it,
-                    isError = state.phase != BackupPhase.INTERRUPTED,
-                )
-                if (authorizationNeeded) {
-                    FilledTonalButton(onClick = ::authorize, enabled = !state.busy) { Text("授权") }
-                }
-            }
-            // 保护只在恢复中断时提示；进行中和已完成时都不应显示“上次恢复未完成”。
-            if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
-                BackupFeedbackCard(
-                    title = "上次恢复未完成",
-                    description = "已写入的短信会保留，验证码自动清理暂缓。可以重新导入继续，或确认结果后结束保护。",
-                )
-            }
-
+            // 所有反馈信息都用对话框呈现，页面只保留操作入口。
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
                     BackupTaskCard(title = "导出备份") {
@@ -203,12 +195,39 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        BackupPasswordField(
-                            password = restorePassword,
-                            onPasswordChange = { restorePassword = it },
-                            label = "文件密码（未加密可留空）",
-                        )
-                        Button(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .toggleable(
+                                    value = restoreEncrypted,
+                                    role = Role.Switch,
+                                    onValueChange = { restoreEncrypted = it },
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("加密文件", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    if (restoreEncrypted) "需要密码才能解密备份文件" else "文件未加密，将直接读取",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = restoreEncrypted, onCheckedChange = null)
+                        }
+                        if (restoreEncrypted) {
+                            BackupPasswordField(
+                                password = restorePassword,
+                                onPasswordChange = { restorePassword = it },
+                                label = "文件密码",
+                            )
+                        }
+                        Button(
+                            onClick = { open.launch(arrayOf("*/*")) },
+                            enabled = !restoreEncrypted || restorePassword.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Text("选择备份文件")
                         }
                     }
@@ -309,26 +328,69 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                     }
                 }
             }
-            // 完成结果统一用对话框呈现；页面只保留中断态的结果与处理入口。
+            // 中断态的入口：反馈在对话框里，这里只保留继续处理的按钮。
             if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
-                BackupTaskCard(title = "恢复结果", cornerRadius = 28.dp) {
-                    BackupResultDetails(state.summary)
-                    Button(onClick = { finishConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("确认结果并结束保护")
-                    }
-                    if (preview == null) {
-                        BackupPasswordField(
-                            password = restorePassword,
-                            onPasswordChange = { restorePassword = it },
-                            label = "文件密码（未加密可留空）",
-                        )
-                        OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                            Text("重新选择文件继续恢复")
-                        }
-                    }
+                Button(onClick = { showInterruptedDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("继续处理上次恢复")
                 }
             }
         }
+    }
+    // 错误提示统一用对话框，关闭后只清除提示，不影响中断进度。
+    state.errorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::clearError,
+            title = { Text(if (state.phase == BackupPhase.INTERRUPTED) "操作已停止" else "操作失败") },
+            text = {
+                Text(
+                    if (state.authorizationRequired && !authorizationNeeded) {
+                        "权限已恢复，请重新创建备份或重试恢复"
+                    } else message,
+                )
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (authorizationNeeded) {
+                        TextButton(onClick = { viewModel.clearError(); authorize() }) { Text("授权") }
+                    }
+                    TextButton(onClick = viewModel::clearError) { Text("知道了") }
+                }
+            },
+        )
+    }
+    // 恢复中断的进度与处理入口也放在对话框里。
+    if (showInterruptedDialog && state.restoreProtected && !state.busy &&
+        state.phase != BackupPhase.COMPLETED
+    ) {
+        AlertDialog(
+            onDismissRequest = { showInterruptedDialog = false },
+            title = { Text("上次恢复未完成") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("已写入的短信会保留，验证码自动清理暂缓。")
+                    BackupResultDetails(state.summary)
+                    if (preview == null) {
+                        if (restoreEncrypted) {
+                            BackupPasswordField(
+                                password = restorePassword,
+                                onPasswordChange = { restorePassword = it },
+                                label = "文件密码",
+                            )
+                        }
+                        TextButton(
+                            onClick = { showInterruptedDialog = false; open.launch(arrayOf("*/*")) },
+                            enabled = !restoreEncrypted || restorePassword.isNotEmpty(),
+                        ) { Text("重新选择文件继续恢复") }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showInterruptedDialog = false; finishConfirm = true }) {
+                    Text("确认结果并结束保护")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showInterruptedDialog = false }) { Text("稍后处理") } },
+        )
     }
     // 导出和恢复完成后都用对话框告知结果，关闭后页面回到初始状态。
     if (state.phase == BackupPhase.COMPLETED && !state.busy && !state.restoreProtected) {

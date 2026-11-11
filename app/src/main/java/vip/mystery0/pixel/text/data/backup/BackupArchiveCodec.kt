@@ -68,6 +68,10 @@ class BackupArchiveCodec(private val context: Context) {
             backupRequire(headers.map { it.fileName }.toSet().size == headers.size)
             val encryption = headers.map { it.isEncrypted }.toSet()
             backupRequire(encryption.size == 1, "备份条目的加密状态不一致")
+            // 加密备份必须先拿到密码，否则 zip4j 只会报解压失败，用户无法知道是开关没打开。
+            if (encryption == setOf(true) && (password == null || password.isEmpty())) {
+                throw BackupException("这个备份已加密，请打开「加密文件」并输入文件密码")
+            }
             var total = 0L
             for (header in headers) {
                 currentCoroutineContext().ensureActive()

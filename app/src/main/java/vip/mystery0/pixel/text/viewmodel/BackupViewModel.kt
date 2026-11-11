@@ -12,4 +12,5 @@ class BackupViewModel(private val repository: BackupRepository) : ViewModel() {
     fun cancel() = repository.cancel()
     fun acknowledge() = repository.acknowledgeResult()
     fun dismissResult() = repository.dismissResult()
+    fun clearError() = repository.clearError()
 }

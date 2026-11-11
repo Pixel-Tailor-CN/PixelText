@@ -35,4 +35,7 @@ interface BackupRepository {
 
     /** 关闭完成结果提示，回到初始状态。 */
     fun dismissResult()
+
+    /** 只清除当前错误提示，保留中断进度与保护状态。 */
+    fun clearError()
 }
