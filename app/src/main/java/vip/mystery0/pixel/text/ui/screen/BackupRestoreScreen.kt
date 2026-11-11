@@ -51,6 +51,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     var confirmation by remember { mutableStateOf("") }
     var restorePassword by remember { mutableStateOf("") }
     var warning by remember { mutableStateOf(false) }
+    var showExportContentDialog by remember { mutableStateOf(false) }
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
     var disableCleanup by remember { mutableStateOf(false) }
@@ -143,12 +144,15 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
                     BackupTaskCard(title = "备份内容") {
-                        Text("不含彩信、附件及应用名称与图标。", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        BackupSectionSelection(
-                            sections = BackupSection.entries,
-                            selection = selection,
-                            onSelectionChange = { selection = it },
+                        Text(
+                            "不含彩信、附件及应用名称与图标。点击导出时选择要备份的内容。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            "当前已选 ${selection.size} 项",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     BackupTaskCard(title = "导出与安全") {
@@ -182,11 +186,9 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
-                            onClick = { if (encrypt) createFile() else warning = true },
-                            enabled = selection.isNotEmpty() &&
-                                (!encrypt || (password.isNotEmpty() && password == confirmation)),
+                            onClick = { showExportContentDialog = true },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("创建备份") }
+                        ) { Text("导出备份") }
                     }
                     BackupTaskCard(title = "从文件恢复") {
                         BackupPasswordField(
@@ -299,6 +301,38 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             }
         }
     }
+    if (showExportContentDialog) AlertDialog(
+        onDismissRequest = { showExportContentDialog = false },
+        title = { Text("选择备份内容") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("选择要导出的内容，确认后进入文件保存流程。")
+                if (encrypt && (password.isEmpty() || password != confirmation)) {
+                    Text(
+                        "请先输入并确认备份密码。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                BackupSectionSelection(
+                    sections = BackupSection.entries,
+                    selection = selection,
+                    onSelectionChange = { selection = it },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    showExportContentDialog = false
+                    if (encrypt) createFile() else warning = true
+                },
+                enabled = selection.isNotEmpty() &&
+                    (!encrypt || (password.isNotEmpty() && password == confirmation)),
+            ) { Text("继续导出") }
+        },
+        dismissButton = { TextButton(onClick = { showExportContentDialog = false }) { Text("取消") } },
+    )
     if (warning) AlertDialog(onDismissRequest = { warning = false }, title = { Text("导出未加密备份？") },
         text = { Text("任何持有此文件的人都可以读取短信正文及设置，请妥善保管。") },
         confirmButton = { TextButton(onClick = { warning = false; createFile() }) { Text("继续") } },
