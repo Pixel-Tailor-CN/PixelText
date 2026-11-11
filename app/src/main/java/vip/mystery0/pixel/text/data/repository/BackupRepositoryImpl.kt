@@ -127,6 +127,7 @@ class BackupRepositoryImpl(
         val preview = inspected
         start(BackupPhase.RESTORING) {
             var paused = false
+            var finalReconciliationComplete = BackupSection.SMS !in sections
             try {
                 restoreSync.acquireRestore()
                 paused = true
@@ -171,21 +172,30 @@ class BackupRepositoryImpl(
                         keywords.rebuildAllMatches()
                         verification.rebuildAll()
                     }
-                    mutable.update {
-                        it.copy(
-                            phase = BackupPhase.COMPLETED,
-                            preview = null,
-                            restoreProtected = true
-                        )
-                    }
                 } finally {
                     discardPreview()
+                }
+                if (BackupSection.SMS in sections) {
+                    phase(BackupPhase.REBUILDING)
+                    finalReconciliationComplete = mirrorScheduler.reconcileAfterRestore()
+                    if (!finalReconciliationComplete) {
+                        throw SmsAccessException(SmsAccessState.READ_PERMISSION_REQUIRED)
+                    }
+                }
+                mutable.update {
+                    it.copy(
+                        phase = BackupPhase.COMPLETED,
+                        preview = null,
+                        restoreProtected = true
+                    )
                 }
                 }
             } finally {
                 if (paused) {
                     restoreSync.releaseRestore()
-                    mirrorScheduler.schedule(forceReconcile = true, reason = "restore_finished")
+                    if (!finalReconciliationComplete) {
+                        mirrorScheduler.schedule(forceReconcile = true, reason = "restore_finished")
+                    }
                 }
             }
         }

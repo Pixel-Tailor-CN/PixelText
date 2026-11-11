@@ -66,6 +66,14 @@ class MessageMirrorScheduler(context: Context) : KoinComponent {
         }
     }
 
+    /** 恢复完成前同步执行最后一次元数据对账，让界面完成状态代表数据已稳定。 */
+    suspend fun reconcileAfterRestore(): Boolean = withContext(Dispatchers.IO) {
+        if (appContext.smsAccessState() != SmsAccessState.READY) return@withContext false
+        synchronizer.reconcile()
+        enqueueAttachments()
+        true
+    }
+
     suspend fun enqueueAttachments() = withContext(Dispatchers.IO) {
         if (appContext.smsAccessState() != SmsAccessState.READY) return@withContext
         schedulingMutex.withLock {

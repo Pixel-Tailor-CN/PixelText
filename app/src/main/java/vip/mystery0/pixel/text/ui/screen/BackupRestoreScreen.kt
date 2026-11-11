@@ -51,7 +51,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     var warning by remember { mutableStateOf(false) }
     var restoreConfirm by remember { mutableStateOf(false) }
     var finishConfirm by remember { mutableStateOf(false) }
-    var disableCleanup by remember { mutableStateOf(true) }
+    var disableCleanup by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableLongStateOf(0L) }
     var permissionVersion by remember { mutableIntStateOf(0) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionVersion++ }
@@ -118,9 +118,8 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 .verticalScroll(scrollState).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("备份与恢复", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "导出短信与设置，或从备份文件合并恢复。现有短信不会被清空。",
+                "安全导出短信，或从备份文件合并恢复。现有短信不会被清空。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -192,6 +191,11 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             password = restorePassword,
                             onPasswordChange = { restorePassword = it },
                             label = "文件密码（未加密可留空）",
+                        )
+                        Text(
+                            "备份文件通常位于 Downloads 文件夹。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         OutlinedButton(onClick = { open.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
                             Text("选择备份文件")
@@ -265,7 +269,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         BackupPhase.REBUILDING -> "正在对账和重建索引…"
                         else -> "正在恢复… ${state.processed} / ${state.total ?: "—"}"
                     }, style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick = viewModel::cancel, modifier = Modifier.fillMaxWidth()) { Text("停止后续处理") }
+                    Text(
+                        "已写入的短信不会撤销；停止后可以重新导入，重复内容会自动跳过。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = viewModel::cancel, modifier = Modifier.fillMaxWidth()) { Text("停止恢复") }
                 }
             }
             if (state.phase == BackupPhase.COMPLETED) {
@@ -305,8 +314,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         text = { Column {
             Text("恢复保护结束后，已启用的常规验证码清理可能删除刚恢复的过期验证码。中断后的计数以最后持久化进度为准，重新导入会再次去重。")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = disableCleanup, onCheckedChange = { disableCleanup = it }); Text("关闭验证码自动删除")
+                Checkbox(checked = disableCleanup, onCheckedChange = { disableCleanup = it })
+                Text("暂停验证码自动删除")
             }
+            Text(
+                "勾选后，本次恢复结束时不会恢复验证码自动清理；之后可在设置中手动开启。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         } }, confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge(disableCleanup) }) { Text("确认结束") } },
         dismissButton = { TextButton(onClick = { finishConfirm = false }) { Text("取消") } })
 }
