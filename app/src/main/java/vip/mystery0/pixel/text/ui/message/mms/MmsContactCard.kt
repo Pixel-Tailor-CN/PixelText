@@ -30,11 +30,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mms.MmsContactModel
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
@@ -76,9 +78,9 @@ fun MmsContactCard(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
-                            Text("姓名", style = MaterialTheme.typography.bodyMedium, color = secondary)
+                            Text(stringResource(R.string.msg_mms_contact_name_label), style = MaterialTheme.typography.bodyMedium, color = secondary)
                             Spacer(Modifier.height(4.dp))
-                            Text(contact.name ?: "未命名联系人",
+                            Text(contact.name ?: stringResource(R.string.msg_mms_contact_unnamed),
                                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold), color = accent)
                         }
                         if (photo != null) Surface(shape = CircleShape,
@@ -86,15 +88,17 @@ fun MmsContactCard(
                             Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                                 Icon(Icons.Rounded.Person, contentDescription = null, tint = accent)
                                 AsyncImage(model = ImageRequest.Builder(context).data(photo).size(96).build(),
-                                    contentDescription = "联系人照片", modifier = Modifier.size(48.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                                    contentDescription = stringResource(R.string.msg_mms_contact_photo_cd),
+                                    modifier = Modifier.size(48.dp).clip(CircleShape), contentScale = ContentScale.Crop)
                             }
                         }
                         MmsAttachmentActions(part, enabled = enabled, onFeedback = onFeedback, menuOnly = true)
                     }
                     contact.phones.firstOrNull()?.let { phone ->
                         Column {
-                            Text(phone.label.ifBlank { "电话号码" }, style = MaterialTheme.typography.bodyMedium, color = secondary)
-                            ContactLink(phone.value, accent, enabled, "拨号", "复制号码",
+                            Text(phone.label.ifBlank { stringResource(R.string.msg_mms_contact_phone_label) }, style = MaterialTheme.typography.bodyMedium, color = secondary)
+                            ContactLink(phone.value, accent, enabled, stringResource(R.string.msg_mms_contact_dial_label),
+                                stringResource(R.string.msg_mms_contact_copy_number_label),
                                 style = MaterialTheme.typography.displaySmallEmphasized.copy(fontSize = 26.sp, fontWeight = FontWeight.SemiBold),
                                 onCopy = { copyContactText(context, phone.value, feedback) }, onOpen = {
                                     launchMmsStructuredIntent(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone.value, null)), feedback)
@@ -104,15 +108,20 @@ fun MmsContactCard(
                     if (contact.organization != null || contact.phones.size > 1 || contact.emails.isNotEmpty()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = accent.copy(alpha = 0.08f)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                contact.organization?.let { ContactDetailField("公司", it, secondary, foreground) }
+                                contact.organization?.let {
+                                    ContactDetailField(stringResource(R.string.msg_mms_contact_company_label), it, secondary, foreground)
+                                }
                                 contact.phones.drop(1).forEach { phone ->
-                                    ContactValueRow(phone.label.ifBlank { "其他电话" }, phone.value, secondary, accent,
+                                    ContactValueRow(phone.label.ifBlank { stringResource(R.string.msg_mms_contact_other_phone_label) }, phone.value, secondary, accent,
                                         enabled, false, { copyContactText(context, phone.value, feedback) }) {
                                         launchMmsStructuredIntent(context, Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone.value, null)), feedback)
                                     }
                                 }
                                 contact.emails.forEach { email ->
-                                    ContactValueRow(email.label.takeIf { it.isNotBlank() }?.let { "邮箱 · $it" } ?: "邮箱",
+                                    val emailLabel = email.label.takeIf { it.isNotBlank() }?.let {
+                                        stringResource(R.string.msg_mms_contact_email_with_label, it)
+                                    } ?: stringResource(R.string.msg_mms_contact_email_label)
+                                    ContactValueRow(emailLabel,
                                         email.value, secondary, accent, enabled, true,
                                         { copyContactText(context, email.value, feedback) }) {
                                         launchMmsStructuredIntent(context, Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", email.value, null)), feedback)
@@ -124,13 +133,25 @@ fun MmsContactCard(
                     if (contact.addresses.isNotEmpty() || contact.title != null || contact.notes != null) {
                         Column {
                             TextButton(enabled = enabled, onClick = { expanded = !expanded }) {
-                                Text(if (expanded) "收起详情" else "地址、职位与备注", color = if (enabled) accent else secondary)
+                                Text(
+                                    stringResource(
+                                        if (expanded) R.string.msg_mms_contact_collapse_details
+                                        else R.string.msg_mms_contact_expand_details,
+                                    ),
+                                    color = if (enabled) accent else secondary,
+                                )
                             }
                             AnimatedVisibility(expanded) {
                                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    contact.addresses.forEach { ContactDetailField("地址", it.value, secondary, foreground) }
-                                    contact.title?.let { ContactDetailField("职位", it, secondary, foreground) }
-                                    contact.notes?.let { ContactDetailField("备注", it, secondary, foreground) }
+                                    contact.addresses.forEach {
+                                        ContactDetailField(stringResource(R.string.msg_mms_contact_address_label), it.value, secondary, foreground)
+                                    }
+                                    contact.title?.let {
+                                        ContactDetailField(stringResource(R.string.msg_mms_contact_title_label), it, secondary, foreground)
+                                    }
+                                    contact.notes?.let {
+                                        ContactDetailField(stringResource(R.string.msg_mms_contact_notes_label), it, secondary, foreground)
+                                    }
                                 }
                             }
                         }
@@ -138,20 +159,20 @@ fun MmsContactCard(
                     if (part.state != MirrorAttachmentState.READY || part.issue != null || part.inlineTextCopy) MmsPartStatus(part)
                     contact.importWarning?.let { Text(it, color = if (isSelected) foreground else MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall) }
-                    if (photo != null) Text("系统添加不携带照片；完整名片可通过右上角菜单打开原件导入",
+                    if (photo != null) Text(stringResource(R.string.msg_mms_contact_photo_warning),
                         color = secondary, style = MaterialTheme.typography.bodySmall)
                     Column {
                         Button(enabled = enabled && contact.hasFields(), onClick = {
                             launchMmsStructuredIntent(context, contactInsertIntent(contact), feedback)
                         }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = container)) {
-                            Text("添加联系人")
+                            Text(stringResource(R.string.msg_mms_contact_add_btn))
                         }
                         TextButton(enabled = enabled && contact.hasFields(), modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
                             copyContactText(context, listOfNotNull(contact.name, contact.organization, contact.title,
                                 contact.phones.joinToString("\n") { it.value }, contact.emails.joinToString("\n") { it.value },
                                 contact.addresses.joinToString("\n") { it.value }, contact.notes).filter(String::isNotBlank).joinToString("\n"), feedback)
-                        }) { Text("复制名片", color = if (enabled) accent else secondary) }
+                        }) { Text(stringResource(R.string.msg_mms_contact_copy_btn), color = if (enabled) accent else secondary) }
                     }
                 }
             }
@@ -173,8 +194,15 @@ private fun ContactValueRow(label: String, value: String, labelColor: Color,
     accent: Color, enabled: Boolean, email: Boolean, onCopy: () -> Unit, onOpen: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = labelColor)
-        ContactLink(value, accent, enabled, if (email) "发送邮件" else "拨号",
-            if (email) "复制邮箱" else "复制号码", onCopy = onCopy, onOpen = onOpen)
+        ContactLink(
+            value,
+            accent,
+            enabled,
+            stringResource(if (email) R.string.msg_mms_contact_send_email_label else R.string.msg_mms_contact_dial_label),
+            stringResource(if (email) R.string.msg_mms_contact_copy_email_label else R.string.msg_mms_contact_copy_number_label),
+            onCopy = onCopy,
+            onOpen = onOpen,
+        )
     }
 }
 
@@ -205,6 +233,7 @@ private fun MmsContactModel.hasFields() = name != null || organization != null |
 private fun copyContactText(context: Context, value: String, feedback: (String) -> Unit) {
     // SDK 的 getter 可空而 setter 非空，Kotlin 无法使用属性赋值。
     @Suppress("UsePropertyAccessSyntax")
-    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("联系人", value))
-    feedback("已复制")
+    context.getSystemService(ClipboardManager::class.java)
+        .setPrimaryClip(ClipData.newPlainText(context.getString(R.string.msg_mms_contact_clip_label), value))
+    feedback(context.getString(R.string.msg_mms_copied))
 }

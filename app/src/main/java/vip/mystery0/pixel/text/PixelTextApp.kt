@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text
 
 import android.app.Application
 import android.app.Activity
+import android.content.res.Configuration
 import android.os.Bundle
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -24,6 +25,7 @@ import vip.mystery0.pixel.text.di.appModule
 import vip.mystery0.pixel.text.notification.ResourceUpdateNotificationHelper
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
 
@@ -36,9 +38,8 @@ class PixelTextApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        SmsNotificationHelper.createNotificationChannel(this)
-        SpamScanNotificationHelper.createNotificationChannel(this)
-        ResourceUpdateNotificationHelper.createNotificationChannel(this)
+        AppStrings.init(this)
+        createNotificationChannels()
         startKoin {
             androidLogger()
             androidContext(this@PixelTextApp)
@@ -69,6 +70,17 @@ class PixelTextApp : Application() {
             override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        createNotificationChannels()
+    }
+
+    private fun createNotificationChannels() {
+        SmsNotificationHelper.createNotificationChannel(this)
+        SpamScanNotificationHelper.createNotificationChannel(this)
+        ResourceUpdateNotificationHelper.createNotificationChannel(this)
     }
 
     private fun startMirror() {

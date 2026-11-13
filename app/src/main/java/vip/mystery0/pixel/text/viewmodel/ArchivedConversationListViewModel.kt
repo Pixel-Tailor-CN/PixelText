@@ -2,12 +2,15 @@ package vip.mystery0.pixel.text.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 
 class ArchivedConversationListViewModel(private val repository: MessageRepository) : ViewModel() {
@@ -50,9 +53,16 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
     fun deleteSelected(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         viewModelScope.launch {
-            repository.deleteThreads(threadIds)
-            pendingDeletedThreadIds.removeAll(threadIds)
-            syncLoadedConversations()
+            runCatching {
+                repository.deleteThreads(threadIds)
+            }.onSuccess {
+                pendingDeletedThreadIds.removeAll(threadIds)
+                syncLoadedConversations()
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                pendingDeletedThreadIds.removeAll(threadIds)
+                syncLoadedConversations()
+            }
         }
     }
 
@@ -113,7 +123,7 @@ class ArchivedConversationListViewModel(private val repository: MessageRepositor
                 .catch { e ->
                     if (archivedConversations.isEmpty()) {
                         _uiState.value =
-                            ArchivedConversationListUiState.Error(e.message ?: "Unknown error")
+                            ArchivedConversationListUiState.Error(e.message ?: AppStrings.get(R.string.sys_unknown_error))
                     }
                     isLoadingMore = false
                 }

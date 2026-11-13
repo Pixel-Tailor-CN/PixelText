@@ -7,6 +7,7 @@ import java.security.MessageDigest
 import android.util.AtomicFile
 import org.json.JSONObject
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.HubSpamModelArtifact
 import java.util.UUID
 import vip.mystery0.pixel.text.data.spam.learning.ModelContract
@@ -176,11 +177,15 @@ class HubResourceStore(
     }
 
     fun requireCompatible(artifact: HubSpamModelArtifact) {
-        require(artifact.minAppVersionCode in 0..BuildConfig.VERSION_CODE) { "当前版本不支持此模型" }
+        require(artifact.minAppVersionCode in 0..BuildConfig.VERSION_CODE) {
+            context.getString(R.string.domain_hub_model_unsupported_version)
+        }
         require(artifact.modelContractVersion == 2 &&
             artifact.preprocessingVersion == "unicode-codepoint-v2" &&
             artifact.personalParameterVersion == "linear-head-v1" &&
-            artifact.featureCompatibilityId.matches(Regex("[a-fA-F0-9]{64}"))) { "模型契约不兼容" }
+            artifact.featureCompatibilityId.matches(Regex("[a-fA-F0-9]{64}"))) {
+            context.getString(R.string.domain_hub_model_incompatible_contract)
+        }
     }
 
     @Synchronized

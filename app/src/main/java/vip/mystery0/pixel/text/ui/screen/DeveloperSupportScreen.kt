@@ -48,10 +48,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.SupportChannelId
 import vip.mystery0.pixel.text.ui.component.AppEmptyState
 import vip.mystery0.pixel.text.util.openSupportApp
@@ -65,6 +68,7 @@ fun DeveloperSupportScreen(
     val state by viewModel.state.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     var enlargedImage by remember { mutableStateOf<Bitmap?>(null) }
 
@@ -78,10 +82,13 @@ fun DeveloperSupportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("支持开发者") },
+                title = { Text(stringResource(R.string.settings_support_dev_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_action_back),
+                        )
                     }
                 },
             )
@@ -97,17 +104,22 @@ fun DeveloperSupportScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                AppEmptyState(if (state.error) "赞助信息暂不可用，请稍后重试" else "赞助入口已暂停")
+                AppEmptyState(
+                    stringResource(
+                        if (state.error) R.string.settings_support_unavailable
+                        else R.string.settings_support_paused,
+                    ),
+                )
                 if (state.error) {
-                    FilledTonalButton(onClick = viewModel::reload) { Text("重试") }
+                    FilledTonalButton(onClick = viewModel::reload) { Text(stringResource(R.string.settings_action_retry)) }
                 }
                 TextButton(onClick = {
                     try {
                         context.startActivity(Intent(Intent.ACTION_VIEW, "https://pixel.mystery0.app/#support".toUri()))
                     } catch (_: Exception) {
-                        viewModel.showMessage("无法打开官网，请检查浏览器是否可用")
+                        viewModel.showMessage(resources.getString(R.string.settings_support_site_error))
                     }
-                }) { Text("访问官网") }
+                }) { Text(stringResource(R.string.settings_support_visit_site)) }
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -116,16 +128,18 @@ fun DeveloperSupportScreen(
             ) {
                 item {
                     Text(
-                        "自愿支持开发与维护，不解锁任何功能或权益。付款前请核对收款方。",
+                        stringResource(R.string.settings_support_disclaimer),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 items(state.channels, key = { it.id.value }) { channel ->
-                    val name = when (channel.id) {
-                        SupportChannelId.ALIPAY -> "支付宝"
-                        SupportChannelId.WECHAT -> "微信"
-                    }
+                    val name = stringResource(
+                        when (channel.id) {
+                            SupportChannelId.ALIPAY -> R.string.settings_support_channel_alipay
+                            SupportChannelId.WECHAT -> R.string.settings_support_channel_wechat
+                        },
+                    )
                     val image = state.images[channel.id]
                     Card(Modifier.fillMaxWidth()) {
                         Column(
@@ -137,17 +151,24 @@ fun DeveloperSupportScreen(
                             when {
                                 image?.bitmap != null -> Image(
                                     bitmap = image.bitmap.asImageBitmap(),
-                                    contentDescription = "$name 收款码，点按放大",
+                                    contentDescription = stringResource(R.string.settings_support_qr_cd, name),
                                     modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
                                         .height(420.dp)
                                         .background(Color.White)
-                                        .clickable(onClickLabel = "放大收款码") { enlargedImage = image.bitmap },
+                                        .clickable(onClickLabel = stringResource(R.string.settings_support_qr_enlarge)) {
+                                            enlargedImage = image.bitmap
+                                        },
                                     contentScale = ContentScale.Fit,
                                 )
                                 image?.loading == true -> CircularProgressIndicator()
                                 else -> {
-                                    Text("收款码加载失败", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    TextButton(onClick = { viewModel.retryImage(channel) }) { Text("重新加载") }
+                                    Text(
+                                        stringResource(R.string.settings_support_qr_failed),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    TextButton(onClick = { viewModel.retryImage(channel) }) {
+                                        Text(stringResource(R.string.settings_support_qr_reload))
+                                    }
                                 }
                             }
                             FlowRow(
@@ -157,15 +178,24 @@ fun DeveloperSupportScreen(
                                 OutlinedButton(
                                     onClick = { viewModel.saveImage(channel) },
                                     enabled = image?.bytes != null && !image.saving,
-                                ) { Text(if (image?.saving == true) "正在保存…" else "保存收款码") }
+                                ) {
+                                    Text(
+                                        stringResource(
+                                            if (image?.saving == true) R.string.settings_support_qr_saving
+                                            else R.string.settings_support_qr_save,
+                                        ),
+                                    )
+                                }
                                 FilledTonalButton(onClick = {
                                     if (!context.openSupportApp(channel)) {
-                                        viewModel.showMessage("无法打开$name，请确认已安装且可用")
+                                        viewModel.showMessage(
+                                            resources.getString(R.string.settings_support_open_app_error, name),
+                                        )
                                     }
-                                }) { Text("打开$name") }
+                                }) { Text(stringResource(R.string.settings_support_open_app, name)) }
                             }
                             Text(
-                                "可保存收款码后，在$name 扫一扫中从相册选择。",
+                                stringResource(R.string.settings_support_qr_tip, name),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -182,8 +212,13 @@ fun DeveloperSupportScreen(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Image(bitmap.asImageBitmap(), "收款码", modifier = Modifier.weight(1f).fillMaxWidth(), contentScale = ContentScale.Fit)
-                TextButton(onClick = { enlargedImage = null }) { Text("关闭") }
+                Image(
+                    bitmap.asImageBitmap(),
+                    stringResource(R.string.settings_support_qr_dialog_cd),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentScale = ContentScale.Fit,
+                )
+                TextButton(onClick = { enlargedImage = null }) { Text(stringResource(R.string.settings_action_close)) }
             }
         }
     }

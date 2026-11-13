@@ -1,10 +1,16 @@
 package vip.mystery0.pixel.text.domain.spam
 
+import androidx.annotation.StringRes
 import com.google.re2j.Pattern
 import kotlinx.coroutines.flow.Flow
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 
-enum class WhitelistRuleType(val label: String) {
-    EXACT("精确号码"), REGEX("正则表达式")
+enum class WhitelistRuleType(@param:StringRes val labelRes: Int) {
+    EXACT(R.string.domain_whitelist_rule_type_exact),
+    REGEX(R.string.domain_whitelist_rule_type_regex);
+
+    val label: String get() = AppStrings.get(labelRes)
 }
 
 data class SenderWhitelistRule(
@@ -23,18 +29,20 @@ class SenderWhitelistMatcher(type: WhitelistRuleType, private val value: String)
         const val MAX_RULE_LENGTH = 256
         const val MAX_RULES = 500
         fun validate(type: WhitelistRuleType, value: String): String? {
-            if (value.isBlank()) return "请输入号码或表达式"
-            if (value.length > MAX_RULE_LENGTH) return "规则不能超过 $MAX_RULE_LENGTH 个字符"
+            if (value.isBlank()) return AppStrings.get(R.string.domain_whitelist_error_empty)
+            if (value.length > MAX_RULE_LENGTH) {
+                return AppStrings.get(R.string.domain_whitelist_error_too_long, MAX_RULE_LENGTH)
+            }
             if (type == WhitelistRuleType.EXACT && !Regex("\\+?[0-9]{1,32}").matches(value)) {
-                return "精确号码仅支持数字和开头的 +，每行一个号码"
+                return AppStrings.get(R.string.domain_whitelist_error_exact_format)
             }
             return try {
                 val matcher = SenderWhitelistMatcher(type, value)
                 if (type == WhitelistRuleType.REGEX && matcher.pattern!!.matcher("").matches()) {
-                    "表达式不能匹配空号码，请缩小匹配范围"
+                    AppStrings.get(R.string.domain_whitelist_error_regex_empty_match)
                 } else null
             } catch (_: com.google.re2j.PatternSyntaxException) {
-                "正则表达式无效，或使用了不支持的环视、回溯引用"
+                AppStrings.get(R.string.domain_whitelist_error_regex_invalid)
             }
         }
     }

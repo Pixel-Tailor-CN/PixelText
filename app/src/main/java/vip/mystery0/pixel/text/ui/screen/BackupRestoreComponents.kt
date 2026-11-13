@@ -18,11 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.backup.BackupSection
 import vip.mystery0.pixel.text.domain.backup.BackupSummary
 
@@ -81,12 +83,13 @@ internal fun BackupSectionSelection(
 internal fun BackupPasswordField(
     password: String,
     onPasswordChange: (String) -> Unit,
-    label: String = "备份密码",
+    label: String? = null,
 ) {
+    val resolvedLabel = label ?: stringResource(R.string.settings_backup_password_label)
     OutlinedTextField(
         value = password,
         onValueChange = onPasswordChange,
-        label = { Text(label) },
+        label = { Text(resolvedLabel) },
         visualTransformation = PasswordVisualTransformation(),
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
@@ -96,12 +99,24 @@ internal fun BackupPasswordField(
 @Composable
 internal fun BackupResultDetails(result: BackupSummary) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("新增 ${result.inserted}，已存在 ${result.existing}", style = MaterialTheme.typography.bodyMedium)
-        Text("失败 ${result.failed}，未处理 ${result.remaining}", style = MaterialTheme.typography.bodyMedium)
-        Text("出站转失败 ${result.convertedOutgoing}，关联跳过 ${result.skippedAssociations}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            stringResource(R.string.settings_backup_result_counts, result.inserted, result.existing),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            stringResource(R.string.settings_backup_result_errors, result.failed, result.remaining),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            stringResource(R.string.settings_backup_result_outgoing, result.convertedOutgoing, result.skippedAssociations),
+            style = MaterialTheme.typography.bodyMedium,
+        )
         if (result.completedSections.isNotEmpty()) {
             Text(
-                "已完成：${result.completedSections.joinToString { it.label }}",
+                stringResource(
+                    R.string.settings_backup_result_completed,
+                    result.completedSections.joinToString { it.label },
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

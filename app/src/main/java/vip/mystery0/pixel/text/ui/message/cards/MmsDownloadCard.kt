@@ -4,9 +4,9 @@ import kotlin.time.Duration.Companion.milliseconds
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,15 +17,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.mms.MmsDownloadCoordinator
 
 @Composable
 fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true, isSelected: Boolean = false) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
     val downloads = koinInject<MmsDownloadCoordinator>()
     val scope = rememberCoroutineScope()
     var phase by remember(mmsId) { mutableStateOf(downloads.state(mmsId)) }
@@ -43,20 +49,24 @@ fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true, isSelected:
         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
     ) else CardDefaults.cardColors()) {
         Column(Modifier.padding(12.dp)) {
-            Text(error ?: when {
-                phase == "persisting" -> "正在保存彩信"
-                busy -> "正在下载彩信"
-                phase == "save_failed" -> "彩信已下载，保存失败，可重试保存"
-                phase == "parse_failed" -> "彩信已下载，暂时无法解析，原件已保留"
-                phase == "failed" -> "彩信下载失败"
-                phase == "expired" -> "彩信已过期，服务器副本无法下载"
-                phase == "invalid_subscription" -> "无法确定接收彩信的 SIM 卡"
-                phase == "sim_unavailable" -> "接收彩信的 SIM 卡不可用"
-                phase == "download_uncertain" -> "下载结果未确认，已有文件已保留，可重新下载"
-                phase == "retry_wait" -> "下载失败，等待自动重试"
-                phase == "state_invalid" -> "下载状态异常，请重新下载"
-                else -> "彩信尚未下载"
-            })
+            Text(
+                error ?: stringResource(
+                    when {
+                        phase == "persisting" -> R.string.msg_mms_download_persisting
+                        busy -> R.string.msg_mms_download_downloading
+                        phase == "save_failed" -> R.string.msg_mms_download_save_failed
+                        phase == "parse_failed" -> R.string.msg_mms_download_parse_failed
+                        phase == "failed" -> R.string.msg_mms_download_failed
+                        phase == "expired" -> R.string.msg_mms_download_expired
+                        phase == "invalid_subscription" -> R.string.msg_mms_download_invalid_subscription
+                        phase == "sim_unavailable" -> R.string.msg_mms_download_sim_unavailable
+                        phase == "download_uncertain" -> R.string.msg_mms_download_uncertain
+                        phase == "retry_wait" -> R.string.msg_mms_download_retry_wait
+                        phase == "state_invalid" -> R.string.msg_mms_download_state_invalid
+                        else -> R.string.msg_mms_download_not_downloaded
+                    }
+                )
+            )
             TextButton(enabled = interactionEnabled && !busy, onClick = {
                 submitting = true
                 error = null
@@ -68,13 +78,27 @@ fun MmsDownloadCard(mmsId: Long, interactionEnabled: Boolean = true, isSelected:
                         throw cancelled
                     } catch (failure: Exception) {
                         phase = downloads.state(mmsId)
-                        error = if (failure is IllegalStateException && failure.message?.any { it.code > 127 } == true)
-                            failure.message else "暂时无法完成，请稍后重试"
+                        error = if (failure is IllegalStateException && failure.message?.any { it.code > 127 } == true) {
+                            failure.message
+                        } else {
+                            resources.getString(R.string.msg_mms_download_error_fallback)
+                        }
                     } finally {
                         submitting = false
                     }
                 }
-            }) { Text(when (phase) { "parse_failed" -> "重试解析"; "save_failed" -> "重试保存"; "failed" -> "重试"; else -> "下载" }) }
+            }) {
+                Text(
+                    stringResource(
+                        when (phase) {
+                            "parse_failed" -> R.string.msg_mms_download_action_retry_parse
+                            "save_failed" -> R.string.msg_mms_download_action_retry_save
+                            "failed" -> R.string.msg_action_retry
+                            else -> R.string.msg_mms_download_action_download
+                        }
+                    )
+                )
+            }
         }
     }
 }

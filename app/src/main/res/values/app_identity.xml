@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_identity_chisu_full">原点尺素</string>
-    <string name="app_name_identity_sms_full">原点短信</string>
-    <string name="app_name_identity_jianxun_full">原点简讯</string>
-    <string name="app_name_identity_pixel_text">Pixel Text</string>
-    <string name="app_name_identity_chisu">尺素</string>
-    <string name="app_name_identity_sms">短信</string>
-    <string name="app_name_identity_message">Message</string>
-    <string name="app_name_identity_pixel_message">Pixel Message</string>
+    <string name="app_name_identity_chisu_full" translatable="false">原点尺素</string>
+    <string name="app_name_identity_sms_full" translatable="false">原点短信</string>
+    <string name="app_name_identity_jianxun_full" translatable="false">原点简讯</string>
+    <string name="app_name_identity_pixel_text" translatable="false">Pixel Text</string>
+    <string name="app_name_identity_chisu" translatable="false">尺素</string>
+    <string name="app_name_identity_sms" translatable="false">短信</string>
+    <string name="app_name_identity_message" translatable="false">Message</string>
+    <string name="app_name_identity_pixel_message" translatable="false">Pixel Message</string>
 </resources>

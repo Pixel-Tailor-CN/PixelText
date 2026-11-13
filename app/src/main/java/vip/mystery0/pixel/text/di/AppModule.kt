@@ -271,13 +271,13 @@ val appModule = module {
                 vip.mystery0.pixel.text.smartspacer.SmartspacerIntegration.notifyChanged(androidContext())
             })
     }
-    single { vip.mystery0.pixel.text.data.source.LearningMessageSource(get(), get()) }
+    single { vip.mystery0.pixel.text.data.source.LearningMessageSource(get(), get(), androidContext()) }
     factory { SpamClassifier(vip.mystery0.pixel.text.data.spam.learning.TfliteSpamModelEngine(get<HubResourceStore>().currentModelBundle()), get(), get(),
         recoverParameters = { revision -> get<vip.mystery0.pixel.text.domain.spam.learning.PersonalLearningCoordinator>().invalidatePersonalParameters(revision) }) }
     single<SpamClassifierFactory> {
         SpamClassifierFactory { get<SpamClassifier>() }
     }
-    single { vip.mystery0.pixel.text.data.source.WhitelistMessageSource(get()) }
+    single { vip.mystery0.pixel.text.data.source.WhitelistMessageSource(get(), androidContext()) }
     single { vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl(get(), get(), get(), get()) }
     single<vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository> {
         get<vip.mystery0.pixel.text.data.repository.SenderWhitelistRepositoryImpl>()
@@ -287,13 +287,13 @@ val appModule = module {
     single { KeywordSpamRepositoryImpl(get(), get(), get(), get(), get()) }
     single<KeywordSpamRepository> { get<KeywordSpamRepositoryImpl>() }
     single(createdAtStart = true) { vip.mystery0.pixel.text.worker.SpamModelRefreshObserver(androidContext(), get(), get()) }
-    single { UnreadSmsCounter(get(), get(), get()) }
+    single { UnreadSmsCounter(androidContext(), get(), get(), get()) }
     single<VerificationCodeRepository> {
         VerificationCodeRepositoryImpl(get(), get(), get(), get())
     }
     single { UnreadSmsComplicationSettingsRepository(androidContext()) }
     factory { MockMessageFactory(get()) }
-    single { SmartspacerSmsRepository(get(), get(), get(), get(), get()) }
+    single { SmartspacerSmsRepository(androidContext(), get(), get(), get(), get(), get()) }
     single {
         ConversationCacheRepository(androidContext(), get(), get(), get(), get(), get())
     }

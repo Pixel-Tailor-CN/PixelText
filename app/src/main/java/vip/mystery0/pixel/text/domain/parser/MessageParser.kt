@@ -5,6 +5,7 @@ import android.util.Log
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.domain.model.DataUsageStatus
 import vip.mystery0.pixel.text.domain.model.ParsedResult
@@ -145,16 +146,16 @@ class MessageParser(
         when (rule.targetCard) {
             "TrainTicket" -> {
                 val details = mutableMapOf<String, String>()
-                getGroupOrNull(matcher, "passenger")?.let { details["乘车人"] = it }
-                getGroupOrNull(matcher, "seatClass")?.let { details["席别"] = it }
-                getGroupOrNull(matcher, "seat")?.let { details["座位"] = it }
-                getGroupOrNull(matcher, "gate")?.let { details["检票口"] = it }
-                getGroupOrNull(matcher, "orderNo")?.let { details["订单号"] = it }
+                getGroupOrNull(matcher, "passenger")?.let { details[context.getString(R.string.domain_parser_detail_passenger)] = it }
+                getGroupOrNull(matcher, "seatClass")?.let { details[context.getString(R.string.domain_parser_detail_seat_class)] = it }
+                getGroupOrNull(matcher, "seat")?.let { details[context.getString(R.string.domain_parser_detail_seat)] = it }
+                getGroupOrNull(matcher, "gate")?.let { details[context.getString(R.string.domain_parser_detail_gate)] = it }
+                getGroupOrNull(matcher, "orderNo")?.let { details[context.getString(R.string.domain_parser_detail_order_no)] = it }
 
                 return ParsedResult.Ticket.TrainTicket(
                     trainNumber = getGroupOrNull(matcher, "trainNo") ?: "--",
                     date = getGroupOrNull(matcher, "date") ?: "",
-                    trainType = "高铁",
+                    trainType = context.getString(R.string.domain_parser_train_type_hsr),
                     departureStation = getGroupOrNull(matcher, "departureStation") ?: "--",
                     departureTime = getGroupOrNull(matcher, "departureTime") ?: "--",
                     arrivalStation = getGroupOrNull(matcher, "arrivalStation") ?: "--",
@@ -169,7 +170,7 @@ class MessageParser(
                     departureCode = getGroupOrNull(matcher, "departureCode") ?: "--",
                     departureCity = getGroupOrNull(matcher, "departureCity") ?: "--",
                     departureTime = getGroupOrNull(matcher, "departureTime") ?: "--",
-                    flightType = getGroupOrNull(matcher, "flightType") ?: "直飞",
+                    flightType = getGroupOrNull(matcher, "flightType") ?: context.getString(R.string.domain_parser_flight_type_nonstop),
                     arrivalCode = getGroupOrNull(matcher, "arrivalCode") ?: "--",
                     arrivalCity = getGroupOrNull(matcher, "arrivalCity") ?: "--",
                     arrivalTime = getGroupOrNull(matcher, "arrivalTime") ?: "--",
@@ -179,16 +180,16 @@ class MessageParser(
             }
             "BankTransaction" -> {
                 val details = mutableMapOf<String, String>()
-                getGroupOrNull(matcher, "account")?.let { details["交易账户"] = it }
-                getGroupOrNull(matcher, "date")?.let { details["交易时间"] = it }
+                getGroupOrNull(matcher, "account")?.let { details[context.getString(R.string.domain_parser_detail_account)] = it }
+                getGroupOrNull(matcher, "date")?.let { details[context.getString(R.string.domain_parser_detail_tx_time)] = it }
                 getGroupOrNull(matcher, "details")?.let {
-                    details["交易备注"] = it.trim('（', '）', '(', ')')
+                    details[context.getString(R.string.domain_parser_detail_tx_memo)] = it.trim('（', '）', '(', ')')
                 }
 
                 val isSuccess = getGroupOrNull(matcher, "status") != "失败"
                 val reason = getGroupOrNull(matcher, "reason")
 
-                val type = getGroupOrNull(matcher, "type") ?: "交易"
+                val type = getGroupOrNull(matcher, "type") ?: context.getString(R.string.domain_parser_bank_type_default)
                 val rawAmount = getGroupOrNull(matcher, "amount") ?: "0.00"
 
                 val incomeKeywords = listOf("入账", "收入", "存入", "退款", "退回")
@@ -219,8 +220,11 @@ class MessageParser(
 
             "PhoneRecharge" -> {
                 val details = mutableMapOf<String, String>()
-                getGroupOrNull(matcher, "date")?.let { details["充值时间"] = it }
-                getGroupOrNull(matcher, "balance")?.let { details["当前余额"] = "${it}元" }
+                getGroupOrNull(matcher, "date")?.let { details[context.getString(R.string.domain_parser_detail_recharge_time)] = it }
+                getGroupOrNull(matcher, "balance")?.let {
+                    details[context.getString(R.string.domain_parser_detail_balance)] =
+                        context.getString(R.string.domain_parser_balance_cny, it)
+                }
 
                 return ParsedResult.PhoneRecharge(
                     amount = getGroupOrNull(matcher, "amount") ?: "0.00",
@@ -246,24 +250,26 @@ class MessageParser(
                     DataUsageStatus.NORMAL,
                     DataUsageStatus.LOW -> remainingData ?: usedData ?: return null
                 }
-                val rawLabel = getGroupOrNull(matcher, "dataLabel") ?: "手机上网流量"
+                val rawLabel = getGroupOrNull(matcher, "dataLabel")
+                    ?: context.getString(R.string.domain_parser_data_label_default)
                 val dataLabel = when {
                     status == DataUsageStatus.EXHAUSTED -> rawLabel
-                    remainingData != null -> "$rawLabel · 剩余"
-                    else -> "$rawLabel · 已使用"
+                    remainingData != null -> context.getString(R.string.domain_parser_data_label_remaining, rawLabel)
+                    else -> context.getString(R.string.domain_parser_data_label_used, rawLabel)
                 }
                 val details = mutableMapOf<String, String>()
-                getGroupOrNull(matcher, "totalData")?.let { details["套餐总量"] = it }
+                getGroupOrNull(matcher, "totalData")?.let { details[context.getString(R.string.domain_parser_detail_total_data)] = it }
                 if (remainingData != null) {
-                    usedData?.let { details["已使用"] = it }
+                    usedData?.let { details[context.getString(R.string.domain_parser_detail_used_data)] = it }
                 }
                 getGroupOrNull(matcher, "throttledUsedData")?.let {
-                    details["达量限速流量"] = "已使用$it"
+                    details[context.getString(R.string.domain_parser_detail_throttled_used)] =
+                        context.getString(R.string.domain_parser_data_used_value, it)
                 }
                 getGroupOrNull(matcher, "throttleThreshold")?.let {
-                    details["限速阈值"] = it
+                    details[context.getString(R.string.domain_parser_detail_throttle_threshold)] = it
                 }
-                getGroupOrNull(matcher, "planName")?.let { details["流量类型"] = it }
+                getGroupOrNull(matcher, "planName")?.let { details[context.getString(R.string.domain_parser_detail_plan_name)] = it }
 
                 return ParsedResult.DataUsage(
                     status = status,

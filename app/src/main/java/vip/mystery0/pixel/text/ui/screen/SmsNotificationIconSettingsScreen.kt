@@ -37,10 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.SmsNotificationIcon
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 
@@ -59,11 +61,11 @@ fun SmsNotificationIconSettingsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.settings_action_back)
                         )
                     }
                 },
-                title = { Text("短信通知图标") },
+                title = { Text(stringResource(R.string.settings_notification_icon_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -169,7 +171,7 @@ private fun NotificationIconCard(
                 ) {
                     Icon(
                         Icons.Rounded.Check,
-                        contentDescription = "当前使用",
+                        contentDescription = stringResource(R.string.settings_selected_cd),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(4.dp),
                     )

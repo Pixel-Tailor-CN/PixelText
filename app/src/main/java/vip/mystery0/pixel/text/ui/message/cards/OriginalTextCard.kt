@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.ui.theme.readableLinkColor
 
 private const val DefaultOriginalTextScale = 1f
@@ -178,8 +180,8 @@ fun OriginalTextCard(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("打开链接") },
-            text = { Text("确定要在浏览器中打开以下链接吗？\n\n$pendingUrl") },
+            title = { Text(stringResource(R.string.msg_open_link_title)) },
+            text = { Text(stringResource(R.string.msg_open_link_message, pendingUrl)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDialog = false
@@ -197,12 +199,12 @@ fun OriginalTextCard(
                         // 处理打开失败的情况
                     }
                 }) {
-                    Text("打开")
+                    Text(stringResource(R.string.msg_action_open))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.msg_action_cancel))
                 }
             }
         )

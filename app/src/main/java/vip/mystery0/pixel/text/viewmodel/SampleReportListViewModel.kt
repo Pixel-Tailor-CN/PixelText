@@ -8,8 +8,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.*
+import vip.mystery0.pixel.text.util.AppStrings
 
 data class SampleReportListState(
     val items: List<SampleReportSummary> = emptyList(),
@@ -26,7 +28,7 @@ data class SampleReportListState(
 )
 
 internal fun Throwable.reportMessage(): String = (this as? SampleReportException)?.message
-    ?: "网络或本机存储暂不可用，请稍后重试"
+    ?: AppStrings.get(R.string.sys_sample_network_or_storage_unavailable)
 
 internal fun Throwable.reportRetryAt(): Long = (this as? SampleReportException)?.retryAfterSeconds
     ?.coerceIn(1, 86400)?.let { System.currentTimeMillis() + it * 1000 } ?: 0
@@ -95,7 +97,7 @@ class SampleReportListViewModel(private val repository: SampleSubmissionReposito
     private fun applyDetailUpdate(old: SampleReportSummary): SampleReportSummary {
         if (old.id in detailUnavailable) return old.copy(contentPreview = "", status = SampleReportStatus.UNKNOWN,
             reviewedCategory = "", reviewedAt = null, reviewMethod = "", reasonCode = "REPORT_NOT_FOUND",
-            reasonText = "无法查看这条上报记录")
+            reasonText = AppStrings.get(R.string.sys_sample_report_not_found))
         val report = detailUpdates[old.id] ?: return old
         return report.copy(submittedAt = old.submittedAt,
             contentPreview = if (report.status == SampleReportStatus.REMOVED) "" else report.contentPreview)
@@ -122,7 +124,7 @@ class SampleReportListViewModel(private val repository: SampleSubmissionReposito
                     items = (it.items + page.items).distinctBy { row -> row.id }.map(::applyDetailUpdate),
                     nextCursor = page.nextCursor,
                     loadingMore = false,
-                    appendError = if (page.nextCursor == cursor) "分页未能前进，请下拉刷新后重试" else null,
+                    appendError = if (page.nextCursor == cursor) AppStrings.get(R.string.sys_sample_pagination_stalled) else null,
                     retryAt = 0,
                 ) }
             } catch (error: CancellationException) { throw error

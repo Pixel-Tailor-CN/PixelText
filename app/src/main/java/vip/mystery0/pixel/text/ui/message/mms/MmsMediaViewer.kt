@@ -37,11 +37,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.media3.ui.compose.ContentFrame
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.mediaCacheKey
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
@@ -52,8 +54,17 @@ fun MmsMediaViewer(part: MmsPartContent, onBack: () -> Unit, controller: MmsPlay
     MmsPlaybackSession(controller)
     // 切换附件只停止，绝不自动启动新媒体。
     LaunchedEffect(part.mediaCacheKey(), part.state) { controller.onViewerSourceChanged(part) }
-    Scaffold(topBar = { TopAppBar(title = { Text(if (part.kind == MmsContentKind.VIDEO) "视频" else "音频") },
-        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") } }, actions = { MmsAttachmentActions(part, menuOnly = true) }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(stringResource(if (part.kind == MmsContentKind.VIDEO) R.string.msg_mms_video else R.string.msg_mms_audio)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.msg_action_back))
+                }
+            },
+            actions = { MmsAttachmentActions(part, menuOnly = true) },
+        )
+    }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(part.displayName)
             MmsMediaContent(part, controller)
@@ -78,7 +89,7 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
                         enabled = interactionEnabled && part.statusInfo().actionable,
                         onClick = { controller.play(part) },
                     ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = "播放视频")
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.msg_mms_play_video_cd))
                     }
                 }
             }
@@ -89,6 +100,7 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
         val duration = if (selected) playback.durationMillis else 0
         val position = if (selected) playback.positionMillis else 0
         if (selected) {
+            val progressCd = stringResource(R.string.msg_mms_playback_progress_cd)
             val sliderState = remember(duration) {
                 SliderState(trackRange = 0f..duration.coerceAtLeast(1).toFloat())
             }.apply { value = dragPosition ?: position.toFloat().coerceAtMost(duration.toFloat()) }
@@ -97,15 +109,15 @@ fun MmsMediaContent(part: MmsPartContent, controller: MmsPlaybackController, mod
                 onValueChange = { dragPosition = it },
                 onValueChangeFinished = { dragPosition?.let { controller.seekTo(it.toLong()) }; dragPosition = null },
                 enabled = interactionEnabled && duration > 0 && player?.isCurrentMediaItemSeekable == true,
-                modifier = Modifier.semantics { contentDescription = "播放进度" },
+                modifier = Modifier.semantics { contentDescription = progressCd },
             )
             Text("${formatMediaTime((dragPosition?.toLong() ?: position))} / ${formatMediaTime(duration)}")
         }
         if (part.kind != MmsContentKind.VIDEO || selected) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(enabled = interactionEnabled && part.statusInfo().actionable, onClick = {
                 if (showPause) controller.pause() else controller.play(part)
-            }) { Text(if (showPause) "暂停" else "播放") }
-            TextButton(enabled = interactionEnabled && selected, onClick = controller::stop) { Text("停止") }
+            }) { Text(stringResource(if (showPause) R.string.msg_mms_pause else R.string.msg_mms_play)) }
+            TextButton(enabled = interactionEnabled && selected, onClick = controller::stop) { Text(stringResource(R.string.msg_mms_stop)) }
         }
     }
 }

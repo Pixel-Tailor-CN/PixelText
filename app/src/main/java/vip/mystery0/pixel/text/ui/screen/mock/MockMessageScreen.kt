@@ -14,23 +14,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.material3.TextButton
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
-import vip.mystery0.pixel.text.ui.screen.currentAppDisplayName
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
 import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.ui.message.MessageItem
+import vip.mystery0.pixel.text.ui.screen.currentAppDisplayName
 import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
 
 @Composable
@@ -43,8 +45,13 @@ fun MockMessageScreen(
         MockMmsContentScreen(onBack = { showMms = false })
         return
     }
-    val mockMessages = remember(messageFactory) {
-        messageFactory.createSpecs(MOCK_SMS_SPECS)
+    val sim2Name = stringResource(R.string.conv_mock_sim_2)
+    val mockMessages = remember(messageFactory, sim2Name) {
+        messageFactory.createSpecs(
+            MOCK_SMS_SPECS.map { spec ->
+                if (!spec.isReceived && spec.simName == null) spec.copy(simName = sim2Name) else spec
+            }
+        )
     }
     val mode = if (isSystemInDarkTheme()) ThemeMode.DARK else ThemeMode.LIGHT
     val detailStyle = resolveConversationDetailStyle(
@@ -58,7 +65,11 @@ fun MockMessageScreen(
         topBar = {
             TopAppBar(
                 title = { Text(appDisplayName) },
-                actions = { TextButton(onClick = { showMms = true }) { Text("彩信媒体") } },
+                actions = {
+                    TextButton(onClick = { showMms = true }) {
+                        Text(stringResource(R.string.conv_mock_mms_media))
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -140,6 +151,5 @@ private val MOCK_SMS_SPECS = listOf(
     MockMessageSpec(
         content = "好的，我稍后处理。",
         isReceived = false,
-        simName = "卡2",
     ),
 )

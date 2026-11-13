@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.DataUsageStatus
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
@@ -41,8 +43,9 @@ fun DataUsageCard(result: ParsedResult.DataUsage, isSelected: Boolean = false) {
     val variantColor =
         if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
         else MaterialTheme.colorScheme.onSurfaceVariant
+    val cutoffLabel = stringResource(R.string.msg_card_data_usage_cutoff)
     val details = linkedMapOf<String, String>().apply {
-        result.cutoffTime?.let { put("截止时间", it) }
+        result.cutoffTime?.let { put(cutoffLabel, it) }
         putAll(result.details)
     }
 
@@ -64,11 +67,13 @@ fun DataUsageCard(result: ParsedResult.DataUsage, isSelected: Boolean = false) {
                 } else {
                     baseThemeColor.copy(alpha = 0.12f)
                 },
-                title = when (result.status) {
-                    DataUsageStatus.NORMAL -> "流量提醒"
-                    DataUsageStatus.LOW -> "流量不足预警"
-                    DataUsageStatus.EXHAUSTED -> "流量用尽提醒"
-                },
+                title = stringResource(
+                    when (result.status) {
+                        DataUsageStatus.NORMAL -> R.string.msg_card_data_usage_title_normal
+                        DataUsageStatus.LOW -> R.string.msg_card_data_usage_title_low
+                        DataUsageStatus.EXHAUSTED -> R.string.msg_card_data_usage_title_exhausted
+                    }
+                ),
                 titleColor = if (isSelected) {
                     MaterialTheme.colorScheme.inverseOnSurface
                 } else {
@@ -80,7 +85,7 @@ fun DataUsageCard(result: ParsedResult.DataUsage, isSelected: Boolean = false) {
             Spacer(modifier = Modifier.height(24.dp))
             if (result.status == DataUsageStatus.EXHAUSTED) {
                 Text(
-                    text = "已用尽",
+                    text = stringResource(R.string.msg_card_data_usage_exhausted_value),
                     style = MaterialTheme.typography.displayMediumEmphasized.copy(fontSize = 36.sp),
                     color = themeColor,
                 )

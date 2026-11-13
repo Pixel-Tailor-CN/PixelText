@@ -18,7 +18,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 
 @Composable
 fun EngagementPromptCard(
@@ -34,16 +36,16 @@ fun EngagementPromptCard(
         Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 16.dp)) {
             Row {
                 Text(
-                    "支持 Pixel Text 持续维护",
+                    stringResource(R.string.settings_engagement_title),
                     modifier = Modifier.weight(1f).padding(top = 12.dp),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "关闭支持与评价提示")
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.settings_engagement_dismiss_cd))
                 }
             }
             Text(
-                "分享使用体验，或自愿支持开发。",
+                stringResource(R.string.settings_engagement_body),
                 modifier = Modifier.padding(top = 4.dp, end = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -53,8 +55,8 @@ fun EngagementPromptCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilledTonalButton(onClick = onReview) { Text("评价应用") }
-                OutlinedButton(onClick = onSupport) { Text("支持开发者") }
+                FilledTonalButton(onClick = onReview) { Text(stringResource(R.string.settings_engagement_rate)) }
+                OutlinedButton(onClick = onSupport) { Text(stringResource(R.string.settings_engagement_support)) }
             }
         }
     }

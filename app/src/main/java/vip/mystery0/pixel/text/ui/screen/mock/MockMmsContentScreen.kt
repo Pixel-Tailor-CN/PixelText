@@ -22,23 +22,25 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentModel
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
+import vip.mystery0.pixel.text.ui.message.mms.MmsCalendarCard
+import vip.mystery0.pixel.text.ui.message.mms.MmsContactCard
 import vip.mystery0.pixel.text.ui.message.mms.MmsFileCard
+import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlCard
+import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlViewer
 import vip.mystery0.pixel.text.ui.message.mms.MmsImageContent
 import vip.mystery0.pixel.text.ui.message.mms.MmsImageViewer
 import vip.mystery0.pixel.text.ui.message.mms.MmsMediaCard
 import vip.mystery0.pixel.text.ui.message.mms.MmsMediaViewer
-import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlCard
-import vip.mystery0.pixel.text.ui.message.mms.MmsHtmlViewer
-import vip.mystery0.pixel.text.ui.message.mms.MmsContactCard
-import vip.mystery0.pixel.text.ui.message.mms.MmsCalendarCard
 
 /** 现有 Mock 页的本地消息入口，复用正式组件，不生成或修改消息。 */
 @Composable
@@ -61,16 +63,35 @@ fun MockMmsContentScreen(onBack: () -> Unit, repository: MmsContentRepository = 
         return
     }
     BackHandler(onBack = onBack)
-    Scaffold(topBar = { TopAppBar(title = { Text("本地彩信预览") }, navigationIcon = {
-        TextButton(onClick = onBack) { Text("返回") }
-    }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(stringResource(R.string.conv_mock_mms_preview_title)) },
+            navigationIcon = {
+                TextButton(onClick = onBack) { Text(stringResource(R.string.conv_cd_back)) }
+            },
+        )
+    }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(input, onValueChange = { input = it.filter(Char::isDigit) }, label = { Text("MMS 消息 ID") },
-                    modifier = Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                Button(onClick = { openedPartId = null; messageId = input.toLongOrNull() }, enabled = input.toLongOrNull() != null) { Text("加载") }
+                OutlinedTextField(
+                    input,
+                    onValueChange = { input = it.filter(Char::isDigit) },
+                    label = { Text(stringResource(R.string.conv_mock_mms_id_label)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                Button(
+                    onClick = { openedPartId = null; messageId = input.toLongOrNull() },
+                    enabled = input.toLongOrNull() != null,
+                ) { Text(stringResource(R.string.conv_action_load)) }
             }
-            Text(model?.subject ?: if (messageId == null) "输入已同步到镜像的彩信 ID" else "消息不存在或正在读取")
+            Text(
+                model?.subject ?: stringResource(
+                    if (messageId == null) R.string.conv_mock_mms_enter_id
+                    else R.string.conv_mock_mms_not_found_or_loading
+                )
+            )
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(model?.parts.orEmpty(), key = { it.key.partId }) { part ->
                     when (part.kind) {

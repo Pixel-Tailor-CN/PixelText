@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -147,12 +148,12 @@ private fun RecipientEntryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("选择收件人") },
+                title = { Text(stringResource(R.string.sys_compose_select_recipient)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.sys_back)
                         )
                     }
                 }
@@ -171,7 +172,7 @@ private fun RecipientEntryScreen(
             TextField(
                 value = recipient,
                 onValueChange = { recipient = it },
-                placeholder = { Text("输入电话号码") },
+                placeholder = { Text(stringResource(R.string.sys_compose_phone_hint)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
@@ -191,7 +192,7 @@ private fun RecipientEntryScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("下一步")
+                Text(stringResource(R.string.sys_compose_next))
             }
         }
     }

@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.domain.hub
 
+import androidx.annotation.StringRes
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 import java.time.Instant
 
 data class SampleReportIdentity(val androidId: String, val installationId: String)
@@ -26,10 +29,17 @@ data class LearningFeedback(
     val originalLabel: String,
 )
 
-enum class SampleReportStatus(val label: String) {
-    PENDING("等待审核"), REVIEWING("自动审核中"), MANUAL_REVIEW("人工复核"),
-    APPROVED("已通过"), REJECTED("未通过"), RESTRICTED("暂不可采纳"),
-    REMOVED("已移除"), UNKNOWN("状态待确认");
+enum class SampleReportStatus(@param:StringRes val labelRes: Int) {
+    PENDING(R.string.domain_sample_report_status_pending),
+    REVIEWING(R.string.domain_sample_report_status_reviewing),
+    MANUAL_REVIEW(R.string.domain_sample_report_status_manual_review),
+    APPROVED(R.string.domain_sample_report_status_approved),
+    REJECTED(R.string.domain_sample_report_status_rejected),
+    RESTRICTED(R.string.domain_sample_report_status_restricted),
+    REMOVED(R.string.domain_sample_report_status_removed),
+    UNKNOWN(R.string.domain_sample_report_status_unknown);
+
+    val label: String get() = AppStrings.get(labelRes)
 
     companion object {
         fun fromValue(value: String): SampleReportStatus = when (value) {

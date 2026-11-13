@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.theme.ConversationDetailAppearance
 import vip.mystery0.pixel.text.domain.theme.DEFAULT_CONVERSATION_DETAIL_TEXT_SCALE
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
@@ -28,6 +29,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.appearance
 import vip.mystery0.pixel.text.domain.theme.backgroundMode
 import vip.mystery0.pixel.text.domain.theme.normalized
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.domain.theme.withAppearance
 import vip.mystery0.pixel.text.ui.theme.HighTextContrastMonitor
 
@@ -311,7 +313,7 @@ class ConversationDetailCustomizationViewModel(
                             "theme background draft failed mode=$mode error=${error.message}",
                         )
                         _events.trySend(
-                            ThemeCustomizationEvent.Message("图片处理失败，请重试"),
+                            ThemeCustomizationEvent.Message(AppStrings.get(R.string.sys_theme_image_process_failed)),
                         )
                     }
             } finally {
@@ -397,7 +399,7 @@ class ConversationDetailCustomizationViewModel(
                         "theme config save failed error=${saveResult.exceptionOrNull()?.message}",
                     )
                     _events.send(
-                        ThemeCustomizationEvent.Message("保存失败，请重试"),
+                        ThemeCustomizationEvent.Message(AppStrings.get(R.string.sys_theme_save_failed)),
                     )
                     return@launch
                 }
@@ -441,7 +443,7 @@ class ConversationDetailCustomizationViewModel(
                 }
                 Log.w(TAG, "theme config save failed error=${error.message}")
                 _events.send(
-                    ThemeCustomizationEvent.Message("保存失败，请重试"),
+                    ThemeCustomizationEvent.Message(AppStrings.get(R.string.sys_theme_save_failed)),
                 )
             } finally {
                 if (_uiState.value.isSaving) {

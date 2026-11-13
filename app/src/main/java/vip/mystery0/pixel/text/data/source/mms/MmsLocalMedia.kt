@@ -11,8 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 只接受本地 URI，内容标识、SMIL src 和文件名都不能作为播放地址。 */
 fun localMmsUri(value: String?): Uri? = value?.toUri()?.takeIf {
@@ -37,13 +39,18 @@ class MmsMediaMetadataReader(context: Context) {
         val key = part.mediaCacheKey()
         // 缺少内容哈希时不缓存，以免同一路径原件更新后展示旧缩略图。
         if (part.contentHash != null) cache.get(key)?.let { return@withContext it }
-        val uri = localMmsUri(part.localUri) ?: return@withContext MmsMediaPreview(error = "附件尚不可读")
-        if ((part.byteCount ?: 0) > MAX_SOURCE_BYTES) return@withContext MmsMediaPreview(error = "文件较大，进入查看页播放")
+        val uri = localMmsUri(part.localUri)
+            ?: return@withContext MmsMediaPreview(error = AppStrings.get(R.string.domain_mms_media_not_readable))
+        if ((part.byteCount ?: 0) > MAX_SOURCE_BYTES) {
+            return@withContext MmsMediaPreview(error = AppStrings.get(R.string.domain_mms_media_too_large_for_preview))
+        }
         val preview = try {
             currentCoroutineContext().ensureActive()
             resolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
                 val length = descriptor.declaredLength.takeIf { it >= 0 } ?: descriptor.parcelFileDescriptor.statSize
-                if (length !in 1..MAX_SOURCE_BYTES) return@use MmsMediaPreview(error = "无法在预览预算内读取媒体")
+                if (length !in 1..MAX_SOURCE_BYTES) {
+                    return@use MmsMediaPreview(error = AppStrings.get(R.string.domain_mms_media_exceeds_budget))
+                }
                 MediaMetadataRetriever().use { reader ->
                     reader.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, length)
                     val duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
@@ -53,11 +60,11 @@ class MmsMediaMetadataReader(context: Context) {
                     currentCoroutineContext().ensureActive()
                     MmsMediaPreview(durationMillis = duration, thumbnail = thumbnail)
                 }
-            } ?: MmsMediaPreview(error = "附件尚不可读")
+            } ?: MmsMediaPreview(error = AppStrings.get(R.string.domain_mms_media_not_readable))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            MmsMediaPreview(error = "无法读取预览，可尝试播放或保存原件")
+            MmsMediaPreview(error = AppStrings.get(R.string.domain_mms_media_preview_failed))
         }
         if (part.contentHash != null) cache.put(key, preview)
         preview

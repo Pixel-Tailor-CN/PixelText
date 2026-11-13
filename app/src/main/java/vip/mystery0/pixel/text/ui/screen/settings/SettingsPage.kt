@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.screen.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,19 +33,29 @@ import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 
-enum class SettingsCategory(val title: String, val icon: ImageVector, val group: Int) {
-    MESSAGES("消息与验证码", Icons.Rounded.ChatBubbleOutline, 0),
-    SPAM("骚扰识别与拦截", Icons.Rounded.Shield, 0),
-    DISPLAY("显示与外观", Icons.Rounded.Palette, 0),
-    RESOURCES("模型与资源", Icons.Rounded.Memory, 1),
-    BACKUP("备份与维护", Icons.Rounded.UploadFile, 1),
-    PERMISSIONS("权限与默认应用", Icons.Rounded.Security, 2),
-    ABOUT("关于与帮助", Icons.Rounded.Info, 2),
+enum class SettingsCategory(
+    @param:StringRes val titleRes: Int,
+    val icon: ImageVector,
+    val group: Int,
+) {
+    MESSAGES(R.string.settings_category_messages, Icons.Rounded.ChatBubbleOutline, 0),
+    SPAM(R.string.settings_category_spam, Icons.Rounded.Shield, 0),
+    DISPLAY(R.string.settings_category_display, Icons.Rounded.Palette, 0),
+    RESOURCES(R.string.settings_category_resources, Icons.Rounded.Memory, 1),
+    BACKUP(R.string.settings_category_backup, Icons.Rounded.UploadFile, 1),
+    PERMISSIONS(R.string.settings_category_permissions, Icons.Rounded.Security, 2),
+    ABOUT(R.string.settings_category_about, Icons.Rounded.Info, 2);
+
+    val title: String
+        get() = AppStrings.get(titleRes)
 }
 
 @Composable
@@ -90,7 +101,7 @@ fun SettingsPage(
                     ) {
                         if (wide) {
                             item(key = "category_title", contentType = "heading") {
-                                Text(category.title, Modifier.padding(top = 16.dp).semantics { heading() },
+                                Text(stringResource(category.titleRes), Modifier.padding(top = 16.dp).semantics { heading() },
                                     style = MaterialTheme.typography.headlineSmall)
                             }
                         }
@@ -116,7 +127,7 @@ fun SettingsPage(
                 }
             } else if (wide) {
                 Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    vip.mystery0.pixel.text.ui.component.AppEmptyState(text = "选择设置分类")
+                    vip.mystery0.pixel.text.ui.component.AppEmptyState(text = stringResource(R.string.settings_select_category_empty))
                 }
             }
         }
@@ -143,7 +154,7 @@ private fun CategoryList(
             item(key = "notice") {
                 SettingsRowContainer(first = true, last = true) {
                     SettingsPreference(
-                        title = { Text("完成短信应用设置") }, summary = { Text(notice) },
+                        title = { Text(stringResource(R.string.settings_setup_notice_title)) }, summary = { Text(notice) },
                         icon = { Icon(Icons.Rounded.Security, null) }, onClick = onNoticeClick,
                     )
                 }
@@ -157,7 +168,7 @@ private fun CategoryList(
                             SettingsRowContainer(index == 0, index == categories.lastIndex,
                                 active = wide && category == selectedCategory) {
                                 SettingsPreference(
-                                    title = { Text(category.title, color = if (category == selectedCategory)
+                                    title = { Text(stringResource(category.titleRes), color = if (category == selectedCategory)
                                         MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface) },
                                     summary = { Text(summary(category)) },
                                     icon = {
@@ -178,7 +189,7 @@ private fun CategoryList(
                                     },
                                     onClick = { onSelect(category) },
                                     trailing = if (wide) ({
-                                        if (category == selectedCategory) Icon(Icons.Rounded.Check, "当前分类")
+                                        if (category == selectedCategory) Icon(Icons.Rounded.Check, stringResource(R.string.settings_current_category_cd))
                                     }) else null,
                                 )
                             }

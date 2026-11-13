@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.message
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.DataInitializationProgress
 import vip.mystery0.pixel.text.domain.model.InitializationPhase
 import java.text.NumberFormat
@@ -25,6 +29,7 @@ internal fun DataInitializationProgressContent(
     phase: InitializationPhase,
     progress: DataInitializationProgress?,
 ) {
+    val context = LocalContext.current
     // 阶段切换时不展示上一个阶段的处理数量和预计时间。
     val currentProgress = progress?.takeIf { it.phase == phase }
     val waiting = currentProgress?.isWaiting == true
@@ -34,13 +39,15 @@ internal fun DataInitializationProgressContent(
         InitializationPhase.SPAM -> 3
         InitializationPhase.VERIFICATION, InitializationPhase.COMPLETE -> 4
     }
-    val description = when (phase) {
-        InitializationPhase.MIRROR -> "导入短信和彩信"
-        InitializationPhase.MMS_TEXT -> "解析彩信文本"
-        InitializationPhase.SPAM -> "识别历史骚扰短信"
-        InitializationPhase.VERIFICATION -> "建立验证码索引"
-        InitializationPhase.COMPLETE -> "完成准备"
-    }
+    val description = stringResource(
+        when (phase) {
+            InitializationPhase.MIRROR -> R.string.msg_init_phase_mirror
+            InitializationPhase.MMS_TEXT -> R.string.msg_init_phase_mms_text
+            InitializationPhase.SPAM -> R.string.msg_init_phase_spam
+            InitializationPhase.VERIFICATION -> R.string.msg_init_phase_verification
+            InitializationPhase.COMPLETE -> R.string.msg_init_phase_complete
+        }
+    )
     val total = currentProgress?.total
     val completed = currentProgress?.completed?.coerceAtLeast(0) ?: 0L
     val fraction = total
@@ -52,7 +59,7 @@ internal fun DataInitializationProgressContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "当前步骤 $step/4 · $description",
+            text = stringResource(R.string.msg_init_current_step, step, description),
             style = MaterialTheme.typography.titleMedium,
         )
 
@@ -63,13 +70,17 @@ internal fun DataInitializationProgressContent(
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Text(
-                    text = "已处理 ${formatInitializationCount(completed)} / ${formatInitializationCount(total)} 条",
+                    text = stringResource(
+                        R.string.msg_init_processed_of_total,
+                        formatInitializationCount(completed),
+                        formatInitializationCount(total),
+                    ),
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "${(fraction * 100).toInt()}%",
+                    text = stringResource(R.string.msg_init_percent, (fraction * 100).toInt()),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -87,14 +98,14 @@ internal fun DataInitializationProgressContent(
             }
         } else if (total == 0L) {
             Text(
-                text = "当前步骤无需处理",
+                text = stringResource(R.string.msg_init_step_no_action),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             currentProgress?.let {
                 Text(
-                    text = "已处理 ${formatInitializationCount(completed)} 条",
+                    text = stringResource(R.string.msg_init_processed_count, formatInitializationCount(completed)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -106,16 +117,22 @@ internal fun DataInitializationProgressContent(
 
         Text(
             text = when {
-                phase == InitializationPhase.COMPLETE -> "即将完成准备，请稍候…"
+                phase == InitializationPhase.COMPLETE -> stringResource(R.string.msg_init_almost_done)
                 waiting && phase == InitializationPhase.VERIFICATION ->
-                    "等待继续，已完成进度会保留；验证码索引将重新扫描"
-                waiting -> "等待继续，已完成进度会保留"
-                currentProgress == null -> "正在估算剩余时间"
-                total == 0L -> "即将进入下一步骤…"
+                    stringResource(R.string.msg_init_waiting_verification)
+                waiting -> stringResource(R.string.msg_init_waiting)
+                currentProgress == null -> stringResource(R.string.msg_init_estimating_remaining)
+                total == 0L -> stringResource(R.string.msg_init_next_step)
                 currentProgress.estimatedRemainingMillis != null ->
-                    "已耗时 ${formatInitializationDuration(currentProgress.elapsedMillis)} · " +
-                        formatRemainingDuration(currentProgress.estimatedRemainingMillis)
-                else -> "已耗时 ${formatInitializationDuration(currentProgress.elapsedMillis)} · 正在估算剩余时间"
+                    stringResource(
+                        R.string.msg_init_elapsed_and_remaining,
+                        formatInitializationDuration(context, currentProgress.elapsedMillis),
+                        formatRemainingDuration(context, currentProgress.estimatedRemainingMillis),
+                    )
+                else -> stringResource(
+                    R.string.msg_init_elapsed_estimating,
+                    formatInitializationDuration(context, currentProgress.elapsedMillis),
+                )
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -124,21 +141,21 @@ internal fun DataInitializationProgressContent(
 }
 
 private fun formatInitializationCount(value: Long): String =
-    NumberFormat.getIntegerInstance(Locale.CHINA).format(value)
+    NumberFormat.getIntegerInstance(Locale.getDefault()).format(value)
 
-private fun formatRemainingDuration(millis: Long): String =
+private fun formatRemainingDuration(context: Context, millis: Long): String =
     if (millis < 1_000) {
-        "预计剩余不到 1 秒"
+        context.getString(R.string.msg_init_remaining_less_than_1s)
     } else {
-        "预计剩余约 ${formatInitializationDuration(millis)}"
+        context.getString(R.string.msg_init_remaining_approx, formatInitializationDuration(context, millis))
     }
 
-private fun formatInitializationDuration(millis: Long): String {
+private fun formatInitializationDuration(context: Context, millis: Long): String {
     val seconds = millis.coerceAtLeast(0) / 1_000
     return when {
-        seconds < 1 -> "不到 1 秒"
-        seconds < 60 -> "$seconds 秒"
-        seconds % 60 == 0L -> "${seconds / 60} 分钟"
-        else -> "${seconds / 60} 分 ${seconds % 60} 秒"
+        seconds < 1 -> context.getString(R.string.msg_init_duration_less_than_1s)
+        seconds < 60 -> context.getString(R.string.msg_init_duration_seconds, seconds)
+        seconds % 60 == 0L -> context.getString(R.string.msg_init_duration_minutes, seconds / 60)
+        else -> context.getString(R.string.msg_init_duration_minutes_seconds, seconds / 60, seconds % 60)
     }
 }

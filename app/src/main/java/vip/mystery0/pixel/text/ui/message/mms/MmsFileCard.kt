@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.message.mms
 
+import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -23,10 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.util.Locale
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
 import vip.mystery0.pixel.text.data.source.mms.suggestedMmsAttachmentName
@@ -43,6 +47,7 @@ fun MmsFileCard(
     onFeedback: ((String) -> Unit)? = null,
     htmlPreview: Boolean = false,
 ) {
+    val context = LocalContext.current
     val containerColor by animateColorAsState(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.inverseSurface
@@ -92,7 +97,7 @@ fun MmsFileCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = listOf(part.mimeType, formatByteCount(part.byteCount)).filter { it.isNotBlank() }
+                        text = listOf(part.mimeType, formatByteCount(context, part.byteCount)).filter { it.isNotBlank() }
                             .joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -104,7 +109,7 @@ fun MmsFileCard(
             }
             if (htmlPreview) {
                 Text(
-                    text = part.htmlSummary?.takeIf { it.isNotBlank() } ?: "暂无可读摘要",
+                    text = part.htmlSummary?.takeIf { it.isNotBlank() } ?: stringResource(R.string.msg_mms_html_no_summary),
                     modifier = Modifier.padding(top = 10.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 5,
@@ -113,7 +118,7 @@ fun MmsFileCard(
                 TextButton(
                     enabled = interactionEnabled && !selectionMode && part.text != null,
                     onClick = { onOpenPart(part.key) },
-                ) { Text("查看完整内容") }
+                ) { Text(stringResource(R.string.msg_mms_html_view_full)) }
             }
             if (part.state != MirrorAttachmentState.READY || part.issue != null || part.inlineTextCopy) {
                 MmsPartStatus(part, Modifier.padding(top = 4.dp))
@@ -122,8 +127,8 @@ fun MmsFileCard(
     }
 }
 
-private fun formatByteCount(bytes: Long?): String {
-    bytes ?: return "大小未知"
+private fun formatByteCount(context: Context, bytes: Long?): String {
+    bytes ?: return context.getString(R.string.msg_mms_unknown_size)
     if (bytes < 1024) return "$bytes B"
     val kib = bytes / 1024.0
     if (kib < 1024) return String.format(Locale.getDefault(), "%.1f KB", kib)

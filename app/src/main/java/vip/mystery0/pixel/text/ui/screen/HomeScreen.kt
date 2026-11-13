@@ -40,10 +40,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.Role
@@ -88,6 +90,11 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val startChat = { showNewChatSheet = true }
 
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        unreadBadgeViewModel.refreshAccessState()
+        onPauseOrDispose { }
+    }
+
     LaunchedEffect(currentRoute) {
         areNavigationControlsVisible = true
     }
@@ -119,6 +126,7 @@ fun HomeScreen(
             ) {
                 NavigationBar {
                     HomeDestination.entries.forEach { destination ->
+                        val label = stringResource(destination.labelRes)
                         NavigationBarItem(
                             selected = currentRoute == destination.route,
                             onClick = {
@@ -149,19 +157,19 @@ fun HomeScreen(
                                             painter = painterResource(
                                                 R.drawable.ic_notification_sms
                                             ),
-                                            contentDescription = destination.label,
+                                            contentDescription = label,
                                         )
                                     }
                                 } else {
                                     Icon(
                                         imageVector = destination.icon,
-                                        contentDescription = destination.label,
+                                        contentDescription = label,
                                     )
                                 }
                             },
                             label = {
                                 Text(
-                                    destination.label,
+                                    label,
                                     style = if (currentRoute == destination.route) {
                                         MaterialTheme.typography.labelMediumEmphasized
                                     } else {
@@ -191,17 +199,18 @@ fun HomeScreen(
                 ) + fadeOut(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)) +
                     scaleOut(tween(NAVIGATION_CONTROLS_ANIMATION_DURATION_MILLIS)),
             ) {
+                val startChatLabel = stringResource(R.string.conv_start_chat)
                 ExtendedFloatingActionButton(
                     modifier = Modifier.clearAndSetSemantics {
-                        contentDescription = "开始聊天"
+                        contentDescription = startChatLabel
                         role = Role.Button
-                        onClick(label = "开始聊天") {
+                        onClick(label = startChatLabel) {
                             startChat()
                             true
                         }
                     },
                     expanded = true,
-                    text = { Text("开始聊天") },
+                    text = { Text(startChatLabel) },
                     icon = {
                         Icon(
                             Icons.AutoMirrored.Rounded.Chat,
@@ -273,17 +282,17 @@ fun HomeScreen(
 
 private enum class HomeDestination(
     val route: String,
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
 ) {
     Conversations(
         route = CONVERSATIONS_ROUTE,
-        label = "会话",
+        labelRes = R.string.conv_tab_conversations,
         icon = Icons.Rounded.ChatBubble,
     ),
     VerificationCodes(
         route = VERIFICATION_CODES_ROUTE,
-        label = "验证码",
+        labelRes = R.string.conv_tab_verification_codes,
         icon = Icons.Rounded.Password,
     ),
 }

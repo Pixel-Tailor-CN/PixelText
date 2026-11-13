@@ -44,11 +44,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.viewmodel.HistorySpamScanPhase
 import vip.mystery0.pixel.text.viewmodel.HistorySpamScanProgress
 import vip.mystery0.pixel.text.viewmodel.HistorySpamStatsUiState
@@ -90,13 +92,13 @@ fun SpamConversationListScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.conv_cd_back)
                         )
                     }
                 },
                 title = {
                     Text(
-                        "骚扰与拦截",
+                        stringResource(R.string.conv_menu_spam_blocking),
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -109,7 +111,7 @@ fun SpamConversationListScreen(
                     ) {
                         Icon(
                             Icons.Rounded.Security,
-                            contentDescription = "历史短信识别"
+                            contentDescription = stringResource(R.string.conv_spam_history_scan_title)
                         )
                     }
                 },
@@ -153,7 +155,7 @@ fun SpamConversationListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "读取失败: ${state.message}",
+                                stringResource(R.string.conv_load_failed, state.message),
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
@@ -177,8 +179,8 @@ fun SpamConversationListScreen(
 
                         if (state.conversations.isEmpty()) {
                             ConversationEmptyState(
-                                imageRes = vip.mystery0.pixel.text.R.drawable.illustration_spam_conversation_empty,
-                                text = "暂无已识别骚扰会话"
+                                imageRes = R.drawable.illustration_spam_conversation_empty,
+                                text = stringResource(R.string.conv_empty_spam)
                             )
                             return@Box
                         }
@@ -278,16 +280,18 @@ private fun HistoricalSpamScanProgressBanner(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            val title = when (progress.phase) {
-                HistorySpamScanPhase.WAITING -> "等待开始历史短信识别"
-                HistorySpamScanPhase.RETRYING -> "等待重试历史短信识别"
-                HistorySpamScanPhase.PREPARING -> "正在准备历史短信识别"
-                HistorySpamScanPhase.SCANNING -> "正在识别历史短信"
-                HistorySpamScanPhase.FINALIZING -> "正在完成历史短信识别"
-                HistorySpamScanPhase.COMPLETED -> "历史短信识别完成"
-                HistorySpamScanPhase.FAILED -> "历史短信识别失败"
-                HistorySpamScanPhase.CANCELLED -> "历史短信识别已取消"
-            }
+            val title = stringResource(
+                when (progress.phase) {
+                    HistorySpamScanPhase.WAITING -> R.string.conv_spam_scan_waiting
+                    HistorySpamScanPhase.RETRYING -> R.string.conv_spam_scan_retrying
+                    HistorySpamScanPhase.PREPARING -> R.string.conv_spam_scan_preparing
+                    HistorySpamScanPhase.SCANNING -> R.string.conv_spam_scan_scanning
+                    HistorySpamScanPhase.FINALIZING -> R.string.conv_spam_scan_finalizing
+                    HistorySpamScanPhase.COMPLETED -> R.string.conv_spam_scan_completed
+                    HistorySpamScanPhase.FAILED -> R.string.conv_spam_scan_failed
+                    HistorySpamScanPhase.CANCELLED -> R.string.conv_spam_scan_cancelled
+                }
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -299,7 +303,7 @@ private fun HistoricalSpamScanProgressBanner(
                 )
                 if (progress.isFinished) {
                     TextButton(onClick = onHide) {
-                        Text("隐藏")
+                        Text(stringResource(R.string.conv_action_hide))
                     }
                 }
             }
@@ -331,7 +335,7 @@ private fun HistoricalSpamStatsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("历史短信识别") },
+        title = { Text(stringResource(R.string.conv_spam_history_scan_title)) },
         text = {
             when (state) {
                 HistorySpamStatsUiState.Idle,
@@ -339,22 +343,25 @@ private fun HistoricalSpamStatsDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LoadingIndicator()
                         Text(
-                            text = "正在统计短信数据...",
+                            text = stringResource(R.string.conv_spam_stats_loading),
                             modifier = Modifier.padding(start = 16.dp)
                         )
                     }
                 }
 
                 is HistorySpamStatsUiState.Error -> {
-                    Text("统计失败: ${state.message}")
+                    Text(stringResource(R.string.conv_spam_stats_error, state.message))
                 }
 
                 is HistorySpamStatsUiState.Success -> {
                     val stats = state.stats
+                    val totalLine = stringResource(R.string.conv_spam_stats_total, stats.totalCount)
+                    val identifiedLine = stringResource(R.string.conv_spam_stats_identified, stats.identifiedCount)
+                    val pendingLine = stringResource(R.string.conv_spam_stats_pending, stats.pendingCount)
                     val message = buildString {
-                        appendLine("短信总数量: ${stats.totalCount}")
-                        appendLine("已识别数量: ${stats.identifiedCount}")
-                        append("未识别数量: ${stats.pendingCount}")
+                        appendLine(totalLine)
+                        appendLine(identifiedLine)
+                        append(pendingLine)
                     }
                     Text(message)
                 }
@@ -365,18 +372,18 @@ private fun HistoricalSpamStatsDialog(
                 is HistorySpamStatsUiState.Success -> {
                     if (state.stats.pendingCount > 0) {
                         TextButton(onClick = onStartScan) {
-                            Text("开始扫描")
+                            Text(stringResource(R.string.conv_spam_start_scan))
                         }
                     } else {
                         TextButton(onClick = onDismiss) {
-                            Text("知道了")
+                            Text(stringResource(R.string.conv_action_got_it))
                         }
                     }
                 }
 
                 is HistorySpamStatsUiState.Error -> {
                     TextButton(onClick = onDismiss) {
-                        Text("知道了")
+                        Text(stringResource(R.string.conv_action_got_it))
                     }
                 }
 
@@ -388,7 +395,7 @@ private fun HistoricalSpamStatsDialog(
                 state.stats.pendingCount > 0
             if (canDismiss) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(stringResource(R.string.conv_action_cancel))
                 }
             }
         }

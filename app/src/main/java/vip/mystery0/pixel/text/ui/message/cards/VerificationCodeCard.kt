@@ -30,9 +30,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
@@ -84,7 +86,8 @@ fun VerificationCodeCard(
                     } else {
                         MaterialTheme.colorScheme.primaryContainer
                     },
-                    title = result.signature?.takeIf { it.isNotBlank() } ?: "验证码",
+                    title = result.signature?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.msg_card_verification_title),
                     dividerColor = onContainerColor.copy(alpha = 0.1f),
                 )
             }
@@ -120,7 +123,7 @@ fun VerificationCodeCard(
                             },
                         ) {
                             Text(
-                                text = "验证码",
+                                text = stringResource(R.string.msg_card_verification_title),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isSelected) onContainerColor else baseThemeColor,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
@@ -142,7 +145,7 @@ fun VerificationCodeCard(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = "复制验证码",
+                            contentDescription = stringResource(R.string.msg_card_verification_copy_cd),
                             modifier = Modifier.size(20.dp),
                         )
                     }

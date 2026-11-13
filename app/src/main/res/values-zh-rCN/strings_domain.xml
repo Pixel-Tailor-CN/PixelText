@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 备份类别 -->
+    <string name="domain_backup_section_settings">设置与主题</string>
+    <string name="domain_backup_section_rules">关键词与白名单</string>
+    <string name="domain_backup_section_sms">短信及归档、放行状态</string>
+
+    <!-- 备份与恢复错误 -->
+    <string name="domain_backup_error_invalid_or_unsupported">备份文件无效或不受支持</string>
+    <string name="domain_backup_error_too_many_records">数据数量超过备份限制</string>
+    <string name="domain_backup_error_snapshot_too_large">数据库快照过大</string>
+    <string name="domain_backup_error_schema_read_failed">无法读取应用数据库结构</string>
+    <string name="domain_backup_error_disallowed_temp_file">快照包含不允许的临时文件</string>
+    <string name="domain_backup_error_exceeds_4gib">备份文件超过 4 GiB 限制</string>
+    <string name="domain_backup_error_write_selected_file">无法写入所选文件</string>
+    <string name="domain_backup_error_read_selected_file">无法读取所选文件</string>
+    <string name="domain_backup_error_inconsistent_encryption">备份条目的加密状态不一致</string>
+    <string name="domain_backup_error_encrypted_needs_password">这个备份已加密，请打开「加密文件」并输入文件密码</string>
+    <string name="domain_backup_error_insufficient_staging_space">暂存空间不足</string>
+    <string name="domain_backup_error_missing_manifest">缺少备份清单</string>
+    <string name="domain_backup_error_unsupported_format">不支持此备份格式版本</string>
+    <string name="domain_backup_error_entries_mismatch">备份条目与清单不一致</string>
+    <string name="domain_backup_error_integrity_failed">备份完整性校验失败</string>
+    <string name="domain_backup_error_exceeds_size_limit">备份超出大小限制</string>
+    <string name="domain_backup_error_unsupported_db_version">此备份的数据库版本不受支持，请升级应用</string>
+    <string name="domain_backup_error_db_category_mismatch">数据库与备份类别不一致</string>
+    <string name="domain_backup_error_db_corrupt">数据库已损坏</string>
+    <string name="domain_backup_error_db_disallowed_structure">数据库包含不允许的结构</string>
+    <string name="domain_backup_error_db_schema_mismatch">数据库结构不匹配</string>
+    <string name="domain_backup_error_db_fk_failed">数据库关联不完整</string>
+    <string name="domain_backup_error_sms_too_large">单条短信超出备份限制</string>
+    <string name="domain_backup_error_keywords_too_large">关键词数据超过备份限制</string>
+    <string name="domain_backup_error_duplicate_source_id">备份消息来源 ID 重复</string>
+    <string name="domain_backup_error_sms_count_mismatch">短信数量与备份清单不一致</string>
+    <string name="domain_backup_error_theme_bg_missing">主题背景文件缺失，请重新选择背景后备份</string>
+    <string name="domain_backup_error_invalid_settings_data">设置数据无效</string>
+    <string name="domain_backup_error_invalid_quick_action">通知快捷操作文案无效</string>
+    <string name="domain_backup_error_theme_out_of_range">主题配置超出允许范围</string>
+    <string name="domain_backup_error_theme_image_invalid">主题图片无效或尺寸过大</string>
+    <string name="domain_backup_error_save_app_settings_failed">应用设置保存失败，部分主题可能已恢复</string>
+    <string name="domain_backup_error_save_filter_settings_failed">默认筛选设置保存失败</string>
+    <string name="domain_backup_error_save_protection_state">无法保存恢复保护状态</string>
+    <string name="domain_backup_error_finish_protection">无法结束恢复保护，请重试</string>
+    <string name="domain_backup_error_save_progress">恢复进度保存失败，已写入的短信会保留</string>
+    <string name="domain_backup_error_read_target_sms">无法读取目标短信</string>
+    <string name="domain_backup_error_batch_insert_count_mismatch">系统短信批量写入数量不一致</string>
+    <string name="domain_backup_error_missing_sms_uri">系统未返回短信标识</string>
+    <string name="domain_backup_error_cleanup_staging">无法清理上次操作的暂存数据</string>
+    <string name="domain_backup_error_create_staging">无法创建备份暂存目录</string>
+    <string name="domain_backup_error_active_protection">请先确认结束上次恢复保护</string>
+    <string name="domain_backup_error_empty_sections">请选择备份内容</string>
+    <string name="domain_backup_error_empty_password">请输入加密密码后重试</string>
+    <string name="domain_backup_error_preview_expired">预览已过期，请重新选择文件</string>
+    <string name="domain_backup_error_invalid_restore_sections">恢复类别无效</string>
+    <string name="domain_backup_error_pause_code_cleanup">无法暂停验证码清理</string>
+    <string name="domain_backup_error_export_interrupted">请检查已保存的备份文件是否完整</string>
+    <string name="domain_backup_error_operation_stopped">操作已停止</string>
+    <string name="domain_backup_error_access_selected_file">无法访问所选文件，请重新选择文件后重试</string>
+    <string name="domain_backup_error_wrong_password_or_corrupt">密码错误或备份文件损坏</string>
+    <string name="domain_backup_error_generic_failure">操作失败（%1$s），已写入的数据会保留，请检查权限、文件和空间</string>
+    <string name="domain_backup_error_create_temp_dir">无法创建暂存目录</string>
+
+    <!-- 样本上报与 Hub -->
+    <string name="domain_sample_report_status_pending">等待审核</string>
+    <string name="domain_sample_report_status_reviewing">自动审核中</string>
+    <string name="domain_sample_report_status_manual_review">人工复核</string>
+    <string name="domain_sample_report_status_approved">已通过</string>
+    <string name="domain_sample_report_status_rejected">未通过</string>
+    <string name="domain_sample_report_status_restricted">暂不可采纳</string>
+    <string name="domain_sample_report_status_removed">已移除</string>
+    <string name="domain_sample_report_status_unknown">状态待确认</string>
+
+    <string name="domain_sample_category_verification_code">验证码</string>
+    <string name="domain_sample_category_bank_transaction">银行动账</string>
+    <string name="domain_sample_category_phone_recharge">话费充值</string>
+    <string name="domain_sample_category_express_delivery">快递通知</string>
+    <string name="domain_sample_category_ticket">票务出行</string>
+    <string name="domain_sample_category_missed_call">来电提醒</string>
+    <string name="domain_sample_category_data_usage">流量提醒</string>
+    <string name="domain_sample_category_spam">垃圾短信</string>
+    <string name="domain_sample_category_normal">普通短信</string>
+
+    <string name="domain_sensitive_type_name">姓名</string>
+    <string name="domain_sensitive_type_phone">手机号</string>
+    <string name="domain_sensitive_type_id_card">身份证号</string>
+    <string name="domain_sensitive_type_address">地址</string>
+    <string name="domain_sensitive_type_bank_card">银行卡号</string>
+    <string name="domain_sensitive_type_order_id">订单号</string>
+    <string name="domain_sensitive_type_verification_code">验证码</string>
+    <string name="domain_sensitive_type_amount">金额</string>
+    <string name="domain_sensitive_type_date">日期</string>
+    <string name="domain_sensitive_type_time">时间</string>
+    <string name="domain_sensitive_type_date_time">日期时间</string>
+
+    <string name="domain_sample_report_name_identity">安装身份</string>
+    <string name="domain_sample_report_name_draft">保留草稿</string>
+    <string name="domain_sample_report_name_pending">待确认请求</string>
+    <string name="domain_sample_report_name_local_data">本机上报数据</string>
+    <string name="domain_sample_report_error_clear_pending">无法清除本机待确认请求，请重试</string>
+    <string name="domain_sample_report_error_clear_draft">无法清除本机草稿，请重试</string>
+    <string name="domain_sample_report_error_read_local">无法读取本机上报数据，请检查存储后重试</string>
+    <string name="domain_sample_report_error_draft_too_large">本机草稿过大，请减少内容后再保留</string>
+    <string name="domain_sample_report_error_write_local">无法保存本机上报数据，请检查存储后重试</string>
+    <string name="domain_sample_report_error_corrupt">%1$s损坏，已保留文件。请检查存储或恢复本次安装的数据后重试；不会自动更换身份或请求</string>
+
+    <string name="domain_sample_submit_pending_exists">有一条提交尚未确认，请先恢复本次提交</string>
+    <string name="domain_sample_submit_invalid_device_id">无法读取有效的设备标识，暂不能提交</string>
+    <string name="domain_sample_submit_no_pending">没有待确认的提交，请返回重新打开页面</string>
+    <string name="domain_sample_submit_incomplete_response">服务响应不完整，已保留本次提交</string>
+    <string name="domain_sample_submit_rate_limited">请求过于频繁，请稍后重试</string>
+    <string name="domain_sample_validation_too_short">样本文本至少需要 6 个字符</string>
+    <string name="domain_sample_validation_too_large">样本文本不能超过 64 KiB，请减少内容</string>
+    <string name="domain_sample_validation_sender_too_long">发送方不能超过 256 个字符</string>
+    <string name="domain_sample_validation_invalid_category">请选择有效的样本类别</string>
+    <string name="domain_sample_validation_versions_too_long">资源版本信息过长，请更新资源后重试</string>
+
+    <string name="domain_hub_report_incomplete_response">服务响应不完整，请稍后重试</string>
+    <string name="domain_hub_report_invalid_cursor">记录分页已失效，请下拉刷新后重试</string>
+    <string name="domain_hub_report_invalid_query">查询信息不符合要求，请刷新后重试</string>
+    <string name="domain_hub_report_invalid_submit">提交信息不符合要求，请检查后重试</string>
+    <string name="domain_hub_report_detail_not_found">无法查看这条上报记录</string>
+    <string name="domain_hub_report_service_unavailable">上报服务暂不可用，请稍后重试</string>
+    <string name="domain_hub_report_conflict">本次请求存在冲突，已保留原请求，请稍后重试或反馈问题</string>
+    <string name="domain_hub_report_payload_too_large">提交内容超出大小限制，请减少内容后重试</string>
+    <string name="domain_hub_report_rate_limited">请求过于频繁，请在稍后重试</string>
+    <string name="domain_hub_report_unknown_error">服务暂未确认结果，请稍后重试</string>
+    <string name="domain_hub_protocol_v2_unavailable_status">资源协议 v2 暂不可用 status=%1$d</string>
+    <string name="domain_hub_protocol_v2_unavailable_empty">资源协议 v2 暂不可用 empty body</string>
+
+    <string name="domain_hub_no_compatible_resources">暂未提供兼容资源，继续使用当前资源</string>
+    <string name="domain_hub_already_latest">当前规则和模型已经是最新版本</string>
+    <string name="domain_hub_progress_preparing">正在准备下载资源</string>
+    <string name="domain_hub_progress_downloading_rules">正在下载智能卡片规则</string>
+    <string name="domain_hub_progress_verifying_rules">正在校验智能卡片规则</string>
+    <string name="domain_hub_progress_downloading_model">正在下载离线模型</string>
+    <string name="domain_hub_progress_downloading_vocab">正在下载模型词表</string>
+    <string name="domain_hub_progress_downloading_contract">正在下载模型契约</string>
+    <string name="domain_hub_progress_verifying_model">正在校验并启用离线模型</string>
+    <string name="domain_hub_error_model_update_incomplete">模型更新未完成，已保留当前模型</string>
+    <string name="domain_hub_progress_complete">资源更新完成</string>
+    <string name="domain_hub_error_model_switch_incomplete">模型切换未完成，已保留当前模型</string>
+    <string name="domain_hub_release_note_model">模型：%1$s</string>
+    <string name="domain_hub_release_note_rules">规则：%1$s</string>
+    <string name="domain_hub_version_not_provided">未提供</string>
+    <string name="domain_hub_no_release_notes">暂无版本说明</string>
+    <string name="domain_hub_model_unsupported_version">当前版本不支持此模型</string>
+    <string name="domain_hub_model_incompatible_contract">模型契约不兼容</string>
+
+    <!-- 发件方资料 -->
+    <string name="domain_sender_profile_not_published">服务端暂未发布发件方资料</string>
+    <string name="domain_sender_profile_already_latest">发件方资料已经是最新版本</string>
+    <string name="domain_sender_profile_requires_app_update">该资料版本需要更新 PixelText 后才能安装</string>
+    <string name="domain_sender_profile_progress_fetching_url">正在获取最新下载地址</string>
+    <string name="domain_sender_profile_progress_downloading">正在下载发件方资料</string>
+    <string name="domain_sender_profile_progress_verifying">正在校验发件方资料</string>
+    <string name="domain_sender_profile_progress_importing">正在导入发件方资料</string>
+    <string name="domain_sender_profile_progress_cleaning">正在清理旧版发件方资料</string>
+    <string name="domain_sender_profile_progress_complete">发件方资料安装完成</string>
+    <string name="domain_sender_profile_install_failed">发件方资料安装失败</string>
+    <string name="domain_sender_profile_unsupported_schema">不支持的发件方资料格式：%1$d</string>
+    <string name="domain_sender_profile_empty_version">发件方资料版本为空</string>
+    <string name="domain_sender_profile_invalid_size">发件方资料大小不合法</string>
+    <string name="domain_sender_profile_invalid_hash">发件方资料哈希不合法</string>
+    <string name="domain_sender_profile_insecure_url">发件方资料下载地址不安全</string>
+    <string name="domain_sender_profile_version_changed">发件方资料版本已变化，请重新检查更新</string>
+
+    <!-- SIM 卡、搜索与短信访问权限 -->
+    <string name="domain_sim_default">默认卡</string>
+    <string name="domain_sim_slot">卡%1$d</string>
+
+    <string name="domain_search_date_any">任意时间</string>
+    <string name="domain_search_date_week">一周前</string>
+    <string name="domain_search_date_month">一月前</string>
+    <string name="domain_search_date_half_year">半年前</string>
+    <string name="domain_search_date_year">一年前</string>
+
+    <string name="domain_sms_access_default_app_required">请先将本应用设为默认短信应用</string>
+    <string name="domain_sms_access_read_permission_required">请授予短信读取权限后重试</string>
+
+    <!-- 应用身份与通知设置 -->
+    <string name="domain_app_display_name_chisu_full">原点尺素</string>
+    <string name="domain_app_display_name_sms_full">原点短信</string>
+    <string name="domain_app_display_name_jianxun_full">原点简讯</string>
+    <string name="domain_app_display_name_pixel_text">Pixel Text</string>
+    <string name="domain_app_display_name_chisu">尺素</string>
+    <string name="domain_app_display_name_sms">短信</string>
+    <string name="domain_app_display_name_message">Message</string>
+    <string name="domain_app_display_name_pixel_message">Pixel Message</string>
+
+    <string name="domain_app_icon_style_violet">叠语</string>
+    <string name="domain_app_icon_style_blue">原点</string>
+    <string name="domain_app_icon_style_green">小零</string>
+    <string name="domain_app_icon_style_azure">信息</string>
+    <string name="domain_app_icon_style_apricot">叠语</string>
+    <string name="domain_app_icon_style_classic">经典</string>
+
+    <string name="domain_sms_notification_icon_double_bubble">双气泡</string>
+    <string name="domain_sms_notification_icon_single_bubble">单气泡</string>
+    <string name="domain_sms_notification_icon_envelope">信封</string>
+    <string name="domain_sms_notification_icon_text_bubble">文本气泡</string>
+
+    <string name="domain_notification_action_mark_read">已阅</string>
+    <string name="domain_notification_action_copy_code">复制 {code}</string>
+    <string name="domain_notification_action_reply">回复</string>
+    <string name="domain_notification_action_error_empty">文案不能为空</string>
+    <string name="domain_notification_action_error_no_placeholder">该按钮不支持 {code} 占位符</string>
+    <string name="domain_notification_action_error_too_long">文案最多 4 个中文或 8 个英文</string>
+    <string name="domain_notification_action_error_duplicate_placeholder">{code} 最多出现一次</string>
+    <string name="domain_notification_action_error_fixed_too_long">固定文案最多 4 个中文或 8 个英文</string>
+
+    <!-- 主题与对话输入提示 -->
+    <string name="domain_default_input_placeholder">请输入内容……</string>
+
+    <!-- 白名单与个人学习 -->
+    <string name="domain_whitelist_rule_type_exact">精确号码</string>
+    <string name="domain_whitelist_rule_type_regex">正则表达式</string>
+    <string name="domain_whitelist_error_empty">请输入号码或表达式</string>
+    <string name="domain_whitelist_error_too_long">规则不能超过 %1$d 个字符</string>
+    <string name="domain_whitelist_error_exact_format">精确号码仅支持数字和开头的 +，每行一个号码</string>
+    <string name="domain_whitelist_error_regex_empty_match">表达式不能匹配空号码，请缩小匹配范围</string>
+    <string name="domain_whitelist_error_regex_invalid">正则表达式无效，或使用了不支持的环视、回溯引用</string>
+    <string name="domain_whitelist_error_edit_single">编辑时只能输入一条规则</string>
+    <string name="domain_whitelist_error_not_found">规则不存在，请刷新后重试</string>
+    <string name="domain_whitelist_error_max_rules">最多保存 %1$d 条规则</string>
+    <string name="domain_whitelist_error_duplicate">包含已存在的规则，请删除重复项后重试</string>
+    <string name="domain_whitelist_error_merge_limit">合并后白名单超过 %1$d 条</string>
+    <string name="domain_whitelist_error_read_messages">无法读取消息，请检查短信权限</string>
+    <string name="domain_whitelist_error_read_mms_sender">无法读取彩信发件人</string>
+
+    <string name="domain_personal_learning_failed">本地学习失败，可重试</string>
+
+    <!-- 智能卡片解析展示字段 -->
+    <string name="domain_parser_detail_passenger">乘车人</string>
+    <string name="domain_parser_detail_seat_class">席别</string>
+    <string name="domain_parser_detail_seat">座位</string>
+    <string name="domain_parser_detail_gate">检票口</string>
+    <string name="domain_parser_detail_order_no">订单号</string>
+    <string name="domain_parser_train_type_hsr">高铁</string>
+    <string name="domain_parser_flight_type_nonstop">直飞</string>
+    <string name="domain_parser_detail_account">交易账户</string>
+    <string name="domain_parser_detail_tx_time">交易时间</string>
+    <string name="domain_parser_detail_tx_memo">交易备注</string>
+    <string name="domain_parser_bank_type_default">交易</string>
+    <string name="domain_parser_detail_recharge_time">充值时间</string>
+    <string name="domain_parser_detail_balance">当前余额</string>
+    <string name="domain_parser_balance_cny">%1$s元</string>
+    <string name="domain_parser_data_label_default">手机上网流量</string>
+    <string name="domain_parser_data_label_remaining">%1$s · 剩余</string>
+    <string name="domain_parser_data_label_used">%1$s · 已使用</string>
+    <string name="domain_parser_detail_total_data">套餐总量</string>
+    <string name="domain_parser_detail_used_data">已使用</string>
+    <string name="domain_parser_detail_throttled_used">达量限速流量</string>
+    <string name="domain_parser_data_used_value">已使用%1$s</string>
+    <string name="domain_parser_detail_throttle_threshold">限速阈值</string>
+    <string name="domain_parser_detail_plan_name">流量类型</string>
+
+    <!-- 彩信解析、媒体、摘要与外发 -->
+    <string name="domain_mms_warning_separator">；</string>
+    <string name="domain_list_separator_comma">、</string>
+    <string name="domain_mms_calendar_too_large">日历过大，请打开原件</string>
+    <string name="domain_mms_calendar_max_events">最多展示 32 个事件，其余事件请打开原件</string>
+    <string name="domain_mms_calendar_incomplete">日历事件不完整，请打开原件</string>
+    <string name="domain_mms_calendar_unreadable">无法读取日历事件，请打开原件</string>
+    <string name="domain_mms_calendar_extra_fields_incomplete">附加字段或提醒未完整导入</string>
+    <string name="domain_mms_calendar_field_truncated">过长字段已截短</string>
+    <string name="domain_mms_calendar_recurring_notice">系统添加仅支持本次事件；完整重复规则及例外请打开原始 ICS</string>
+    <string name="domain_mms_calendar_check_properties">部分日历属性请核对原件</string>
+    <string name="domain_mms_calendar_missing_title">事件缺少标题</string>
+    <string name="domain_mms_calendar_embedded_tz">内嵌时区规则需由日历应用完整读取</string>
+    <string name="domain_mms_calendar_floating_tz">未声明时区，按设备当前时区显示，请核对</string>
+    <string name="domain_mms_calendar_invalid_time">日期、时区或时长无法可靠读取，请打开原件</string>
+
+    <string name="domain_mms_contact_too_large">名片过大，请打开原件</string>
+    <string name="domain_mms_contact_max_contacts">最多展示 %1$d 位联系人，其余内容请打开原件</string>
+    <string name="domain_mms_contact_nested">嵌套名片无法完整读取，请打开原件</string>
+    <string name="domain_mms_contact_incomplete">名片不完整，请打开原件</string>
+    <string name="domain_mms_contact_unreadable">无法读取名片，请打开原件</string>
+    <string name="domain_mms_contact_partial_fields">部分字段、照片或姓名未完整读取，请核对原件</string>
+    <string name="domain_mms_contact_invalid_fields">名片字段异常，请打开原件</string>
+    <string name="domain_mms_contact_photo_unreadable">名片照片无法在本消息内读取，请核对原件</string>
+
+    <string name="domain_mms_html_image_unavailable">图片不可用</string>
+
+    <string name="domain_mms_pending_download">等待下载彩信</string>
+    <string name="domain_mms_label">彩信</string>
+    <string name="domain_mms_preparing_content">正在准备彩信内容</string>
+    <string name="domain_mms_attachment_numbered">附件 %1$d</string>
+    <string name="domain_mms_empty_readable">彩信（暂无可读内容）</string>
+    <string name="domain_mms_kind_image">图片</string>
+    <string name="domain_mms_kind_audio">音频</string>
+    <string name="domain_mms_kind_video">视频</string>
+    <string name="domain_mms_kind_contact">联系人</string>
+    <string name="domain_mms_kind_calendar">日历</string>
+    <string name="domain_mms_kind_html">网页</string>
+    <string name="domain_mms_kind_text">文本</string>
+    <string name="domain_mms_kind_file">文件</string>
+    <string name="domain_mms_kind_count">%1$s × %2$d</string>
+
+    <string name="domain_mms_attachment_text">文本附件</string>
+    <string name="domain_mms_attachment_image">图片附件</string>
+    <string name="domain_mms_attachment_audio">音频附件</string>
+    <string name="domain_mms_attachment_video">视频附件</string>
+    <string name="domain_mms_attachment_html">网页附件</string>
+    <string name="domain_mms_attachment_contact">联系人附件</string>
+    <string name="domain_mms_attachment_calendar">日历附件</string>
+    <string name="domain_mms_attachment_smil">演示附件</string>
+    <string name="domain_mms_attachment_multipart">复合附件</string>
+    <string name="domain_mms_attachment_file">附件</string>
+
+    <string name="domain_mms_contact_export_select_system">请选择系统联系人</string>
+    <string name="domain_mms_contact_export_not_found">联系人已不存在，请重新选择</string>
+    <string name="domain_mms_contact_export_read_failed">无法读取联系人，请重新选择</string>
+    <string name="domain_mms_contact_export_phones_failed">无法读取联系人电话，请重新选择</string>
+    <string name="domain_mms_contact_export_no_phones">该联系人没有电话号码，请选择其他联系人</string>
+    <string name="domain_mms_contact_export_save_failed">无法保存联系人附件，请检查存储空间</string>
+    <string name="domain_mms_contact_export_default_filename">联系人</string>
+
+    <string name="domain_mms_media_not_readable">附件尚不可读</string>
+    <string name="domain_mms_media_too_large_for_preview">文件较大，进入查看页播放</string>
+    <string name="domain_mms_media_exceeds_budget">无法在预览预算内读取媒体</string>
+    <string name="domain_mms_media_preview_failed">无法读取预览，可尝试播放或保存原件</string>
+
+    <string name="domain_mms_send_late_success_duplicate">旧尝试后来报告成功，可能重复发送</string>
+    <string name="domain_mms_send_origin_unavailable">原发送记录不可用</string>
+    <string name="domain_mms_send_previous_late_success">此前尝试后来报告成功，请先检查已发送记录</string>
+    <string name="domain_mms_send_origin_state_changed">原发送结果已变化，请重新确认</string>
+    <string name="domain_mms_send_draft_updated">草稿已更新，请重新打开</string>
+    <string name="domain_mms_send_content_changed">内容已更改，请重新确认</string>
+    <string name="domain_mms_send_attachment_not_imported">有附件尚未导入，请重新选择或明确移除</string>
+    <string name="domain_mms_send_empty_content">请添加正文或附件</string>
+    <string name="domain_mms_send_attachment_not_ready">附件尚未准备完成</string>
+    <string name="domain_mms_send_origin_state_changed_risk">原发送结果已变化，请重新查看结果与重发风险</string>
+    <string name="domain_mms_send_duplicate_source_changed">重发来源已变化，请重新确认</string>
+    <string name="domain_mms_send_queue_limit">待处理彩信已达 10 条，请先确认或清理已有记录</string>
+    <string name="domain_mms_send_paused_late_success">旧尝试后来报告成功，已暂停本次提交</string>
+    <string name="domain_mms_send_paused_origin_changed">原发送结果已变化，请重新确认重发风险</string>
+    <string name="domain_mms_send_cancelled">已取消发送</string>
+    <string name="domain_mms_send_record_unavailable">发送记录不可用</string>
+    <string name="domain_mms_send_cannot_retry">当前状态不能重试</string>
+    <string name="domain_mms_send_syncing_failed">正在同步失败记录，请稍后重试</string>
+    <string name="domain_mms_send_provider_conflict">系统消息存在身份冲突，已暂停同步，请核对其他短信应用中的记录</string>
+    <string name="domain_mms_send_message_deleted">消息已删除</string>
+</resources>

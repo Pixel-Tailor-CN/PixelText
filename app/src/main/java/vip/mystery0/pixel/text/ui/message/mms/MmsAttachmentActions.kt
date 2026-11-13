@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.ui.message.mms
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -27,9 +28,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExportException
 import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentExporter
 import vip.mystery0.pixel.text.data.source.mms.MmsAttachmentFailureReason
@@ -50,10 +55,12 @@ fun MmsAttachmentActions(
     enabled: Boolean = true,
     exporter: MmsAttachmentExporter = koinInject(),
     onFeedback: ((String) -> Unit)? = null,
-    openLabel: String = "外部打开",
+    openLabel: String? = null,
     menuOnly: Boolean = false,
 ) {
+    val resolvedOpenLabel = openLabel ?: stringResource(R.string.msg_mms_open_external)
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val currentPart by rememberUpdatedState(part)
     val currentFeedback by rememberUpdatedState(onFeedback)
@@ -74,13 +81,13 @@ fun MmsAttachmentActions(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: ActivityNotFoundException) {
-                feedback("没有可处理此附件的应用")
+                feedback(resources.getString(R.string.msg_mms_no_app_for_attachment))
             } catch (failure: MmsAttachmentExportException) {
-                feedback(failure.userMessage())
+                feedback(failure.userMessage(context))
             } catch (_: SecurityException) {
-                feedback("没有权限访问附件，请重试")
+                feedback(resources.getString(R.string.msg_mms_no_permission_attachment))
             } catch (_: Exception) {
-                feedback("附件处理失败，请重试")
+                feedback(resources.getString(R.string.msg_mms_attachment_action_failed))
             } finally {
                 activeAction = null
             }
@@ -96,11 +103,11 @@ fun MmsAttachmentActions(
         // 用户取消系统文件选择器时 destination 为空，不显示错误。
         if (destination != null) {
             if (requestedPart == null) {
-                feedback("保存请求已失效，请重新选择附件")
+                feedback(resources.getString(R.string.msg_mms_save_request_expired))
             } else {
                 runAction(ActiveAttachmentAction.SAVE) {
                     exporter.export(requestedPart, destination)
-                    feedback("附件已保存")
+                    feedback(resources.getString(R.string.msg_mms_attachment_saved))
                 }
             }
         }
@@ -114,7 +121,7 @@ fun MmsAttachmentActions(
     }
     fun share() = runAction(ActiveAttachmentAction.SHARE) {
         val shared = exporter.prepareShare(currentPart.key)
-        context.startActivity(shareIntent(shared))
+        context.startActivity(shareIntent(context, shared))
     }
     fun save() {
         pendingSaveKey = encodePartKey(currentPart.key)
@@ -122,28 +129,28 @@ fun MmsAttachmentActions(
             saveLauncher.launch(suggestedMmsAttachmentName(currentPart))
         } catch (_: ActivityNotFoundException) {
             pendingSaveKey = null
-            feedback("没有可保存附件的系统应用")
+            feedback(resources.getString(R.string.msg_mms_no_save_app))
         } catch (_: SecurityException) {
             pendingSaveKey = null
-            feedback("没有权限打开系统保存界面，请重试")
+            feedback(resources.getString(R.string.msg_mms_no_permission_save_ui))
         } catch (_: Exception) {
             pendingSaveKey = null
-            feedback("无法打开系统保存界面，请重试")
+            feedback(resources.getString(R.string.msg_mms_cannot_open_save_ui))
         }
     }
     if (menuOnly) {
         Box(modifier) {
             IconButton(enabled = actionsEnabled, onClick = { expanded = true }) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = "附件操作：${part.displayName}")
+                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.msg_mms_attachment_actions_cd, part.displayName))
             }
             DropdownMenu(expanded = expanded && actionsEnabled, onDismissRequest = { expanded = false }) {
-                DropdownMenuItem(text = { Text(openLabel) }, leadingIcon = {
+                DropdownMenuItem(text = { Text(resolvedOpenLabel) }, leadingIcon = {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, null)
                 }, onClick = { expanded = false; open() })
-                DropdownMenuItem(text = { Text("保存") }, leadingIcon = {
+                DropdownMenuItem(text = { Text(stringResource(R.string.msg_action_save)) }, leadingIcon = {
                     Icon(Icons.Rounded.SaveAlt, null)
                 }, onClick = { expanded = false; save() })
-                DropdownMenuItem(text = { Text("分享") }, leadingIcon = {
+                DropdownMenuItem(text = { Text(stringResource(R.string.msg_action_share)) }, leadingIcon = {
                     Icon(Icons.Rounded.Share, null)
                 }, onClick = { expanded = false; share() })
             }
@@ -152,15 +159,15 @@ fun MmsAttachmentActions(
         Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(enabled = actionsEnabled, onClick = ::open, contentPadding = PaddingValues(8.dp)) {
                 Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp)); Text(openLabel, style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(4.dp)); Text(resolvedOpenLabel, style = MaterialTheme.typography.labelMedium)
             }
             TextButton(enabled = actionsEnabled, onClick = ::save, contentPadding = PaddingValues(8.dp)) {
                 Icon(Icons.Rounded.SaveAlt, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp)); Text("保存", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.msg_action_save), style = MaterialTheme.typography.labelMedium)
             }
             TextButton(enabled = actionsEnabled, onClick = ::share, contentPadding = PaddingValues(8.dp)) {
                 Icon(Icons.Rounded.Share, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp)); Text("分享", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.msg_action_share), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -184,24 +191,26 @@ private fun openIntent(shared: SharedMmsAttachment): Intent = Intent(Intent.ACTI
     clipData = ClipData.newRawUri(shared.displayName, shared.uri)
 }
 
-private fun shareIntent(shared: SharedMmsAttachment): Intent {
+private fun shareIntent(context: Context, shared: SharedMmsAttachment): Intent {
     val send = Intent(Intent.ACTION_SEND).apply {
         type = shared.mimeType
         putExtra(Intent.EXTRA_STREAM, shared.uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         clipData = ClipData.newRawUri(shared.displayName, shared.uri)
     }
-    return Intent.createChooser(send, "分享附件").apply {
+    return Intent.createChooser(send, context.getString(R.string.msg_mms_share_chooser_title)).apply {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 }
 
-private fun MmsAttachmentExportException.userMessage(): String = when (reason) {
-    MmsAttachmentFailureReason.MESSAGE_UNAVAILABLE,
-    MmsAttachmentFailureReason.PART_UNAVAILABLE,
-    MmsAttachmentFailureReason.SOURCE_MISSING -> "附件已删除或失效，请刷新后重试"
-    MmsAttachmentFailureReason.NOT_READY -> "附件仍在准备中，请稍后重试"
-    MmsAttachmentFailureReason.PERMISSION_DENIED -> "没有权限访问附件或目标位置，请重试"
-    MmsAttachmentFailureReason.NO_SPACE -> "存储空间不足，请清理后重试"
-    MmsAttachmentFailureReason.WRITE_FAILED -> "附件写入失败，请重试"
-}
+private fun MmsAttachmentExportException.userMessage(context: Context): String = context.getString(
+    when (reason) {
+        MmsAttachmentFailureReason.MESSAGE_UNAVAILABLE,
+        MmsAttachmentFailureReason.PART_UNAVAILABLE,
+        MmsAttachmentFailureReason.SOURCE_MISSING -> R.string.msg_mms_export_err_missing
+        MmsAttachmentFailureReason.NOT_READY -> R.string.msg_mms_export_err_not_ready
+        MmsAttachmentFailureReason.PERMISSION_DENIED -> R.string.msg_mms_export_err_permission
+        MmsAttachmentFailureReason.NO_SPACE -> R.string.msg_mms_export_err_no_space
+        MmsAttachmentFailureReason.WRITE_FAILED -> R.string.msg_mms_export_err_write_failed
+    }
+)

@@ -10,6 +10,7 @@ import ezvcard.VCardVersion
 import ezvcard.property.StructuredName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import java.io.File
 import java.util.UUID
 
@@ -25,7 +26,7 @@ class MmsContactExporter(private val context: Context) {
                 // 系统选择器可能返回带 Android 用户前缀的 authority，例如 0@com.android.contacts。
                 require(contactUri.scheme == "content" && contactUri.host == ContactsContract.AUTHORITY &&
                     contactUri.port == -1 && (contactUri.userInfo == null || contactUri.userInfo?.toIntOrNull() != null)) {
-                    "请选择系统联系人"
+                    context.getString(R.string.domain_mms_contact_export_select_system)
                 }
                 phase = "contact"
                 val resolver = context.contentResolver
@@ -34,9 +35,9 @@ class MmsContactExporter(private val context: Context) {
                     arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
                     null, null, null,
                 )?.use { cursor ->
-                    check(cursor.moveToFirst()) { "联系人已不存在，请重新选择" }
+                    check(cursor.moveToFirst()) { context.getString(R.string.domain_mms_contact_export_not_found) }
                     cursor.getLong(0) to cursor.getString(1).orEmpty()
-                } ?: error("无法读取联系人，请重新选择")
+                } ?: error(context.getString(R.string.domain_mms_contact_export_read_failed))
                 phase = "phones"
                 val numbers = resolver.query(
                     // 保持选中 URI 的用户范围，不能用工作资料的联系人 ID 查询个人通讯录。
@@ -49,8 +50,8 @@ class MmsContactExporter(private val context: Context) {
                     buildList {
                         while (cursor.moveToNext()) cursor.getString(0)?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
                     }.distinct()
-                } ?: error("无法读取联系人电话，请重新选择")
-                check(numbers.isNotEmpty()) { "该联系人没有电话号码，请选择其他联系人" }
+                } ?: error(context.getString(R.string.domain_mms_contact_export_phones_failed))
+                check(numbers.isNotEmpty()) { context.getString(R.string.domain_mms_contact_export_no_phones) }
                 val name = displayName.ifBlank { numbers.first() }
                 phase = "encode"
                 val card = VCard().apply {
@@ -61,11 +62,14 @@ class MmsContactExporter(private val context: Context) {
                 val encoded = Ezvcard.write(card).version(VCardVersion.V3_0).prodId(false).go()
                 phase = "write"
                 val directory = File(context.cacheDir, "mms-share/contacts")
-                check(directory.isDirectory || directory.mkdirs()) { "无法保存联系人附件，请检查存储空间" }
+                check(directory.isDirectory || directory.mkdirs()) {
+                    context.getString(R.string.domain_mms_contact_export_save_failed)
+                }
                 val file = File(directory, "${UUID.randomUUID()}.vcf")
                 temporary = file
                 file.writeText(encoded, Charsets.UTF_8)
-                val filename = name.filter { !it.isISOControl() && it !in "\\/" }.take(60).ifBlank { "联系人" } + ".vcf"
+                val filename = name.filter { !it.isISOControl() && it !in "\\/" }.take(60)
+                    .ifBlank { context.getString(R.string.domain_mms_contact_export_default_filename) } + ".vcf"
                 Attachment(FileProvider.getUriForFile(context, "${context.packageName}.mms.attachment", file, filename), file)
             }
         } catch (error: Exception) {

@@ -1,15 +1,21 @@
 package vip.mystery0.pixel.text.domain.sample
 
-enum class SensitiveType(val label: String) {
-    NAME("姓名"),
-    PHONE("手机号"),
-    ID_CARD("身份证号"),
-    ADDRESS("地址"),
-    BANK_CARD("银行卡号"),
-    ORDER_ID("订单号"),
-    VERIFICATION_CODE("验证码"),
-    AMOUNT("金额"),
-    DATE("日期"),
-    TIME("时间"),
-    DATE_TIME("日期时间"),
+import androidx.annotation.StringRes
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
+
+enum class SensitiveType(@param:StringRes val labelRes: Int) {
+    NAME(R.string.domain_sensitive_type_name),
+    PHONE(R.string.domain_sensitive_type_phone),
+    ID_CARD(R.string.domain_sensitive_type_id_card),
+    ADDRESS(R.string.domain_sensitive_type_address),
+    BANK_CARD(R.string.domain_sensitive_type_bank_card),
+    ORDER_ID(R.string.domain_sensitive_type_order_id),
+    VERIFICATION_CODE(R.string.domain_sensitive_type_verification_code),
+    AMOUNT(R.string.domain_sensitive_type_amount),
+    DATE(R.string.domain_sensitive_type_date),
+    TIME(R.string.domain_sensitive_type_time),
+    DATE_TIME(R.string.domain_sensitive_type_date_time);
+
+    val label: String get() = AppStrings.get(labelRes)
 }

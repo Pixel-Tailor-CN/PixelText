@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -49,6 +50,7 @@ import vip.mystery0.pixel.text.ui.message.cards.SpamMessageCard
 import vip.mystery0.pixel.text.ui.message.cards.SpamMessageIndicator
 import vip.mystery0.pixel.text.ui.message.factory.MessageCardFactory
 import vip.mystery0.pixel.text.ui.theme.ResolvedOriginalMessageStyle
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.viewmodel.ManualSpamCheckState
 import java.text.SimpleDateFormat
 import kotlinx.coroutines.coroutineScope
@@ -207,7 +209,7 @@ fun MessageItem(
                         model?.let {
                             vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected, interactionEnabled,
                                 onOpenMmsPart, selectionMode, onClick, onLongClick)
-                        } ?: Text("正在读取彩信", color = textColor)
+                        } ?: Text(stringResource(R.string.msg_mms_loading), color = textColor)
                     }
                 } else {
                     val hasTextContent = message.content.isNotBlank()
@@ -269,7 +271,7 @@ fun MessageItem(
                         }
                     } else if (message.imageUris.isEmpty() && !message.mmsDownloadPending) {
                         OriginalTextCard(
-                            content = "【不支持的消息】",
+                            content = stringResource(R.string.msg_unsupported_message),
                             isSelected = isSelected,
                             isReceived = message.isReceived,
                             textScale = textScale,
@@ -311,7 +313,7 @@ fun MessageItem(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_sim),
-                            contentDescription = "SIM",
+                            contentDescription = stringResource(R.string.msg_sim_content_description),
                             modifier = Modifier.size(12.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -327,13 +329,15 @@ fun MessageItem(
 
             if (!message.isMms && (isSpam || message.parsedResult !is ParsedResult.None)) {
                 Text(
-                    text = when {
-                        isSpam && showOriginal -> "隐藏内容"
-                        isVerificationCode && showOriginal -> "收起原文"
-                        isVerificationCode -> "展开原文"
-                        showOriginal -> "显示智能卡片"
-                        else -> "显示原文"
-                    },
+                    text = stringResource(
+                        when {
+                            isSpam && showOriginal -> R.string.msg_toggle_hide_content
+                            isVerificationCode && showOriginal -> R.string.msg_toggle_collapse_original
+                            isVerificationCode -> R.string.msg_toggle_expand_original
+                            showOriginal -> R.string.msg_toggle_show_smart_card
+                            else -> R.string.msg_toggle_show_original
+                        }
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable(enabled = interactionEnabled) {
@@ -345,13 +349,13 @@ fun MessageItem(
 
         if (message.content.isNotBlank() && manualSpamCheckState != null) {
             val manualCheckText = when (manualSpamCheckState) {
-                ManualSpamCheckState.Checking -> "识别中..."
+                ManualSpamCheckState.Checking -> stringResource(R.string.msg_manual_spam_checking)
                 is ManualSpamCheckState.Result -> {
                     val percent = (manualSpamCheckState.score * 100).toInt().coerceIn(0, 100)
                     if (manualSpamCheckState.score >= 0.7f) {
-                        "手动识别: 骚扰概率 $percent%"
+                        stringResource(R.string.msg_manual_spam_high, percent)
                     } else {
-                        "手动识别: 风险较低 $percent%"
+                        stringResource(R.string.msg_manual_spam_low, percent)
                     }
                 }
 
@@ -395,10 +399,10 @@ fun formatTimeAgo(timestamp: Long): String {
     val sevenDays = oneDay * 7
 
     return when {
-        diff < oneMinute * 5 -> "刚刚"
-        diff < oneHour -> "${diff / oneMinute}分钟前"
-        diff < oneDay -> "${diff / oneHour}小时前"
-        diff < sevenDays -> "${diff / oneDay}天前"
+        diff < oneMinute * 5 -> AppStrings.get(R.string.msg_time_just_now)
+        diff < oneHour -> AppStrings.get(R.string.msg_time_minutes_ago, diff / oneMinute)
+        diff < oneDay -> AppStrings.get(R.string.msg_time_hours_ago, diff / oneHour)
+        diff < sevenDays -> AppStrings.get(R.string.msg_time_days_ago, diff / oneDay)
         else -> formatDetailedTime(timestamp)
     }
 }
@@ -411,7 +415,7 @@ private const val MESSAGE_ENTRANCE_START_SCALE = 0.88f
 private const val MESSAGE_ENTRANCE_FADE_MILLIS = 180
 
 fun formatDetailedTime(timestamp: Long): String {
-    val formatter = SimpleDateFormat("yyyy年M月d日 HH:mm:ss", Locale.getDefault())
+    val formatter = SimpleDateFormat(AppStrings.get(R.string.msg_time_detailed_format), Locale.getDefault())
     return formatter.format(Date(timestamp))
 }
 

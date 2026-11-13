@@ -4,6 +4,7 @@ import android.content.Context
 import android.annotation.SuppressLint
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.backup.BackupSummary
 
 /** 删除批次与恢复开启使用同一把锁，防止检查后、删除前插入历史消息。 */
@@ -65,12 +66,18 @@ class RestoreSafetyCoordinator(private val context: Context) {
     @SuppressLint("UseKtx")
     suspend fun begin() = deletionGate.withLock {
         if (!active) history.execSQL("DELETE FROM historical")
-        backupRequire(prefs.edit().putBoolean("active", true).commit(), "无法保存恢复保护状态")
+        backupRequire(
+            prefs.edit().putBoolean("active", true).commit(),
+            context.getString(R.string.domain_backup_error_save_protection_state),
+        )
     }
     // 仅在保护开关落盘成功后清理历史记录。
     @SuppressLint("UseKtx")
     suspend fun finish() = deletionGate.withLock {
-        backupRequire(prefs.edit().clear().commit(), "无法结束恢复保护，请重试")
+        backupRequire(
+            prefs.edit().clear().commit(),
+            context.getString(R.string.domain_backup_error_finish_protection),
+        )
         history.execSQL("DELETE FROM historical")
     }
     suspend fun cleanupBatch(action: suspend () -> Int): Int = deletionGate.withLock {
@@ -82,7 +89,7 @@ class RestoreSafetyCoordinator(private val context: Context) {
         backupRequire(prefs.edit().putLong("inserted", summary.inserted).putLong("existing", summary.existing)
             .putLong("remaining", summary.remaining).putLong("failed", summary.failed)
             .putLong("converted", summary.convertedOutgoing).putLong("skipped", summary.skippedAssociations).putStringSet("completed", summary.completedSections.map { it.name }.toSet()).commit(),
-            "恢复进度保存失败，已写入的短信会保留")
+            context.getString(R.string.domain_backup_error_save_progress))
     }
     fun summary(): BackupSummary = BackupSummary(
         inserted = prefs.getLong("inserted", 0), existing = prefs.getLong("existing", 0),

@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.spam.learning.ModelContract
@@ -17,6 +18,7 @@ import vip.mystery0.pixel.text.domain.sample.sampleCategory
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 import vip.mystery0.pixel.text.domain.spam.learning.*
+import vip.mystery0.pixel.text.util.AppStrings
 import java.util.concurrent.ConcurrentHashMap
 
 enum class LearningRuleConflict {
@@ -100,7 +102,7 @@ class PersonalLearningViewModel(
             message = message,
             selectedLabel = null,
             needsEnable = needsEnable,
-            error = if (message.content.isBlank()) "这条消息没有可学习的文本，图片和附件不参与学习" else null,
+            error = if (message.content.isBlank()) AppStrings.get(R.string.sys_learning_no_text) else null,
         )
         if (message.content.isBlank() || message.isMms) return
         viewModelScope.launch {
@@ -132,7 +134,7 @@ class PersonalLearningViewModel(
                 mutableInteraction.update { current ->
                     if (current.message?.id != message.id) current
                     else current.copy(
-                        error = current.error ?: "读取规则或关联信息失败，仍可继续保存在本机",
+                        error = current.error ?: AppStrings.get(R.string.sys_learning_meta_load_failed),
                     )
                 }
             }
@@ -205,7 +207,7 @@ class PersonalLearningViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                mutableInteraction.update { it.copy(busy = false, error = "未能保存学习样本，请重试") }
+                mutableInteraction.update { it.copy(busy = false, error = AppStrings.get(R.string.sys_learning_save_sample_failed)) }
             }
         }
     }
@@ -271,7 +273,7 @@ class PersonalLearningViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                mutableError.value = "无法准备贡献样本，请重试"
+                mutableError.value = AppStrings.get(R.string.sys_learning_prepare_contribution_failed)
             } finally {
                 mutableUpdatingSample.value = false
             }
@@ -288,7 +290,7 @@ class PersonalLearningViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                mutableError.value = "分类未能保存，请重试"
+                mutableError.value = AppStrings.get(R.string.sys_learning_update_label_failed)
             } finally {
                 mutableUpdatingSample.value = false
             }
@@ -306,7 +308,7 @@ class PersonalLearningViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                mutableError.value = "操作未完成，请重试"
+                mutableError.value = AppStrings.get(R.string.sys_learning_operation_failed)
             }
         }
     }

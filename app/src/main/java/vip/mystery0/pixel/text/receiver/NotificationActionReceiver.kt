@@ -5,6 +5,7 @@ import androidx.core.net.toUri
 import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
+import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -132,7 +133,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                         updateNotificationAfterReply(
                             context = context,
                             notificationId = notificationId,
-                            statusText = "正在发送"
+                            statusText = context.getString(R.string.sys_notification_reply_sending)
                         )
                     } else {
                         updateNotificationAfterReply(
@@ -231,6 +232,13 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         recipient: String,
         text: String
     ): Boolean {
+        val roles = context.getSystemService(RoleManager::class.java)
+        if (roles?.isRoleHeld(RoleManager.ROLE_SMS) != true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "reply skipped: sms role or send permission unavailable")
+            return false
+        }
         var messageUri: Uri? = null
         return try {
             val defaultSubId = SubscriptionManager.getDefaultSmsSubscriptionId()

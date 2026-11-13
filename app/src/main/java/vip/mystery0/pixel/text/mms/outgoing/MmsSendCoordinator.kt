@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
@@ -35,7 +36,7 @@ fun interface MmsPlatformTransport {
 class AndroidMmsPlatformTransport : MmsPlatformTransport {
     override fun send(context: Context, subscriptionId: Int, pduUri: Uri, callback: PendingIntent) {
         val manager = context.getSystemService(SmsManager::class.java)?.createForSubscriptionId(subscriptionId)
-            ?: throw MmsSendException("设备不支持彩信")
+            ?: throw MmsSendException(context.getString(R.string.sys_mms_device_not_supported))
         // 平台按指定订阅选择 APN/MMSC，并为系统及 carrier service 转授权该 PDU。
         manager.sendMultimediaMessage(context, pduUri, null, null, callback)
     }
@@ -55,15 +56,15 @@ class MmsSendCoordinator(
 ) {
     suspend fun prepare(draft: MmsDraft): MmsSendSnapshot = withContext(Dispatchers.IO) {
         checkPrerequisites()
-        val recipient = MmsRecipient.normalize(draft.recipientAddress) ?: throw MmsSendException("请确认一个有效电话号码")
-        if (draft.body.isBlank() && draft.attachments.isEmpty()) throw MmsSendException("请添加正文或附件")
-        if (draft.attachments.size > 10 || draft.attachments.sumOf { it.originalSize } > 64L * 1024 * 1024) throw MmsSendException("附件超过本地准备上限")
+        val recipient = MmsRecipient.normalize(draft.recipientAddress) ?: throw MmsSendException(context.getString(R.string.sys_mms_confirm_valid_phone))
+        if (draft.body.isBlank() && draft.attachments.isEmpty()) throw MmsSendException(context.getString(R.string.sys_mms_add_body_or_attachment))
+        if (draft.attachments.size > 10 || draft.attachments.sumOf { it.originalSize } > 64L * 1024 * 1024) throw MmsSendException(context.getString(R.string.sys_mms_attachments_over_local_limit))
         val policy = policies.resolve(draft.subscriptionId)
         val base = MmsSendSnapshot(recipient, draft.body, draft.subject, draft.subscriptionId, policy, emptyList())
         // 为地址、主题、SMIL和part头保留有界余量，最终门槛仍是实际完整PDU字节。
         val reserve = draft.body.toByteArray(Charsets.UTF_8).size + draft.subject.toByteArray(Charsets.UTF_8).size + 4096 + draft.attachments.size * 1024
         var remaining = policy.maxMessageBytes - reserve
-        if (remaining < 0) throw MmsSendException("正文或主题超过彩信上限")
+        if (remaining < 0) throw MmsSendException(context.getString(R.string.sys_mms_text_or_subject_over_limit))
         val prepared = mutableListOf<MmsAttachment>()
         try {
             val (images, originals) = draft.attachments.partition { attachments.isAdaptableImage(it) }
@@ -87,14 +88,14 @@ class MmsSendCoordinator(
     suspend fun preparedSize(snapshot: MmsSendSnapshot): Int = withContext(Dispatchers.IO) { composer.compose(snapshot, PREVIEW_TRANSACTION).bytes.size }
     suspend fun accept(draftId: String, revision: Long, snapshot: MmsSendSnapshot, possibleDuplicateOf: String? = null): String = withContext(Dispatchers.IO) {
         checkPrerequisites()
-        if (policies.resolve(snapshot.subscriptionId).fingerprint != snapshot.policy.fingerprint) throw MmsSendException("SIM 或运营商配置已变化，请重新准备并确认")
+        if (policies.resolve(snapshot.subscriptionId).fingerprint != snapshot.policy.fingerprint) throw MmsSendException(context.getString(R.string.sys_mms_sim_config_changed_reprepare))
         composer.compose(snapshot, PREVIEW_TRANSACTION)
         repository.accept(draftId, revision, snapshot, possibleDuplicateOf).also { scheduleRecovery() }
     }
     suspend fun retryFailed(requestId: String) {
-        val old = repository.get(requestId) ?: throw MmsSendException("发送记录不可用")
+        val old = repository.get(requestId) ?: throw MmsSendException(context.getString(R.string.sys_mms_send_record_unavailable))
         checkPrerequisites()
-        if (policies.resolve(old.snapshot.subscriptionId).fingerprint != old.snapshot.policy.fingerprint) throw MmsSendException("SIM 或配置已变化，请恢复草稿重新确认")
+        if (policies.resolve(old.snapshot.subscriptionId).fingerprint != old.snapshot.policy.fingerprint) throw MmsSendException(context.getString(R.string.sys_mms_sim_config_changed_restore))
         repository.retryFailed(requestId); scheduleRecovery()
     }
     suspend fun releaseUnknownPayload(requestId: String): Boolean {
@@ -127,9 +128,9 @@ class MmsSendCoordinator(
                     if (message.deleted) {
                         // 删除只隐藏消息，不能让此尝试永久占用同 SIM 的提交名额。
                         when (message.state) {
-                            MmsSendState.DISPATCHING -> repository.unknown(message.attemptToken, "提交期间消息已删除，发送结果不明")
+                            MmsSendState.DISPATCHING -> repository.unknown(message.attemptToken, context.getString(R.string.sys_mms_deleted_during_dispatch))
                             MmsSendState.AWAITING_RESULT -> if (now - (message.submittedAt ?: now) >= RESULT_WAIT_MILLIS) {
-                                repository.unknown(message.attemptToken, "消息已删除，暂未收到发送结果")
+                                repository.unknown(message.attemptToken, context.getString(R.string.sys_mms_deleted_result_pending))
                             }
                             else -> Unit
                         }
@@ -141,9 +142,9 @@ class MmsSendCoordinator(
                         return@forEach
                     }
                     when (message.state) {
-                        MmsSendState.DISPATCHING -> repository.unknown(message.attemptToken, "提交期间应用中断，可能已经发出")
+                        MmsSendState.DISPATCHING -> repository.unknown(message.attemptToken, context.getString(R.string.sys_mms_interrupted_during_dispatch))
                         MmsSendState.AWAITING_RESULT -> if (now - (message.submittedAt ?: now) >= RESULT_WAIT_MILLIS) {
-                            repository.unknown(message.attemptToken, "暂未收到发送结果，可能已经发出")
+                            repository.unknown(message.attemptToken, context.getString(R.string.sys_mms_result_timeout_unknown))
                         }
                         MmsSendState.PREPARING -> prepareRequest(message)
                         else -> Unit
@@ -158,7 +159,7 @@ class MmsSendCoordinator(
                 } catch (_: MmsProviderDeleted) {
                     repository.markDeleted(initial.requestId)
                 } catch (_: MmsProviderConflict) {
-                    repository.failBeforeDispatch(initial.attemptToken, "系统消息已更改，请保留记录并重新检查")
+                    repository.failBeforeDispatch(initial.attemptToken, context.getString(R.string.sys_mms_system_message_changed))
                     repository.recordProviderConflict(initial.requestId, initial.attemptToken)
                     pendingLocal = true
                 } catch (error: MmsSendException) {
@@ -180,7 +181,7 @@ class MmsSendCoordinator(
     }
     private suspend fun prepareRequest(message: OutgoingMmsMessage) {
         checkPrerequisites()
-        if (policies.resolve(message.snapshot.subscriptionId).fingerprint != message.snapshot.policy.fingerprint) throw MmsSendException("SIM 或配置已变化，请重新确认")
+        if (policies.resolve(message.snapshot.subscriptionId).fingerprint != message.snapshot.policy.fingerprint) throw MmsSendException(context.getString(R.string.sys_mms_sim_config_changed_reconfirm))
         val composed = composer.compose(message.snapshot, message.transactionId)
         val source = provider.prepare(message, composed, repository.previousTransaction(message.attemptToken), repository.previousProviderReady(message.attemptToken)) { id ->
             repository.setSource(message.requestId, message.attemptToken, id)
@@ -192,12 +193,12 @@ class MmsSendCoordinator(
     }
     private suspend fun dispatch(message: OutgoingMmsMessage) {
         checkPrerequisites()
-        if (policies.resolve(message.snapshot.subscriptionId).fingerprint != message.snapshot.policy.fingerprint) throw MmsSendException("SIM 或配置已变化，请重新确认")
+        if (policies.resolve(message.snapshot.subscriptionId).fingerprint != message.snapshot.policy.fingerprint) throw MmsSendException(context.getString(R.string.sys_mms_sim_config_changed_reconfirm))
         val composed = composer.compose(message.snapshot, message.transactionId)
         provider.verify(message, composed)
-        val path = message.pduPath ?: throw MmsSendException("发送文件不可用")
+        val path = message.pduPath ?: throw MmsSendException(context.getString(R.string.sys_mms_send_file_unavailable))
         val bytes = payloads.read(path, message.snapshot.policy.maxMessageBytes)
-        if (payloads.sha256(bytes) != message.pduSha256 || !bytes.contentEquals(composed.bytes)) throw MmsSendException("发送文件已变化，请重新确认")
+        if (payloads.sha256(bytes) != message.pduSha256 || !bytes.contentEquals(composed.bytes)) throw MmsSendException(context.getString(R.string.sys_mms_send_file_changed))
         if (!repository.claim(message.requestId, message.attemptToken)) return
         try {
             val pdu = payloads.resolveOwned(path)
@@ -209,7 +210,7 @@ class MmsSendCoordinator(
             transport.send(context, message.snapshot.subscriptionId, pduUri, callback)
             repository.awaiting(message.attemptToken)
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { repository.unknown(message.attemptToken, "系统提交结果不明，可能已经发出") }
+        catch (_: Exception) { repository.unknown(message.attemptToken, context.getString(R.string.sys_mms_submit_result_unknown)) }
     }
     private suspend fun interpretCallbacks(requestId: String) {
         repository.pendingCallbacks(requestId).forEach { fact ->
@@ -252,13 +253,13 @@ class MmsSendCoordinator(
         val holdsSmsRole = context.getSystemService(RoleManager::class.java)
             ?.isRoleHeld(RoleManager.ROLE_SMS) == true
         if (defaultSmsPackage != context.packageName && !holdsSmsRole) {
-            throw MmsSendException("请先将 PixelText 设为默认短信应用")
+            throw MmsSendException(context.getString(R.string.sys_mms_set_default_sms_app))
         }
         if (context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) throw MmsSendException("请先授予短信权限")
-        if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) throw MmsSendException("请先授予电话状态权限以确认 SIM")
+            context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) throw MmsSendException(context.getString(R.string.sys_mms_grant_sms_permission))
+        if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) throw MmsSendException(context.getString(R.string.sys_mms_grant_phone_state_permission))
         val feature = if (Build.VERSION.SDK_INT >= 33) PackageManager.FEATURE_TELEPHONY_MESSAGING else PackageManager.FEATURE_TELEPHONY
-        if (!context.packageManager.hasSystemFeature(feature)) throw MmsSendException("设备不支持短信和彩信")
+        if (!context.packageManager.hasSystemFeature(feature)) throw MmsSendException(context.getString(R.string.sys_mms_device_no_sms_mms))
     }
     companion object {
         private val processing = Mutex()

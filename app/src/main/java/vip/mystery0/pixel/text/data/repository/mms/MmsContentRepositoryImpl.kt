@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.MmsPartReader
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
@@ -30,6 +31,7 @@ import vip.mystery0.pixel.text.mms.vendor.pdu.PduBody
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduParser
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
+import vip.mystery0.pixel.text.util.AppStrings
 
 class MmsContentRepositoryImpl(
     private val mirror: MessageMirrorRepository,
@@ -138,7 +140,7 @@ class MmsContentRepositoryImpl(
                                     } else candidate.contentLocation == reference
                             }
                             contact.copy(photoPartId = target?.key?.partId, photoReference = null,
-                                importWarning = contact.importWarning ?: if (target == null) "名片照片无法在本消息内读取，请核对原件" else null)
+                                importWarning = contact.importWarning ?: if (target == null) AppStrings.get(R.string.domain_mms_contact_photo_unreadable) else null)
                         }
                     },
                 )
@@ -209,7 +211,7 @@ class MmsContentRepositoryImpl(
             key = snapshot.key, revision = snapshot.revision, subject = subject,
             parts = parts, pages = pages,
             summary = searchableText.takeIf { it.isNotBlank() }?.take(160)
-                ?: if (pending) "等待下载彩信" else mmsAttachmentSummary(parts.map { it.kind }),
+                ?: if (pending) AppStrings.get(R.string.domain_mms_pending_download) else mmsAttachmentSummary(parts.map { it.kind }),
             searchableText = searchableText, pendingDownload = pending,
             bodyPartIds = selection.parts.map { it.key.partId },
             attachmentPartIds = parts.filter {
@@ -307,7 +309,7 @@ class MmsContentRepositoryImpl(
         key = snapshot.key, revision = snapshot.revision,
         subject = snapshot.decodedSubject ?: snapshot.subject,
         parts = orderedParts(snapshot).map { partContent(snapshot, it).copy(issue = "preparing") },
-        pages = emptyList(), summary = "正在准备彩信内容", searchableText = "", preparing = true,
+        pages = emptyList(), summary = AppStrings.get(R.string.domain_mms_preparing_content), searchableText = "", preparing = true,
         pendingDownload = pendingDownload(snapshot),
     )
 
@@ -322,7 +324,7 @@ class MmsContentRepositoryImpl(
             key = MmsPartKey(snapshot.key, part.sourceId), revision = snapshot.revision,
             kind = kind, mimeType = MmsMimeTypes.normalize(part.mimeType),
             displayName = listOf(part.filename, part.name, part.contentLocation)
-                .firstOrNull { !it.isNullOrBlank() } ?: "附件 ${part.sourceId}",
+                .firstOrNull { !it.isNullOrBlank() } ?: AppStrings.get(R.string.domain_mms_attachment_numbered, part.sourceId),
             byteCount = if (hasInlineText) null else part.attachment?.byteCount,
             contentHash = if (hasInlineText) null else part.attachment?.sha256,
             inlineTextCopy = hasInlineText,

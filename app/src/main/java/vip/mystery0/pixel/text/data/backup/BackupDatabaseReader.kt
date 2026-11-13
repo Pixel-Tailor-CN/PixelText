@@ -3,9 +3,11 @@ package vip.mystery0.pixel.text.data.backup
 import android.database.sqlite.SQLiteDatabase
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.backup.BackupSection
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistMatcher
 import vip.mystery0.pixel.text.domain.spam.WhitelistRuleType
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 
 /** v1 只接受发布时的三个明确版本；不对未知库执行自动迁移。 */
@@ -13,18 +15,20 @@ class BackupDatabaseReader(private val snapshots: AppDatabaseSnapshotter) {
     suspend fun validate(backup: ValidatedBackup) {
         val manifest = backup.manifest
         backupRequire(manifest.mirrorVersion == 3 && manifest.spamVersion == 3 && manifest.archiveVersion == 1,
-            "此备份的数据库版本不受支持，请升级应用")
+            AppStrings.get(R.string.domain_backup_error_unsupported_db_version))
         var smsCount = 0L
         var ruleBytes = 0L
         for (definition in snapshots.definitions) {
             val file = File(backup.directory, "databases/${definition.name}")
             val smsSelected = BackupSection.SMS in manifest.sections
             val needed = if (definition.name == "spam.db") smsSelected || BackupSection.RULES in manifest.sections else smsSelected
-            backupRequire(file.isFile == needed, "数据库与备份类别不一致")
+            backupRequire(file.isFile == needed, AppStrings.get(R.string.domain_backup_error_db_category_mismatch))
             if (!needed) continue
             open(file).use { db ->
                 backupRequire(db.version == definition.version)
-                db.rawQuery("PRAGMA quick_check", null).use { backupRequire(it.moveToFirst() && it.getString(0) == "ok", "数据库已损坏") }
+                db.rawQuery("PRAGMA quick_check", null).use {
+                    backupRequire(it.moveToFirst() && it.getString(0) == "ok", AppStrings.get(R.string.domain_backup_error_db_corrupt))
+                }
                 val tables = mutableSetOf<String>()
                 db.rawQuery("SELECT type,name,sql FROM sqlite_master", null).use { cursor ->
                     while (cursor.moveToNext()) {
@@ -42,14 +46,16 @@ class BackupDatabaseReader(private val snapshots: AppDatabaseSnapshotter) {
                             }
                             if (expectedIndex != null && normalize(cursor.getString(2)) == expectedIndex) continue
                         }
-                        backupRequire(type == "table" && name in definition.tables, "数据库包含不允许的结构")
+                        backupRequire(type == "table" && name in definition.tables, AppStrings.get(R.string.domain_backup_error_db_disallowed_structure))
                         val expected = snapshotTableSql(definition, name)
-                        backupRequire(matchesTableSchema(definition.name, name, expected, cursor.getString(2)), "数据库结构不匹配")
+                        backupRequire(matchesTableSchema(definition.name, name, expected, cursor.getString(2)), AppStrings.get(R.string.domain_backup_error_db_schema_mismatch))
                         tables += name
                     }
                 }
                 backupRequire(tables == definition.tables.toSet())
-                db.rawQuery("PRAGMA foreign_key_check", null).use { backupRequire(!it.moveToFirst(), "数据库关联不完整") }
+                db.rawQuery("PRAGMA foreign_key_check", null).use {
+                    backupRequire(!it.moveToFirst(), AppStrings.get(R.string.domain_backup_error_db_fk_failed))
+                }
                 for (table in definition.tables) {
                     var count = 0L
                     db.rawQuery("SELECT * FROM $table", null).use { cursor ->
@@ -69,13 +75,13 @@ class BackupDatabaseReader(private val snapshots: AppDatabaseSnapshotter) {
                                     for (column in listOf("body", "address", "subject", "rawSnapshot")) {
                                         bytes += cursor.stringOrNull(column)?.toByteArray(Charsets.UTF_8)?.size ?: 0
                                     }
-                                    backupRequire(bytes <= MAX_SMS_BYTES, "单条短信超出备份限制")
+                                    backupRequire(bytes <= MAX_SMS_BYTES, AppStrings.get(R.string.domain_backup_error_sms_too_large))
                                 }
                                 "blocked_keyword" -> {
                                     backupRequire(BackupSection.RULES in manifest.sections)
                                     val keyword = cursor.stringOrNull("keyword").orEmpty()
                                     ruleBytes += keyword.toByteArray(Charsets.UTF_8).size * 2L
-                                    backupRequire(keyword.isNotBlank() && keyword.length <= MAX_SMS_BYTES && count <= 100_000 && ruleBytes <= 4L * 1024 * 1024, "关键词数据超过备份限制")
+                                    backupRequire(keyword.isNotBlank() && keyword.length <= MAX_SMS_BYTES && count <= 100_000 && ruleBytes <= 4L * 1024 * 1024, AppStrings.get(R.string.domain_backup_error_keywords_too_large))
                                     backupRequire(cursor.stringOrNull("normalized_keyword") == keyword.trim().lowercase(java.util.Locale.ROOT))
                                 }
                                 "sender_whitelist_rule" -> {
@@ -91,11 +97,13 @@ class BackupDatabaseReader(private val snapshots: AppDatabaseSnapshotter) {
                 }
                 if (definition.name == "message_mirror.db") {
                     db.rawQuery("SELECT COUNT(*) FROM mirror_sms", null).use { backupRequire(it.moveToFirst() && it.getLong(0) == smsCount) }
-                    db.rawQuery("SELECT sourceId FROM mirror_message GROUP BY sourceId HAVING COUNT(*)>1 LIMIT 1", null).use { backupRequire(!it.moveToFirst(), "备份消息来源 ID 重复") }
+                    db.rawQuery("SELECT sourceId FROM mirror_message GROUP BY sourceId HAVING COUNT(*)>1 LIMIT 1", null).use {
+                        backupRequire(!it.moveToFirst(), AppStrings.get(R.string.domain_backup_error_duplicate_source_id))
+                    }
                 }
             }
         }
-        backupRequire(smsCount == manifest.smsCount, "短信数量与备份清单不一致")
+        backupRequire(smsCount == manifest.smsCount, AppStrings.get(R.string.domain_backup_error_sms_count_mismatch))
     }
 
     fun open(file: File): SQLiteDatabase = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY).apply {

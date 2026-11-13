@@ -9,8 +9,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.*
 import vip.mystery0.pixel.text.viewmodel.MmsContentViewModel
 import vip.mystery0.pixel.text.ui.message.mms.*
@@ -31,11 +33,23 @@ fun MmsPartScreen(key: MmsPartKey, onBack: () -> Unit) {
         MmsContentKind.HTML -> { MmsHtmlViewer(part, model!!.parts, onBack); return }
         else -> Unit
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("彩信附件") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") } }) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (part == null) Text(if (loaded) "附件已不存在或尚未同步" else "正在读取附件")
-            else when (part.kind) {
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(stringResource(R.string.conv_mms_part_title)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.conv_cd_back))
+                }
+            },
+        )
+    }) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).padding(20.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (part == null) {
+                Text(stringResource(if (loaded) R.string.conv_mms_part_not_found else R.string.conv_mms_part_loading))
+            } else when (part.kind) {
                 MmsContentKind.CONTACT -> MmsContactCard(part, parts = model!!.parts)
                 MmsContentKind.CALENDAR -> MmsCalendarCard(part)
                 else -> {

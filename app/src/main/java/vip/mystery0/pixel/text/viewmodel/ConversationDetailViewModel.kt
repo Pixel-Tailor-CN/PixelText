@@ -32,6 +32,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
@@ -314,7 +315,7 @@ class ConversationDetailViewModel(
                 if (generation == loadVersion) {
                     loadFailureCount++
                     if (_messages.isEmpty()) {
-                        _uiState.value = MessageUiState.Error(error.message ?: "加载失败，请重试")
+                        _uiState.value = MessageUiState.Error(error.message ?: getApplication<Application>().getString(R.string.sys_detail_load_failed))
                     }
                     Log.w(
                         TAG,
@@ -357,7 +358,7 @@ class ConversationDetailViewModel(
                 )
             }.onFailure { e ->
                 _deleteMessageResultEvents.trySend(
-                    DeleteMessageResultEvent.Failure(e.message ?: "删除失败")
+                    DeleteMessageResultEvent.Failure(e.message ?: getApplication<Application>().getString(R.string.sys_detail_delete_failed))
                 )
             }
         }
@@ -365,11 +366,11 @@ class ConversationDetailViewModel(
 
     fun checkSpamOnce(message: MessageModel) {
         if (message.content.isBlank()) {
-            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error("没有可检测的文本"))
+            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error(getApplication<Application>().getString(R.string.sys_detail_no_text_to_check)))
             return
         }
         if (message.spamScore >= 0f) {
-            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error("已有识别记录"))
+            _manualSpamChecks.value += (message.id to ManualSpamCheckState.Error(getApplication<Application>().getString(R.string.sys_detail_already_checked)))
             return
         }
         if (_manualSpamChecks.value[message.id] is ManualSpamCheckState.Checking) return
@@ -383,7 +384,7 @@ class ConversationDetailViewModel(
                         spamClassifierFactory.create().use { classifier ->
                             val prediction = classifier.predict(message.content)
                             check(spamRepository.savePrediction(message.id, prediction, vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create(
-                                if (message.isMms) "MMS" else "SMS", message.id, message.sender, message.timestamp, message.content), allowDisabled = true)) { "模型已更新，请重新检测" }
+                                if (message.isMms) "MMS" else "SMS", message.id, message.sender, message.timestamp, message.content), allowDisabled = true)) { getApplication<Application>().getString(R.string.sys_detail_model_updated_recheck) }
                             prediction.score
                         }
                     }
@@ -397,10 +398,10 @@ class ConversationDetailViewModel(
                     updateMessageSpamScore(message.id, effectiveScore)
                     ManualSpamCheckState.Result(effectiveScore)
                 } else {
-                    ManualSpamCheckState.Error("识别失败")
+                    ManualSpamCheckState.Error(getApplication<Application>().getString(R.string.sys_detail_check_failed))
                 }
             } else {
-                ManualSpamCheckState.Error(result.exceptionOrNull()?.message ?: "识别失败")
+                ManualSpamCheckState.Error(result.exceptionOrNull()?.message ?: getApplication<Application>().getString(R.string.sys_detail_check_failed))
             }
             _manualSpamChecks.value += (message.id to state)
         }

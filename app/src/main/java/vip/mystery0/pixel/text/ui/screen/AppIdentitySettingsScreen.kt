@@ -48,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,7 +71,7 @@ fun AppIdentitySettingsPreference(
 ) {
     val identity by viewModel.identity.collectAsStateWithLifecycle()
     Preference(
-        title = { Text("应用名称与图标") },
+        title = { Text(stringResource(R.string.settings_app_identity_title)) },
         summary = { Text("${identity.displayName.label} · ${identity.iconStyle.label}") },
         icon = { AppIdentityIcon(identity.iconStyle, Modifier.size(32.dp)) },
         onClick = onClick,
@@ -104,11 +106,16 @@ fun AppIdentitySettingsScreen(
     val draft = AppIdentity(displayName, iconStyle)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     // 写入期间保留页面，确保切换失败时提示仍然可见。
     BackHandler(enabled = updateState.isApplying) { }
     LaunchedEffect(updateState.applied) {
         if (updateState.applied) {
-            Toast.makeText(context, "已应用，桌面显示可能稍有延迟", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                resources.getString(R.string.settings_app_identity_applied_toast),
+                Toast.LENGTH_SHORT,
+            ).show()
             viewModel.resetResult()
         }
     }
@@ -117,10 +124,13 @@ fun AppIdentitySettingsScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack, enabled = !updateState.isApplying) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_action_back),
+                        )
                     }
                 },
-                title = { Text("应用名称与图标") },
+                title = { Text(stringResource(R.string.settings_app_identity_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -141,9 +151,9 @@ fun AppIdentitySettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(when {
-                            updateState.isApplying -> "应用中…"
-                            draft == identity -> "已应用"
-                            else -> "应用"
+                            updateState.isApplying -> stringResource(R.string.settings_app_identity_applying)
+                            draft == identity -> stringResource(R.string.settings_app_identity_applied)
+                            else -> stringResource(R.string.settings_app_identity_apply)
                         })
                     }
                 }
@@ -181,13 +191,13 @@ fun AppIdentitySettingsScreen(
                     ) {
                         AppIdentityIcon(iconStyle, Modifier.size(80.dp))
                         Text(displayName.label, style = MaterialTheme.typography.titleLarge)
-                        Text("桌面预览", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.settings_app_identity_preview), style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
             item(key = "names", span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("应用名称", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.settings_app_identity_name_heading), style = MaterialTheme.typography.titleSmall)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppDisplayName.entries.forEach { name ->
                             FilterChip(
@@ -204,7 +214,7 @@ fun AppIdentitySettingsScreen(
                 }
             }
             item(key = "icon_heading", span = { GridItemSpan(maxLineSpan) }) {
-                Text("应用图标", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.settings_app_identity_icon_heading), style = MaterialTheme.typography.titleSmall)
             }
             items(AppIconStyle.selectableEntries, key = AppIconStyle::storageValue) { style ->
                 AppIconStyleCard(
@@ -219,7 +229,7 @@ fun AppIdentitySettingsScreen(
             }
             item(key = "description", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    "系统通知名称保持「Pixel Text」；主题图标配色跟随系统。",
+                    stringResource(R.string.settings_app_identity_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -266,7 +276,7 @@ private fun AppIconStyleCard(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                 ) {
-                    Icon(Icons.Rounded.Check, "已选择", Modifier.padding(4.dp))
+                    Icon(Icons.Rounded.Check, stringResource(R.string.settings_selected_cd), Modifier.padding(4.dp))
                 }
             }
         }

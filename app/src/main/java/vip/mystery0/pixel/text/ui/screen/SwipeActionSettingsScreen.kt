@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
@@ -54,10 +55,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
 import vip.mystery0.pixel.text.viewmodel.SettingsViewModel
 
@@ -76,13 +79,13 @@ fun SwipeActionSettingsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.settings_action_back)
                         )
                     }
                 },
                 title = {
                     Text(
-                        "滑动操作",
+                        stringResource(R.string.settings_swipe_actions_title),
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -162,7 +165,7 @@ private fun SwipeActionOverviewSection(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = direction.title,
+                    text = stringResource(direction.titleRes),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -173,7 +176,7 @@ private fun SwipeActionOverviewSection(
                 )
             }
             TextButton(onClick = onCustomizeClick) {
-                Text("自定义")
+                Text(stringResource(R.string.settings_action_customize))
             }
         }
         SwipeGestureIllustration(
@@ -297,7 +300,7 @@ private fun SwipeActionPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(direction.title) },
+        title = { Text(stringResource(direction.titleRes)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 ConversationSwipeAction.entries.forEach { action ->
@@ -311,7 +314,7 @@ private fun SwipeActionPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.settings_action_cancel))
             }
         }
     )
@@ -353,17 +356,17 @@ private fun ConversationSwipeActionOption(
 }
 
 private enum class SwipeDirection(
-    val title: String,
+    @param:StringRes val titleRes: Int,
     val actionAlignment: Alignment,
     val actionShape: RoundedCornerShape,
 ) {
     Right(
-        title = "向右滑动",
+        titleRes = R.string.settings_swipe_right_title,
         actionAlignment = Alignment.CenterStart,
         actionShape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp)
     ),
     Left(
-        title = "向左滑动",
+        titleRes = R.string.settings_swipe_left_title,
         actionAlignment = Alignment.CenterEnd,
         actionShape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
     )

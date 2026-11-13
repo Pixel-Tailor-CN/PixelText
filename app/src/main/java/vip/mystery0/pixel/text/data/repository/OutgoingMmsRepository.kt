@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.outgoing.MmsAttemptEntity
 import vip.mystery0.pixel.text.data.db.outgoing.MmsCallbackEntity
 import vip.mystery0.pixel.text.data.db.outgoing.MmsCleanupEntity
@@ -11,6 +12,7 @@ import vip.mystery0.pixel.text.data.db.outgoing.MmsDraftEntity
 import vip.mystery0.pixel.text.data.db.outgoing.MmsRequestEntity
 import vip.mystery0.pixel.text.data.db.outgoing.OutgoingMmsDatabase
 import vip.mystery0.pixel.text.mms.outgoing.*
+import vip.mystery0.pixel.text.util.AppStrings
 import java.util.UUID
 
 /** 所有跨实体更新在 Room 事务中完成；WorkManager 唯一任务不能替代提交栅栏。 */
@@ -23,7 +25,7 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         attempt.token, attempt.transactionId, MmsSendState.valueOf(attempt.state), request.sourceId,
         request.providerReady, attempt.pduPath, attempt.pduSha256, attempt.submittedAt, attempt.resultCode,
         attempt.httpStatus, attempt.responseStatus, attempt.messageId, attempt.confirmation,
-        if (request.lateSuccess) "旧尝试后来报告成功，可能重复发送" else attempt.error,
+        if (request.lateSuccess) AppStrings.get(R.string.domain_mms_send_late_success_duplicate) else attempt.error,
         request.providerSyncPending, request.deleted, request.possibleDuplicateOf,
     )
     fun observeDrafts(): Flow<List<MmsDraft>> = dao.observeDrafts().map { rows -> rows.map { it.model() } }
@@ -42,9 +44,14 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         MmsDraft(UUID.randomUUID().toString(), recipientAddress = normalized).also { dao.insertDraft(it.entity()) }
     }
     suspend fun copyToDraft(requestId: String): MmsDraft = database.withTransaction {
-        val original = get(requestId) ?: throw MmsSendException("原发送记录不可用")
-        if (dao.request(requestId)?.lateSuccess == true) throw MmsSendException("此前尝试后来报告成功，请先检查已发送记录")
-        if (original.deleted || original.state !in setOf(MmsSendState.UNKNOWN, MmsSendState.FAILED, MmsSendState.CANCELLED)) throw MmsSendException("原发送结果已变化，请重新确认")
+        val original = get(requestId)
+            ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_unavailable))
+        if (dao.request(requestId)?.lateSuccess == true) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_previous_late_success))
+        }
+        if (original.deleted || original.state !in setOf(MmsSendState.UNKNOWN, MmsSendState.FAILED, MmsSendState.CANCELLED)) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_state_changed))
+        }
         val snapshot = original.snapshot
         MmsDraft(UUID.randomUUID().toString(), recipientAddress = snapshot.recipientAddress, body = snapshot.body,
             subject = snapshot.subject, subscriptionId = snapshot.subscriptionId, attachments = snapshot.attachments,
@@ -68,27 +75,39 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
     }
     suspend fun accept(id: String, revision: Long, snapshot: MmsSendSnapshot, possibleDuplicateOf: String? = null): String = database.withTransaction {
         dao.accepted(id, revision)?.let { return@withTransaction it.id }
-        val draft = dao.draft(id)?.takeUnless { it.accepted }?.model() ?: throw MmsSendException("草稿已更新，请重新打开")
-        if (draft.revision != revision) throw MmsSendException("内容已更改，请重新确认")
-        if (draft.importError != null) throw MmsSendException("有附件尚未导入，请重新选择或明确移除")
+        val draft = dao.draft(id)?.takeUnless { it.accepted }?.model()
+            ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_draft_updated))
+        if (draft.revision != revision) throw MmsSendException(AppStrings.get(R.string.domain_mms_send_content_changed))
+        if (draft.importError != null) throw MmsSendException(AppStrings.get(R.string.domain_mms_send_attachment_not_imported))
         if (MmsRecipient.normalize(draft.recipientAddress) != snapshot.recipientAddress || draft.body != snapshot.body ||
             draft.subject != snapshot.subject || draft.subscriptionId != snapshot.subscriptionId ||
             draft.attachments.map { it.id to it.originalPath } != snapshot.attachments.map { it.id to it.originalPath }) {
-            throw MmsSendException("内容已更改，请重新确认")
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_content_changed))
         }
-        if (snapshot.body.isBlank() && snapshot.attachments.isEmpty()) throw MmsSendException("请添加正文或附件")
-        if (snapshot.attachments.any { it.preparedPath == null || it.preparedSha256 == null || it.error != null }) throw MmsSendException("附件尚未准备完成")
+        if (snapshot.body.isBlank() && snapshot.attachments.isEmpty()) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_empty_content))
+        }
+        if (snapshot.attachments.any { it.preparedPath == null || it.preparedSha256 == null || it.error != null }) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_attachment_not_ready))
+        }
         if (draft.originRequestId != null && draft.possibleDuplicateOf == null) {
-            val origin = get(draft.originRequestId) ?: throw MmsSendException("原发送记录不可用")
-            if (dao.request(draft.originRequestId)?.lateSuccess == true || origin.state !in setOf(MmsSendState.FAILED, MmsSendState.CANCELLED)) throw MmsSendException("原发送结果已变化，请重新查看结果与重发风险")
+            val origin = get(draft.originRequestId)
+                ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_unavailable))
+            if (dao.request(draft.originRequestId)?.lateSuccess == true || origin.state !in setOf(MmsSendState.FAILED, MmsSendState.CANCELLED)) {
+                throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_state_changed_risk))
+            }
         }
-        if (possibleDuplicateOf != draft.possibleDuplicateOf) throw MmsSendException("重发来源已变化，请重新确认")
+        if (possibleDuplicateOf != draft.possibleDuplicateOf) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_duplicate_source_changed))
+        }
         draft.possibleDuplicateOf?.let {
-            val old = get(it) ?: throw MmsSendException("原发送记录不可用")
-            if (old.state != MmsSendState.UNKNOWN) throw MmsSendException("原发送结果已变化，请重新确认")
+            val old = get(it) ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_unavailable))
+            if (old.state != MmsSendState.UNKNOWN) {
+                throw MmsSendException(AppStrings.get(R.string.domain_mms_send_origin_state_changed))
+            }
         }
         if (dao.attempts().count { it.state in setOf("PREPARING", "READY", "DISPATCHING", "AWAITING_RESULT") || it.state == "UNKNOWN" && it.pduPath != null } >= 10) {
-            throw MmsSendException("待处理彩信已达 10 条，请先确认或清理已有记录")
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_queue_limit))
         }
         val requestId = UUID.randomUUID().toString(); val token = UUID.randomUUID().toString()
         dao.insertRequest(MmsRequestEntity(requestId, id, revision, MmsSnapshotCodec.encode(snapshot), token, possibleDuplicateOf = draft.possibleDuplicateOf, originRequestId = draft.originRequestId))
@@ -125,7 +144,7 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         val request = dao.request(id) ?: return@withTransaction false
         val attempt = dao.attempt(token) ?: return@withTransaction false
         if (request.lateSuccess && attempt.state == "READY") {
-            dao.updateAttempt(attempt.copy(state = "FAILED", error = "旧尝试后来报告成功，已暂停本次提交"))
+            dao.updateAttempt(attempt.copy(state = "FAILED", error = AppStrings.get(R.string.domain_mms_send_paused_late_success)))
             return@withTransaction false
         }
         if (request.deleted || request.currentAttempt != token || !request.providerReady || attempt.state != "READY" ||
@@ -134,7 +153,7 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
             val origin = dao.request(request.originRequestId)
             val originAttempt = origin?.let { dao.attempt(it.currentAttempt) }
             if (origin?.lateSuccess == true || originAttempt?.state !in setOf("FAILED", "CANCELLED")) {
-                dao.updateAttempt(attempt.copy(state = "FAILED", error = "原发送结果已变化，请重新确认重发风险"))
+                dao.updateAttempt(attempt.copy(state = "FAILED", error = AppStrings.get(R.string.domain_mms_send_paused_origin_changed)))
                 return@withTransaction false
             }
         }
@@ -159,14 +178,20 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         val request = dao.request(id) ?: return@withTransaction false
         val attempt = dao.attempt(request.currentAttempt) ?: return@withTransaction false
         if (attempt.state !in setOf("PREPARING", "READY")) return@withTransaction false
-        dao.updateAttempt(attempt.copy(state = "CANCELLED", error = "已取消发送"))
+        dao.updateAttempt(attempt.copy(state = "CANCELLED", error = AppStrings.get(R.string.domain_mms_send_cancelled)))
         dao.updateRequest(request.copy(providerSyncPending = true)); true
     }
     suspend fun retryFailed(id: String): String = database.withTransaction {
-        val request = dao.request(id) ?: throw MmsSendException("发送记录不可用")
-        val old = dao.attempt(request.currentAttempt) ?: throw MmsSendException("发送记录不可用")
-        if (request.deleted || old.state != "FAILED" || request.lateSuccess) throw MmsSendException("当前状态不能重试")
-        if (request.sourceId != null && request.providerSyncPending) throw MmsSendException("正在同步失败记录，请稍后重试")
+        val request = dao.request(id)
+            ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_record_unavailable))
+        val old = dao.attempt(request.currentAttempt)
+            ?: throw MmsSendException(AppStrings.get(R.string.domain_mms_send_record_unavailable))
+        if (request.deleted || old.state != "FAILED" || request.lateSuccess) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_cannot_retry))
+        }
+        if (request.sourceId != null && request.providerSyncPending) {
+            throw MmsSendException(AppStrings.get(R.string.domain_mms_send_syncing_failed))
+        }
         val token = UUID.randomUUID().toString()
         dao.insertAttempt(MmsAttemptEntity(token, id, old.number + 1, newTransaction(), old.transactionId,
             old.subscriptionId, "PREPARING", System.currentTimeMillis()))
@@ -205,7 +230,7 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         val request = dao.request(id) ?: return@withTransaction
         val attempt = dao.attempt(token) ?: return@withTransaction
         if (request.currentAttempt == token && !request.deleted) dao.updateAttempt(attempt.copy(
-            error = "系统消息存在身份冲突，已暂停同步，请核对其他短信应用中的记录"))
+            error = AppStrings.get(R.string.domain_mms_send_provider_conflict)))
     }
     suspend fun markSynced(id: String, token: String) = database.withTransaction {
         val request = dao.request(id) ?: return@withTransaction
@@ -222,7 +247,7 @@ class OutgoingMmsRepository(private val database: OutgoingMmsDatabase) {
         val tombstone = MmsSnapshotCodec.encode(snapshot.copy(recipientAddress = "", body = "", subject = "", attachments = emptyList()))
         dao.updateRequest(request.copy(deleted = true, providerSyncPending = false, snapshot = tombstone))
         val attempt = dao.attempt(request.currentAttempt) ?: return@withTransaction
-        if (attempt.state in setOf("PREPARING", "READY")) dao.updateAttempt(attempt.copy(state = "CANCELLED", error = "消息已删除"))
+        if (attempt.state in setOf("PREPARING", "READY")) dao.updateAttempt(attempt.copy(state = "CANCELLED", error = AppStrings.get(R.string.domain_mms_send_message_deleted)))
     }
     suspend fun releaseUnknownPayload(id: String): Boolean = database.withTransaction {
         val request = dao.request(id) ?: return@withTransaction false

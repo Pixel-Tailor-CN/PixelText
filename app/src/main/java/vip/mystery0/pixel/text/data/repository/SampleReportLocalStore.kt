@@ -8,11 +8,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.SampleReportBody
 import vip.mystery0.pixel.text.data.source.SampleReportDraftDto
 import vip.mystery0.pixel.text.data.source.toDto
 import vip.mystery0.pixel.text.data.source.toBody
 import vip.mystery0.pixel.text.domain.hub.*
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 import java.io.FileNotFoundException
 import java.security.SecureRandom
@@ -32,11 +34,11 @@ class SampleReportLocalStore(context: Context) {
     suspend fun installationId(): String = locked {
         val stored = read(identityFile)
         if (stored != null) {
-            if (!validIdentity(stored)) corrupt("安装身份")
+            if (!validIdentity(stored)) corrupt(AppStrings.get(R.string.domain_sample_report_name_identity))
             stored
         } else {
             // 身份遗失而请求仍在时不能创建另一身份，避免破坏原请求归属。
-            if (read(pendingFile) != null) corrupt("安装身份")
+            if (read(pendingFile) != null) corrupt(AppStrings.get(R.string.domain_sample_report_name_identity))
             val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
             Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
                 .also { write(identityFile, it) }
@@ -55,14 +57,17 @@ class SampleReportLocalStore(context: Context) {
     suspend fun clearPending(requestId: String) = locked {
         if (readPending()?.clientRequestId == requestId) {
             pendingFile.delete()
-            if (read(pendingFile) != null) throw SampleReportException("LOCAL_WRITE", "无法清除本机待确认请求，请重试")
+            if (read(pendingFile) != null) {
+                throw SampleReportException("LOCAL_WRITE", AppStrings.get(R.string.domain_sample_report_error_clear_pending))
+            }
         }
     }
 
     suspend fun draft(): SampleReportDraft? = locked {
         val text = read(draftFile) ?: return@locked null
-        val dto = try { draftAdapter.fromJson(text) } catch (_: Exception) { corrupt("保留草稿") }
-            ?: corrupt("保留草稿")
+        val dto = try { draftAdapter.fromJson(text) } catch (_: Exception) {
+            corrupt(AppStrings.get(R.string.domain_sample_report_name_draft))
+        } ?: corrupt(AppStrings.get(R.string.domain_sample_report_name_draft))
         SampleReportDraft(dto.content, dto.sender, dto.category, dto.learningFeedback?.toDomain())
     }
 
@@ -72,13 +77,16 @@ class SampleReportLocalStore(context: Context) {
 
     suspend fun clearDraft() = locked {
         draftFile.delete()
-        if (read(draftFile) != null) throw SampleReportException("LOCAL_WRITE", "无法清除本机草稿，请重试")
+        if (read(draftFile) != null) {
+            throw SampleReportException("LOCAL_WRITE", AppStrings.get(R.string.domain_sample_report_error_clear_draft))
+        }
     }
 
     private fun readPending(): SampleReportRequest? {
         val text = read(pendingFile) ?: return null
-        val body = try { requestAdapter.fromJson(text) } catch (_: Exception) { corrupt("待确认请求") }
-            ?: corrupt("待确认请求")
+        val pendingName = AppStrings.get(R.string.domain_sample_report_name_pending)
+        val body = try { requestAdapter.fromJson(text) } catch (_: Exception) { corrupt(pendingName) }
+            ?: corrupt(pendingName)
         val identity = read(identityFile)
         if (identity != body.installationId ||
             !validIdentity(body.installationId) ||
@@ -86,7 +94,7 @@ class SampleReportLocalStore(context: Context) {
             runCatching { UUID.fromString(body.clientRequestId).toString() }.getOrNull() != body.clientRequestId ||
             SampleSubmissionRepository.validationError(body.content, body.sender, body.category,
                 listOf(body.appVersion, body.ruleVersion, body.modelVersion)) != null
-        ) corrupt("待确认请求")
+        ) corrupt(pendingName)
         return body.toDomain()
     }
 
@@ -96,24 +104,27 @@ class SampleReportLocalStore(context: Context) {
 
     private fun read(file: AtomicFile): String? = try {
         file.openRead().use {
-            if (it.channel.size() > 512 * 1024) corrupt("本机上报数据")
+            if (it.channel.size() > 512 * 1024) corrupt(AppStrings.get(R.string.domain_sample_report_name_local_data))
             it.readBytes().toString(Charsets.UTF_8)
         }
     } catch (_: FileNotFoundException) {
         if (file.baseFile.exists() || File(file.baseFile.path + ".bak").exists()) {
-            throw SampleReportException("LOCAL_READ", "无法读取本机上报数据，请检查存储后重试")
+            throw SampleReportException("LOCAL_READ", AppStrings.get(R.string.domain_sample_report_error_read_local))
         }
         null
     }
 
     private fun write(file: AtomicFile, value: String) {
         val bytes = value.toByteArray(Charsets.UTF_8)
-        if (bytes.size > 512 * 1024) throw SampleReportException("LOCAL_SIZE", "本机草稿过大，请减少内容后再保留")
+        if (bytes.size > 512 * 1024) {
+            throw SampleReportException("LOCAL_SIZE", AppStrings.get(R.string.domain_sample_report_error_draft_too_large))
+        }
+        val writeError = AppStrings.get(R.string.domain_sample_report_error_write_local)
         if (!directory.isDirectory && !directory.mkdirs()) {
-            throw SampleReportException("LOCAL_WRITE", "无法保存本机上报数据，请检查存储后重试")
+            throw SampleReportException("LOCAL_WRITE", writeError)
         }
         val stream = try { file.startWrite() } catch (_: Exception) {
-            throw SampleReportException("LOCAL_WRITE", "无法保存本机上报数据，请检查存储后重试")
+            throw SampleReportException("LOCAL_WRITE", writeError)
         }
         try {
             stream.write(bytes)
@@ -123,12 +134,14 @@ class SampleReportLocalStore(context: Context) {
             if (read(file) != value) throw IllegalStateException("atomic write verification failed")
         } catch (_: Exception) {
             file.failWrite(stream)
-            throw SampleReportException("LOCAL_WRITE", "无法保存本机上报数据，请检查存储后重试")
+            throw SampleReportException("LOCAL_WRITE", writeError)
         }
     }
 
-    private fun corrupt(name: String): Nothing = throw SampleReportException("LOCAL_CORRUPT",
-        "${name}损坏，已保留文件。请检查存储或恢复本次安装的数据后重试；不会自动更换身份或请求")
+    private fun corrupt(name: String): Nothing = throw SampleReportException(
+        "LOCAL_CORRUPT",
+        AppStrings.get(R.string.domain_sample_report_error_corrupt, name),
+    )
 
     private fun validIdentity(value: String): Boolean = try {
         val flags = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING

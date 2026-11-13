@@ -11,6 +11,7 @@ import androidx.core.database.sqlite.transaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.ArchivedConversationEntity
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
@@ -51,7 +52,7 @@ class SmsRestoreDataSource(
                     null,
                     null,
                     "_id ASC",
-                ) ?: throw BackupException("无法读取目标短信")
+                ) ?: throw BackupException(context.getString(R.string.domain_backup_error_read_target_sms))
                 cursor.use { c ->
                     while (c.moveToNext()) {
                         currentCoroutineContext().ensureActive()
@@ -167,10 +168,11 @@ class SmsRestoreDataSource(
         val results = safety.insertHistoricalBatch(pending.map { it.values }) {
             resolver.applyBatch("sms", operations)
         }
-        backupRequire(results.size == pending.size, "系统短信批量写入数量不一致")
+        backupRequire(results.size == pending.size, context.getString(R.string.domain_backup_error_batch_insert_count_mismatch))
         var result = initial
         pending.forEachIndexed { indexInBatch, item ->
-            val uri = results[indexInBatch].uri ?: throw BackupException("系统未返回短信标识")
+            val uri = results[indexInBatch].uri
+                ?: throw BackupException(context.getString(R.string.domain_backup_error_missing_sms_uri))
             result = commitRestored(
                 record = item.record,
                 id = ContentUris.parseId(uri),

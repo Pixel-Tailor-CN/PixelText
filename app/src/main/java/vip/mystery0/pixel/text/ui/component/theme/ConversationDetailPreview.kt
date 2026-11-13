@@ -23,7 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
@@ -33,28 +35,30 @@ import vip.mystery0.pixel.text.ui.screen.mock.MockMessageSpec
 import vip.mystery0.pixel.text.ui.theme.ResolvedConversationDetailStyle
 import vip.mystery0.pixel.text.ui.theme.rememberConversationBackgroundColorScheme
 import vip.mystery0.pixel.text.ui.theme.ThemeBackgroundImage
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 
-val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec> = listOf(
-    MockMessageSpec(
-        content = "能说服爸妈同意我休学一段时间，真是多谢了。应该费了不少功夫吧？",
-        isReceived = true,
-        simName = "无漾",
-        parsedResultOverride = ParsedResult.None,
-    ),
-    MockMessageSpec(
-        content = "呃……倒也没那么难。我就是告诉他们你回来后回去读研。",
-        isReceived = false,
-        simName = "安燃",
-        parsedResultOverride = ParsedResult.None,
-    ),
-    MockMessageSpec(
-        content = "太好——啥？",
-        isReceived = true,
-        simName = "无漾",
-        parsedResultOverride = ParsedResult.None,
-    ),
-)
+val ConversationDetailPreviewMessageSpecs: List<MockMessageSpec>
+    get() = listOf(
+        MockMessageSpec(
+            content = AppStrings.get(R.string.settings_preview_msg_1),
+            isReceived = true,
+            simName = AppStrings.get(R.string.settings_preview_sim_1),
+            parsedResultOverride = ParsedResult.None,
+        ),
+        MockMessageSpec(
+            content = AppStrings.get(R.string.settings_preview_msg_2),
+            isReceived = false,
+            simName = AppStrings.get(R.string.settings_preview_sim_2),
+            parsedResultOverride = ParsedResult.None,
+        ),
+        MockMessageSpec(
+            content = AppStrings.get(R.string.settings_preview_msg_3),
+            isReceived = true,
+            simName = AppStrings.get(R.string.settings_preview_sim_1),
+            parsedResultOverride = ParsedResult.None,
+        ),
+    )
 
 @Composable
 fun ConversationDetailPreviewTheme(
@@ -152,7 +156,9 @@ fun ConversationDetailPreview(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = style.inputPlaceholder,
+                        text = style.inputPlaceholder.ifBlank {
+                            stringResource(R.string.settings_input_placeholder_default_hint)
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),

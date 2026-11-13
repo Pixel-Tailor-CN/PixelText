@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通用与短信撰写 -->
+    <string name="sys_back">返回</string>
+    <string name="sys_unknown_error">未知错误</string>
+    <string name="sys_compose_select_recipient">选择收件人</string>
+    <string name="sys_compose_phone_hint">输入电话号码</string>
+    <string name="sys_compose_next">下一步</string>
+
+    <!-- SIM 卡信息 -->
+    <string name="sys_sim_slot_fallback">卡%1$d</string>
+
+    <!-- 彩信接收与附件准备 -->
+    <string name="sys_mms_received_subject_fallback">收到一条彩信</string>
+    <string name="sys_mms_unknown_sender">未知发件人</string>
+    <string name="sys_mms_attach_picker_only">只支持通过系统选择器选择的附件</string>
+    <string name="sys_mms_attach_default_name">附件</string>
+    <string name="sys_mms_attach_original_too_large">附件原件不能超过 32 MiB</string>
+    <string name="sys_mms_attach_cannot_open">无法打开附件，请重新选择</string>
+    <string name="sys_mms_attach_cannot_read">无法读取附件，请检查文件后重新选择</string>
+    <string name="sys_mms_attach_limit_exceeded">正文和附件已超出彩信限额，请减少内容</string>
+    <string name="sys_mms_attach_missing_or_changed">附件原件缺失或已改变，请重新选择</string>
+    <string name="sys_mms_attach_invalid_type">附件类型无效，请重新选择</string>
+    <string name="sys_mms_attach_animated_exceeds_limit">动图超出所选 SIM 的尺寸或大小限额，请移除或更换；不会自动转为静态图</string>
+    <string name="sys_mms_attach_note_animated_original">保留动图原件，文件可能含原始元数据</string>
+    <string name="sys_mms_attach_media_exceeds_budget">音视频或文件超出本条彩信的附件预算，请移除或更换</string>
+    <string name="sys_mms_attach_note_plain_file_fallback">保留原件字节，按普通文件发送以避免文字编码损失或外部演示；文件可能含原始元数据</string>
+    <string name="sys_mms_attach_note_original_generic">按原件发送，文件可能含原始元数据；接收端未必支持此格式</string>
+    <string name="sys_mms_attach_prepare_failed">无法准备附件，请更换文件后重试</string>
+    <string name="sys_mms_attach_invalid_image_format">图片格式无效</string>
+    <string name="sys_mms_attach_cannot_read_image_size">无法读取图片尺寸</string>
+    <string name="sys_mms_attach_cannot_read_image">无法读取图片</string>
+    <string name="sys_mms_attach_animated_no_static_convert">动图不能自动转为静态图</string>
+    <string name="sys_mms_attach_note_png_resized">已按所选 SIM 调整图片尺寸和方向，移除原始元数据，保留透明背景</string>
+    <string name="sys_mms_attach_note_jpeg_flattened">已缩放并转为 JPEG，透明背景变为白色，原始元数据已移除</string>
+    <string name="sys_mms_attach_note_jpeg_resized">已按所选 SIM 调整图片尺寸、方向和质量，原始元数据已移除</string>
+    <string name="sys_mms_attach_image_still_too_large">图片压缩后仍超出预算，请减少附件或更换图片</string>
+    <string name="sys_mms_attach_image_exceeds_budget">图片超出彩信预算</string>
+    <string name="sys_mms_attach_image_pixels_exceeded">图片尺寸无效或超过 6400 万像素</string>
+    <string name="sys_mms_attach_png_corrupt">PNG 图片结构不完整</string>
+
+    <!-- 彩信外部输入 -->
+    <string name="sys_mms_ext_invalid_input">分享附件或收件信息无效，请重新选择并确认</string>
+    <string name="sys_mms_ext_single_recipient_only">此入口仅支持单人彩信，请重新确认一个电话号码；原收件人未被采用</string>
+    <string name="sys_mms_ext_missing_attachment">分享附件缺失，请重新选择文件，或明确移除未导入附件后继续</string>
+    <string name="sys_mms_ext_too_many_attachments">只接受最多 10 个已授权的内容附件，请重新选择文件</string>
+    <string name="sys_mms_ext_text_too_long">分享文字过长，请在编辑器中重新填写</string>
+
+    <!-- 彩信存储与发送 -->
+    <string name="sys_mms_store_low_space_choose">存储空间不足，请清理后重新选择附件</string>
+    <string name="sys_mms_store_empty_attachment">附件为空，请重新选择</string>
+    <string name="sys_mms_store_save_attachment_failed">无法保存附件，请重试</string>
+    <string name="sys_mms_store_invalid_copy_size">附件副本大小无效</string>
+    <string name="sys_mms_store_invalid_payload">彩信发送载荷无效</string>
+    <string name="sys_mms_store_payload_mismatch">彩信载荷身份不一致，请重新编辑</string>
+    <string name="sys_mms_store_invalid_path">附件路径无效，请重新选择</string>
+    <string name="sys_mms_store_invalid_read_budget">附件读取预算无效</string>
+    <string name="sys_mms_store_missing_or_over_limit">附件不存在或已超出发送限额</string>
+    <string name="sys_mms_store_exceeds_limit">附件超出发送限额</string>
+    <string name="sys_mms_store_mkdir_failed">无法创建彩信私有存储</string>
+    <string name="sys_mms_store_low_space_retry">存储空间不足，请清理后重试</string>
+    <string name="sys_mms_store_save_payload_failed">无法保存彩信载荷，请重试</string>
+
+    <string name="sys_mms_device_not_supported">设备不支持彩信</string>
+    <string name="sys_mms_confirm_valid_phone">请确认一个有效电话号码</string>
+    <string name="sys_mms_add_body_or_attachment">请添加正文或附件</string>
+    <string name="sys_mms_attachments_over_local_limit">附件超过本地准备上限</string>
+    <string name="sys_mms_text_or_subject_over_limit">正文或主题超过彩信上限</string>
+    <string name="sys_mms_sim_config_changed_reprepare">SIM 或运营商配置已变化，请重新准备并确认</string>
+    <string name="sys_mms_send_record_unavailable">发送记录不可用</string>
+    <string name="sys_mms_sim_config_changed_restore">SIM 或配置已变化，请恢复草稿重新确认</string>
+    <string name="sys_mms_deleted_during_dispatch">提交期间消息已删除，发送结果不明</string>
+    <string name="sys_mms_deleted_result_pending">消息已删除，暂未收到发送结果</string>
+    <string name="sys_mms_interrupted_during_dispatch">提交期间应用中断，可能已经发出</string>
+    <string name="sys_mms_result_timeout_unknown">暂未收到发送结果，可能已经发出</string>
+    <string name="sys_mms_system_message_changed">系统消息已更改，请保留记录并重新检查</string>
+    <string name="sys_mms_sim_config_changed_reconfirm">SIM 或配置已变化，请重新确认</string>
+    <string name="sys_mms_send_file_unavailable">发送文件不可用</string>
+    <string name="sys_mms_send_file_changed">发送文件已变化，请重新确认</string>
+    <string name="sys_mms_submit_result_unknown">系统提交结果不明，可能已经发出</string>
+    <string name="sys_mms_set_default_sms_app">请先将 PixelText 设为默认短信应用</string>
+    <string name="sys_mms_grant_sms_permission">请先授予短信权限</string>
+    <string name="sys_mms_grant_phone_state_permission">请先授予电话状态权限以确认 SIM</string>
+    <string name="sys_mms_device_no_sms_mms">设备不支持短信和彩信</string>
+
+    <!-- 彩信 PDU 组包与策略 -->
+    <string name="sys_mms_pdu_single_recipient_only">彩信仅支持一个明确的电话号码</string>
+    <string name="sys_mms_pdu_info_changed">彩信发送信息已改变，请重新确认</string>
+    <string name="sys_mms_pdu_invalid_tx_id">彩信事务标识无效</string>
+    <string name="sys_mms_pdu_subject_only_disallowed">请添加正文或附件，不能只发送主题</string>
+    <string name="sys_mms_pdu_subject_too_long">主题超过所选 SIM 的长度限制</string>
+    <string name="sys_mms_pdu_attachments_over_limit">附件数量或原件总量超过限制</string>
+    <string name="sys_mms_pdu_attachment_not_prepared">附件尚未准备完成</string>
+    <string name="sys_mms_pdu_attachment_mime_unconfirmed">附件类型尚未确认</string>
+    <string name="sys_mms_pdu_container_disallowed">此附件容器格式不能直接发送，请选择原始文件</string>
+    <string name="sys_mms_pdu_attachment_size_unconfirmed">附件大小尚未确认</string>
+    <string name="sys_mms_pdu_attachment_not_ready_or_over_limit">附件尚未就绪或超出彩信限额</string>
+    <string name="sys_mms_pdu_attachment_changed">附件内容已改变，请重新选择</string>
+    <string name="sys_mms_pdu_plain_text_encoding_unconfirmed">纯文本附件编码未确认，请重新准备附件</string>
+    <string name="sys_mms_pdu_full_exceeds_sim_limit_reduce">完整彩信超出所选 SIM 的发送限额，请减少内容</string>
+    <string name="sys_mms_pdu_encode_failed">无法编码彩信，请检查内容</string>
+    <string name="sys_mms_pdu_exceeds_limit_or_invalid">完整彩信超出限额或编码无效，请减少内容</string>
+    <string name="sys_mms_pdu_full_exceeds_sim_limit">完整彩信超出所选 SIM 的发送限额</string>
+    <string name="sys_mms_pdu_verify_failed">彩信编码校验失败，尚未发送</string>
+    <string name="sys_mms_pdu_verify_mismatch">彩信内容校验不一致，尚未发送</string>
+    <string name="sys_mms_pdu_text_limit_or_invalid_chars">正文或主题超过限制，或包含不支持的字符</string>
+    <string name="sys_mms_pdu_text_exceeds_sim_bytes">正文或主题超过所选 SIM 的字节限制</string>
+    <string name="sys_mms_pdu_text_incomplete_chars">正文或主题包含不完整字符，请重新编辑</string>
+
+    <string name="sys_mms_policy_grant_sim_permission">请允许读取 SIM 信息后重试</string>
+    <string name="sys_mms_policy_device_unsupported">此设备不支持彩信发送</string>
+    <string name="sys_mms_policy_select_sim">请选择发送彩信的 SIM</string>
+    <string name="sys_mms_policy_cannot_read_sim">无法读取 SIM 信息</string>
+    <string name="sys_mms_policy_sim_unavailable">所选 SIM 已不可用，请重新选择</string>
+    <string name="sys_mms_policy_carrier_config_unavailable">运营商彩信配置暂不可用，请稍后重新读取</string>
+    <string name="sys_mms_policy_carrier_config_not_loaded">运营商配置尚未载入，请稍后重新读取</string>
+    <string name="sys_mms_policy_device_cannot_read_config">此设备暂不能读取彩信配置</string>
+    <string name="sys_mms_policy_mms_disabled_by_carrier">所选 SIM 的运营商未启用彩信</string>
+    <string name="sys_mms_policy_sim_permission_changed">SIM 读取权限已变化，请重新授权后重试</string>
+    <string name="sys_mms_policy_device_no_config_read">此设备不支持读取彩信配置</string>
+    <string name="sys_mms_policy_missing_or_invalid">运营商彩信限制缺失或无效，请稍后重新读取</string>
+
+    <string name="sys_mms_result_invalid_response">彩信确认异常，可能已发出，请勿直接重发</string>
+    <string name="sys_mms_result_inconsistent_response">彩信结果不完整，可能已发出，请勿直接重发</string>
+    <string name="sys_mms_result_mmsc_rejected">运营商拒绝了这条彩信，请检查内容和套餐后手动重试</string>
+    <string name="sys_mms_result_unknown_response">未能确认彩信结果，可能已发出</string>
+    <string name="sys_mms_result_error_invalid_apn">彩信 APN 不可用，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_unable_connect">无法连接彩信网络，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_no_data">彩信数据网络不可用，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_http_failure">彩信服务器通信失败，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_io_error">彩信传输中断，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_config">运营商彩信配置异常，发送结果仍需确认</string>
+    <string name="sys_mms_result_error_generic">系统未确认彩信成功，可能已发出，请勿直接重发</string>
+
+    <!-- 短信发送 -->
+    <string name="sys_sms_state_sending">正在发送短信</string>
+    <string name="sys_sms_state_sent">短信已发送（不代表已送达）</string>
+    <string name="sys_sms_state_failed">短信发送失败（多段短信可能已有部分发出）</string>
+    <string name="sys_sms_state_unknown">发送结果未知，可能已发出，请勿直接重复发送</string>
+    <string name="sys_sms_set_default_app">请先设置为默认短信应用</string>
+    <string name="sys_sms_empty_address_or_body">号码和正文不能为空</string>
+    <string name="sys_sms_invalid_body">短信正文无效</string>
+    <string name="sys_sms_save_outbox_failed">无法保存待发送短信</string>
+    <string name="sys_sms_outbox_unavailable">待发送短信不可用</string>
+
+    <!-- 通知与后台 -->
+    <string name="sys_channel_resource_updates_name">资源更新</string>
+    <string name="sys_channel_resource_updates_desc">规则和模型资源更新提醒</string>
+    <string name="sys_resource_update_available_title">发现资源更新</string>
+    <string name="sys_resource_update_available_text">有新的规则或模型资源可用，点按查看</string>
+    <string name="sys_resource_update_available_subtext">模型 %1$s / 规则 %2$s</string>
+
+    <string name="sys_channel_new_sms_name">新短信</string>
+    <string name="sys_channel_new_sms_desc">收到新短信时的通知</string>
+
+    <string name="sys_channel_spam_scan_name">骚扰识别</string>
+    <string name="sys_channel_spam_scan_desc">历史短信骚扰识别进度</string>
+    <string name="sys_spam_scan_progress_title">正在识别历史短信</string>
+    <string name="sys_spam_scan_progress_text">%1$d/%2$d %3$d%%</string>
+    <string name="sys_spam_scan_completed_title">历史短信识别完成</string>
+    <string name="sys_spam_scan_completed_text">已识别 %1$d 条短信，发现 %2$d 条骚扰短信</string>
+    <string name="sys_spam_scan_failed_title">历史短信识别失败</string>
+    <string name="sys_spam_scan_failed_text">请稍后重试</string>
+
+    <string name="sys_notification_reply_sending">正在发送</string>
+    <string name="sys_spam_hidden_notification_body">已识别为骚扰短信，内容已自动隐藏</string>
+
+    <!-- Smartspacer -->
+    <string name="sys_smartspacer_unread_config_title">Smartspacer 未读统计</string>
+    <string name="sys_smartspacer_normal_messages">正常短信</string>
+    <string name="sys_smartspacer_spam_messages">骚扰短信</string>
+    <string name="sys_smartspacer_archived_messages">归档短信</string>
+    <string name="sys_smartspacer_save">保存</string>
+    <string name="sys_smartspacer_unread_hidden">未读数量已隐藏</string>
+    <string name="sys_smartspacer_unread_cd">未读短信</string>
+    <string name="sys_smartspacer_unread_label">未读短信数量</string>
+    <string name="sys_smartspacer_unread_desc">显示 PixelText 中的未读短信数量</string>
+    <string name="sys_smartspacer_unread_99_plus">99+ 未读</string>
+    <string name="sys_smartspacer_unread_count">%1$d 未读</string>
+    <string name="sys_smartspacer_signature_label">【%1$s】</string>
+    <string name="sys_smartspacer_code_title">验证码 %1$s</string>
+    <string name="sys_smartspacer_code_subtitle">%1$s · 点按复制</string>
+    <string name="sys_smartspacer_code_label">验证码</string>
+    <string name="sys_smartspacer_code_desc">显示最近一条未读验证码，点按复制并标记已读</string>
+
+    <!-- ViewModel -->
+    <string name="sys_app_identity_apply_failed">应用失败，请重试。桌面图标可能需要稍后刷新。</string>
+    <string name="sys_theme_image_process_failed">图片处理失败，请重试</string>
+    <string name="sys_theme_save_failed">保存失败，请重试</string>
+    <string name="sys_detail_load_failed">加载失败，请重试</string>
+    <string name="sys_detail_delete_failed">删除失败</string>
+    <string name="sys_detail_no_text_to_check">没有可检测的文本</string>
+    <string name="sys_detail_already_checked">已有识别记录</string>
+    <string name="sys_detail_model_updated_recheck">模型已更新，请重新检测</string>
+    <string name="sys_detail_check_failed">识别失败</string>
+    <string name="sys_list_mark_read_failed">标记失败</string>
+    <string name="sys_support_qr_saved">收款码已保存到相册</string>
+    <string name="sys_support_qr_save_failed">保存失败，请稍后重试</string>
+    <string name="sys_keyword_empty">请输入关键词</string>
+    <string name="sys_keyword_duplicate">这个关键词已经存在</string>
+    <string name="sys_keyword_not_found">关键词不存在，请刷新后重试</string>
+    <string name="sys_keyword_save_failed">保存关键词失败</string>
+    <string name="sys_keyword_deleted">已删除“%1$s”</string>
+    <string name="sys_keyword_delete_failed">删除关键词失败</string>
+    <string name="sys_mms_vm_draft_updated_elsewhere">草稿已在另一个窗口更新，请关闭后重新打开</string>
+    <string name="sys_mms_vm_max_attachments">每条彩信最多 10 个附件，请重新选择或明确移除未导入项</string>
+    <string name="sys_mms_vm_import_incomplete">附件导入未完成，请重新选择或明确移除</string>
+    <string name="sys_mms_vm_total_size_exceeded">附件原件总大小超过 64 MiB</string>
+    <string name="sys_mms_vm_draft_updated_reselect">草稿已更新，请重新选择附件</string>
+    <string name="sys_mms_vm_attachments_not_saved">附件尚未保存，请检查存储空间后重新选择；已有内容已保留</string>
+    <string name="sys_mms_vm_draft_updated_reprepare">草稿已更新，请重新准备</string>
+    <string name="sys_mms_vm_sim_invalidated">所选 SIM 已失效，请重新选卡</string>
+    <string name="sys_mms_vm_sms_submit_failed">短信未能提交，请检查默认短信资格和 SIM，输入已保留</string>
+    <string name="sys_mms_vm_unsaved_close_warning">输入尚未成功保存，请重试保存或明确删除草稿后返回</string>
+    <string name="sys_mms_vm_prepare_failed">彩信准备失败，草稿已保留，请重试</string>
+    <string name="sys_learning_no_text">这条消息没有可学习的文本，图片和附件不参与学习</string>
+    <string name="sys_learning_meta_load_failed">读取规则或关联信息失败，仍可继续保存在本机</string>
+    <string name="sys_learning_save_sample_failed">未能保存学习样本，请重试</string>
+    <string name="sys_learning_prepare_contribution_failed">无法准备贡献样本，请重试</string>
+    <string name="sys_learning_update_label_failed">分类未能保存，请重试</string>
+    <string name="sys_learning_operation_failed">操作未完成，请重试</string>
+    <string name="sys_sample_report_not_found">无法查看这条上报记录</string>
+    <string name="sys_sample_network_or_storage_unavailable">网络或本机存储暂不可用，请稍后重试</string>
+    <string name="sys_sample_pagination_stalled">分页未能前进，请下拉刷新后重试</string>
+    <string name="sys_sample_pending_restored_init">暂未确认提交结果。已恢复本次确认的内容和请求编号；查看记录不会自动结束本次提交</string>
+    <string name="sys_sample_pending_restored_retry">已恢复本次待确认提交，将继续使用原请求编号和全部内容</string>
+    <string name="sys_sample_local_reloaded">本机数据已重新读取，可继续编辑或提交</string>
+    <string name="sys_sample_saving_submission_hint">正在保存本次提交，请稍候再返回</string>
+    <string name="sys_sample_busy_local_hint">正在读取或保存本机数据，请稍候再返回</string>
+    <string name="sys_sample_invalid_amount">选择的内容似乎不是有效的金额格式，请手动修改</string>
+    <string name="sys_sample_invalid_temporal">选择的内容似乎不是有效的时间格式，请手动修改</string>
+    <string name="sys_sample_pending_error_prefix">暂未确认提交结果。%1$s</string>
+    <string name="sys_whitelist_saved">规则已保存，匹配的已有消息已放行</string>
+    <string name="sys_whitelist_deleted">规则已删除，已放行消息保持非骚扰</string>
+    <string name="sys_whitelist_operation_failed">操作失败，请稍后重试</string>
+    <string name="sys_settings_sms_sync_failed">同步短信数据失败</string>
+    <string name="sys_settings_check_update_failed">检查更新失败</string>
+    <string name="sys_settings_preparing_download">正在准备下载资源</string>
+    <string name="sys_settings_resource_update_complete">资源更新完成</string>
+    <string name="sys_settings_resources_updated">资源已更新</string>
+    <string name="sys_settings_check_sender_profiles_failed">检查发件方资料失败</string>
+    <string name="sys_settings_preparing_install">正在准备安装</string>
+    <string name="sys_settings_sender_profiles_installed">发件方资料已安装</string>
+    <string name="sys_settings_deleting_model">正在删除下载的模型文件</string>
+    <string name="sys_settings_deleted_model">已删除下载的模型文件，已回退到内置模型</string>
+    <string name="sys_settings_deleting_rules">正在删除下载的智能卡片规则文件</string>
+    <string name="sys_settings_deleted_rules">已删除下载的智能卡片规则文件，已回退到内置规则</string>
+    <string name="sys_vc_index_update_failed">验证码索引更新失败，请稍后重试</string>
+    <string name="sys_vc_read_body_failed">读取原文失败，请重试</string>
+    <string name="sys_vc_original_missing">原短信已不存在</string>
+    <string name="sys_vc_original_missing_cleanup_failed">原短信已不存在，但清理索引失败，请重试</string>
+</resources>

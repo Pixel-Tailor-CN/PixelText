@@ -19,7 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 
 @Composable
 fun SpamMessageCard(isSelected: Boolean = false) {
@@ -51,7 +53,7 @@ fun SpamMessageCard(isSelected: Boolean = false) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "骚扰内容已隐藏",
+                text = stringResource(R.string.msg_spam_hidden),
                 style = MaterialTheme.typography.bodyMedium,
                 color = contentColor
             )
@@ -96,7 +98,7 @@ fun SpamMessageIndicator(isSelected: Boolean = false) {
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "骚扰短信",
+                text = stringResource(R.string.msg_spam_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = contentColor,
             )

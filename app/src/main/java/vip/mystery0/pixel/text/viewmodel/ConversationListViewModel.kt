@@ -20,9 +20,11 @@ import vip.mystery0.pixel.text.data.repository.initialization.DataInitialization
 import vip.mystery0.pixel.text.worker.DataInitializationScheduler
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.util.AppStrings
 
 private const val TAG = "ConversationListVM"
 
@@ -137,7 +139,7 @@ class ConversationListViewModel(
                     )
                     if (allConversations.isEmpty()) {
                         _uiState.value =
-                            ConversationListUiState.Error(error.message ?: "Unknown error")
+                            ConversationListUiState.Error(error.message ?: AppStrings.get(R.string.sys_unknown_error))
                     }
                 } finally {
                     isLoading = false
@@ -189,14 +191,20 @@ class ConversationListViewModel(
 
     fun toggleRead(conversation: ConversationModel) {
         viewModelScope.launch {
-            if (conversation.unreadCount > 0) {
-                repository.markThreadAsRead(conversation.threadId)
-                markLoadedConversationsAsRead(setOf(conversation.threadId))
-            } else {
-                repository.markThreadAsUnread(conversation.threadId)
-                markLoadedConversationAsUnread(conversation.threadId)
+            runCatching {
+                if (conversation.unreadCount > 0) {
+                    repository.markThreadAsRead(conversation.threadId)
+                    markLoadedConversationsAsRead(setOf(conversation.threadId))
+                } else {
+                    repository.markThreadAsUnread(conversation.threadId)
+                    markLoadedConversationAsUnread(conversation.threadId)
+                }
+            }.onSuccess {
+                refreshSilent()
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Log.w(TAG, "toggle read failed thread_id=${conversation.threadId} error=${error.javaClass.simpleName}")
             }
-            refreshSilent()
         }
     }
 
@@ -234,7 +242,7 @@ class ConversationListViewModel(
             }.onFailure { e ->
                 markLoadedConversationsAsRead(completedThreadIds)
                 _markAllReadResultEvents.trySend(
-                    MarkAllReadResultEvent.Failure(e.message ?: "标记失败")
+                    MarkAllReadResultEvent.Failure(e.message ?: AppStrings.get(R.string.sys_list_mark_read_failed))
                 )
             }
             _markAllReadProgress.value = null
@@ -268,9 +276,17 @@ class ConversationListViewModel(
     fun deleteSelected(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         viewModelScope.launch {
-            repository.deleteThreads(threadIds)
-            pendingDeletedThreadIds.removeAll(threadIds)
-            refreshSilent()
+            runCatching {
+                repository.deleteThreads(threadIds)
+            }.onSuccess {
+                pendingDeletedThreadIds.removeAll(threadIds)
+                refreshSilent()
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                pendingDeletedThreadIds.removeAll(threadIds)
+                replaceConversations(latestConversations)
+                Log.w(TAG, "delete threads failed count=${threadIds.size} error=${error.javaClass.simpleName}")
+            }
         }
     }
 

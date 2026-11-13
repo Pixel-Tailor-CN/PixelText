@@ -1,14 +1,17 @@
 package vip.mystery0.pixel.text.ui.screen
 
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
+import vip.mystery0.pixel.text.util.AppStrings
 
 internal fun NotificationQuickActionType.settingTitle(): String {
-    return when (this) {
-        NotificationQuickActionType.MARK_READ -> "已阅按钮"
-        NotificationQuickActionType.COPY_CODE -> "验证码复制按钮"
-        NotificationQuickActionType.REPLY -> "回复按钮"
+    val resId = when (this) {
+        NotificationQuickActionType.MARK_READ -> R.string.settings_notif_action_type_mark_read
+        NotificationQuickActionType.COPY_CODE -> R.string.settings_notif_action_type_copy_code
+        NotificationQuickActionType.REPLY -> R.string.settings_notif_action_type_reply
     }
+    return AppStrings.get(resId)
 }
 
 internal fun List<NotificationQuickActionConfig>.settingsSummary(): String {

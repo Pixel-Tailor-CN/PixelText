@@ -47,8 +47,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListUiState
 import vip.mystery0.pixel.text.viewmodel.ArchivedConversationListViewModel
 import kotlinx.coroutines.delay
@@ -61,6 +65,8 @@ fun ArchivedConversationListScreen(
     onNavigateToDetail: (Long, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val resources = LocalResources.current
     var selectedThreadIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     val selectionMode = selectedThreadIds.isNotEmpty()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -83,20 +89,24 @@ fun ArchivedConversationListScreen(
                 navigationIcon = {
                     if (selectionMode) {
                         IconButton(onClick = { selectedThreadIds = emptySet() }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Cancel selection")
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.conv_cd_cancel_selection))
                         }
                     } else {
                         IconButton(onClick = onNavigateBack) {
                             Icon(
                                 Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = stringResource(R.string.conv_cd_back)
                             )
                         }
                     }
                 },
                 title = {
                     Text(
-                        if (selectionMode) "已选择 ${selectedThreadIds.size} 项" else "已归档会话",
+                        if (selectionMode) {
+                            stringResource(R.string.conv_selected_count, selectedThreadIds.size)
+                        } else {
+                            stringResource(R.string.conv_archived_title)
+                        },
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -109,14 +119,14 @@ fun ArchivedConversationListScreen(
                                 viewModel.unarchiveSelected(selected)
                             }
                         ) {
-                            Icon(Icons.Rounded.Unarchive, contentDescription = "Unarchive")
+                            Icon(Icons.Rounded.Unarchive, contentDescription = stringResource(R.string.conv_cd_unarchive))
                         }
                         IconButton(
                             onClick = {
                                 deleteCandidateThreadIds = selectedThreadIds
                             }
                         ) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete")
+                            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.conv_cd_delete))
                         }
                     }
                 },
@@ -151,7 +161,7 @@ fun ArchivedConversationListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "读取失败: ${state.message}",
+                                stringResource(R.string.conv_load_failed, state.message),
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
@@ -163,8 +173,8 @@ fun ArchivedConversationListScreen(
 
                         if (state.conversations.isEmpty()) {
                             ConversationEmptyState(
-                                imageRes = vip.mystery0.pixel.text.R.drawable.illustration_archived_conversation_empty,
-                                text = "暂无归档会话"
+                                imageRes = R.drawable.illustration_archived_conversation_empty,
+                                text = stringResource(R.string.conv_empty_archived)
                             )
                             return@Box
                         }
@@ -246,8 +256,8 @@ fun ArchivedConversationListScreen(
     if (deleteCandidateThreadIds.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { deleteCandidateThreadIds = emptySet() },
-            title = { Text("删除会话？") },
-            text = { Text("将删除所选 ${deleteCandidateThreadIds.size} 个会话中的短信和彩信。") },
+            title = { Text(stringResource(R.string.conv_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.conv_delete_dialog_message, deleteCandidateThreadIds.size)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -261,8 +271,8 @@ fun ArchivedConversationListScreen(
                                 snackbarHostState.currentSnackbarData?.dismiss()
                             }
                             val result = snackbarHostState.showSnackbar(
-                                message = "已删除 ${selected.size} 个会话",
-                                actionLabel = "恢复",
+                                message = resources.getString(R.string.conv_deleted_conversations_count, selected.size),
+                                actionLabel = resources.getString(R.string.conv_undo),
                                 duration = SnackbarDuration.Indefinite
                             )
                             dismissJob.cancel()
@@ -274,12 +284,12 @@ fun ArchivedConversationListScreen(
                         }
                     }
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.conv_action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteCandidateThreadIds = emptySet() }) {
-                    Text("取消")
+                    Text(stringResource(R.string.conv_action_cancel))
                 }
             }
         )

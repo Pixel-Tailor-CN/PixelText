@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
@@ -55,15 +56,21 @@ fun SenderWhitelistScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("号码白名单") },
+                title = { Text(stringResource(R.string.settings_whitelist_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack, enabled = !state.busy) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_action_back),
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = { showInfo = true }, enabled = !state.busy) {
-                        Icon(Icons.Rounded.Info, contentDescription = "关于号码白名单")
+                        Icon(
+                            Icons.Rounded.Info,
+                            contentDescription = stringResource(R.string.settings_whitelist_about_cd),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
@@ -75,7 +82,7 @@ fun SenderWhitelistScreen(
                 modifier = Modifier.navigationBarsPadding(),
                 onClick = { if (!state.busy) viewModel.openEditor() },
                 icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("添加规则") },
+                text = { Text(stringResource(R.string.settings_whitelist_add_rule)) },
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -93,14 +100,18 @@ fun SenderWhitelistScreen(
                 item(key = "empty") {
                     AppEmptyState(
                         imageRes = R.drawable.illustration_spam_conversation_empty,
-                        text = "暂无白名单规则",
+                        text = stringResource(R.string.settings_whitelist_empty),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     )
                 }
             } else {
                 item(key = "count") {
                     Text(
-                        "已添加 ${rules.size} 条规则",
+                        stringResource(
+                            if (rules.size == 1) R.string.settings_whitelist_added_count_single
+                            else R.string.settings_whitelist_added_count_plural,
+                            rules.size,
+                        ),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 4.dp),
@@ -115,8 +126,8 @@ fun SenderWhitelistScreen(
                     onDelete = { viewModel.requestDelete(rule) },
                     enabled = !state.busy,
                     titleMaxLines = 3,
-                    editDescription = "编辑规则 ${rule.value}",
-                    deleteDescription = "删除规则 ${rule.value}",
+                    editDescription = stringResource(R.string.settings_whitelist_edit_rule_cd, rule.value),
+                    deleteDescription = stringResource(R.string.settings_whitelist_delete_rule_cd, rule.value),
                 )
             }
         }
@@ -125,9 +136,9 @@ fun SenderWhitelistScreen(
     if (showInfo) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
-            title = { Text("号码白名单") },
-            text = { Text("规则仅保存在本机。匹配的号码会放行，优先于模型和关键词识别。删除或修改规则不会撤销已有放行，也不会恢复已删除的短信。") },
-            confirmButton = { TextButton(onClick = { showInfo = false }) { Text("知道了") } },
+            title = { Text(stringResource(R.string.settings_whitelist_title)) },
+            text = { Text(stringResource(R.string.settings_whitelist_about_body)) },
+            confirmButton = { TextButton(onClick = { showInfo = false }) { Text(stringResource(R.string.settings_action_ok)) } },
         )
     }
 }
@@ -141,7 +152,10 @@ fun ConversationWhitelistAction(
 ) {
     val state by viewModel.state.collectAsState()
     IconButton(onClick = { viewModel.openEditor(sender = sender) }, enabled = sender.isNotBlank() && !state.busy) {
-        Icon(Icons.Rounded.VerifiedUser, contentDescription = "添加到骚扰识别白名单")
+        Icon(
+            Icons.Rounded.VerifiedUser,
+            contentDescription = stringResource(R.string.settings_whitelist_quick_add_cd),
+        )
     }
     SenderWhitelistDialogs(viewModel, state, snackbar)
 }

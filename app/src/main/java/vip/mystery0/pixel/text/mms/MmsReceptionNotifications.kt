@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
@@ -28,7 +29,7 @@ class MmsReceptionNotifications(
         if (journal.get(id.toString()) != null) return
         val row = source(id) ?: return
         val record = JSONObject().put("identity", identity).put("sender", MmsAddresses.clean(reception.optString("from")))
-            .put("phase", "attempted").put("summary", reception.optString("subject").ifBlank { "收到一条彩信" })
+            .put("phase", "attempted").put("summary", reception.optString("subject").ifBlank { context.getString(R.string.sys_mms_received_subject_fallback) })
         // 先标记尝试，进程中断后至多静默更新，避免重复响铃。
         journal.put(id.toString(), record)
         if (!row.read) show(id, row.thread, record, silent = false)
@@ -57,7 +58,7 @@ class MmsReceptionNotifications(
     }
 
     private suspend fun show(id: Long, thread: Long, record: JSONObject, silent: Boolean) {
-        val sender = record.optString("sender").ifBlank { "未知发件人" }
+        val sender = record.optString("sender").ifBlank { context.getString(R.string.sys_mms_unknown_sender) }
         val profile = try { profiles.findByNumber(sender) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { null }

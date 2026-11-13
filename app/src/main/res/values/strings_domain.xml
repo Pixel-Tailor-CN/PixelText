@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backup sections -->
+    <string name="domain_backup_section_settings">Settings &amp; Theme</string>
+    <string name="domain_backup_section_rules">Keywords &amp; Whitelist</string>
+    <string name="domain_backup_section_sms">SMS, Archive &amp; Allowlist</string>
+
+    <!-- Backup & restore errors -->
+    <string name="domain_backup_error_invalid_or_unsupported">Backup file is invalid or unsupported</string>
+    <string name="domain_backup_error_too_many_records">Record count exceeds backup limit</string>
+    <string name="domain_backup_error_snapshot_too_large">Database snapshot is too large</string>
+    <string name="domain_backup_error_schema_read_failed">Unable to read app database schema</string>
+    <string name="domain_backup_error_disallowed_temp_file">Snapshot contains disallowed temporary files</string>
+    <string name="domain_backup_error_exceeds_4gib">Backup file exceeds the 4 GiB limit</string>
+    <string name="domain_backup_error_write_selected_file">Unable to write to the selected file</string>
+    <string name="domain_backup_error_read_selected_file">Unable to read the selected file</string>
+    <string name="domain_backup_error_inconsistent_encryption">Inconsistent encryption state across backup entries</string>
+    <string name="domain_backup_error_encrypted_needs_password">This backup is encrypted. Enable "Encrypt file" and enter the password</string>
+    <string name="domain_backup_error_insufficient_staging_space">Insufficient temporary storage space</string>
+    <string name="domain_backup_error_missing_manifest">Backup manifest is missing</string>
+    <string name="domain_backup_error_unsupported_format">Unsupported backup format version</string>
+    <string name="domain_backup_error_entries_mismatch">Backup entries do not match the manifest</string>
+    <string name="domain_backup_error_integrity_failed">Backup integrity verification failed</string>
+    <string name="domain_backup_error_exceeds_size_limit">Backup exceeds size limit</string>
+    <string name="domain_backup_error_unsupported_db_version">This backup\'s database version is unsupported; please update the app</string>
+    <string name="domain_backup_error_db_category_mismatch">Databases do not match the backup sections</string>
+    <string name="domain_backup_error_db_corrupt">Database is corrupted</string>
+    <string name="domain_backup_error_db_disallowed_structure">Database contains disallowed structure</string>
+    <string name="domain_backup_error_db_schema_mismatch">Database schema does not match</string>
+    <string name="domain_backup_error_db_fk_failed">Database references are incomplete</string>
+    <string name="domain_backup_error_sms_too_large">A message exceeds the backup size limit</string>
+    <string name="domain_backup_error_keywords_too_large">Keyword data exceeds the backup limit</string>
+    <string name="domain_backup_error_duplicate_source_id">Backup contains duplicate message source IDs</string>
+    <string name="domain_backup_error_sms_count_mismatch">Message count does not match the backup manifest</string>
+    <string name="domain_backup_error_theme_bg_missing">Theme background file is missing; please re-select a background before backing up</string>
+    <string name="domain_backup_error_invalid_settings_data">Invalid settings data</string>
+    <string name="domain_backup_error_invalid_quick_action">Invalid notification quick action label</string>
+    <string name="domain_backup_error_theme_out_of_range">Theme configuration is out of allowed range</string>
+    <string name="domain_backup_error_theme_image_invalid">Theme image is invalid or too large</string>
+    <string name="domain_backup_error_save_app_settings_failed">Failed to save app settings; part of the theme may have been restored</string>
+    <string name="domain_backup_error_save_filter_settings_failed">Failed to save default filter settings</string>
+    <string name="domain_backup_error_save_protection_state">Unable to save restore protection state</string>
+    <string name="domain_backup_error_finish_protection">Unable to end restore protection; please retry</string>
+    <string name="domain_backup_error_save_progress">Failed to save restore progress; already-written messages will be kept</string>
+    <string name="domain_backup_error_read_target_sms">Unable to read target messages</string>
+    <string name="domain_backup_error_batch_insert_count_mismatch">System SMS batch insert count mismatch</string>
+    <string name="domain_backup_error_missing_sms_uri">System did not return a message URI</string>
+    <string name="domain_backup_error_cleanup_staging">Unable to clean up staging data from the previous operation</string>
+    <string name="domain_backup_error_create_staging">Unable to create backup staging directory</string>
+    <string name="domain_backup_error_active_protection">Please finish the previous restore protection first</string>
+    <string name="domain_backup_error_empty_sections">Please select backup contents</string>
+    <string name="domain_backup_error_empty_password">Please enter an encryption password and retry</string>
+    <string name="domain_backup_error_preview_expired">Preview expired; please select the file again</string>
+    <string name="domain_backup_error_invalid_restore_sections">Invalid restore sections</string>
+    <string name="domain_backup_error_pause_code_cleanup">Unable to pause verification code cleanup</string>
+    <string name="domain_backup_error_export_interrupted">Please verify whether the saved backup file is complete</string>
+    <string name="domain_backup_error_operation_stopped">Operation stopped</string>
+    <string name="domain_backup_error_access_selected_file">Unable to access the selected file; please select it again</string>
+    <string name="domain_backup_error_wrong_password_or_corrupt">Incorrect password or corrupted backup file</string>
+    <string name="domain_backup_error_generic_failure">Operation failed (%1$s). Written data will be kept; please check permissions, file, and storage space</string>
+    <string name="domain_backup_error_create_temp_dir">Unable to create temporary directory</string>
+
+    <!-- Sample report & hub -->
+    <string name="domain_sample_report_status_pending">Pending review</string>
+    <string name="domain_sample_report_status_reviewing">Auto-reviewing</string>
+    <string name="domain_sample_report_status_manual_review">Manual review</string>
+    <string name="domain_sample_report_status_approved">Approved</string>
+    <string name="domain_sample_report_status_rejected">Rejected</string>
+    <string name="domain_sample_report_status_restricted">Not adoptable</string>
+    <string name="domain_sample_report_status_removed">Removed</string>
+    <string name="domain_sample_report_status_unknown">Pending confirmation</string>
+
+    <string name="domain_sample_category_verification_code">Verification Code</string>
+    <string name="domain_sample_category_bank_transaction">Bank Transaction</string>
+    <string name="domain_sample_category_phone_recharge">Phone Top-up</string>
+    <string name="domain_sample_category_express_delivery">Delivery</string>
+    <string name="domain_sample_category_ticket">Travel &amp; Tickets</string>
+    <string name="domain_sample_category_missed_call">Missed Call</string>
+    <string name="domain_sample_category_data_usage">Data Usage</string>
+    <string name="domain_sample_category_spam">Spam</string>
+    <string name="domain_sample_category_normal">Regular SMS</string>
+
+    <string name="domain_sensitive_type_name">Name</string>
+    <string name="domain_sensitive_type_phone">Phone Number</string>
+    <string name="domain_sensitive_type_id_card">ID Number</string>
+    <string name="domain_sensitive_type_address">Address</string>
+    <string name="domain_sensitive_type_bank_card">Bank Card</string>
+    <string name="domain_sensitive_type_order_id">Order ID</string>
+    <string name="domain_sensitive_type_verification_code">Verification Code</string>
+    <string name="domain_sensitive_type_amount">Amount</string>
+    <string name="domain_sensitive_type_date">Date</string>
+    <string name="domain_sensitive_type_time">Time</string>
+    <string name="domain_sensitive_type_date_time">Date &amp; Time</string>
+
+    <string name="domain_sample_report_name_identity">Installation identity</string>
+    <string name="domain_sample_report_name_draft">Saved draft</string>
+    <string name="domain_sample_report_name_pending">Pending request</string>
+    <string name="domain_sample_report_name_local_data">Local report data</string>
+    <string name="domain_sample_report_error_clear_pending">Unable to clear local pending request; please retry</string>
+    <string name="domain_sample_report_error_clear_draft">Unable to clear local draft; please retry</string>
+    <string name="domain_sample_report_error_read_local">Unable to read local report data; check storage and retry</string>
+    <string name="domain_sample_report_error_draft_too_large">Local draft is too large; reduce content before saving</string>
+    <string name="domain_sample_report_error_write_local">Unable to save local report data; check storage and retry</string>
+    <string name="domain_sample_report_error_corrupt">%1$s is corrupted; file preserved. Check storage or restore data from this installation and retry; identity and requests will not be replaced automatically</string>
+
+    <string name="domain_sample_submit_pending_exists">A submission is awaiting confirmation; resume it first</string>
+    <string name="domain_sample_submit_invalid_device_id">Unable to read a valid device ID; cannot submit right now</string>
+    <string name="domain_sample_submit_no_pending">No pending submission found; go back and reopen the page</string>
+    <string name="domain_sample_submit_incomplete_response">Incomplete server response; this submission has been preserved</string>
+    <string name="domain_sample_submit_rate_limited">Too many requests; please try again later</string>
+    <string name="domain_sample_validation_too_short">Sample text must be at least 6 characters</string>
+    <string name="domain_sample_validation_too_large">Sample text cannot exceed 64 KiB; please shorten it</string>
+    <string name="domain_sample_validation_sender_too_long">Sender cannot exceed 256 characters</string>
+    <string name="domain_sample_validation_invalid_category">Please select a valid sample category</string>
+    <string name="domain_sample_validation_versions_too_long">Resource version info is too long; update resources and retry</string>
+
+    <string name="domain_hub_report_incomplete_response">Incomplete server response; please try again later</string>
+    <string name="domain_hub_report_invalid_cursor">Pagination expired; pull to refresh and try again</string>
+    <string name="domain_hub_report_invalid_query">Invalid query parameters; please refresh and try again</string>
+    <string name="domain_hub_report_invalid_submit">Submitted info does not meet requirements; please check and retry</string>
+    <string name="domain_hub_report_detail_not_found">Unable to view this report record</string>
+    <string name="domain_hub_report_service_unavailable">Reporting service temporarily unavailable; please try again later</string>
+    <string name="domain_hub_report_conflict">Request conflict; original request kept—please retry later or report the issue</string>
+    <string name="domain_hub_report_payload_too_large">Submitted content exceeds size limit; please shorten and retry</string>
+    <string name="domain_hub_report_rate_limited">Too many requests; please try again later</string>
+    <string name="domain_hub_report_unknown_error">Server did not confirm result; please try again later</string>
+    <string name="domain_hub_protocol_v2_unavailable_status">Resource protocol v2 unavailable status=%1$d</string>
+    <string name="domain_hub_protocol_v2_unavailable_empty">Resource protocol v2 unavailable empty body</string>
+
+    <string name="domain_hub_no_compatible_resources">No compatible resources available yet; continuing with current resources</string>
+    <string name="domain_hub_already_latest">Rules and model are already up to date</string>
+    <string name="domain_hub_progress_preparing">Preparing to download resources</string>
+    <string name="domain_hub_progress_downloading_rules">Downloading smart card rules</string>
+    <string name="domain_hub_progress_verifying_rules">Verifying smart card rules</string>
+    <string name="domain_hub_progress_downloading_model">Downloading offline model</string>
+    <string name="domain_hub_progress_downloading_vocab">Downloading model vocabulary</string>
+    <string name="domain_hub_progress_downloading_contract">Downloading model contract</string>
+    <string name="domain_hub_progress_verifying_model">Verifying and enabling offline model</string>
+    <string name="domain_hub_error_model_update_incomplete">Model update incomplete; keeping current model</string>
+    <string name="domain_hub_progress_complete">Resource update complete</string>
+    <string name="domain_hub_error_model_switch_incomplete">Model switch incomplete; keeping current model</string>
+    <string name="domain_hub_release_note_model">Model: %1$s</string>
+    <string name="domain_hub_release_note_rules">Rules: %1$s</string>
+    <string name="domain_hub_version_not_provided">Not provided</string>
+    <string name="domain_hub_no_release_notes">No release notes</string>
+    <string name="domain_hub_model_unsupported_version">This model is not supported by the current app version</string>
+    <string name="domain_hub_model_incompatible_contract">Model contract is incompatible</string>
+
+    <!-- Sender profiles -->
+    <string name="domain_sender_profile_not_published">No sender profiles published on server yet</string>
+    <string name="domain_sender_profile_already_latest">Sender profiles are already up to date</string>
+    <string name="domain_sender_profile_requires_app_update">This profile version requires updating Pixel Text</string>
+    <string name="domain_sender_profile_progress_fetching_url">Fetching download URL</string>
+    <string name="domain_sender_profile_progress_downloading">Downloading sender profiles</string>
+    <string name="domain_sender_profile_progress_verifying">Verifying sender profiles</string>
+    <string name="domain_sender_profile_progress_importing">Importing sender profiles</string>
+    <string name="domain_sender_profile_progress_cleaning">Cleaning up old sender profiles</string>
+    <string name="domain_sender_profile_progress_complete">Sender profiles installed</string>
+    <string name="domain_sender_profile_install_failed">Failed to install sender profiles</string>
+    <string name="domain_sender_profile_unsupported_schema">Unsupported sender profile format: %1$d</string>
+    <string name="domain_sender_profile_empty_version">Sender profile version is empty</string>
+    <string name="domain_sender_profile_invalid_size">Invalid sender profile size</string>
+    <string name="domain_sender_profile_invalid_hash">Invalid sender profile hash</string>
+    <string name="domain_sender_profile_insecure_url">Insecure sender profile download URL</string>
+    <string name="domain_sender_profile_version_changed">Sender profile version changed; please check for updates again</string>
+
+    <!-- SIM & search & SMS access -->
+    <string name="domain_sim_default">Default SIM</string>
+    <string name="domain_sim_slot">SIM %1$d</string>
+
+    <string name="domain_search_date_any">Any time</string>
+    <string name="domain_search_date_week">1 week ago</string>
+    <string name="domain_search_date_month">1 month ago</string>
+    <string name="domain_search_date_half_year">6 months ago</string>
+    <string name="domain_search_date_year">1 year ago</string>
+
+    <string name="domain_sms_access_default_app_required">Set this app as the default SMS app first</string>
+    <string name="domain_sms_access_read_permission_required">Grant SMS read permission and try again</string>
+
+    <!-- App identity & notification settings -->
+    <string name="domain_app_display_name_chisu_full">原点尺素</string>
+    <string name="domain_app_display_name_sms_full">原点短信</string>
+    <string name="domain_app_display_name_jianxun_full">原点简讯</string>
+    <string name="domain_app_display_name_pixel_text">Pixel Text</string>
+    <string name="domain_app_display_name_chisu">尺素</string>
+    <string name="domain_app_display_name_sms">短信</string>
+    <string name="domain_app_display_name_message">Message</string>
+    <string name="domain_app_display_name_pixel_message">Pixel Message</string>
+
+    <string name="domain_app_icon_style_violet">Violet</string>
+    <string name="domain_app_icon_style_blue">Origin</string>
+    <string name="domain_app_icon_style_green">Zero</string>
+    <string name="domain_app_icon_style_azure">Messages</string>
+    <string name="domain_app_icon_style_apricot">Violet</string>
+    <string name="domain_app_icon_style_classic">Classic</string>
+
+    <string name="domain_sms_notification_icon_double_bubble">Double Bubble</string>
+    <string name="domain_sms_notification_icon_single_bubble">Single Bubble</string>
+    <string name="domain_sms_notification_icon_envelope">Envelope</string>
+    <string name="domain_sms_notification_icon_text_bubble">Text Bubble</string>
+
+    <string name="domain_notification_action_mark_read">Mark read</string>
+    <string name="domain_notification_action_copy_code">Copy {code}</string>
+    <string name="domain_notification_action_reply">Reply</string>
+    <string name="domain_notification_action_error_empty">Label cannot be empty</string>
+    <string name="domain_notification_action_error_no_placeholder">This action does not support {code}</string>
+    <string name="domain_notification_action_error_too_long">Max 4 CJK or 8 ASCII characters</string>
+    <string name="domain_notification_action_error_duplicate_placeholder">{code} can only appear once</string>
+    <string name="domain_notification_action_error_fixed_too_long">Fixed text: max 4 CJK or 8 ASCII characters</string>
+
+    <!-- Theme & conversation input -->
+    <string name="domain_default_input_placeholder">Type a message…</string>
+
+    <!-- Whitelist & personal learning -->
+    <string name="domain_whitelist_rule_type_exact">Exact Number</string>
+    <string name="domain_whitelist_rule_type_regex">Regular Expression</string>
+    <string name="domain_whitelist_error_empty">Enter a number or expression</string>
+    <string name="domain_whitelist_error_too_long">Rule cannot exceed %1$d characters</string>
+    <string name="domain_whitelist_error_exact_format">Exact numbers only support digits and a leading +, one per line</string>
+    <string name="domain_whitelist_error_regex_empty_match">Expression cannot match an empty number; narrow the pattern</string>
+    <string name="domain_whitelist_error_regex_invalid">Invalid regex, or uses unsupported lookaround/backreferences</string>
+    <string name="domain_whitelist_error_edit_single">Only one rule can be entered when editing</string>
+    <string name="domain_whitelist_error_not_found">Rule does not exist; refresh and retry</string>
+    <string name="domain_whitelist_error_max_rules">Up to %1$d rules can be saved</string>
+    <string name="domain_whitelist_error_duplicate">Contains existing rules; remove duplicates and retry</string>
+    <string name="domain_whitelist_error_merge_limit">Merged whitelist exceeds %1$d rules</string>
+    <string name="domain_whitelist_error_read_messages">Unable to read messages; check SMS permissions</string>
+    <string name="domain_whitelist_error_read_mms_sender">Unable to read MMS sender</string>
+
+    <string name="domain_personal_learning_failed">On-device learning failed; you can retry</string>
+
+    <!-- MessageParser display labels -->
+    <string name="domain_parser_detail_passenger">Passenger</string>
+    <string name="domain_parser_detail_seat_class">Seat Class</string>
+    <string name="domain_parser_detail_seat">Seat</string>
+    <string name="domain_parser_detail_gate">Gate</string>
+    <string name="domain_parser_detail_order_no">Order No.</string>
+    <string name="domain_parser_train_type_hsr">High-Speed Rail</string>
+    <string name="domain_parser_flight_type_nonstop">Nonstop</string>
+    <string name="domain_parser_detail_account">Account</string>
+    <string name="domain_parser_detail_tx_time">Time</string>
+    <string name="domain_parser_detail_tx_memo">Note</string>
+    <string name="domain_parser_bank_type_default">Transaction</string>
+    <string name="domain_parser_detail_recharge_time">Top-up Time</string>
+    <string name="domain_parser_detail_balance">Balance</string>
+    <string name="domain_parser_balance_cny">¥%1$s</string>
+    <string name="domain_parser_data_label_default">Mobile Data</string>
+    <string name="domain_parser_data_label_remaining">%1$s · Remaining</string>
+    <string name="domain_parser_data_label_used">%1$s · Used</string>
+    <string name="domain_parser_detail_total_data">Plan Total</string>
+    <string name="domain_parser_detail_used_data">Used</string>
+    <string name="domain_parser_detail_throttled_used">Throttled Data</string>
+    <string name="domain_parser_data_used_value">Used %1$s</string>
+    <string name="domain_parser_detail_throttle_threshold">Throttle Limit</string>
+    <string name="domain_parser_detail_plan_name">Data Type</string>
+
+    <!-- MMS parsers, media, summary & outgoing -->
+    <string name="domain_mms_warning_separator">; </string>
+    <string name="domain_list_separator_comma">, </string>
+    <string name="domain_mms_calendar_too_large">Calendar file is too large; open original to view</string>
+    <string name="domain_mms_calendar_max_events">Showing up to 32 events; open original for more</string>
+    <string name="domain_mms_calendar_incomplete">Calendar event is incomplete; open original to view</string>
+    <string name="domain_mms_calendar_unreadable">Unable to read calendar event; open original to view</string>
+    <string name="domain_mms_calendar_extra_fields_incomplete">Additional fields or reminders were not fully imported</string>
+    <string name="domain_mms_calendar_field_truncated">Long fields were truncated</string>
+    <string name="domain_mms_calendar_recurring_notice">System calendar only adds this occurrence; open original ICS for full recurrence rules and exceptions</string>
+    <string name="domain_mms_calendar_check_properties">Some calendar properties could not be parsed; check original</string>
+    <string name="domain_mms_calendar_missing_title">Event is missing a title</string>
+    <string name="domain_mms_calendar_embedded_tz">Embedded timezone rules require a calendar app to read completely</string>
+    <string name="domain_mms_calendar_floating_tz">No timezone specified; displayed in device\'s current timezone—please verify</string>
+    <string name="domain_mms_calendar_invalid_time">Date, timezone, or duration could not be read reliably; open original</string>
+
+    <string name="domain_mms_contact_too_large">Contact card is too large; open original to view</string>
+    <string name="domain_mms_contact_max_contacts">Showing up to %1$d contacts; open original for more</string>
+    <string name="domain_mms_contact_nested">Nested contact card cannot be read completely; open original</string>
+    <string name="domain_mms_contact_incomplete">Contact card is incomplete; open original</string>
+    <string name="domain_mms_contact_unreadable">Unable to read contact card; open original</string>
+    <string name="domain_mms_contact_partial_fields">Some fields, photo, or name were not fully read; check original</string>
+    <string name="domain_mms_contact_invalid_fields">Contact card has invalid fields; open original</string>
+    <string name="domain_mms_contact_photo_unreadable">Contact photo cannot be read in this message; check original</string>
+
+    <string name="domain_mms_html_image_unavailable">Image unavailable</string>
+
+    <string name="domain_mms_pending_download">MMS waiting to download</string>
+    <string name="domain_mms_label">MMS</string>
+    <string name="domain_mms_preparing_content">Preparing MMS content</string>
+    <string name="domain_mms_attachment_numbered">Attachment %1$d</string>
+    <string name="domain_mms_empty_readable">MMS (no readable content)</string>
+    <string name="domain_mms_kind_image">Image</string>
+    <string name="domain_mms_kind_audio">Audio</string>
+    <string name="domain_mms_kind_video">Video</string>
+    <string name="domain_mms_kind_contact">Contact</string>
+    <string name="domain_mms_kind_calendar">Calendar</string>
+    <string name="domain_mms_kind_html">Webpage</string>
+    <string name="domain_mms_kind_text">Text</string>
+    <string name="domain_mms_kind_file">File</string>
+    <string name="domain_mms_kind_count">%1$s × %2$d</string>
+
+    <string name="domain_mms_attachment_text">Text attachment</string>
+    <string name="domain_mms_attachment_image">Image attachment</string>
+    <string name="domain_mms_attachment_audio">Audio attachment</string>
+    <string name="domain_mms_attachment_video">Video attachment</string>
+    <string name="domain_mms_attachment_html">Webpage attachment</string>
+    <string name="domain_mms_attachment_contact">Contact attachment</string>
+    <string name="domain_mms_attachment_calendar">Calendar attachment</string>
+    <string name="domain_mms_attachment_smil">Slideshow attachment</string>
+    <string name="domain_mms_attachment_multipart">Multipart attachment</string>
+    <string name="domain_mms_attachment_file">Attachment</string>
+
+    <string name="domain_mms_contact_export_select_system">Please select a system contact</string>
+    <string name="domain_mms_contact_export_not_found">Contact no longer exists; please select again</string>
+    <string name="domain_mms_contact_export_read_failed">Unable to read contact; please select again</string>
+    <string name="domain_mms_contact_export_phones_failed">Unable to read contact phone numbers; please select again</string>
+    <string name="domain_mms_contact_export_no_phones">This contact has no phone number; choose another contact</string>
+    <string name="domain_mms_contact_export_save_failed">Unable to save contact attachment; check storage space</string>
+    <string name="domain_mms_contact_export_default_filename">Contact</string>
+
+    <string name="domain_mms_media_not_readable">Attachment is not readable yet</string>
+    <string name="domain_mms_media_too_large_for_preview">File is large; open viewer to play</string>
+    <string name="domain_mms_media_exceeds_budget">Unable to read media within preview budget</string>
+    <string name="domain_mms_media_preview_failed">Unable to load preview; try playing or saving the original</string>
+
+    <string name="domain_mms_send_late_success_duplicate">A previous attempt later reported success; possible duplicate send</string>
+    <string name="domain_mms_send_origin_unavailable">Original send record is unavailable</string>
+    <string name="domain_mms_send_previous_late_success">A previous attempt later reported success; check sent messages first</string>
+    <string name="domain_mms_send_origin_state_changed">Original send result has changed; please reconfirm</string>
+    <string name="domain_mms_send_draft_updated">Draft was updated; please reopen it</string>
+    <string name="domain_mms_send_content_changed">Content has changed; please reconfirm</string>
+    <string name="domain_mms_send_attachment_not_imported">Some attachments are not imported yet; re-select or remove them</string>
+    <string name="domain_mms_send_empty_content">Please add message text or an attachment</string>
+    <string name="domain_mms_send_attachment_not_ready">Attachments are not ready yet</string>
+    <string name="domain_mms_send_origin_state_changed_risk">Original send result has changed; review the result and resend risk</string>
+    <string name="domain_mms_send_duplicate_source_changed">Resend source has changed; please reconfirm</string>
+    <string name="domain_mms_send_queue_limit">Up to 10 pending MMS messages allowed; confirm or clear existing records first</string>
+    <string name="domain_mms_send_paused_late_success">Previous attempt later reported success; this submission was paused</string>
+    <string name="domain_mms_send_paused_origin_changed">Original send result changed; reconfirm resend risk</string>
+    <string name="domain_mms_send_cancelled">Sending cancelled</string>
+    <string name="domain_mms_send_record_unavailable">Send record is unavailable</string>
+    <string name="domain_mms_send_cannot_retry">Cannot retry in the current state</string>
+    <string name="domain_mms_send_syncing_failed">Syncing failed record; please retry later</string>
+    <string name="domain_mms_send_provider_conflict">Message ID conflict in system store; sync paused—check other SMS apps</string>
+    <string name="domain_mms_send_message_deleted">Message deleted</string>
+</resources>

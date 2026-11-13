@@ -15,22 +15,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
 import vip.mystery0.pixel.text.domain.sample.SampleCategory
+import vip.mystery0.pixel.text.util.AppStrings
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 internal fun SampleReportTopBar(title: String, onBack: () -> Unit, action: @Composable () -> Unit = {}) {
     TopAppBar(title = { Text(title) }, navigationIcon = {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.conv_cd_back)) }
     }, actions = { action() }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
 }
 
@@ -83,7 +87,10 @@ internal fun SampleReportError(message: String, retryAt: Long, onRetry: () -> Un
     Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(message, color = MaterialTheme.colorScheme.error)
         TextButton(onClick = onRetry, enabled = seconds == 0L) {
-            Text(if (seconds > 0) "$seconds 秒后可重试" else "重试")
+            Text(
+                if (seconds > 0) stringResource(R.string.conv_sample_retry_in_seconds, seconds)
+                else stringResource(R.string.conv_action_retry)
+            )
         }
     }
 }
@@ -100,8 +107,13 @@ internal fun SampleReportOnResume(onResume: () -> Unit) {
     }
 }
 
-internal fun sampleReportCategory(value: String): String = SampleCategory.fromValue(value)?.label ?: "未知分类"
+internal fun sampleReportCategory(value: String): String =
+    SampleCategory.fromValue(value)?.label ?: AppStrings.get(R.string.conv_sample_unknown_category)
+
 internal fun sampleReportDate(value: Instant?): String = value?.atZone(ZoneId.systemDefault())
-    ?.format(DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm")) ?: "时间未知"
+    ?.format(DateTimeFormatter.ofPattern(AppStrings.get(R.string.conv_sample_date_pattern), Locale.getDefault()))
+    ?: AppStrings.get(R.string.conv_unknown_time)
+
 internal fun sampleReportMonth(value: Instant?): String = value?.atZone(ZoneId.systemDefault())
-    ?.format(DateTimeFormatter.ofPattern("yyyy年M月")) ?: "时间未知"
+    ?.format(DateTimeFormatter.ofPattern(AppStrings.get(R.string.conv_month_year_pattern), Locale.getDefault()))
+    ?: AppStrings.get(R.string.conv_unknown_time)

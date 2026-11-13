@@ -18,17 +18,15 @@ object SpamScanNotificationHelper {
     private const val TAG = "SpamScanNotificationHel"
     const val CHANNEL_ID_SPAM_SCAN = "channel_spam_scan"
 
-    private const val CHANNEL_NAME = "骚扰识别"
-    private const val CHANNEL_DESC = "历史短信骚扰识别进度"
     private const val NOTIFICATION_ID_SCAN_PROGRESS = 20010
 
     fun createNotificationChannel(context: Context) {
         val channel = NotificationChannel(
             CHANNEL_ID_SPAM_SCAN,
-            CHANNEL_NAME,
+            context.getString(R.string.sys_channel_spam_scan_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = CHANNEL_DESC
+            description = context.getString(R.string.sys_channel_spam_scan_desc)
             setShowBadge(false)
         }
         val notificationManager =
@@ -43,8 +41,8 @@ object SpamScanNotificationHelper {
         val percent = percent(processed, total)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SPAM_SCAN)
             .setSmallIcon(R.drawable.ic_notification_sms)
-            .setContentTitle("正在识别历史短信")
-            .setContentText("$processed/$total $percent%")
+            .setContentTitle(context.getString(R.string.sys_spam_scan_progress_title))
+            .setContentText(context.getString(R.string.sys_spam_scan_progress_text, processed, total, percent))
             .setProgress(total.coerceAtLeast(1), processed.coerceAtMost(total), total == 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -60,8 +58,8 @@ object SpamScanNotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SPAM_SCAN)
             .setSmallIcon(R.drawable.ic_notification_sms)
-            .setContentTitle("历史短信识别完成")
-            .setContentText("已识别 $processed 条短信，发现 $spamCount 条骚扰短信")
+            .setContentTitle(context.getString(R.string.sys_spam_scan_completed_title))
+            .setContentText(context.getString(R.string.sys_spam_scan_completed_text, processed, spamCount))
             .setProgress(0, 0, false)
             .setOngoing(false)
             .setAutoCancel(true)
@@ -78,8 +76,8 @@ object SpamScanNotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SPAM_SCAN)
             .setSmallIcon(R.drawable.ic_notification_sms)
-            .setContentTitle("历史短信识别失败")
-            .setContentText("请稍后重试")
+            .setContentTitle(context.getString(R.string.sys_spam_scan_failed_title))
+            .setContentText(context.getString(R.string.sys_spam_scan_failed_text))
             .setOngoing(false)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -90,7 +88,7 @@ object SpamScanNotificationHelper {
 
     @SuppressLint("MissingPermission")
     private fun postNotification(context: Context, notification: Notification) {
-        if (canPostNotifications(context)) {
+        if (!canPostNotifications(context)) {
             Log.w(TAG, "user not grant permission")
             return
         }

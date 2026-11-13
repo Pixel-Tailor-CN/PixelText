@@ -26,9 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 
 /** 分类页的分组与条目；稳定键同时用于滚动定位和状态恢复。 */
 data class SettingsSection(val key: String, val title: String?, val rows: List<SettingsEntry>)
@@ -67,7 +69,7 @@ fun SettingsPreference(
                 Icon(
                     if (external) Icons.AutoMirrored.Rounded.OpenInNew
                     else Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = if (external) "打开外部页面" else null,
+                    contentDescription = if (external) stringResource(R.string.settings_open_external_cd) else null,
                     modifier = Modifier.alpha(if (enabled) 1f else 0.38f),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

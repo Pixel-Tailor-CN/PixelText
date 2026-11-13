@@ -3,14 +3,19 @@ package vip.mystery0.pixel.text.data.source
 import android.Manifest
 import android.app.role.RoleManager
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.core.content.PermissionChecker
 import androidx.core.content.edit
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 系统短信访问先核对默认角色；已有镜像的本地查询不使用此门槛。 */
-enum class SmsAccessState(val userMessage: String) {
-    READY(""),
-    DEFAULT_APP_REQUIRED("请先将本应用设为默认短信应用"),
-    READ_PERMISSION_REQUIRED("请授予短信读取权限后重试"),
+enum class SmsAccessState(@param:StringRes val userMessageRes: Int?) {
+    READY(null),
+    DEFAULT_APP_REQUIRED(R.string.domain_sms_access_default_app_required),
+    READ_PERMISSION_REQUIRED(R.string.domain_sms_access_read_permission_required);
+
+    val userMessage: String get() = userMessageRes?.let { AppStrings.get(it) }.orEmpty()
 }
 
 class SmsAccessException(val state: SmsAccessState) : SecurityException(state.userMessage)

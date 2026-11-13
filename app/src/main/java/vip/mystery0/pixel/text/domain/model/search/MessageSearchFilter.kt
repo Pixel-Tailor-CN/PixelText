@@ -1,12 +1,21 @@
 package vip.mystery0.pixel.text.domain.model.search
 
+import androidx.annotation.StringRes
 import java.time.ZonedDateTime
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
+import vip.mystery0.pixel.text.util.AppStrings
 
 // 日期是日历意义上的“之前”，不是最近若干毫秒。
-enum class SearchDate(val label: String) {
-    ANY("任意时间"), WEEK("一周前"), MONTH("一月前"), HALF_YEAR("半年前"), YEAR("一年前");
+enum class SearchDate(@param:StringRes val labelRes: Int) {
+    ANY(R.string.domain_search_date_any),
+    WEEK(R.string.domain_search_date_week),
+    MONTH(R.string.domain_search_date_month),
+    HALF_YEAR(R.string.domain_search_date_half_year),
+    YEAR(R.string.domain_search_date_year);
+
+    val label: String get() = AppStrings.get(labelRes)
 
     fun cutoff(now: ZonedDateTime): Long? = when (this) {
         ANY -> null

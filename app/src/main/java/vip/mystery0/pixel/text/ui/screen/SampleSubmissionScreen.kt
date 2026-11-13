@@ -22,11 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.LearningFeedback
 import vip.mystery0.pixel.text.domain.sample.DesensitizationAssistantState
 import vip.mystery0.pixel.text.domain.sample.SampleCategory
@@ -60,8 +62,10 @@ fun SampleSubmissionScreen(
     var showLeaveDialog by remember { mutableStateOf(false) }
     val seconds = sampleReportRetrySeconds(state.retryAt)
     val contentError = when {
-        state.content.trim().codePointCount(0, state.content.trim().length) < 6 -> "样本文本至少需要 6 个字符"
-        state.content.trim().toByteArray(Charsets.UTF_8).size > 64 * 1024 -> "样本文本不能超过 64 KiB，请减少内容"
+        state.content.trim().codePointCount(0, state.content.trim().length) < 6 ->
+            stringResource(R.string.conv_sample_error_too_short)
+        state.content.trim().toByteArray(Charsets.UTF_8).size > 64 * 1024 ->
+            stringResource(R.string.conv_sample_error_too_large)
         else -> null
     }
     val senderTooLong = state.sender.codePointCount(0, state.sender.length) > 256
@@ -127,7 +131,7 @@ fun SampleSubmissionScreen(
     }
 
     Scaffold(
-        topBar = { SampleReportTopBar("贡献样本", handleBack) },
+        topBar = { SampleReportTopBar(stringResource(R.string.conv_menu_contribute_sample), handleBack) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         LazyColumn(
@@ -147,7 +151,7 @@ fun SampleSubmissionScreen(
             if (state.preparing) {
                 item(key = "preparing") {
                     Text(
-                        "正在保存提交内容…",
+                        stringResource(R.string.conv_sample_saving_submission),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -165,9 +169,9 @@ fun SampleSubmissionScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text("暂未确认提交结果", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.conv_sample_pending_title), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "重试将提交已确认的内容。",
+                                stringResource(R.string.conv_sample_pending_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                             )
@@ -192,7 +196,12 @@ fun SampleSubmissionScreen(
                         onClick = viewModel::retryLocalRead,
                         enabled = !state.loading && !state.submitting && !state.saving,
                     ) {
-                        Text(if (state.loading) "正在重新读取…" else "重新读取本机数据")
+                        Text(
+                            stringResource(
+                                if (state.loading) R.string.conv_sample_reloading_local
+                                else R.string.conv_sample_reload_local
+                            )
+                        )
                     }
                 }
             }
@@ -208,7 +217,7 @@ fun SampleSubmissionScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !state.locked,
-                            label = { Text("短信正文") },
+                            label = { Text(stringResource(R.string.conv_sample_body_label)) },
                             minLines = 4,
                             isError = visibleContentError != null,
                             supportingText = visibleContentError?.let { { Text(it) } },
@@ -221,7 +230,7 @@ fun SampleSubmissionScreen(
                             enabled = !state.locked && state.content.isNotBlank(),
                         ) {
                             Icon(Icons.Rounded.Edit, null)
-                            Text("辅助脱敏", Modifier.padding(start = 8.dp))
+                            Text(stringResource(R.string.conv_sample_desensitize_assistant), Modifier.padding(start = 8.dp))
                         }
                     }
                 }
@@ -229,7 +238,7 @@ fun SampleSubmissionScreen(
                 item(key = "step1_category") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "提交分类",
+                            stringResource(R.string.conv_sample_submitted_category),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -256,9 +265,9 @@ fun SampleSubmissionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.locked,
                         singleLine = true,
-                        label = { Text("发送方（可选）") },
+                        label = { Text(stringResource(R.string.conv_sample_sender_optional)) },
                         isError = senderTooLong,
-                        supportingText = if (senderTooLong) ({ Text("发送方不能超过 256 个字符") }) else null,
+                        supportingText = if (senderTooLong) ({ Text(stringResource(R.string.conv_sample_sender_too_long)) }) else null,
                     )
                 }
 
@@ -272,12 +281,12 @@ fun SampleSubmissionScreen(
                         enabled = canProceedToConfirm,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
-                        Text("下一步：确认提交")
+                        Text(stringResource(R.string.conv_sample_next_confirm))
                     }
                 }
             } else {
                 item(key = "step2_title") {
-                    Text("确认本次上传内容", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.conv_sample_confirm_upload_title), style = MaterialTheme.typography.titleLarge)
                 }
 
                 item(key = "step2_preview") {
@@ -292,13 +301,13 @@ fun SampleSubmissionScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                "短信正文",
+                                stringResource(R.string.conv_sample_body_label),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             SelectionContainer {
                                 Text(
-                                    text = state.content.ifBlank { "（空）" },
+                                    text = state.content.ifBlank { stringResource(R.string.conv_sample_empty_placeholder) },
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
@@ -314,7 +323,7 @@ fun SampleSubmissionScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "分类",
+                                stringResource(R.string.conv_sample_category_label),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -329,12 +338,12 @@ fun SampleSubmissionScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "发送方",
+                                stringResource(R.string.conv_sample_sender),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                state.sender.ifBlank { "未填写" },
+                                state.sender.ifBlank { stringResource(R.string.conv_sample_not_provided) },
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
@@ -348,7 +357,7 @@ fun SampleSubmissionScreen(
                                 enabled = !state.locked,
                                 contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
                             ) {
-                                Text("返回修改")
+                                Text(stringResource(R.string.conv_sample_back_to_edit))
                             }
                         }
                     }
@@ -356,25 +365,30 @@ fun SampleSubmissionScreen(
 
                 item(key = "step2_attached_info") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("同时提交", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.conv_sample_also_included), style = MaterialTheme.typography.titleMedium)
                         val feedback = state.learningFeedback
                         Text(
                             text = if (feedback != null) {
-                                "1. 应用与资源版本、学习反馈（来源：本机学习；基础版本：${feedback.baseModelVersion.ifBlank { "内置" }}；" +
-                                    "代次：${feedback.personalGeneration?.toString() ?: "无"}；" +
-                                    "标签：${if (feedback.originalLabel == "spam") "骚扰短信" else "正常短信"}；" +
-                                    "不上传个人参数或学习样本库）；"
+                                stringResource(
+                                    R.string.conv_sample_included_learning_feedback,
+                                    feedback.baseModelVersion.ifBlank { stringResource(R.string.conv_sample_builtin) },
+                                    feedback.personalGeneration?.toString() ?: stringResource(R.string.conv_sample_none),
+                                    stringResource(
+                                        if (feedback.originalLabel == "spam") R.string.conv_sample_label_spam
+                                        else R.string.conv_sample_label_normal
+                                    ),
+                                )
                             } else {
-                                "1. 应用版本、当前规则版本与离线模型版本（不上传个人参数或本机学习样本库）；"
+                                stringResource(R.string.conv_sample_included_versions)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = "2. Android 设备标识与本次安装身份。",
+                            text = stringResource(R.string.conv_sample_included_device_id),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = "用于规则改进、模型优化、反滥用风控和查询本人记录。",
+                            text = stringResource(R.string.conv_sample_included_purpose),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -404,7 +418,7 @@ fun SampleSubmissionScreen(
                                 modifier = Modifier.clearAndSetSemantics {},
                             )
                             Text(
-                                text = "我已检查脱敏结果并移除敏感信息，同意上传以上内容。",
+                                text = stringResource(R.string.conv_sample_consent_text),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -433,11 +447,11 @@ fun SampleSubmissionScreen(
                             }
                             Text(
                                 when {
-                                    state.preparing -> "正在保存…"
-                                    state.submitting -> "正在提交…"
-                                    seconds > 0 -> "$seconds 秒后可重试"
-                                    state.pending -> "重试本次提交"
-                                    else -> "确认并提交"
+                                    state.preparing -> stringResource(R.string.conv_sample_btn_saving)
+                                    state.submitting -> stringResource(R.string.conv_sample_btn_submitting)
+                                    seconds > 0 -> stringResource(R.string.conv_sample_retry_in_seconds, seconds)
+                                    state.pending -> stringResource(R.string.conv_sample_btn_retry_submit)
+                                    else -> stringResource(R.string.conv_sample_btn_confirm_submit)
                                 }
                             )
                         }
@@ -446,11 +460,11 @@ fun SampleSubmissionScreen(
                                 onClick = onViewReports,
                                 enabled = !state.submitting,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("查看我的上报") }
+                            ) { Text(stringResource(R.string.conv_sample_view_my_reports)) }
                             TextButton(
                                 onClick = requestExit,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("保留并返回") }
+                            ) { Text(stringResource(R.string.conv_sample_keep_and_back)) }
                         }
                     }
                 }
@@ -461,21 +475,21 @@ fun SampleSubmissionScreen(
     if (state.draftChoice != null) {
         AlertDialog(
             onDismissRequest = onNavigateBack,
-            title = { Text("选择要编辑的内容") },
-            text = { Text("本机已有一份保留草稿。请选择使用当前短信，或继续编辑保留草稿。选择当前短信不会删除或覆盖原草稿。") },
+            title = { Text(stringResource(R.string.conv_sample_draft_choice_title)) },
+            text = { Text(stringResource(R.string.conv_sample_draft_choice_desc)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmStep = false
                     viewModel.chooseCurrentMessage()
-                }) { Text("使用当前短信") }
+                }) { Text(stringResource(R.string.conv_sample_use_current_message)) }
             },
             dismissButton = {
                 Column {
                     TextButton(onClick = {
                         confirmStep = false
                         viewModel.chooseRetainedDraft()
-                    }) { Text("继续保留草稿") }
-                    TextButton(onClick = onNavigateBack) { Text("取消") }
+                    }) { Text(stringResource(R.string.conv_sample_continue_draft)) }
+                    TextButton(onClick = onNavigateBack) { Text(stringResource(R.string.conv_action_cancel)) }
                 }
             },
         )
@@ -484,26 +498,28 @@ fun SampleSubmissionScreen(
     if (showLeaveDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveDialog = false },
-            title = { Text("保留这份草稿？") },
+            title = { Text(stringResource(R.string.conv_sample_keep_draft_title)) },
             text = {
                 Text(
-                    "脱敏修改尚未提交。保留后仅存于本次安装的本机私有目录，不参与备份，也不会自动上传。" +
-                        if (state.hasRetainedDraft) "保留会覆盖先前保留的草稿；选择放弃草稿会删除先前的保留草稿。" else ""
+                    stringResource(
+                        if (state.hasRetainedDraft) R.string.conv_sample_keep_draft_desc_overwrite
+                        else R.string.conv_sample_keep_draft_desc
+                    )
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     showLeaveDialog = false
                     viewModel.saveAndLeave(onNavigateBack)
-                }) { Text("保留并返回") }
+                }) { Text(stringResource(R.string.conv_sample_keep_and_back)) }
             },
             dismissButton = {
                 Row {
                     TextButton(onClick = {
                         showLeaveDialog = false
                         viewModel.discardAndLeave(onNavigateBack)
-                    }) { Text("放弃草稿") }
-                    TextButton(onClick = { showLeaveDialog = false }) { Text("继续编辑") }
+                    }) { Text(stringResource(R.string.conv_sample_discard_draft)) }
+                    TextButton(onClick = { showLeaveDialog = false }) { Text(stringResource(R.string.conv_sample_continue_editing)) }
                 }
             },
         )
@@ -560,8 +576,8 @@ fun SampleSubmissionScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("放弃修改？") },
-            text = { Text("辅助脱敏中的修改还没有应用到样本。") },
+            title = { Text(stringResource(R.string.conv_sample_discard_edits_title)) },
+            text = { Text(stringResource(R.string.conv_sample_discard_edits_desc)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -569,12 +585,12 @@ fun SampleSubmissionScreen(
                         viewModel.discardDesensitizedDraft()
                     }
                 ) {
-                    Text("放弃修改")
+                    Text(stringResource(R.string.conv_sample_discard_edits))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog = false }) {
-                    Text("继续编辑")
+                    Text(stringResource(R.string.conv_sample_continue_editing))
                 }
             },
         )
@@ -621,7 +637,7 @@ private fun SubmissionStepHeader(confirmStep: Boolean) {
                 }
             }
             Text(
-                "检查内容",
+                stringResource(R.string.conv_sample_step_review),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (!confirmStep) {
                     MaterialTheme.colorScheme.primary
@@ -659,7 +675,7 @@ private fun SubmissionStepHeader(confirmStep: Boolean) {
                 )
             }
             Text(
-                "确认提交",
+                stringResource(R.string.conv_sample_step_confirm),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (confirmStep) {
                     MaterialTheme.colorScheme.primary
@@ -693,14 +709,14 @@ private fun ColumnScope.DesensitizationAssistantSheet(
     ) {
         item {
             Text(
-                "辅助脱敏",
+                stringResource(R.string.conv_sample_desensitize_assistant),
                 style = MaterialTheme.typography.titleLarge,
             )
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "选择敏感片段",
+                    stringResource(R.string.conv_sample_select_sensitive),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -727,7 +743,7 @@ private fun ColumnScope.DesensitizationAssistantSheet(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "敏感类型",
+                    stringResource(R.string.conv_sample_sensitive_type),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -751,7 +767,7 @@ private fun ColumnScope.DesensitizationAssistantSheet(
                 onValueChange = {},
                 modifier = Modifier.fillMaxWidth(),
                 readOnly = true,
-                label = { Text("预览") },
+                label = { Text(stringResource(R.string.conv_sample_preview)) },
                 minLines = 4,
             )
         }
@@ -761,7 +777,7 @@ private fun ColumnScope.DesensitizationAssistantSheet(
                 enabled = state.canReplace,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("替换")
+                Text(stringResource(R.string.conv_sample_replace))
             }
         }
         item {
@@ -773,14 +789,14 @@ private fun ColumnScope.DesensitizationAssistantSheet(
                     onClick = onDismissRequest,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.conv_action_cancel))
                 }
                 Button(
                     onClick = onApply,
                     enabled = state.draft.isNotBlank(),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("应用到样本")
+                    Text(stringResource(R.string.conv_sample_apply_to_sample))
                 }
             }
         }
@@ -819,11 +835,12 @@ private fun TokenChip(
     }
 }
 
+@Composable
 private fun SampleTextToken.displayText(): String {
     return when {
-        text == "\n" -> "换行"
-        text == "\t" -> "制表"
-        text.isBlank() -> "空格"
+        text == "\n" -> stringResource(R.string.conv_token_newline)
+        text == "\t" -> stringResource(R.string.conv_token_tab)
+        text.isBlank() -> stringResource(R.string.conv_token_space)
         else -> text
     }
 }

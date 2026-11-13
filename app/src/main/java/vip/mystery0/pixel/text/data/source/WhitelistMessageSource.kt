@@ -1,16 +1,23 @@
 package vip.mystery0.pixel.text.data.source
 
 import android.content.ContentResolver
+import android.content.Context
 import android.provider.Telephony
 import androidx.core.net.toUri
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 import java.security.MessageDigest
 
 /** 只读取身份元数据，不把短信正文用于白名单匹配或持久化。 */
 data class WhitelistMessageIdentity(val id: Long, val sender: String, val fingerprint: String)
 
-class WhitelistMessageSource(private val resolver: ContentResolver) {
+class WhitelistMessageSource(
+    private val resolver: ContentResolver,
+    private val context: Context? = null,
+) {
     fun load(ids: Collection<Long>? = null): List<WhitelistMessageIdentity> {
         if (ids != null && ids.isEmpty()) return emptyList()
+        context?.requireSmsAccess()
         return buildList {
             loadTransport(false, ids?.filter { it > 0 }, this)
             loadTransport(true, ids?.filter { it < 0 }?.map { -it }, this)
@@ -30,7 +37,7 @@ class WhitelistMessageSource(private val resolver: ContentResolver) {
             val selection = chunk?.let { "_id IN (${it.joinToString(",") { "?" }})" }
             val uri = if (mms) Telephony.Mms.CONTENT_URI else Telephony.Sms.CONTENT_URI
             val cursor = resolver.query(uri, projection, selection, chunk?.map(Long::toString)?.toTypedArray(), null)
-                ?: error("无法读取消息，请检查短信权限")
+                ?: error(AppStrings.get(R.string.domain_whitelist_error_read_messages))
             cursor.use {
                 while (it.moveToNext()) {
                     val sourceId = it.getLong(it.getColumnIndexOrThrow("_id"))
@@ -51,7 +58,7 @@ class WhitelistMessageSource(private val resolver: ContentResolver) {
         val cursor = resolver.query(
             "content://mms/$id/addr".toUri(), arrayOf("address", "type"),
             "type IN (137,151,130,129)", null, null,
-        ) ?: error("无法读取彩信发件人")
+        ) ?: error(AppStrings.get(R.string.domain_whitelist_error_read_mms_sender))
         cursor.use {
             var fallback = ""
             while (it.moveToNext()) {

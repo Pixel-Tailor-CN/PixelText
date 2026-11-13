@@ -38,11 +38,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kieronquinn.app.smartspacer.sdk.SmartspacerConstants
 import com.kieronquinn.app.smartspacer.sdk.provider.SmartspacerComplicationProvider
 import org.koin.android.ext.android.inject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class UnreadSmsComplicationConfigActivity : ComponentActivity() {
@@ -95,12 +97,12 @@ private fun UnreadSmsComplicationConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Smartspacer 未读统计") },
+                title = { Text(stringResource(R.string.sys_smartspacer_unread_config_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.sys_back)
                         )
                     }
                 }
@@ -119,17 +121,17 @@ private fun UnreadSmsComplicationConfigScreen(
         ) {
             Spacer(modifier = Modifier.size(0.dp))
             UnreadSmsComplicationSwitchRow(
-                title = "正常短信",
+                title = stringResource(R.string.sys_smartspacer_normal_messages),
                 checked = includeNormalMessages,
                 onCheckedChange = { includeNormalMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
-                title = "骚扰短信",
+                title = stringResource(R.string.sys_smartspacer_spam_messages),
                 checked = includeSpamMessages,
                 onCheckedChange = { includeSpamMessages = it }
             )
             UnreadSmsComplicationSwitchRow(
-                title = "归档短信",
+                title = stringResource(R.string.sys_smartspacer_archived_messages),
                 checked = includeArchivedMessages,
                 onCheckedChange = { includeArchivedMessages = it }
             )
@@ -146,10 +148,10 @@ private fun UnreadSmsComplicationConfigScreen(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Text("保存")
+                Text(stringResource(R.string.sys_smartspacer_save))
             }
             if (!includeNormalMessages && !includeSpamMessages && !includeArchivedMessages) Text(
-                text = "未读数量已隐藏",
+                text = stringResource(R.string.sys_smartspacer_unread_hidden),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

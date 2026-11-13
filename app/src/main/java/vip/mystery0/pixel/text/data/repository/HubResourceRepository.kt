@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.data.repository
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.resource.HubResourceStore
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.domain.hub.HubOperationResult
@@ -11,6 +12,7 @@ import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 import vip.mystery0.pixel.text.domain.parser.MessageParser
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.io.File
 import java.util.UUID
@@ -37,7 +39,9 @@ class HubResourceRepository(
     suspend fun checkResourceUpdateAvailability(): ResourceUpdateAvailability {
         val manifest = checkManifest()
         if (manifest.rules == null && manifest.spamModel == null) {
-            return ResourceUpdateAvailability.NoUpdate("暂未提供兼容资源，继续使用当前资源")
+            return ResourceUpdateAvailability.NoUpdate(
+                AppStrings.get(R.string.domain_hub_no_compatible_resources),
+            )
         }
         val currentRuleVersion = settings.getRuleResourceVersion()
         val currentModelVersion = store.activeModelBundle()?.version ?: AppSettingsKeys.DEFAULT_RESOURCE_VERSION
@@ -48,7 +52,9 @@ class HubResourceRepository(
             remoteRuleVersion == currentRuleVersion &&
             remoteModelVersion == currentModelVersion
         ) {
-            ResourceUpdateAvailability.NoUpdate("当前规则和模型已经是最新版本")
+            ResourceUpdateAvailability.NoUpdate(
+                AppStrings.get(R.string.domain_hub_already_latest),
+            )
         } else {
             ResourceUpdateAvailability.Available(
                 manifest = manifest,
@@ -94,13 +100,21 @@ class HubResourceRepository(
                         }
                     }
 
-                    onProgress("正在准备下载资源", 0f)
+                    onProgress(AppStrings.get(R.string.domain_hub_progress_preparing), 0f)
                     manifest.rules?.let { rules ->
                         val temp = store.tempFile("rules-${safeVersion(rules.version)}.json")
-                        downloadTracked("正在下载智能卡片规则", rules.downloadUrl, temp, rules.sizeBytes)
+                        downloadTracked(
+                            AppStrings.get(R.string.domain_hub_progress_downloading_rules),
+                            rules.downloadUrl,
+                            temp,
+                            rules.sizeBytes,
+                        )
                         store.verifySize(temp, rules.sizeBytes)
                         store.verifySha256(temp, rules.sha256)
-                        onProgress("正在校验智能卡片规则", completedBytes.toProgress(totalBytes))
+                        onProgress(
+                            AppStrings.get(R.string.domain_hub_progress_verifying_rules),
+                            completedBytes.toProgress(totalBytes),
+                        )
                         val rulesJson = temp.readText(Charsets.UTF_8)
                         initializationGuard.withInputMutation {
                             messageParser.replaceRules(rulesJson) {
@@ -116,14 +130,32 @@ class HubResourceRepository(
                         val modelTemp = store.tempFile("spam-model-$safeVersion.tflite")
                         val vocabTemp = store.tempFile("vocab-$safeVersion.txt")
                         val contractTemp = store.tempFile("contract-$safeVersion.json")
-                        downloadTracked("正在下载离线模型", spamModel.model.downloadUrl, modelTemp, spamModel.model.sizeBytes)
-                        downloadTracked("正在下载模型词表", spamModel.vocab.downloadUrl, vocabTemp, spamModel.vocab.sizeBytes)
-                        downloadTracked("正在下载模型契约", spamModel.contract.downloadUrl, contractTemp, spamModel.contract.sizeBytes)
+                        downloadTracked(
+                            AppStrings.get(R.string.domain_hub_progress_downloading_model),
+                            spamModel.model.downloadUrl,
+                            modelTemp,
+                            spamModel.model.sizeBytes,
+                        )
+                        downloadTracked(
+                            AppStrings.get(R.string.domain_hub_progress_downloading_vocab),
+                            spamModel.vocab.downloadUrl,
+                            vocabTemp,
+                            spamModel.vocab.sizeBytes,
+                        )
+                        downloadTracked(
+                            AppStrings.get(R.string.domain_hub_progress_downloading_contract),
+                            spamModel.contract.downloadUrl,
+                            contractTemp,
+                            spamModel.contract.sizeBytes,
+                        )
                         val candidate = store.stageModelBundle(modelTemp, vocabTemp, contractTemp, spamModel)
                         modelTemp.delete()
                         vocabTemp.delete()
                         contractTemp.delete()
-                        onProgress("正在校验并启用离线模型", completedBytes.toProgress(totalBytes))
+                        onProgress(
+                            AppStrings.get(R.string.domain_hub_progress_verifying_model),
+                            completedBytes.toProgress(totalBytes),
+                        )
                         // 与初始化扫描保持相同锁序：输入变更锁先于学习决策锁。
                         initializationGuard.withInputMutation {
                             check(activateBundle(candidate) {
@@ -131,12 +163,12 @@ class HubResourceRepository(
                                 store.activateModelBundle(candidate)
                                 settings.setSpamModelResourceVersion(spamModel.version)
                                 settings.setVocabResourceVersion(spamModel.version)
-                            }) { "模型更新未完成，已保留当前模型" }
+                            }) { AppStrings.get(R.string.domain_hub_error_model_update_incomplete) }
                         }
                     }
 
                     settings.setResourceUpdatedAt(System.currentTimeMillis())
-                    onProgress("资源更新完成", 1f)
+                    onProgress(AppStrings.get(R.string.domain_hub_progress_complete), 1f)
                     HubOperationResult.Success
                 }.getOrElse { error ->
                     if (error is CancellationException) throw error
@@ -172,7 +204,7 @@ class HubResourceRepository(
                         settings.setSpamModelResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
                         settings.setVocabResourceVersion(AppSettingsKeys.DEFAULT_RESOURCE_VERSION)
                         settings.setResourceUpdatedAt(System.currentTimeMillis())
-                    }) { "模型切换未完成，已保留当前模型" }
+                    }) { AppStrings.get(R.string.domain_hub_error_model_switch_incomplete) }
                 }
                 HubOperationResult.Success
             }.getOrElse { error ->
@@ -190,18 +222,19 @@ class HubResourceRepository(
         val notes = listOfNotNull(
             spamModel?.releaseNotes
                 ?.takeIf { it.isNotBlank() }
-                ?.let { "模型：$it" },
+                ?.let { AppStrings.get(R.string.domain_hub_release_note_model, it) },
             rules?.releaseNotes
                 ?.takeIf { it.isNotBlank() }
-                ?.let { "规则：$it" }
+                ?.let { AppStrings.get(R.string.domain_hub_release_note_rules, it) }
         ).joinToString(separator = "\n")
 
+        val notProvided = AppStrings.get(R.string.domain_hub_version_not_provided)
         return ResourceUpdateDetail(
-            modelVersion = spamModel?.version ?: "未提供",
+            modelVersion = spamModel?.version ?: notProvided,
             modelSizeBytes = spamModel?.model?.sizeBytes,
-            ruleVersion = rules?.version ?: "未提供",
+            ruleVersion = rules?.version ?: notProvided,
             ruleSizeBytes = rules?.sizeBytes,
-            releaseNotes = notes.ifBlank { "暂无版本说明" }
+            releaseNotes = notes.ifBlank { AppStrings.get(R.string.domain_hub_no_release_notes) }
         )
     }
 

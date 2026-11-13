@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
@@ -20,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import java.io.File
 import java.util.UUID
+import vip.mystery0.pixel.text.R
 
 /** 仅管理采集文件；成功后仍需经过统一附件导入，不能把相机 URI 当作持久草稿。 */
 class ComposerCapture internal constructor(private val context: Context) {
@@ -64,7 +66,7 @@ class ComposerCapture internal constructor(private val context: Context) {
             recording = true
         } catch (_: Exception) {
             cancelRecording()
-            onError("无法录音，请检查麦克风权限或是否被其他应用占用")
+            onError(context.getString(R.string.msg_capture_record_error))
         }
     }
 
@@ -74,7 +76,7 @@ class ComposerCapture internal constructor(private val context: Context) {
         val valid = runCatching { recorder?.stop(); file != null && file.length() > 0 }.getOrDefault(false)
         release()
         if (valid && file != null) onCaptured(uri(context, file)) { file.delete() }
-        else { file?.delete(); onError("录音太短，请重新录制") }
+        else { file?.delete(); onError(context.getString(R.string.msg_capture_record_too_short)) }
     }
 
     fun cancelRecording() {
@@ -96,7 +98,8 @@ class ComposerCapture internal constructor(private val context: Context) {
             File(context.cacheDir, "mms-share/capture/${UUID.randomUUID()}.$extension").also { it.parentFile?.mkdirs() }
         fun uri(context: Context, file: File): Uri =
             FileProvider.getUriForFile(context, "${context.packageName}.mms.attachment", file,
-                if (file.extension == "m4a") "语音消息.m4a" else "照片.jpg")
+                if (file.extension == "m4a") context.getString(R.string.msg_capture_voice_filename)
+                else context.getString(R.string.msg_capture_photo_filename))
     }
 }
 
@@ -106,6 +109,7 @@ fun rememberComposerCapture(
     onError: (String) -> Unit,
 ): ComposerCapture {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val owner = LocalLifecycleOwner.current
     val controller = remember(context) { ComposerCapture(context) }
     val latestCaptured by rememberUpdatedState(onCaptured)
@@ -120,7 +124,7 @@ fun rememberComposerCapture(
         }
     }
     val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) controller.startRecording() else latestError("未获得麦克风权限，仍可选择已有音频或继续输入文字")
+        if (granted) controller.startRecording() else latestError(resources.getString(R.string.msg_capture_mic_denied))
     }
     SideEffect {
         controller.onCaptured = { uri, cleanup -> latestCaptured(uri, cleanup) }
@@ -129,7 +133,7 @@ fun rememberComposerCapture(
             val file = ComposerCapture.newFile(context, "jpg")
             cameraPath = file.path
             runCatching { camera.launch(ComposerCapture.uri(context, file)) }.onFailure {
-                file.delete(); cameraPath = null; latestError("没有可用的相机应用")
+                file.delete(); cameraPath = null; latestError(resources.getString(R.string.msg_capture_no_camera))
             }
         }
         controller.requestRecording = {
@@ -147,7 +151,7 @@ fun rememberComposerCapture(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE && controller.recording) {
                 controller.cancelRecording()
-                latestError("录音已取消，已有消息内容已保留")
+                latestError(resources.getString(R.string.msg_capture_record_cancelled))
             }
         }
         owner.lifecycle.addObserver(observer)

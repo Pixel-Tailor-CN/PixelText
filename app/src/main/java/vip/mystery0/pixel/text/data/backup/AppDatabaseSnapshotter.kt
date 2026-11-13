@@ -8,9 +8,11 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.source.whitelistMessageFingerprint
 import vip.mystery0.pixel.text.domain.backup.BackupSection
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 
 /** 从 Room 的事务视图复制允许数据，不能复制主文件后 DELETE 裁剪。 */
@@ -61,7 +63,10 @@ class AppDatabaseSnapshotter(
                                 var count = 0L
                                 while (cursor.moveToNext()) {
                                     currentCoroutineContext().ensureActive()
-                                    backupRequire(++count <= MAX_SMS_COUNT, "数据数量超过备份限制")
+                                    backupRequire(
+                                        ++count <= MAX_SMS_COUNT,
+                                        AppStrings.get(R.string.domain_backup_error_too_many_records),
+                                    )
                                     val row = ContentValues().also { DatabaseUtils.cursorRowToContentValues(cursor, it) }
                                     if (table == "archived_conversation") {
                                         // 旧协议包含展示字段，运行库只保留归档状态；恢复时不使用这些占位值。
@@ -104,7 +109,10 @@ class AppDatabaseSnapshotter(
                     target.setTransactionSuccessful()
                 } finally { target.endTransaction() }
             }
-            backupRequire(file.length() <= MAX_BACKUP_BYTES, "数据库快照过大")
+            backupRequire(
+                file.length() <= MAX_BACKUP_BYTES,
+                AppStrings.get(R.string.domain_backup_error_snapshot_too_large),
+            )
         }
     }
 }
@@ -127,7 +135,7 @@ internal fun snapshotTableSql(definition: SnapshotDefinition, table: String): St
 
 internal fun tableSql(database: SupportSQLiteDatabase, table: String): String =
     database.query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", arrayOf(table)).use {
-        backupRequire(it.moveToFirst(), "无法读取应用数据库结构")
+        backupRequire(it.moveToFirst(), AppStrings.get(R.string.domain_backup_error_schema_read_failed))
         it.getString(0)
     }
 internal fun Cursor.stringOrNull(name: String): String? = getColumnIndexOrThrow(name).let { if (isNull(it)) null else getString(it) }

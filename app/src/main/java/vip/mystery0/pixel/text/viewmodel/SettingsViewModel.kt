@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.HubResourceRepository
 import vip.mystery0.pixel.text.data.repository.SenderProfileInstallResult
 import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
@@ -26,6 +27,7 @@ import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.formatResourceVersionForDisplay
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
@@ -190,7 +192,7 @@ class SettingsViewModel(
                 }
                 .onFailure { error ->
                     _smsSyncState.value =
-                        SmsSyncState.Error(error.message ?: "同步短信数据失败")
+                        SmsSyncState.Error(error.message ?: AppStrings.get(R.string.sys_settings_sms_sync_failed))
                 }
         }
     }
@@ -228,7 +230,7 @@ class SettingsViewModel(
                 }
                 .onFailure { error ->
                     _resourceUpdateState.value =
-                        ResourceUpdateState.Error(error.message ?: "检查更新失败")
+                        ResourceUpdateState.Error(error.message ?: AppStrings.get(R.string.sys_settings_check_update_failed))
                 }
         }
     }
@@ -237,7 +239,7 @@ class SettingsViewModel(
         val manifest = pendingManifest ?: return
         if (_resourceUpdateState.value is ResourceUpdateState.Busy) return
         _resourceUpdateState.value = ResourceUpdateState.Updating(
-            message = "正在准备下载资源",
+            message = AppStrings.get(R.string.sys_settings_preparing_download),
             progress = 0f
         )
         viewModelScope.launch {
@@ -251,10 +253,10 @@ class SettingsViewModel(
                 HubOperationResult.Success -> {
                     pendingManifest = null
                     _resourceUpdateState.value = ResourceUpdateState.Updating(
-                        message = "资源更新完成",
+                        message = AppStrings.get(R.string.sys_settings_resource_update_complete),
                         progress = 1f
                     )
-                    _resourceUpdateState.value = ResourceUpdateState.Success("资源已更新")
+                    _resourceUpdateState.value = ResourceUpdateState.Success(AppStrings.get(R.string.sys_settings_resources_updated))
                 }
 
                 is HubOperationResult.Failure -> {
@@ -286,7 +288,7 @@ class SettingsViewModel(
                 .onFailure { error ->
                     pendingSenderProfileManifest = null
                     _senderProfileUpdateState.value =
-                        SenderProfileUpdateState.Error(error.message ?: "检查发件方资料失败")
+                        SenderProfileUpdateState.Error(error.message ?: AppStrings.get(R.string.sys_settings_check_sender_profiles_failed))
                 }
         }
     }
@@ -295,7 +297,7 @@ class SettingsViewModel(
         if (_senderProfileUpdateState.value is SenderProfileUpdateState.Busy) return
         val manifest = pendingSenderProfileManifest ?: return
         _senderProfileUpdateState.value =
-            SenderProfileUpdateState.Installing("正在准备安装", 0f)
+            SenderProfileUpdateState.Installing(AppStrings.get(R.string.sys_settings_preparing_install), 0f)
         viewModelScope.launch {
             when (val result = senderProfileRepository.install(manifest) { message, progress ->
                 _senderProfileUpdateState.value =
@@ -305,7 +307,7 @@ class SettingsViewModel(
                     pendingSenderProfileManifest = null
                     _senderProfileVersion.value = result.version
                     _senderProfileUpdateState.value =
-                        SenderProfileUpdateState.Success("发件方资料已安装")
+                        SenderProfileUpdateState.Success(AppStrings.get(R.string.sys_settings_sender_profiles_installed))
                 }
 
                 is SenderProfileInstallResult.Failure -> {
@@ -326,16 +328,16 @@ class SettingsViewModel(
 
     fun deleteDownloadedModelResource() {
         runResourceMaintenance(
-            busyState = ResourceUpdateState.Working("正在删除下载的模型文件"),
-            successMessage = "已删除下载的模型文件，已回退到内置模型",
+            busyState = ResourceUpdateState.Working(AppStrings.get(R.string.sys_settings_deleting_model)),
+            successMessage = AppStrings.get(R.string.sys_settings_deleted_model),
             action = hubResourceRepository::deleteDownloadedModel
         )
     }
 
     fun deleteDownloadedRulesResource() {
         runResourceMaintenance(
-            busyState = ResourceUpdateState.Working("正在删除下载的智能卡片规则文件"),
-            successMessage = "已删除下载的智能卡片规则文件，已回退到内置规则",
+            busyState = ResourceUpdateState.Working(AppStrings.get(R.string.sys_settings_deleting_rules)),
+            successMessage = AppStrings.get(R.string.sys_settings_deleted_rules),
             action = hubResourceRepository::deleteDownloadedRules
         )
     }

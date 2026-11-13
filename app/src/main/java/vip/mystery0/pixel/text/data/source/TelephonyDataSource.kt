@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 
 private const val TELEPHONY_TAG = "TelephonyDataSource"
 
@@ -596,7 +597,7 @@ class TelephonyDataSource(
     }
 
     fun getSimName(subId: Int): String {
-        if (subId <= 0) return "默认卡"
+        if (subId <= 0) return context.getString(R.string.domain_sim_default)
         simNameCache[subId]?.let { return it }
 
         try {
@@ -649,7 +650,7 @@ class TelephonyDataSource(
                     } else if (!displayName.isNullOrBlank() && displayName != "null") {
                         displayName
                     } else {
-                        "卡${simId + 1}"
+                        context.getString(R.string.domain_sim_slot, simId + 1)
                     }
                     simNameCache[subId] = name
                     return name
@@ -659,7 +660,7 @@ class TelephonyDataSource(
             Log.e(TELEPHONY_TAG, "exception while querying siminfo for subId $subId", e)
         }
 
-        val fallbackName = "卡${simNameCache.size + 1}"
+        val fallbackName = context.getString(R.string.domain_sim_slot, simNameCache.size + 1)
         simNameCache[subId] = fallbackName
         return fallbackName
     }

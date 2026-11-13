@@ -35,7 +35,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.search.SearchDate
 import vip.mystery0.pixel.text.util.SimInfo
@@ -56,9 +58,10 @@ fun SimFilterSheet(
         activeSims.groupingBy { it.displayName }.eachCount()
     }
 
+    @Composable
     fun getSimTitle(sim: SimInfo): String {
         return if ((nameCounts[sim.displayName] ?: 0) > 1) {
-            "${sim.displayName} (卡槽 ${sim.slotIndex + 1})"
+            stringResource(R.string.msg_search_sim_slot, sim.displayName, sim.slotIndex + 1)
         } else {
             sim.displayName
         }
@@ -76,7 +79,7 @@ fun SimFilterSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = "选择 SIM 卡",
+                text = stringResource(R.string.msg_search_select_sim),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -84,22 +87,22 @@ fun SimFilterSheet(
 
             when {
                 activeSims.isEmpty() -> {
-                    AppEmptyState(text = "暂无可用的 SIM 卡")
+                    AppEmptyState(text = stringResource(R.string.msg_search_no_sim))
                     if (currentSimSubIds.isNotEmpty()) {
                         TextButton(onClick = { onClear(); onDismissRequest() }) {
-                            Text("清除 SIM 卡筛选")
+                            Text(stringResource(R.string.msg_search_clear_sim))
                         }
                     }
                 }
                 activeSims.size == 1 -> {
                     Text(getSimTitle(activeSims.first()), style = MaterialTheme.typography.bodyLarge)
-                    TextButton(onClick = { onClear(); onDismissRequest() }) { Text("完成") }
+                    TextButton(onClick = { onClear(); onDismissRequest() }) { Text(stringResource(R.string.msg_action_done)) }
                 }
                 activeSims.size == 2 -> {
                     Column(Modifier.selectableGroup()) {
                         val unrestricted = currentSimSubIds.isEmpty() ||
                             currentSimSubIds.containsAll(activeSims.map { it.subscriptionId })
-                        SimFilterOption("不限 SIM 卡", unrestricted) {
+                        SimFilterOption(stringResource(R.string.msg_search_any_sim), unrestricted) {
                             onClear()
                             onDismissRequest()
                         }
@@ -131,8 +134,8 @@ fun SimFilterSheet(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { onClear(); onDismissRequest() }) { Text("不限 SIM 卡") }
-                        Button(onClick = { onApply(draftSelection); onDismissRequest() }) { Text("应用") }
+                        TextButton(onClick = { onClear(); onDismissRequest() }) { Text(stringResource(R.string.msg_search_any_sim)) }
+                        Button(onClick = { onApply(draftSelection); onDismissRequest() }) { Text(stringResource(R.string.msg_action_apply)) }
                     }
                 }
             }
@@ -169,9 +172,13 @@ fun TransportFilterSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
                 .navigationBarsPadding().selectableGroup(),
         ) {
-            Text("结果类型", style = MaterialTheme.typography.titleMedium,
+            Text(stringResource(R.string.msg_search_filter_type), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 16.dp))
-            listOf(null to "全部消息", MessageTransport.SMS to "短信", MessageTransport.MMS to "彩信")
+            listOf(
+                null to stringResource(R.string.msg_search_all_messages),
+                MessageTransport.SMS to stringResource(R.string.msg_search_transport_sms),
+                MessageTransport.MMS to stringResource(R.string.msg_search_transport_mms),
+            )
                 .forEach { (transport, label) ->
                     Row(
                         modifier = Modifier.fillMaxWidth()
@@ -211,7 +218,7 @@ fun DateFilterSheet(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = "按日期筛选",
+                text = stringResource(R.string.msg_search_filter_by_date),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -238,7 +245,7 @@ fun DateFilterSheet(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = date.label,
+                        text = stringResource(date.localizedLabelRes()),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )

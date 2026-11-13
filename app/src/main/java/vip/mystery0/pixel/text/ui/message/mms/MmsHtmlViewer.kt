@@ -41,12 +41,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.MmsHtmlResourceHandler
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.parser.mms.MmsHtmlDocument
@@ -67,28 +70,44 @@ fun MmsHtmlViewer(
         value = withContext(Dispatchers.Default) { parser.prepare(part, allParts) }
     }
     val context = LocalContext.current
+    val resources = LocalResources.current
     var pendingLink by remember(document) { mutableStateOf<String?>(null) }
     var unavailable by remember(document) { mutableStateOf(false) }
     var plainOnly by remember(part.key) { mutableStateOf(false) }
     val dark = isSystemInDarkTheme()
     val fontScale = LocalDensity.current.fontScale
-    Scaffold(topBar = { TopAppBar(title = { Text("离线网页") }, navigationIcon = {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") }
-    }, actions = { TextButton(onClick = { plainOnly = !plainOnly }) { Text(if (plainOnly) "网页" else "纯文本") }; MmsAttachmentActions(part, menuOnly = true) }) }) { padding ->
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(stringResource(R.string.msg_mms_html_viewer_title)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.msg_action_back))
+                }
+            },
+            actions = {
+                TextButton(onClick = { plainOnly = !plainOnly }) {
+                    Text(stringResource(if (plainOnly) R.string.msg_mms_html_mode_web else R.string.msg_mms_html_mode_plain))
+                }
+                MmsAttachmentActions(part, menuOnly = true)
+            },
+        )
+    }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             MmsPartStatus(part)
             val prepared = document
             when {
                 prepared == null -> CircularProgressIndicator()
                 unavailable || plainOnly || part.text == null || prepared.issue != null -> {
-                    if (unavailable) Text("系统网页组件不可用，仍可阅读纯文本或导出原件")
-                    if (prepared.issue != null) Text("网页超过安全预览限制，可导出原件")
+                    if (unavailable) Text(stringResource(R.string.msg_mms_html_webview_unavailable))
+                    if (prepared.issue != null) Text(stringResource(R.string.msg_mms_html_over_limit))
                     SelectionContainer(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        Text(prepared.plainText.ifBlank { "没有可显示的文本" })
+                        Text(prepared.plainText.ifBlank { stringResource(R.string.msg_mms_html_no_text) })
                     }
                 }
                 else -> {
-                    if (prepared.unresolvedReferenceCount > 0) Text("${prepared.unresolvedReferenceCount} 个图片引用不可用或已阻止")
+                    if (prepared.unresolvedReferenceCount > 0) {
+                        Text(stringResource(R.string.msg_mms_html_blocked_images, prepared.unresolvedReferenceCount))
+                    }
                     // 主题只修改应用生成的样式，不保留来信样式。主题切换重建页面与资源拦截器。
                     key(prepared.documentUrl, dark) {
                         val themed = remember(prepared, dark) { prepared.copy(html = prepared.html.replace(
@@ -145,16 +164,40 @@ fun MmsHtmlViewer(
     pendingLink?.let { link ->
         val scheme = link.toUri().scheme?.lowercase()
         val system = scheme == "tel" || scheme == "mailto"
-        AlertDialog(onDismissRequest = { pendingLink = null }, title = { Text(if (system) "打开系统应用？" else "在浏览器中打开链接？") },
-            text = { Text(if (system) "将打开拨号或邮件编辑界面：\n$link" else "此操作将离开彩信并访问网络：\n$link") },
-            confirmButton = { TextButton(onClick = {
-                pendingLink = null
-                try {
-                    val action = when (scheme) { "tel" -> Intent.ACTION_DIAL; "mailto" -> Intent.ACTION_SENDTO; else -> Intent.ACTION_VIEW }
-                    context.startActivity(Intent(action, link.toUri()).apply { if (!system) addCategory(Intent.CATEGORY_BROWSABLE) })
-                } catch (_: Exception) { Toast.makeText(context, "没有可用的处理应用", Toast.LENGTH_SHORT).show() }
-            }) { Text(if (system) "打开应用" else "打开浏览器") } },
-            dismissButton = { TextButton(onClick = { pendingLink = null }) { Text("取消") } })
+        AlertDialog(
+            onDismissRequest = { pendingLink = null },
+            title = {
+                Text(
+                    stringResource(
+                        if (system) R.string.msg_mms_html_open_system_title else R.string.msg_mms_html_open_browser_title,
+                    )
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        if (system) R.string.msg_mms_html_open_system_body else R.string.msg_mms_html_open_browser_body,
+                        link,
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingLink = null
+                    try {
+                        val action = when (scheme) { "tel" -> Intent.ACTION_DIAL; "mailto" -> Intent.ACTION_SENDTO; else -> Intent.ACTION_VIEW }
+                        context.startActivity(Intent(action, link.toUri()).apply { if (!system) addCategory(Intent.CATEGORY_BROWSABLE) })
+                    } catch (_: Exception) {
+                        Toast.makeText(context, resources.getString(R.string.msg_mms_html_no_handler), Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text(stringResource(if (system) R.string.msg_mms_html_open_app else R.string.msg_mms_html_open_browser))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLink = null }) { Text(stringResource(R.string.msg_action_cancel)) }
+            },
+        )
     }
 }
 

@@ -18,17 +18,15 @@ import vip.mystery0.pixel.text.domain.hub.ResourceUpdateDetail
 
 object ResourceUpdateNotificationHelper {
     const val CHANNEL_ID_RESOURCE_UPDATES = "channel_resource_updates"
-    private const val CHANNEL_NAME = "资源更新"
-    private const val CHANNEL_DESC = "规则和模型资源更新提醒"
     private const val NOTIFICATION_ID_RESOURCE_UPDATE = 20020
 
     fun createNotificationChannel(context: Context) {
         val channel = NotificationChannel(
             CHANNEL_ID_RESOURCE_UPDATES,
-            CHANNEL_NAME,
+            context.getString(R.string.sys_channel_resource_updates_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = CHANNEL_DESC
+            description = context.getString(R.string.sys_channel_resource_updates_desc)
             setShowBadge(false)
         }
         val notificationManager =
@@ -42,7 +40,7 @@ object ResourceUpdateNotificationHelper {
         createNotificationChannel(context)
         cancel(context)
 
-        val contentText = "有新的规则或模型资源可用，点按查看"
+        val contentText = context.getString(R.string.sys_resource_update_available_text)
         val contentIntent = PendingIntent.getActivity(
             context,
             NOTIFICATION_ID_RESOURCE_UPDATE,
@@ -55,10 +53,16 @@ object ResourceUpdateNotificationHelper {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_RESOURCE_UPDATES)
             .setSmallIcon(R.drawable.ic_notification_sms)
-            .setContentTitle("发现资源更新")
+            .setContentTitle(context.getString(R.string.sys_resource_update_available_title))
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
-            .setSubText("模型 ${detail.modelVersion} / 规则 ${detail.ruleVersion}")
+            .setSubText(
+                context.getString(
+                    R.string.sys_resource_update_available_subtext,
+                    detail.modelVersion,
+                    detail.ruleVersion,
+                )
+            )
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)

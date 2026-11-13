@@ -8,11 +8,13 @@ import java.security.MessageDigest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import androidx.room.withTransaction
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.mirror.*
 import vip.mystery0.pixel.text.domain.model.mirror.*
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
 import vip.mystery0.pixel.text.domain.repository.MmsContentRepository
+import vip.mystery0.pixel.text.util.AppStrings
 
 private const val TAG = "MmsTextIndexer"
 
@@ -48,18 +50,20 @@ suspend fun mmsContentFingerprint(snapshot: MirrorMessageModel): String {
 
 fun mmsAttachmentSummary(kinds: List<MmsContentKind>): String {
     val leaves = kinds.filter { it != MmsContentKind.SMIL && it != MmsContentKind.MULTIPART }
-    if (leaves.isEmpty()) return "彩信（暂无可读内容）"
+    if (leaves.isEmpty()) return AppStrings.get(R.string.domain_mms_empty_readable)
     val labels = leaves.groupingBy { kind -> when (kind) {
-        MmsContentKind.IMAGE -> "图片"
-        MmsContentKind.AUDIO -> "音频"
-        MmsContentKind.VIDEO -> "视频"
-        MmsContentKind.CONTACT -> "联系人"
-        MmsContentKind.CALENDAR -> "日历"
-        MmsContentKind.HTML -> "网页"
-        MmsContentKind.TEXT -> "文本"
-        else -> "文件"
+        MmsContentKind.IMAGE -> AppStrings.get(R.string.domain_mms_kind_image)
+        MmsContentKind.AUDIO -> AppStrings.get(R.string.domain_mms_kind_audio)
+        MmsContentKind.VIDEO -> AppStrings.get(R.string.domain_mms_kind_video)
+        MmsContentKind.CONTACT -> AppStrings.get(R.string.domain_mms_kind_contact)
+        MmsContentKind.CALENDAR -> AppStrings.get(R.string.domain_mms_kind_calendar)
+        MmsContentKind.HTML -> AppStrings.get(R.string.domain_mms_kind_html)
+        MmsContentKind.TEXT -> AppStrings.get(R.string.domain_mms_kind_text)
+        else -> AppStrings.get(R.string.domain_mms_kind_file)
     } }.eachCount()
-    return labels.entries.joinToString("、") { (label, count) -> if (count == 1) label else "$label × $count" }
+    return labels.entries.joinToString(AppStrings.get(R.string.domain_list_separator_comma)) { (label, count) ->
+        if (count == 1) label else AppStrings.get(R.string.domain_mms_kind_count, label, count)
+    }
 }
 
 /** 应用级单个增量任务；搜索输入只读取已派生文本，不启动解码。 */

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import vip.mystery0.pixel.text.ui.component.AppEmptyState
@@ -42,7 +43,7 @@ fun SearchResultList(
             is SearchUiState.Idle -> {
                 AppEmptyState(
                     imageRes = R.drawable.illustration_search_idle,
-                    text = "搜索短信和彩信",
+                    text = stringResource(R.string.msg_search_idle),
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -72,7 +73,7 @@ fun SearchResultList(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(onClick = onRetry) {
-                            Text("重试")
+                            Text(stringResource(R.string.msg_action_retry))
                         }
                     }
                 }
@@ -81,9 +82,9 @@ fun SearchResultList(
             is SearchUiState.Success -> {
                 if (uiState.results.isEmpty()) {
                     val emptyText = if (uiState.incomplete) {
-                        "当前未找到匹配消息，结果可能尚未完整"
+                        stringResource(R.string.msg_search_empty_incomplete)
                     } else {
-                        "没有找到符合条件的消息"
+                        stringResource(R.string.msg_search_empty)
                     }
                     AppEmptyState(
                         imageRes = R.drawable.illustration_search_empty,
@@ -109,7 +110,7 @@ fun SearchResultList(
                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                 ) {
                                     Text(
-                                        text = "部分消息仍在准备，结果可能不完整",
+                                        text = stringResource(R.string.msg_search_incomplete_banner),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

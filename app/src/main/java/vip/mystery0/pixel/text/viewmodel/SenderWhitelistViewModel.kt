@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRule
 import vip.mystery0.pixel.text.domain.spam.WhitelistRuleType
@@ -59,14 +60,14 @@ class SenderWhitelistViewModel(
 
     fun save() {
         val editor = _state.value.editor ?: return
-        execute("规则已保存，匹配的已有消息已放行") {
+        execute(getApplication<Application>().getString(R.string.sys_whitelist_saved)) {
             repository.save(editor.id, editor.type, editor.input)
         }
     }
 
     fun confirmDelete() {
         val rule = _state.value.deleting ?: return
-        execute("规则已删除，已放行消息保持非骚扰") { repository.delete(rule.id) }
+        execute(getApplication<Application>().getString(R.string.sys_whitelist_deleted)) { repository.delete(rule.id) }
     }
 
     private fun execute(success: String, operation: suspend () -> Unit) {
@@ -80,7 +81,9 @@ class SenderWhitelistViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.value = _state.value.copy(error = e.message ?: "操作失败，请稍后重试")
+                _state.value = _state.value.copy(
+                    error = e.message ?: getApplication<Application>().getString(R.string.sys_whitelist_operation_failed)
+                )
             } finally {
                 _state.value = _state.value.copy(busy = false)
             }

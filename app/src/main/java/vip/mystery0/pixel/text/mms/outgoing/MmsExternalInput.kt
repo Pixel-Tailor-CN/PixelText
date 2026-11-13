@@ -3,6 +3,8 @@ package vip.mystery0.pixel.text.mms.outgoing
 import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 外部输入只生成编辑建议。任何不唯一收件信息都不能偷偷取第一项。 */
 data class MmsExternalInput(val recipient: String, val body: String, val subject: String,
@@ -11,7 +13,7 @@ data class MmsExternalInput(val recipient: String, val body: String, val subject
         fun parse(intent: Intent): MmsExternalInput = try { parseChecked(intent) }
         catch (_: Exception) {
             // exported 入口的 Parcel 类型与内容都不可信，失败必须整体阻断而非丢掉坏项。
-            MmsExternalInput("", "", "", emptyList(), "分享附件或收件信息无效，请重新选择并确认", true)
+            MmsExternalInput("", "", "", emptyList(), AppStrings.get(R.string.sys_mms_ext_invalid_input), true)
         }
         @Suppress("DEPRECATION")
         private fun parseChecked(intent: Intent): MmsExternalInput {
@@ -36,7 +38,7 @@ data class MmsExternalInput(val recipient: String, val body: String, val subject
             }
             val normalized = candidates.map { MmsRecipient.normalize(it) }
             val unique = normalized.filterNotNull().distinct()
-            var error: String? = if (hasAdditionalRecipients || normalized.any { it == null } || unique.size > 1) "此入口仅支持单人彩信，请重新确认一个电话号码；原收件人未被采用" else null
+            var error: String? = if (hasAdditionalRecipients || normalized.any { it == null } || unique.size > 1) AppStrings.get(R.string.sys_mms_ext_single_recipient_only) else null
             val recipient = if (error == null) unique.singleOrNull().orEmpty() else ""
             val shares = intent.action in setOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)
             val declaredMime = intent.type?.substringBefore(';')?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
@@ -60,14 +62,14 @@ data class MmsExternalInput(val recipient: String, val body: String, val subject
                     for (index in 0 until clip.itemCount) clip.getItemAt(index).uri?.let(::add)
                 }
             }.distinct() else emptyList()
-            if (attachmentExpected && uris.isEmpty()) error = "分享附件缺失，请重新选择文件，或明确移除未导入附件后继续"
+            if (attachmentExpected && uris.isEmpty()) error = AppStrings.get(R.string.sys_mms_ext_missing_attachment)
             val validUris = if (uris.size > 10 || uris.any { it.scheme != "content" }) {
-                error = "只接受最多 10 个已授权的内容附件，请重新选择文件"; emptyList()
+                error = AppStrings.get(R.string.sys_mms_ext_too_many_attachments); emptyList()
             } else uris
             val body = (intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
                 ?: intent.getStringExtra("sms_body") ?: runCatching { queryUri.getQueryParameter("body") }.getOrNull()).orEmpty()
             val subject = (intent.getStringExtra(Intent.EXTRA_SUBJECT) ?: runCatching { queryUri.getQueryParameter("subject") }.getOrNull()).orEmpty()
-            if (body.length > 1024 * 1024 || subject.length > 4096) error = "分享文字过长，请在编辑器中重新填写"
+            if (body.length > 1024 * 1024 || subject.length > 4096) error = AppStrings.get(R.string.sys_mms_ext_text_too_long)
             return MmsExternalInput(recipient, body.takeIf { it.length <= 1024 * 1024 }.orEmpty(), subject.takeIf { it.length <= 4096 }.orEmpty(), validUris, error,
                 scheme in setOf("mms", "mmsto") || subject.isNotEmpty() || uris.isNotEmpty() || attachmentExpected)
         }

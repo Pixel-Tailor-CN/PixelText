@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home & navigation -->
+    <string name="conv_start_chat">Start chat</string>
+    <string name="conv_tab_conversations">Conversations</string>
+    <string name="conv_tab_verification_codes">Verification</string>
+
+    <!-- Common actions & content descriptions -->
+    <string name="conv_action_cancel">Cancel</string>
+    <string name="conv_action_delete">Delete</string>
+    <string name="conv_action_retry">Retry</string>
+    <string name="conv_action_settings">Settings</string>
+    <string name="conv_action_close">Close</string>
+    <string name="conv_action_got_it">Got it</string>
+    <string name="conv_action_hide">Hide</string>
+    <string name="conv_action_next">Next</string>
+    <string name="conv_action_load">Load</string>
+    <string name="conv_action_load_more">Load more</string>
+    <string name="conv_action_request_permission">Request</string>
+    <string name="conv_action_later">Later</string>
+    <string name="conv_undo">Undo</string>
+    <string name="conv_cd_back">Back</string>
+    <string name="conv_cd_cancel_selection">Cancel selection</string>
+    <string name="conv_cd_clear_selection">Clear selection</string>
+    <string name="conv_cd_archive">Archive</string>
+    <string name="conv_cd_unarchive">Unarchive</string>
+    <string name="conv_cd_delete">Delete</string>
+    <string name="conv_cd_search">Search</string>
+    <string name="conv_cd_more_options">More options</string>
+    <string name="conv_cd_more">More</string>
+    <string name="conv_cd_copy">Copy</string>
+    <string name="conv_cd_call">Call</string>
+    <string name="conv_cd_refresh">Refresh</string>
+    <string name="conv_cd_open_conversation">Open conversation</string>
+
+    <!-- Conversation list -->
+    <string name="conv_selected_count">%1$d selected</string>
+    <string name="conv_load_failed">Failed to load: %1$s</string>
+    <string name="conv_empty_conversations">No conversations</string>
+    <string name="conv_default_sms_banner_title">Not set as default SMS app</string>
+    <string name="conv_default_sms_banner_body">Set as default to receive, send, and sync messages.</string>
+    <string name="conv_not_now">Not now</string>
+    <string name="conv_set_as_default">Set as default</string>
+    <string name="conv_set_as_default_sms_app">Set as default SMS app</string>
+    <string name="conv_grant">Grant</string>
+    <string name="conv_missing_read_sms_permission">SMS read permission not granted</string>
+    <string name="conv_open_play_failed">Unable to open Google Play, please try again later</string>
+    <string name="conv_deleted_conversations_count">Deleted %1$d conversation(s)</string>
+    <string name="conv_mark_all_read_success">Marked %1$d conversation(s) as read</string>
+    <string name="conv_no_unread_conversations">No unread conversations</string>
+    <string name="conv_archived_one">Archived 1 conversation</string>
+    <string name="conv_marked_as_read">Marked as read</string>
+    <string name="conv_marked_as_unread">Marked as unread</string>
+    <string name="conv_delete_dialog_title">Delete conversations?</string>
+    <string name="conv_delete_dialog_message">SMS and MMS messages in the %1$d selected conversation(s) will be deleted.</string>
+    <string name="conv_init_incompatible_version">Incompatible data version</string>
+    <string name="conv_init_preparing_data">Preparing app data</string>
+    <string name="conv_init_newer_version_desc">This data was created by a newer version. Please update the app before continuing.</string>
+    <string name="conv_init_permission_desc">Please grant SMS permission and retry. Existing data will not be cleared.</string>
+    <string name="conv_init_error_io">Failed to read or save app data. Please retry.</string>
+    <string name="conv_init_error_spam_not_ready">Message classification data is not ready yet. Please retry.</string>
+    <string name="conv_init_error_generic">Data preparation is incomplete. Please retry.</string>
+    <string name="conv_mark_all_read_title">Marking as read</string>
+    <string name="conv_mark_all_read_progress_message">Marking all conversations as read, please wait…</string>
+    <string name="conv_read_sms_permission_title">SMS read permission required</string>
+    <string name="conv_read_sms_permission_message">SMS read permission is required to display conversations and message content.</string>
+    <string name="conv_badge_mms">MMS</string>
+    <string name="conv_mms_snippet_prefix">[MMS] %1$s</string>
+
+    <!-- Menu sheet & swipe labels -->
+    <string name="conv_menu_set_default_sms_app">Set as default SMS app</string>
+    <string name="conv_menu_archived_messages">Archived</string>
+    <string name="conv_menu_mark_all_read">Mark all as read</string>
+    <string name="conv_menu_spam_blocking">Spam &amp; blocked</string>
+    <string name="conv_menu_mock">Developer test (MOCK)</string>
+    <string name="conv_swipe_archive">Archive</string>
+    <string name="conv_swipe_mark_read">Mark read</string>
+    <string name="conv_swipe_mark_unread">Mark unread</string>
+
+    <!-- Date & time formatting -->
+    <string name="conv_weekday_mon">Mon</string>
+    <string name="conv_weekday_tue">Tue</string>
+    <string name="conv_weekday_wed">Wed</string>
+    <string name="conv_weekday_thu">Thu</string>
+    <string name="conv_weekday_fri">Fri</string>
+    <string name="conv_weekday_sat">Sat</string>
+    <string name="conv_weekday_sun">Sun</string>
+    <string name="conv_date_pattern_month_day">MMM d</string>
+    <string name="conv_date_pattern_year_month_day">MMM d, yyyy</string>
+    <string name="conv_month_year_pattern">MMMM yyyy</string>
+
+    <!-- New chat bottom sheet -->
+    <string name="conv_contacts_permission_toast">Contacts permission is required to pick a contact</string>
+    <string name="conv_recipient_label">To</string>
+    <string name="conv_enter_phone_number">Enter phone number</string>
+    <string name="conv_invalid_phone_number">Please enter a valid phone number</string>
+    <string name="conv_pick_contact">Choose contact</string>
+    <string name="conv_contacts_permission_title">Contacts permission required</string>
+    <string name="conv_contacts_permission_message">Contacts permission is required to choose a recipient.</string>
+
+    <!-- Conversation detail -->
+    <string name="conv_text_scale_save_failed">Failed to save text size</string>
+    <string name="conv_deleted_messages_count">Deleted %1$d message(s)</string>
+    <string name="conv_no_messages_deleted">No messages deleted</string>
+    <string name="conv_learning_saved_whitelist">Correction saved, updating personal learning (sender is whitelisted; whitelist takes precedence)</string>
+    <string name="conv_learning_saved_keyword">Correction saved, updating personal learning (keyword rule still takes precedence)</string>
+    <string name="conv_learning_saved">Correction saved, updating personal learning</string>
+    <string name="conv_learning_view_action">View</string>
+    <string name="conv_clipboard_label">Messages</string>
+    <string name="conv_menu_message_details">Message details</string>
+    <string name="conv_menu_check_spam">Check for spam</string>
+    <string name="conv_menu_adjust_category">Adjust category</string>
+    <string name="conv_menu_contribute_sample">Contribute sample</string>
+    <string name="conv_menu_share">Share</string>
+    <string name="conv_menu_forward">Forward</string>
+    <string name="conv_unable_open_dialer">Unable to open dialer</string>
+    <string name="conv_original_message_not_found">Original message no longer exists</string>
+    <string name="conv_empty_messages">No messages yet</string>
+    <string name="conv_sms_sent">Sent</string>
+    <string name="conv_delete_messages_title">Delete messages?</string>
+    <string name="conv_delete_messages_message">The %1$d selected SMS or MMS message(s) will be deleted. Submitted MMS may still be sent, and deletion cannot be undone.</string>
+
+    <!-- Archived & spam lists -->
+    <string name="conv_archived_title">Archived conversations</string>
+    <string name="conv_empty_archived">No archived conversations</string>
+    <string name="conv_empty_spam">No spam conversations detected</string>
+    <string name="conv_spam_history_scan_title">Scan message history</string>
+    <string name="conv_spam_scan_waiting">Waiting to start message scan</string>
+    <string name="conv_spam_scan_retrying">Waiting to retry message scan</string>
+    <string name="conv_spam_scan_preparing">Preparing message scan</string>
+    <string name="conv_spam_scan_scanning">Scanning message history</string>
+    <string name="conv_spam_scan_finalizing">Finalizing message scan</string>
+    <string name="conv_spam_scan_completed">Message scan complete</string>
+    <string name="conv_spam_scan_failed">Message scan failed</string>
+    <string name="conv_spam_scan_cancelled">Message scan cancelled</string>
+    <string name="conv_spam_stats_loading">Counting messages…</string>
+    <string name="conv_spam_stats_error">Failed to count: %1$s</string>
+    <string name="conv_spam_stats_total">Total messages: %1$d</string>
+    <string name="conv_spam_stats_identified">Scanned: %1$d</string>
+    <string name="conv_spam_stats_pending">Unscanned: %1$d</string>
+    <string name="conv_spam_start_scan">Start scan</string>
+
+    <!-- Verification codes -->
+    <string name="conv_verification_codes_title">Verification codes</string>
+    <string name="conv_verification_initializing">Scanning verification codes…</string>
+    <string name="conv_verification_check_settings">Check settings</string>
+    <string name="conv_verification_empty">No verification codes yet</string>
+    <string name="conv_verification_hide_original">Hide original</string>
+    <string name="conv_verification_show_original">Show original</string>
+
+    <!-- Mirror message detail & MMS part -->
+    <string name="conv_message_detail_title">Message details</string>
+    <string name="conv_message_not_found">Message no longer exists or is not synced yet</string>
+    <string name="conv_message_loading">Loading message…</string>
+    <string name="conv_unknown_number">Unknown number</string>
+    <string name="conv_message_received">Received</string>
+    <string name="conv_message_sent">Sent</string>
+    <string name="conv_sim_slot_with_name">SIM %1$d · %2$s</string>
+    <string name="conv_sim_with_name">SIM · %1$s</string>
+    <string name="conv_sim_unavailable">SIM info unavailable</string>
+    <string name="conv_addr_from">From</string>
+    <string name="conv_addr_to">To</string>
+    <string name="conv_addr_cc">Cc</string>
+    <string name="conv_addr_bcc">Bcc</string>
+    <string name="conv_addr_separator">, </string>
+    <string name="conv_addr_line">%1$s: %2$s</string>
+    <string name="conv_mms_loading">Loading MMS…</string>
+    <string name="conv_mms_part_title">MMS attachment</string>
+    <string name="conv_mms_part_not_found">Attachment no longer exists or is not synced yet</string>
+    <string name="conv_mms_part_loading">Loading attachment…</string>
+
+    <!-- Sample report & submission -->
+    <string name="conv_sample_retry_in_seconds">Retry in %1$ds</string>
+    <string name="conv_sample_unknown_category">Unknown category</string>
+    <string name="conv_sample_date_pattern">MMM d, yyyy HH:mm</string>
+    <string name="conv_unknown_time">Unknown time</string>
+    <string name="conv_sample_detail_title">Report details</string>
+    <string name="conv_sample_record_info">Record info</string>
+    <string name="conv_sample_content_removed">Sample content removed</string>
+    <string name="conv_sample_reported_content">Reported content</string>
+    <string name="conv_sample_no_body">No content</string>
+    <string name="conv_sample_sender">Sender</string>
+    <string name="conv_sample_submitted_category">Submitted category</string>
+    <string name="conv_sample_reviewed_category">Reviewed category</string>
+    <string name="conv_sample_submitted_at">Submitted at</string>
+    <string name="conv_sample_record_id">Record ID</string>
+    <string name="conv_sample_reviewed_at">Reviewed at</string>
+    <string name="conv_sample_review_method">Review method</string>
+    <string name="conv_sample_review_ai">Automated</string>
+    <string name="conv_sample_review_manual">Manual</string>
+    <string name="conv_sample_pending_confirm">Pending</string>
+    <string name="conv_sample_source">Source</string>
+    <string name="conv_sample_source_legacy">Legacy report</string>
+    <string name="conv_sample_source_app">App report</string>
+    <string name="conv_sample_my_reports">My reports</string>
+    <string name="conv_sample_about_reports">About reports</string>
+    <string name="conv_sample_pending_submission">Submission pending confirmation</string>
+    <string name="conv_sample_empty_reports">No reports yet</string>
+    <string name="conv_sample_unavailable_report">Unable to view this report</string>
+    <string name="conv_sample_removed_preview">Sample removed; content no longer available</string>
+    <string name="conv_sample_no_preview">No summary</string>
+    <string name="conv_sample_about_reports_desc">Records are tied to this app installation and cannot be accessed after uninstalling or clearing app data. Review status does not affect local message classification.</string>
+    <string name="conv_sample_error_too_short">Sample text must be at least 6 characters</string>
+    <string name="conv_sample_error_too_large">Sample text cannot exceed 64 KiB. Please shorten it.</string>
+    <string name="conv_sample_saving_submission">Saving submission…</string>
+    <string name="conv_sample_pending_title">Submission result unconfirmed</string>
+    <string name="conv_sample_pending_desc">Retrying will submit the confirmed content.</string>
+    <string name="conv_sample_reloading_local">Reloading…</string>
+    <string name="conv_sample_reload_local">Reload local data</string>
+    <string name="conv_sample_body_label">Message body</string>
+    <string name="conv_sample_desensitize_assistant">Redaction assistant</string>
+    <string name="conv_sample_sender_optional">Sender (optional)</string>
+    <string name="conv_sample_sender_too_long">Sender cannot exceed 256 characters</string>
+    <string name="conv_sample_next_confirm">Next: Confirm submission</string>
+    <string name="conv_sample_confirm_upload_title">Confirm content to upload</string>
+    <string name="conv_sample_empty_placeholder">(Empty)</string>
+    <string name="conv_sample_category_label">Category</string>
+    <string name="conv_sample_not_provided">Not provided</string>
+    <string name="conv_sample_back_to_edit">Back to edit</string>
+    <string name="conv_sample_also_included">Also included</string>
+    <string name="conv_sample_builtin">Built-in</string>
+    <string name="conv_sample_none">None</string>
+    <string name="conv_sample_label_spam">Spam</string>
+    <string name="conv_sample_label_normal">Normal</string>
+    <string name="conv_sample_included_learning_feedback">1. App &amp; resource versions and learning feedback (Source: local learning; Base version: %1$s; Generation: %2$s; Label: %3$s; personal parameters and training samples are not uploaded);</string>
+    <string name="conv_sample_included_versions">1. App version, current rule version, and offline model version (personal parameters and local training samples are not uploaded);</string>
+    <string name="conv_sample_included_device_id">2. Android device identifier and this installation ID.</string>
+    <string name="conv_sample_included_purpose">Used to improve rules and models, prevent abuse, and look up your own reports.</string>
+    <string name="conv_sample_consent_text">I have reviewed the redaction and removed sensitive information, and I agree to upload the content above.</string>
+    <string name="conv_sample_btn_saving">Saving…</string>
+    <string name="conv_sample_btn_submitting">Submitting…</string>
+    <string name="conv_sample_btn_retry_submit">Retry submission</string>
+    <string name="conv_sample_btn_confirm_submit">Confirm and submit</string>
+    <string name="conv_sample_view_my_reports">View my reports</string>
+    <string name="conv_sample_keep_and_back">Save draft &amp; leave</string>
+    <string name="conv_sample_draft_choice_title">Choose content to edit</string>
+    <string name="conv_sample_draft_choice_desc">A saved draft exists on this device. Choose to use the current message or continue editing the saved draft. Choosing the current message will not delete or overwrite the saved draft.</string>
+    <string name="conv_sample_use_current_message">Use current message</string>
+    <string name="conv_sample_continue_draft">Continue saved draft</string>
+    <string name="conv_sample_keep_draft_title">Save this draft?</string>
+    <string name="conv_sample_keep_draft_desc">Your edits have not been submitted. Saved drafts stay in private local storage for this installation, are excluded from backups, and are never uploaded automatically.</string>
+    <string name="conv_sample_keep_draft_desc_overwrite">Your edits have not been submitted. Saved drafts stay in private local storage for this installation, are excluded from backups, and are never uploaded automatically. Saving will overwrite the previous draft; discarding will delete it.</string>
+    <string name="conv_sample_discard_draft">Discard draft</string>
+    <string name="conv_sample_continue_editing">Keep editing</string>
+    <string name="conv_sample_discard_edits_title">Discard changes?</string>
+    <string name="conv_sample_discard_edits_desc">Changes made in the redaction assistant have not been applied to the sample yet.</string>
+    <string name="conv_sample_discard_edits">Discard changes</string>
+    <string name="conv_sample_step_review">Review content</string>
+    <string name="conv_sample_step_confirm">Confirm &amp; submit</string>
+    <string name="conv_sample_select_sensitive">Select sensitive text</string>
+    <string name="conv_sample_sensitive_type">Sensitive type</string>
+    <string name="conv_sample_preview">Preview</string>
+    <string name="conv_sample_replace">Replace</string>
+    <string name="conv_sample_apply_to_sample">Apply to sample</string>
+    <string name="conv_token_newline">Newline</string>
+    <string name="conv_token_tab">Tab</string>
+    <string name="conv_token_space">Space</string>
+
+    <!-- Mock screens -->
+    <string name="conv_mock_sim_1">SIM 1</string>
+    <string name="conv_mock_sim_2">SIM 2</string>
+    <string name="conv_mock_sender_default">Simulated SMS</string>
+    <string name="conv_mock_mms_media">MMS Media</string>
+    <string name="conv_mock_mms_preview_title">Local MMS preview</string>
+    <string name="conv_mock_mms_id_label">MMS message ID</string>
+    <string name="conv_mock_mms_enter_id">Enter a synced MMS message ID</string>
+    <string name="conv_mock_mms_not_found_or_loading">Message not found or loading</string>
+</resources>

@@ -12,8 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
+import vip.mystery0.pixel.text.util.AppStrings
 
 data class MmsPartStatusInfo(
     val text: String,
@@ -22,46 +24,48 @@ data class MmsPartStatusInfo(
 )
 
 fun MmsPartContent.statusInfo(): MmsPartStatusInfo {
-    if (issue == "preparing") return MmsPartStatusInfo("正在准备附件", actionable = false, busy = true)
+    if (issue == "preparing") return MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_preparing), actionable = false, busy = true)
     return when (state) {
         MirrorAttachmentState.READY -> MmsPartStatusInfo(
             text = readyStatusText(),
             actionable = true,
         )
         MirrorAttachmentState.PENDING_DOWNLOAD ->
-            MmsPartStatusInfo("等待下载", actionable = false, busy = true)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_pending_download), actionable = false, busy = true)
         MirrorAttachmentState.SOURCE_PRESENT ->
-            MmsPartStatusInfo("等待保存到本地", actionable = false, busy = true)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_source_present), actionable = false, busy = true)
         MirrorAttachmentState.COPYING ->
-            MmsPartStatusInfo("正在保存到本地", actionable = false, busy = true)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_copying), actionable = false, busy = true)
         MirrorAttachmentState.COPY_FAILED ->
-            MmsPartStatusInfo("附件保存失败，请稍后重试", actionable = false)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_copy_failed), actionable = false)
         MirrorAttachmentState.SOURCE_UNREADABLE ->
-            MmsPartStatusInfo("附件已删除或无法读取", actionable = false)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_source_unreadable), actionable = false)
         MirrorAttachmentState.UNKNOWN ->
-            MmsPartStatusInfo("附件尚不可用", actionable = false)
+            MmsPartStatusInfo(AppStrings.get(R.string.msg_mms_part_unknown), actionable = false)
     }
 }
 
 private fun MmsPartContent.readyStatusText(): String {
     val inlineCopy = inlineTextCopy
-    val availableText = if (inlineCopy) "仍可导出 UTF-8 文本副本" else "原件仍可导出"
+    val availableText = AppStrings.get(
+        if (inlineCopy) R.string.msg_mms_part_available_utf8 else R.string.msg_mms_part_available_original
+    )
     return when (issue) {
-        null -> if (inlineCopy) "可导出 · UTF-8 文本副本" else "可打开、保存或分享"
-        "too_large", "html_too_large" -> "内容过大，$availableText"
-        "unsupported_charset", "invalid_encoding" -> "文本编码无法预览，$availableText"
-        "read_failed", "source_unreadable", "unavailable" -> "内容无法预览，$availableText"
-        "multipart_invalid" -> "复合附件结构异常，$availableText"
-        "multipart_ambiguous" -> "复合附件关系不明确，$availableText"
-        "multipart_unresolved" -> "复合附件结构未解析，$availableText"
-        "multipart_no_usable_alternative" -> "没有可预览的替代内容，$availableText"
-        "smil_too_large" -> "演示控制内容过大，$availableText"
-        "smil_unsafe_xml" -> "演示控制内容不安全，$availableText"
+        null -> AppStrings.get(if (inlineCopy) R.string.msg_mms_part_ready_utf8 else R.string.msg_mms_part_ready_original)
+        "too_large", "html_too_large" -> AppStrings.get(R.string.msg_mms_part_issue_too_large, availableText)
+        "unsupported_charset", "invalid_encoding" -> AppStrings.get(R.string.msg_mms_part_issue_charset, availableText)
+        "read_failed", "source_unreadable", "unavailable" -> AppStrings.get(R.string.msg_mms_part_issue_unreadable, availableText)
+        "multipart_invalid" -> AppStrings.get(R.string.msg_mms_part_issue_multipart_invalid, availableText)
+        "multipart_ambiguous" -> AppStrings.get(R.string.msg_mms_part_issue_multipart_ambiguous, availableText)
+        "multipart_unresolved" -> AppStrings.get(R.string.msg_mms_part_issue_multipart_unresolved, availableText)
+        "multipart_no_usable_alternative" -> AppStrings.get(R.string.msg_mms_part_issue_multipart_no_alt, availableText)
+        "smil_too_large" -> AppStrings.get(R.string.msg_mms_part_issue_smil_too_large, availableText)
+        "smil_unsafe_xml" -> AppStrings.get(R.string.msg_mms_part_issue_smil_unsafe, availableText)
         "smil_invalid_xml", "smil_invalid_structure", "smil_depth_limit", "smil_page_limit" ->
-            "演示结构异常，$availableText"
+            AppStrings.get(R.string.msg_mms_part_issue_smil_invalid, availableText)
         "smil_missing_reference", "smil_ambiguous_reference", "smil_ambiguous_document" ->
-            "演示附件引用不完整，$availableText"
-        "smil_invalid_duration" -> "演示时长无效，$availableText"
+            AppStrings.get(R.string.msg_mms_part_issue_smil_missing_ref, availableText)
+        "smil_invalid_duration" -> AppStrings.get(R.string.msg_mms_part_issue_smil_duration, availableText)
         else -> availableText
     }
 }

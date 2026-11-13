@@ -1,6 +1,7 @@
 package vip.mystery0.pixel.text.mms.outgoing
 
 import android.content.Context
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.mms.vendor.pdu.CharacterSets
 import vip.mystery0.pixel.text.mms.vendor.pdu.EncodedStringValue
 import vip.mystery0.pixel.text.mms.vendor.pdu.PduBody
@@ -21,18 +22,18 @@ class MmsSendPduComposer(
     fun compose(snapshot: MmsSendSnapshot, transactionId: String): ComposedMms {
         val limit = minOf(snapshot.policy.maxMessageBytes, MmsPayloadStore.MAX_PDU_BYTES)
         val recipient = MmsRecipient.normalize(snapshot.recipientAddress)
-            ?: throw MmsSendException("彩信仅支持一个明确的电话号码")
+            ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_single_recipient_only))
         if (recipient != snapshot.recipientAddress || snapshot.subscriptionId != snapshot.policy.subscriptionId || limit <= 0) {
-            throw MmsSendException("彩信发送信息已改变，请重新确认")
+            throw MmsSendException(context.getString(R.string.sys_mms_pdu_info_changed))
         }
-        if (!transactionId.matches(Regex("[A-Za-z0-9_-]{1,100}"))) throw MmsSendException("彩信事务标识无效")
-        if (snapshot.body.isBlank() && snapshot.attachments.isEmpty()) throw MmsSendException("请添加正文或附件，不能只发送主题")
-        if (snapshot.subject.length > snapshot.policy.maxSubjectLength) throw MmsSendException("主题超过所选 SIM 的长度限制")
+        if (!transactionId.matches(Regex("[A-Za-z0-9_-]{1,100}"))) throw MmsSendException(context.getString(R.string.sys_mms_pdu_invalid_tx_id))
+        if (snapshot.body.isBlank() && snapshot.attachments.isEmpty()) throw MmsSendException(context.getString(R.string.sys_mms_pdu_subject_only_disallowed))
+        if (snapshot.subject.length > snapshot.policy.maxSubjectLength) throw MmsSendException(context.getString(R.string.sys_mms_pdu_subject_too_long))
         if (snapshot.attachments.size > MmsPayloadStore.MAX_ATTACHMENTS ||
             snapshot.attachments.map { it.id }.distinct().size != snapshot.attachments.size ||
             snapshot.attachments.any { it.originalSize !in 1..MmsPayloadStore.MAX_ORIGINAL_BYTES } ||
             snapshot.attachments.sumOf { it.originalSize } > MmsPayloadStore.MAX_DRAFT_ORIGINAL_BYTES
-        ) throw MmsSendException("附件数量或原件总量超过限制")
+        ) throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachments_over_limit))
         val bodyBytes = utf8(snapshot.body, minOf(snapshot.policy.maxTextBytes, limit))
         val subjectBytes = utf8(snapshot.subject, limit)
         val parts = mutableListOf<MmsPayloadPart>()
@@ -44,20 +45,20 @@ class MmsSendPduComposer(
         if (bodyBytes.isNotEmpty()) parts += MmsPayloadPart("<pt-$identity-body>", "body.txt", "text/plain", bodyBytes, CharacterSets.UTF_8)
         var contentBytes = bodyBytes.size.toLong() + subjectBytes.size
         snapshot.attachments.forEachIndexed { index, attachment ->
-            val path = attachment.preparedPath ?: throw MmsSendException("附件尚未准备完成")
-            val mime = attachment.preparedMime ?: throw MmsSendException("附件类型尚未确认")
+            val path = attachment.preparedPath ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachment_not_prepared))
+            val mime = attachment.preparedMime ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachment_mime_unconfirmed))
             if (!mime.matches(Regex("[a-z0-9!#$&^_.+\\-]+/[a-z0-9!#$&^_.+\\-]+")) || mime.length > 127 ||
                 mime.startsWith("multipart/") || mime.startsWith("application/vnd.wap.multipart") || mime == "application/smil"
-            ) throw MmsSendException("此附件容器格式不能直接发送，请选择原始文件")
-            val expectedSize = attachment.preparedSize ?: throw MmsSendException("附件大小尚未确认")
-            if (attachment.error != null || expectedSize <= 0 || expectedSize > limit - contentBytes) throw MmsSendException("附件尚未就绪或超出彩信限额")
+            ) throw MmsSendException(context.getString(R.string.sys_mms_pdu_container_disallowed))
+            val expectedSize = attachment.preparedSize ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachment_size_unconfirmed))
+            if (attachment.error != null || expectedSize <= 0 || expectedSize > limit - contentBytes) throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachment_not_ready_or_over_limit))
             val bytes = payloadStore.read(path, (limit - contentBytes).toInt())
             if (bytes.size.toLong() != expectedSize || payloadStore.sha256(bytes) != attachment.preparedSha256) {
-                throw MmsSendException("附件内容已改变，请重新选择")
+                throw MmsSendException(context.getString(R.string.sys_mms_pdu_attachment_changed))
             }
             if (mime == "text/plain" && (bytes.any { it == 0.toByte() } ||
                     !String(bytes, Charsets.UTF_8).toByteArray(Charsets.UTF_8).contentEquals(bytes))) {
-                throw MmsSendException("纯文本附件编码未确认，请重新准备附件")
+                throw MmsSendException(context.getString(R.string.sys_mms_pdu_plain_text_encoding_unconfirmed))
             }
             contentBytes += bytes.size
             parts += MmsPayloadPart("<pt-$identity-part-$index>", "attachment-${index + 1}.${extension(mime)}", mime, bytes, if (mime == "text/plain") CharacterSets.UTF_8 else 0)
@@ -68,7 +69,7 @@ class MmsSendPduComposer(
             contentBytes += smil.size
             parts.add(0, MmsPayloadPart("<pt-$identity-smil>", "presentation.smil", "application/smil", smil, CharacterSets.UTF_8))
         }
-        if (contentBytes >= limit) throw MmsSendException("完整彩信超出所选 SIM 的发送限额，请减少内容")
+        if (contentBytes >= limit) throw MmsSendException(context.getString(R.string.sys_mms_pdu_full_exceeds_sim_limit_reduce))
         val contentType = if (related) RELATED else MIXED
         val request = SendReq().apply {
             setTransactionId(transactionId.toByteArray(Charsets.US_ASCII))
@@ -93,19 +94,19 @@ class MmsSendPduComposer(
             }
         }
         val bytes = try {
-            PduComposer(context, request, limit).make() ?: throw MmsSendException("无法编码彩信，请检查内容")
+            PduComposer(context, request, limit).make() ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_encode_failed))
         } catch (_: IllegalArgumentException) {
-            throw MmsSendException("完整彩信超出限额或编码无效，请减少内容")
+            throw MmsSendException(context.getString(R.string.sys_mms_pdu_exceeds_limit_or_invalid))
         }
-        if (bytes.isEmpty() || bytes.size > limit) throw MmsSendException("完整彩信超出所选 SIM 的发送限额")
+        if (bytes.isEmpty() || bytes.size > limit) throw MmsSendException(context.getString(R.string.sys_mms_pdu_full_exceeds_sim_limit))
         verify(bytes, request, parts)
         return ComposedMms(bytes, parts.toList(), contentType)
     }
 
     private fun verify(bytes: ByteArray, expected: SendReq, parts: List<MmsPayloadPart>) {
         val parsed = try { PduParser(bytes, true).parse() as? SendReq } catch (_: RuntimeException) { null }
-            ?: throw MmsSendException("彩信编码校验失败，尚未发送")
-        fun fail(): Nothing = throw MmsSendException("彩信内容校验不一致，尚未发送")
+            ?: throw MmsSendException(context.getString(R.string.sys_mms_pdu_verify_failed))
+        fun fail(): Nothing = throw MmsSendException(context.getString(R.string.sys_mms_pdu_verify_mismatch))
         if (parsed.messageType != PduHeaders.MESSAGE_TYPE_SEND_REQ || parsed.mmsVersion != expected.mmsVersion ||
             !parsed.transactionId.contentEquals(expected.transactionId) || !parsed.contentType.contentEquals(expected.contentType) ||
             parsed.from?.string != PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR || parsed.to?.size != 1 ||
@@ -126,18 +127,18 @@ class MmsSendPduComposer(
     }
 
     private fun utf8(value: String, limit: Int): ByteArray {
-        if (limit < 0 || value.length > limit || value.contains('\u0000')) throw MmsSendException("正文或主题超过限制，或包含不支持的字符")
+        if (limit < 0 || value.length > limit || value.contains('\u0000')) throw MmsSendException(context.getString(R.string.sys_mms_pdu_text_limit_or_invalid_chars))
         return try {
             val encoder = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
             val buffer = ByteBuffer.allocate(minOf(limit.toLong(), value.length.toLong() * 3).toInt())
             val result = encoder.encode(CharBuffer.wrap(value), buffer, true)
             if (result.isError) result.throwException()
-            if (result.isOverflow) throw MmsSendException("正文或主题超过所选 SIM 的字节限制")
+            if (result.isOverflow) throw MmsSendException(context.getString(R.string.sys_mms_pdu_text_exceeds_sim_bytes))
             buffer.flip()
             ByteArray(buffer.remaining()).also { buffer.get(it) }
         } catch (_: java.nio.charset.CharacterCodingException) {
-            throw MmsSendException("正文或主题包含不完整字符，请重新编辑")
+            throw MmsSendException(context.getString(R.string.sys_mms_pdu_text_incomplete_chars))
         }
     }
 

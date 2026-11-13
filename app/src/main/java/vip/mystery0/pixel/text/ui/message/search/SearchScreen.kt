@@ -44,11 +44,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.util.SimInfoProvider
 
@@ -157,7 +159,7 @@ fun SearchScreen(
                                 decorationBox = { innerTextField ->
                                     if (searchQuery.isEmpty()) {
                                         Text(
-                                            text = "搜索短信",
+                                            text = stringResource(R.string.msg_search_hint),
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -169,7 +171,7 @@ fun SearchScreen(
                                 IconButton(onClick = { viewModel.updateQuery("") }, enabled = !selectionState.isDeleting) {
                                     Icon(
                                         imageVector = Icons.Rounded.Close,
-                                        contentDescription = "清空搜索内容"
+                                        contentDescription = stringResource(R.string.msg_search_clear_query_cd)
                                     )
                                 }
                             }
@@ -186,7 +188,7 @@ fun SearchScreen(
                         }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "返回"
+                                contentDescription = stringResource(R.string.msg_action_back)
                             )
                         }
                     },

@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorInitializationPhase
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorSyncState
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
@@ -47,18 +49,20 @@ fun MirrorSyncBanner() {
     val currentNotice = notice ?: return
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(currentNotice.message, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(currentNotice.messageRes), style = MaterialTheme.typography.bodySmall)
             if (currentNotice.retryable) {
-                TextButton(onClick = { scheduler.schedule(forceReconcile = true) }) { Text("重试") }
+                TextButton(onClick = { scheduler.schedule(forceReconcile = true) }) {
+                    Text(stringResource(R.string.msg_action_retry))
+                }
             }
         }
     }
 }
 
-private enum class MirrorBannerNotice(val message: String, val retryable: Boolean) {
-    INITIAL_IMPORT("正在首次同步消息，结果可能尚未完整", false),
-    SYNC_FAILURE("部分消息同步失败，结果可能不完整", true),
-    ATTACHMENT_FAILURE("部分附件尚未复制，可稍后重试", true),
+private enum class MirrorBannerNotice(val messageRes: Int, val retryable: Boolean) {
+    INITIAL_IMPORT(R.string.msg_mirror_initial_import, false),
+    SYNC_FAILURE(R.string.msg_mirror_sync_failure, true),
+    ATTACHMENT_FAILURE(R.string.msg_mirror_attachment_failure, true),
 }
 
 private fun MirrorSyncState.bannerNotice(): MirrorBannerNotice? = when {

@@ -29,8 +29,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.mediaCacheKey
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 
@@ -42,9 +44,18 @@ fun MmsImageViewer(part: MmsPartContent, onBack: () -> Unit, imageNumber: Int = 
     var offset by remember(identity) { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("图片 $imageNumber") }, navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") }
-        }, actions = { TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text("重置") }; MmsAttachmentActions(part, menuOnly = true) })
+        TopAppBar(
+            title = { Text(stringResource(R.string.msg_mms_image_number, imageNumber)) },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.msg_action_back))
+                }
+            },
+            actions = {
+                TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text(stringResource(R.string.msg_action_reset)) }
+                MmsAttachmentActions(part, menuOnly = true)
+            },
+        )
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(part.displayName, Modifier.padding(horizontal = 16.dp))
@@ -65,7 +76,7 @@ fun MmsImageViewer(part: MmsPartContent, onBack: () -> Unit, imageNumber: Int = 
                 }) {
                 if (part.statusInfo().actionable) MmsLocalImage(
                     uri = part.localUri, cacheKey = identity, cacheEnabled = part.contentHash != null,
-                    description = "图片 $imageNumber，${part.displayName}",
+                    description = stringResource(R.string.msg_mms_image_number_desc, imageNumber, part.displayName),
                     modifier = Modifier.fillMaxSize().graphicsLayer {
                         scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
                     },

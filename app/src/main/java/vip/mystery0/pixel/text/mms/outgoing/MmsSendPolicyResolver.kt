@@ -9,6 +9,7 @@ import android.telephony.CarrierConfigManager
 import android.telephony.SmsManager
 import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
+import vip.mystery0.pixel.text.R
 import java.security.MessageDigest
 
 /** 每次从明确订阅读取有效政策，不回退默认卡，也不虚构运营商字节限额。 */
@@ -17,26 +18,26 @@ class MmsSendPolicyResolver(private val context: Context) {
     @Suppress("DEPRECATION")
     fun resolve(subId: Int): MmsSendPolicy {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            throw MmsSendException("请允许读取 SIM 信息后重试")
+            throw MmsSendException(context.getString(R.string.sys_mms_policy_grant_sim_permission))
         }
         val feature = if (Build.VERSION.SDK_INT >= 33) PackageManager.FEATURE_TELEPHONY_MESSAGING else PackageManager.FEATURE_TELEPHONY
-        if (!context.packageManager.hasSystemFeature(feature)) throw MmsSendException("此设备不支持彩信发送")
-        if (!SubscriptionManager.isValidSubscriptionId(subId)) throw MmsSendException("请选择发送彩信的 SIM")
+        if (!context.packageManager.hasSystemFeature(feature)) throw MmsSendException(context.getString(R.string.sys_mms_policy_device_unsupported))
+        if (!SubscriptionManager.isValidSubscriptionId(subId)) throw MmsSendException(context.getString(R.string.sys_mms_policy_select_sim))
         try {
             val subscriptions = context.getSystemService(SubscriptionManager::class.java)
-                ?: throw MmsSendException("无法读取 SIM 信息")
+                ?: throw MmsSendException(context.getString(R.string.sys_mms_policy_cannot_read_sim))
             val subscription = subscriptions.activeSubscriptionInfoList?.singleOrNull { it.subscriptionId == subId }
-                ?: throw MmsSendException("所选 SIM 已不可用，请重新选择")
+                ?: throw MmsSendException(context.getString(R.string.sys_mms_policy_sim_unavailable))
             val carrier = context.getSystemService(CarrierConfigManager::class.java)?.getConfigForSubId(subId)
-                ?: throw MmsSendException("运营商彩信配置暂不可用，请稍后重新读取")
+                ?: throw MmsSendException(context.getString(R.string.sys_mms_policy_carrier_config_unavailable))
             if (!CarrierConfigManager.isConfigForIdentifiedCarrier(carrier)) {
-                throw MmsSendException("运营商配置尚未载入，请稍后重新读取")
+                throw MmsSendException(context.getString(R.string.sys_mms_policy_carrier_config_not_loaded))
             }
             val manager = context.getSystemService(SmsManager::class.java)?.createForSubscriptionId(subId)
-                ?: throw MmsSendException("此设备暂不能读取彩信配置")
+                ?: throw MmsSendException(context.getString(R.string.sys_mms_policy_device_cannot_read_config))
             val values = manager.carrierConfigValues
             if (!values.containsKey(SmsManager.MMS_CONFIG_MMS_ENABLED)) throw missingPolicy()
-            if (!values.getBoolean(SmsManager.MMS_CONFIG_MMS_ENABLED)) throw MmsSendException("所选 SIM 的运营商未启用彩信")
+            if (!values.getBoolean(SmsManager.MMS_CONFIG_MMS_ENABLED)) throw MmsSendException(context.getString(R.string.sys_mms_policy_mms_disabled_by_carrier))
             val maxBytes = requiredPositive(values, SmsManager.MMS_CONFIG_MAX_MESSAGE_SIZE)
             val width = requiredPositive(values, SmsManager.MMS_CONFIG_MAX_IMAGE_WIDTH)
             val height = requiredPositive(values, SmsManager.MMS_CONFIG_MAX_IMAGE_HEIGHT)
@@ -52,9 +53,9 @@ class MmsSendPolicyResolver(private val context: Context) {
             return MmsSendPolicy(subId, boundedBytes, width, height, subject,
                 if (text == -1) boundedBytes else minOf(text, boundedBytes), fingerprint)
         } catch (_: SecurityException) {
-            throw MmsSendException("SIM 读取权限已变化，请重新授权后重试")
+            throw MmsSendException(context.getString(R.string.sys_mms_policy_sim_permission_changed))
         } catch (_: UnsupportedOperationException) {
-            throw MmsSendException("此设备不支持读取彩信配置")
+            throw MmsSendException(context.getString(R.string.sys_mms_policy_device_no_config_read))
         }
     }
 
@@ -63,5 +64,5 @@ class MmsSendPolicyResolver(private val context: Context) {
         return values.getInt(key).takeIf { it > 0 } ?: throw missingPolicy()
     }
 
-    private fun missingPolicy() = MmsSendException("运营商彩信限制缺失或无效，请稍后重新读取")
+    private fun missingPolicy() = MmsSendException(context.getString(R.string.sys_mms_policy_missing_or_invalid))
 }

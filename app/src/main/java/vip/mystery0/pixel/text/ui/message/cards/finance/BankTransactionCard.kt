@@ -20,9 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
@@ -52,7 +54,7 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolea
                 icon = Icons.Rounded.AccountBalance,
                 iconTint = headerColor,
                 iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else (if (result.isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer),
-                title = "银行交易",
+                title = stringResource(R.string.msg_card_bank_title),
                 dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.1f)
             )
 
@@ -87,7 +89,7 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolea
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    "交易失败",
+                                    stringResource(R.string.msg_card_bank_failed_badge),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.error
                                 )
@@ -108,14 +110,15 @@ fun BankTransactionCard(result: ParsedResult.BankTransaction, isSelected: Boolea
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            val failureReasonLabel = stringResource(R.string.msg_bank_failure_reason)
             val finalDetails = result.details.toMutableMap()
             if (!result.isSuccess && result.errorMessage != null) {
-                finalDetails["失败原因"] = result.errorMessage
+                finalDetails[failureReasonLabel] = result.errorMessage
             }
 
             InfoMapList(
                 details = finalDetails,
-                highlightKey = if (!result.isSuccess) "失败原因" else null,
+                highlightKey = if (!result.isSuccess) failureReasonLabel else null,
                 highlightColor = MaterialTheme.colorScheme.error,
                 containerColor = if (isSelected) baseThemeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.08f)
             )

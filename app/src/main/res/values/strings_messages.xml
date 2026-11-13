@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Common actions / labels -->
+    <string name="msg_action_retry">Retry</string>
+    <string name="msg_action_open">Open</string>
+    <string name="msg_action_cancel">Cancel</string>
+    <string name="msg_action_save">Save</string>
+    <string name="msg_action_share">Share</string>
+    <string name="msg_action_delete">Delete</string>
+    <string name="msg_action_keep">Keep</string>
+    <string name="msg_action_close">Close</string>
+    <string name="msg_action_back">Back</string>
+    <string name="msg_action_reset">Reset</string>
+    <string name="msg_action_done">Done</string>
+    <string name="msg_action_apply">Apply</string>
+    <string name="msg_action_clean_up">Clean up</string>
+
+    <!-- DataInitializationProgressContent -->
+    <string name="msg_init_phase_mirror">Importing SMS &amp; MMS</string>
+    <string name="msg_init_phase_mms_text">Parsing MMS text</string>
+    <string name="msg_init_phase_spam">Scanning historical spam</string>
+    <string name="msg_init_phase_verification">Indexing verification codes</string>
+    <string name="msg_init_phase_complete">Finishing up</string>
+    <string name="msg_init_current_step">Step %1$d/4 · %2$s</string>
+    <string name="msg_init_processed_of_total">Processed %1$s / %2$s</string>
+    <string name="msg_init_percent">%1$d%%</string>
+    <string name="msg_init_step_no_action">Nothing to process in this step</string>
+    <string name="msg_init_processed_count">Processed %1$s</string>
+    <string name="msg_init_almost_done">Almost done, please wait…</string>
+    <string name="msg_init_waiting_verification">Waiting to resume; completed progress is saved. Verification code index will rescan</string>
+    <string name="msg_init_waiting">Waiting to resume; completed progress is saved</string>
+    <string name="msg_init_estimating_remaining">Estimating remaining time</string>
+    <string name="msg_init_next_step">Moving to next step…</string>
+    <string name="msg_init_elapsed_and_remaining">Elapsed %1$s · %2$s</string>
+    <string name="msg_init_elapsed_estimating">Elapsed %1$s · Estimating remaining time</string>
+    <string name="msg_init_remaining_less_than_1s">Est. &lt; 1 s left</string>
+    <string name="msg_init_remaining_approx">Est. %1$s left</string>
+    <string name="msg_init_duration_less_than_1s">&lt; 1 s</string>
+    <string name="msg_init_duration_seconds">%1$d s</string>
+    <string name="msg_init_duration_minutes">%1$d min</string>
+    <string name="msg_init_duration_minutes_seconds">%1$d min %2$d s</string>
+
+    <!-- MessageItem -->
+    <string name="msg_mms_loading">Loading MMS</string>
+    <string name="msg_unsupported_message">[Unsupported message]</string>
+    <string name="msg_sim_content_description">SIM</string>
+    <string name="msg_toggle_hide_content">Hide content</string>
+    <string name="msg_toggle_collapse_original">Hide original</string>
+    <string name="msg_toggle_expand_original">Show original</string>
+    <string name="msg_toggle_show_smart_card">Show smart card</string>
+    <string name="msg_toggle_show_original">Show original</string>
+    <string name="msg_manual_spam_checking">Checking…</string>
+    <string name="msg_manual_spam_high">Manual check: %1$d%% spam likelihood</string>
+    <string name="msg_manual_spam_low">Manual check: low risk (%1$d%%)</string>
+    <string name="msg_time_just_now">Just now</string>
+    <string name="msg_time_minutes_ago">%1$d min ago</string>
+    <string name="msg_time_hours_ago">%1$d hr ago</string>
+    <string name="msg_time_days_ago">%1$d d ago</string>
+    <string name="msg_time_detailed_format">MMM d, yyyy HH:mm:ss</string>
+
+    <!-- MirrorSyncBanner -->
+    <string name="msg_mirror_initial_import">Initial message sync in progress; results may be incomplete</string>
+    <string name="msg_mirror_sync_failure">Some messages failed to sync; results may be incomplete</string>
+    <string name="msg_mirror_attachment_failure">Some attachments haven\'t been copied yet; you can retry later</string>
+
+    <!-- Smart cards -->
+    <string name="msg_card_express_title">%1$s · Package Pickup</string>
+    <string name="msg_card_express_location_cd">Location</string>
+    <string name="msg_card_express_time_cd">Time</string>
+
+    <string name="msg_mms_download_persisting">Saving MMS</string>
+    <string name="msg_mms_download_downloading">Downloading MMS</string>
+    <string name="msg_mms_download_save_failed">MMS downloaded, failed to save. Tap to retry saving</string>
+    <string name="msg_mms_download_parse_failed">MMS downloaded, unable to parse yet. Original file kept</string>
+    <string name="msg_mms_download_failed">MMS download failed</string>
+    <string name="msg_mms_download_expired">MMS expired and can no longer be downloaded from server</string>
+    <string name="msg_mms_download_invalid_subscription">Unable to identify receiving SIM card</string>
+    <string name="msg_mms_download_sim_unavailable">Receiving SIM card is unavailable</string>
+    <string name="msg_mms_download_uncertain">Download status uncertain; existing file kept. You can re-download</string>
+    <string name="msg_mms_download_retry_wait">Download failed, waiting for automatic retry</string>
+    <string name="msg_mms_download_state_invalid">Invalid download state, please re-download</string>
+    <string name="msg_mms_download_not_downloaded">MMS not downloaded</string>
+    <string name="msg_mms_download_error_fallback">Unable to complete right now, please try again later</string>
+    <string name="msg_mms_download_action_retry_parse">Retry parsing</string>
+    <string name="msg_mms_download_action_retry_save">Retry saving</string>
+    <string name="msg_mms_download_action_download">Download</string>
+
+    <string name="msg_open_link_title">Open link</string>
+    <string name="msg_open_link_message">Open this link in your browser?\n\n%1$s</string>
+
+    <string name="msg_spam_hidden">Spam content hidden</string>
+    <string name="msg_spam_label">Spam</string>
+
+    <string name="msg_card_verification_title">Verification Code</string>
+    <string name="msg_card_verification_copy_cd">Copy verification code</string>
+
+    <string name="msg_card_data_usage_cutoff">As of</string>
+    <string name="msg_card_data_usage_title_normal">Data Usage</string>
+    <string name="msg_card_data_usage_title_low">Low Data Alert</string>
+    <string name="msg_card_data_usage_title_exhausted">Data Exhausted</string>
+    <string name="msg_card_data_usage_exhausted_value">Exhausted</string>
+
+    <string name="msg_card_missed_call_time">Call time</string>
+    <string name="msg_card_missed_call_location">Location</string>
+    <string name="msg_card_missed_call_title">Missed Call</string>
+    <string name="msg_card_missed_call_number">Caller number</string>
+    <string name="msg_card_missed_call_callback">Call back</string>
+
+    <string name="msg_card_bank_title">Bank Transaction</string>
+    <string name="msg_card_bank_failed_badge">Failed</string>
+    <string name="msg_bank_failure_reason">Failure reason</string>
+
+    <string name="msg_card_recharge_title">Recharge Successful</string>
+    <string name="msg_card_recharge_currency_unit">CNY</string>
+
+    <string name="msg_card_flight_title">Flight</string>
+    <string name="msg_card_flight_terminal">Terminal</string>
+    <string name="msg_card_flight_boarding_time">Boarding time</string>
+
+    <string name="msg_card_train_title">Train Ticket</string>
+
+    <!-- MMS capture & composer -->
+    <string name="msg_capture_record_error">Unable to record audio. Check microphone permission or if another app is using it</string>
+    <string name="msg_capture_record_too_short">Recording too short, please try again</string>
+    <string name="msg_capture_voice_filename">voice_message.m4a</string>
+    <string name="msg_capture_photo_filename">photo.jpg</string>
+    <string name="msg_capture_mic_denied">Microphone permission denied. You can still attach existing audio or type text</string>
+    <string name="msg_capture_no_camera">No camera app available</string>
+    <string name="msg_capture_record_cancelled">Recording cancelled; your message draft has been kept</string>
+
+    <string name="msg_contact_picker_no_permission">Unable to read contacts. Grant Contacts permission and try again</string>
+    <string name="msg_contact_picker_export_retry">Unable to export contact, please select again</string>
+    <string name="msg_contact_picker_export_failed">Unable to export contact. Check permissions and storage space, then try again</string>
+    <string name="msg_contact_picker_no_app">No contacts picker app available</string>
+    <string name="msg_contact_picker_perm_denied">Contacts permission denied; your message draft has been kept</string>
+
+    <string name="msg_composer_placeholder_sms">Text message</string>
+    <string name="msg_composer_draft_busy_contact">Draft is busy, please select the contact again later</string>
+    <string name="msg_composer_recipient_label">Recipient</string>
+    <string name="msg_composer_recipient_hint">Enter a phone number</string>
+    <string name="msg_composer_mms_subject_label">MMS subject</string>
+    <string name="msg_composer_remove_subject_cd">Remove subject</string>
+    <string name="msg_composer_cancel_recording_cd">Cancel recording</string>
+    <string name="msg_composer_recording_timer">%1$s · Max 1 min</string>
+    <string name="msg_composer_stop_recording_cd">Stop recording and attach</string>
+    <string name="msg_composer_add_attachment_cd">Add attachment</string>
+    <string name="msg_composer_placeholder_mms">Add message</string>
+    <string name="msg_composer_send_mms_cd">Send MMS</string>
+    <string name="msg_composer_send_sms_cd">Send SMS</string>
+    <string name="msg_composer_type_mms">MMS</string>
+    <string name="msg_composer_type_sms">SMS</string>
+    <string name="msg_composer_authorize_sim">Authorize SIM</string>
+    <string name="msg_composer_no_sim">No available SIM detected</string>
+    <string name="msg_composer_select_sim">Select SIM</string>
+    <string name="msg_composer_processing">Processing, please wait…</string>
+    <string name="msg_composer_remove_failed_imports">Remove failed imports and keep current content</string>
+    <string name="msg_composer_add_to_message">Add to message</string>
+    <string name="msg_composer_attach_media">Photos &amp; videos</string>
+    <string name="msg_composer_attach_camera">Camera</string>
+    <string name="msg_composer_attach_file">File</string>
+    <string name="msg_composer_attach_audio">Audio</string>
+    <string name="msg_composer_attach_record">Record</string>
+    <string name="msg_composer_attach_contact">Contact</string>
+    <string name="msg_composer_select_sim_title">Select sending SIM</string>
+    <string name="msg_composer_select_sim_desc">Messages will be sent via the selected SIM for this conversation only.</string>
+    <string name="msg_sim_slot">Slot %1$d</string>
+    <string name="msg_composer_sim_in_use">Active</string>
+    <string name="msg_composer_duplicate_title">Send again anyway?</string>
+    <string name="msg_composer_send_mms_title">Send MMS</string>
+    <string name="msg_composer_duplicate_desc">The previous message\'s status is unknown and the recipient may have already received it. Sending again may cause duplicate delivery and charges.</string>
+    <string name="msg_composer_send_mms_desc">An MMS will be sent to %1$s via %2$s. Carrier charges may apply. This notice won\'t be shown again for future MMS.</string>
+    <string name="msg_composer_selected_sim_fallback">Selected SIM</string>
+    <string name="msg_composer_send_anyway">Send anyway</string>
+    <string name="msg_composer_confirm_send">Send</string>
+    <string name="msg_composer_image_attachment_cd">Image attachment</string>
+    <string name="msg_composer_video_attachment_cd">Video attachment</string>
+    <string name="msg_composer_video_size">Video · %1$s</string>
+    <string name="msg_composer_stop_preview_cd">Stop preview</string>
+    <string name="msg_composer_play_preview_cd">Play preview</string>
+    <string name="msg_composer_cannot_preview">Cannot preview</string>
+    <string name="msg_composer_remove_attachment_cd">Remove attachment %1$s</string>
+
+    <!-- MMS attachment actions & viewers -->
+    <string name="msg_mms_open_external">Open externally</string>
+    <string name="msg_mms_no_app_for_attachment">No app available to open this attachment</string>
+    <string name="msg_mms_no_permission_attachment">No permission to access attachment, please try again</string>
+    <string name="msg_mms_attachment_action_failed">Failed to process attachment, please try again</string>
+    <string name="msg_mms_save_request_expired">Save request expired, please select the attachment again</string>
+    <string name="msg_mms_attachment_saved">Attachment saved</string>
+    <string name="msg_mms_no_save_app">No system app available to save attachment</string>
+    <string name="msg_mms_no_permission_save_ui">No permission to open system save dialog, please try again</string>
+    <string name="msg_mms_cannot_open_save_ui">Unable to open system save dialog, please try again</string>
+    <string name="msg_mms_attachment_actions_cd">Attachment actions: %1$s</string>
+    <string name="msg_mms_share_chooser_title">Share attachment</string>
+    <string name="msg_mms_export_err_missing">Attachment deleted or invalid, please refresh and try again</string>
+    <string name="msg_mms_export_err_not_ready">Attachment is still preparing, please try again later</string>
+    <string name="msg_mms_export_err_permission">No permission to access attachment or destination, please try again</string>
+    <string name="msg_mms_export_err_no_space">Not enough storage space, please free up space and try again</string>
+    <string name="msg_mms_export_err_write_failed">Failed to write attachment, please try again</string>
+
+    <string name="msg_mms_calendar_confirm_title">Review calendar import</string>
+    <string name="msg_mms_calendar_confirm_body">%1$s\n\nOnly this single event from the card will be passed to the system calendar editor. Check the date, time zone, and fields before saving.</string>
+    <string name="msg_mms_calendar_confirm_add">Add this event</string>
+    <string name="msg_mms_calendar_header">Calendar event · %1$s</string>
+    <string name="msg_mms_calendar_untitled_event">Untitled event</string>
+    <string name="msg_mms_calendar_all_day"> (All day)</string>
+    <string name="msg_mms_calendar_exclusive_end"> (Exclusive)</string>
+    <string name="msg_mms_calendar_start">Start: %1$s%2$s</string>
+    <string name="msg_mms_calendar_end">End: %1$s%2$s</string>
+    <string name="msg_mms_calendar_location">Location: %1$s</string>
+    <string name="msg_mms_calendar_recurrence">Recurrence: %1$s</string>
+    <string name="msg_mms_calendar_add_event">Add to calendar</string>
+    <string name="msg_mms_calendar_add_occurrence">Add this occurrence</string>
+
+    <string name="msg_mms_composer_reedit">Edit &amp; resend</string>
+    <string name="msg_mms_composer_new_message">New message</string>
+    <string name="msg_mms_composer_back_cd">Save draft and go back</string>
+    <string name="msg_mms_composer_delete_draft_cd">Delete draft</string>
+    <string name="msg_mms_composer_empty_state">Start a conversation</string>
+    <string name="msg_mms_composer_discard_title">Delete this draft?</string>
+    <string name="msg_mms_composer_discard_body">Delete local edits and unused attachments</string>
+    <string name="msg_mms_send_state_preparing">Preparing</string>
+    <string name="msg_mms_send_state_sending">Sending</string>
+    <string name="msg_mms_send_state_sent_syncing">Sent, syncing record</string>
+    <string name="msg_mms_send_state_sent">Sent</string>
+    <string name="msg_mms_send_state_failed">Send failed</string>
+    <string name="msg_mms_send_state_unknown">Status pending</string>
+    <string name="msg_mms_send_state_cancelled">Cancelled</string>
+    <string name="msg_mms_status_label">MMS · %1$s</string>
+    <string name="msg_mms_send_actions_cd">Send actions</string>
+    <string name="msg_mms_action_cancel_send">Cancel sending</string>
+    <string name="msg_mms_error_cannot_recall">Already handed to system, cannot recall</string>
+    <string name="msg_mms_action_manual_retry">Retry manually</string>
+    <string name="msg_mms_error_retry_rejected">Retry not accepted, please check status</string>
+    <string name="msg_mms_action_review_resend">Review resend risk</string>
+    <string name="msg_mms_action_resume_editing">Resume editing</string>
+    <string name="msg_mms_action_clean_payload">Clean up leftover send file</string>
+    <string name="msg_mms_clean_payload_title">Clean up leftover send file?</string>
+    <string name="msg_mms_clean_payload_body">Cleaning up cannot recall a submitted MMS and may interrupt a file the system is still reading. Send status will remain pending without automatic resend.</string>
+    <string name="msg_mms_drafts_pending_btn">Drafts %1$d · Pending %2$d</string>
+    <string name="msg_mms_drafts_pending_title">Drafts &amp; Outbox</string>
+    <string name="msg_mms_draft_item">Draft · %1$s · %2$d attachments</string>
+    <string name="msg_mms_no_recipient">No recipient</string>
+    <string name="msg_mms_deleted_leftover">Leftover send file from deleted message</string>
+
+    <string name="msg_mms_contact_name_label">Name</string>
+    <string name="msg_mms_contact_unnamed">Unnamed contact</string>
+    <string name="msg_mms_contact_photo_cd">Contact photo</string>
+    <string name="msg_mms_contact_phone_label">Phone</string>
+    <string name="msg_mms_contact_dial_label">Dial</string>
+    <string name="msg_mms_contact_copy_number_label">Copy number</string>
+    <string name="msg_mms_contact_company_label">Company</string>
+    <string name="msg_mms_contact_other_phone_label">Other phone</string>
+    <string name="msg_mms_contact_email_with_label">Email · %1$s</string>
+    <string name="msg_mms_contact_email_label">Email</string>
+    <string name="msg_mms_contact_collapse_details">Hide details</string>
+    <string name="msg_mms_contact_expand_details">Address, title &amp; notes</string>
+    <string name="msg_mms_contact_address_label">Address</string>
+    <string name="msg_mms_contact_title_label">Title</string>
+    <string name="msg_mms_contact_notes_label">Notes</string>
+    <string name="msg_mms_contact_photo_warning">System import excludes photo; use the top-right menu to open the original file for the full vCard</string>
+    <string name="msg_mms_contact_add_btn">Add contact</string>
+    <string name="msg_mms_contact_copy_btn">Copy contact</string>
+    <string name="msg_mms_contact_send_email_label">Send email</string>
+    <string name="msg_mms_contact_copy_email_label">Copy email</string>
+    <string name="msg_mms_contact_clip_label">Contact</string>
+    <string name="msg_mms_copied">Copied</string>
+
+    <string name="msg_mms_select_cd">Select MMS</string>
+    <string name="msg_mms_toggle_select_cd">Toggle selection</string>
+    <string name="msg_mms_partial_unavailable">Some MMS content is unavailable</string>
+    <string name="msg_mms_no_readable_content">No readable MMS content</string>
+    <string name="msg_mms_attachments_count">Attachments (%1$d)</string>
+
+    <string name="msg_mms_html_no_summary">No readable summary available</string>
+    <string name="msg_mms_html_view_full">View full content</string>
+    <string name="msg_mms_unknown_size">Unknown size</string>
+
+    <string name="msg_mms_html_viewer_title">Offline webpage</string>
+    <string name="msg_mms_html_mode_web">Web</string>
+    <string name="msg_mms_html_mode_plain">Plain text</string>
+    <string name="msg_mms_html_webview_unavailable">System WebView unavailable. You can still read plain text or export the original file</string>
+    <string name="msg_mms_html_over_limit">Webpage exceeds safe preview limit; you can export the original file</string>
+    <string name="msg_mms_html_no_text">No displayable text</string>
+    <string name="msg_mms_html_blocked_images">%1$d image references unavailable or blocked</string>
+    <string name="msg_mms_html_open_system_title">Open system app?</string>
+    <string name="msg_mms_html_open_browser_title">Open link in browser?</string>
+    <string name="msg_mms_html_open_system_body">This will open the dialer or email composer:\n%1$s</string>
+    <string name="msg_mms_html_open_browser_body">This will leave MMS and access the network:\n%1$s</string>
+    <string name="msg_mms_html_no_handler">No app available to handle this</string>
+    <string name="msg_mms_html_open_app">Open app</string>
+    <string name="msg_mms_html_open_browser">Open browser</string>
+
+    <string name="msg_mms_image_number">Image %1$d</string>
+    <string name="msg_mms_list_separator">, </string>
+    <string name="msg_mms_image_view_cd">View image</string>
+    <string name="msg_mms_image_unreadable">Image not readable yet</string>
+    <string name="msg_mms_image_loading_cd">Loading image</string>
+    <string name="msg_mms_image_decode_error">Unable to decode image; you can save the original file</string>
+    <string name="msg_mms_image_number_desc">Image %1$d, %2$s</string>
+
+    <string name="msg_mms_video_preview_cd">Video preview, %1$s</string>
+    <string name="msg_mms_play">Play</string>
+    <string name="msg_mms_video_title">Video · %1$s</string>
+    <string name="msg_mms_audio_title">Audio · %1$s</string>
+    <string name="msg_mms_media_loading_preview">Loading media preview</string>
+    <string name="msg_mms_media_preview_unavailable">Preview unavailable, try playing</string>
+
+    <string name="msg_mms_video">Video</string>
+    <string name="msg_mms_audio">Audio</string>
+    <string name="msg_mms_play_video_cd">Play video</string>
+    <string name="msg_mms_playback_progress_cd">Playback progress</string>
+    <string name="msg_mms_pause">Pause</string>
+    <string name="msg_mms_stop">Stop</string>
+
+    <string name="msg_mms_part_preparing">Preparing attachment</string>
+    <string name="msg_mms_part_pending_download">Waiting to download</string>
+    <string name="msg_mms_part_source_present">Waiting to save locally</string>
+    <string name="msg_mms_part_copying">Saving locally</string>
+    <string name="msg_mms_part_copy_failed">Failed to save attachment, please try again later</string>
+    <string name="msg_mms_part_source_unreadable">Attachment deleted or unreadable</string>
+    <string name="msg_mms_part_unknown">Attachment unavailable</string>
+    <string name="msg_mms_part_available_utf8">UTF-8 text copy can still be exported</string>
+    <string name="msg_mms_part_available_original">original file can still be exported</string>
+    <string name="msg_mms_part_ready_utf8">Exportable · UTF-8 text copy</string>
+    <string name="msg_mms_part_ready_original">Open, save, or share</string>
+    <string name="msg_mms_part_issue_too_large">Content too large; %1$s</string>
+    <string name="msg_mms_part_issue_charset">Text encoding unsupported for preview; %1$s</string>
+    <string name="msg_mms_part_issue_unreadable">Content cannot be previewed; %1$s</string>
+    <string name="msg_mms_part_issue_multipart_invalid">Invalid multipart structure; %1$s</string>
+    <string name="msg_mms_part_issue_multipart_ambiguous">Ambiguous multipart relation; %1$s</string>
+    <string name="msg_mms_part_issue_multipart_unresolved">Unresolved multipart structure; %1$s</string>
+    <string name="msg_mms_part_issue_multipart_no_alt">No previewable alternative content; %1$s</string>
+    <string name="msg_mms_part_issue_smil_too_large">Presentation control content too large; %1$s</string>
+    <string name="msg_mms_part_issue_smil_unsafe">Unsafe presentation control content; %1$s</string>
+    <string name="msg_mms_part_issue_smil_invalid">Invalid presentation structure; %1$s</string>
+    <string name="msg_mms_part_issue_smil_missing_ref">Incomplete presentation attachment references; %1$s</string>
+    <string name="msg_mms_part_issue_smil_duration">Invalid presentation duration; %1$s</string>
+
+    <string name="msg_mms_playback_decode_error">Unable to play this attachment: file may be corrupted or codec unsupported. Save the original file and open with another app</string>
+    <string name="msg_mms_playback_not_ready">Attachment is not playable yet</string>
+    <string name="msg_mms_playback_source_changed">Attachment deleted or updated, please reopen</string>
+
+    <string name="msg_mms_presentation_prev_cd">Previous page</string>
+    <string name="msg_mms_presentation_next_cd">Next page</string>
+    <string name="msg_mms_presentation_stop_autoplay">Stop</string>
+    <string name="msg_mms_presentation_start_autoplay">Autoplay</string>
+
+    <string name="msg_mms_intent_no_app">No app found for this action; save or open the original file instead</string>
+    <string name="msg_mms_intent_security">System denied this action; save or open the original file instead</string>
+    <string name="msg_mms_intent_invalid_arg">This field cannot be passed to a system app; please check the original file</string>
+    <string name="msg_mms_intent_overflow">Date or duration exceeds system limits; please open the original file</string>
+
+    <!-- Search -->
+    <string name="msg_search_filter_sender">Sender</string>
+    <string name="msg_search_filter_sender_cd">Sender filter, current: %1$s</string>
+    <string name="msg_search_filter_sim">SIM</string>
+    <string name="msg_search_sim_fallback">SIM %1$d</string>
+    <string name="msg_search_filter_sim_count">SIM · %1$d</string>
+    <string name="msg_search_filter_sim_cd">SIM filter, current: %1$s</string>
+    <string name="msg_search_transport_sms">SMS</string>
+    <string name="msg_search_transport_mms">MMS</string>
+    <string name="msg_search_filter_type">Type</string>
+    <string name="msg_search_filter_type_cd">Type filter, current: %1$s</string>
+    <string name="msg_search_filter_date">Date</string>
+    <string name="msg_search_filter_date_cd">Date filter, current: %1$s</string>
+    <string name="msg_search_filter_unread">Unread</string>
+    <string name="msg_search_filter_unread_on_cd">Unread filter enabled</string>
+    <string name="msg_search_filter_unread_off_cd">Unread filter disabled</string>
+
+    <string name="msg_search_date_any">Any time</string>
+    <string name="msg_search_date_week">Older than 1 week</string>
+    <string name="msg_search_date_month">Older than 1 month</string>
+    <string name="msg_search_date_half_year">Older than 6 months</string>
+    <string name="msg_search_date_year">Older than 1 year</string>
+
+    <string name="msg_search_sim_slot">%1$s (Slot %2$d)</string>
+    <string name="msg_search_select_sim">Select SIM</string>
+    <string name="msg_search_no_sim">No SIM card available</string>
+    <string name="msg_search_clear_sim">Clear SIM filter</string>
+    <string name="msg_search_any_sim">Any SIM</string>
+    <string name="msg_search_all_messages">All messages</string>
+    <string name="msg_search_filter_by_date">Filter by date</string>
+
+    <string name="msg_search_phone_read_failed">Unable to read selected number, please enter manually</string>
+    <string name="msg_search_phone_hint">Enter phone number</string>
+    <string name="msg_search_clear_input_cd">Clear input</string>
+    <string name="msg_search_view_conversations">View conversations with %1$s</string>
+    <string name="msg_search_pick_contact">Choose from contacts</string>
+    <string name="msg_search_clear_phone">Clear number filter</string>
+
+    <string name="msg_search_select_message_cd">Select message</string>
+    <string name="msg_search_idle">Search SMS &amp; MMS</string>
+    <string name="msg_search_empty_incomplete">No matching messages found yet; results may be incomplete</string>
+    <string name="msg_search_empty">No matching messages found</string>
+    <string name="msg_search_incomplete_banner">Some messages are still being prepared; results may be incomplete</string>
+
+    <string name="msg_search_hint">Search messages</string>
+    <string name="msg_search_clear_query_cd">Clear search</string>
+
+    <string name="msg_search_exit_selection_cd">Exit selection</string>
+    <string name="msg_search_deleting">Deleting…</string>
+    <string name="msg_search_selected_count">%1$d selected</string>
+    <string name="msg_search_deselect_all">Deselect all</string>
+    <string name="msg_search_select_all_results">Select all</string>
+    <string name="msg_search_delete_selected_cd">Delete selected messages</string>
+    <string name="msg_search_delete_dialog_title">Delete selected messages?</string>
+    <string name="msg_search_delete_dialog_body">Permanently delete %1$d selected SMS or MMS messages? This cannot be undone. Unselected messages in the same conversation won\'t be deleted.</string>
+    <string name="msg_search_delete_dialog_incomplete">\n\nSearch results may be incomplete. Only currently selected messages will be deleted, not messages that appear later.</string>
+
+    <string name="msg_search_deleted_count">Deleted %1$d messages</string>
+    <string name="msg_search_deleted_partial">Deleted %1$d messages; the rest were not deleted or no longer exist. Please check search results</string>
+    <string name="msg_search_delete_incomplete_error">Deletion did not complete. Some messages may have been deleted; check search results and retry</string>
+    <string name="msg_search_failed_error">Search failed, please try again later</string>
+</resources>

@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.core.content.ContextCompat
+import vip.mystery0.pixel.text.R
 
 /**
  * 简化版的 SIM 卡信息描述，剥离系统对象方便在 UI 层使用。
@@ -51,7 +52,7 @@ object SimInfoProvider {
                 slotIndex = info.simSlotIndex,
                 displayName = info.displayName?.toString()?.takeIf { it.isNotBlank() }
                     ?: info.carrierName?.toString()?.takeIf { it.isNotBlank() }
-                    ?: "卡${info.simSlotIndex + 1}",
+                    ?: context.getString(R.string.sys_sim_slot_fallback, info.simSlotIndex + 1),
             )
         }.sortedBy { it.slotIndex }
     }

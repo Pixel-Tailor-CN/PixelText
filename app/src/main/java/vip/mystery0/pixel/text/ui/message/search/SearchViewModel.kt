@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.PickedPhone
 import vip.mystery0.pixel.text.data.source.PickedPhoneSource
 import vip.mystery0.pixel.text.domain.model.MessageModel
@@ -18,6 +19,7 @@ import vip.mystery0.pixel.text.domain.model.search.MessageSearchFilter
 import vip.mystery0.pixel.text.domain.model.search.MessageSearchRequest
 import vip.mystery0.pixel.text.domain.model.search.SearchDate
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
+import vip.mystery0.pixel.text.util.AppStrings
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -95,16 +97,16 @@ class SearchViewModel(
             try {
                 val deletedCount = repository.deleteMessages(snapshot.messageIds)
                 val feedback = if (deletedCount == snapshot.messageIds.size) {
-                    "已删除 $deletedCount 条消息"
+                    AppStrings.get(R.string.msg_search_deleted_count, deletedCount)
                 } else {
-                    "已删除 $deletedCount 条消息，其余消息未删除或已不存在，请检查搜索结果"
+                    AppStrings.get(R.string.msg_search_deleted_partial, deletedCount)
                 }
                 _selectionState.value = _selectionState.value.copy(feedback = feedback)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 _selectionState.value = _selectionState.value.copy(
-                    feedback = "删除未完成，部分消息可能已删除，请检查搜索结果后重试",
+                    feedback = AppStrings.get(R.string.msg_search_delete_incomplete_error),
                 )
             } finally {
                 _selectionState.value = _selectionState.value.copy(
@@ -198,7 +200,7 @@ class SearchViewModel(
             throw e
         } catch (_: Throwable) {
             if (generation == requestGeneration) {
-                _uiState.value = SearchUiState.Error("搜索失败，请稍后重试")
+                _uiState.value = SearchUiState.Error(AppStrings.get(R.string.msg_search_failed_error))
             }
         }
     }

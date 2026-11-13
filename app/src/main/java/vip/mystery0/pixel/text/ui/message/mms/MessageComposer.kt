@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.mms.outgoing.MmsRecipient
 import vip.mystery0.pixel.text.mms.outgoing.MmsPayloadStore
 import vip.mystery0.pixel.text.mms.outgoing.MmsAttachment
@@ -79,13 +82,15 @@ fun MessageComposer(
     showRecipient: Boolean = false,
     sessionKey: String = recipient,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    placeholder: String = "短信",
+    placeholder: String? = null,
     resetOnSubmission: Boolean = true,
     onSubmitted: () -> Unit = {},
     viewModel: MmsComposerViewModel = koinViewModel(key = "message-composer-$sessionKey"),
 ) {
+    val resolvedPlaceholder = placeholder ?: stringResource(R.string.msg_composer_placeholder_sms)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val owner = LocalLifecycleOwner.current
     val consent = remember(context) { context.getSharedPreferences("mms_send_consent", Context.MODE_PRIVATE) }
     var menu by remember { mutableStateOf(false) }
@@ -118,7 +123,7 @@ fun MessageComposer(
         onAttachment = { uri, cleanup ->
             if (viewModel.state.value.busy || viewModel.state.value.draft == null) {
                 cleanup()
-                localError = "草稿正在处理，请稍后重新选择联系人"
+                localError = resources.getString(R.string.msg_composer_draft_busy_contact)
             } else viewModel.importAttachments(listOf(uri), cleanup)
         },
         onError = { localError = it },
@@ -165,8 +170,8 @@ fun MessageComposer(
                 value = draft?.recipientAddress ?: recipient,
                 onValueChange = { viewModel.edit { draft -> draft.copy(recipientAddress = it) } },
                 enabled = enabled,
-                label = { Text("收件人") },
-                placeholder = { Text("输入一个手机号码") },
+                label = { Text(stringResource(R.string.msg_composer_recipient_label)) },
+                placeholder = { Text(stringResource(R.string.msg_composer_recipient_hint)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
@@ -193,24 +198,34 @@ fun MessageComposer(
                             value = draft.subject,
                             onValueChange = { viewModel.edit { draft -> draft.copy(subject = it) } },
                             enabled = enabled,
-                            label = { Text("彩信主题") },
+                            label = { Text(stringResource(R.string.msg_composer_mms_subject_label)) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                         )
-                        IconButton(onClick = { viewModel.edit { it.copy(subject = "") } }, enabled = enabled) { Icon(Icons.Default.Close, "移除主题") }
+                        IconButton(onClick = { viewModel.edit { it.copy(subject = "") } }, enabled = enabled) {
+                            Icon(Icons.Default.Close, stringResource(R.string.msg_composer_remove_subject_cd))
+                        }
                     }
                 }
                 if (capture.recording) {
                     Row(Modifier.fillMaxWidth().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = capture::cancelRecording) { Icon(Icons.Default.DeleteOutline, "取消录音") }
+                        IconButton(onClick = capture::cancelRecording) {
+                            Icon(Icons.Default.DeleteOutline, stringResource(R.string.msg_composer_cancel_recording_cd))
+                        }
                         Icon(Icons.Default.Mic, null, tint = MaterialTheme.colorScheme.error)
-                        Text("${capture.seconds / 60}:${(capture.seconds % 60).toString().padStart(2, '0')} · 最长 1 分钟", Modifier.weight(1f).padding(horizontal = 8.dp))
-                        FilledIconButton(onClick = capture::stopRecording) { Icon(Icons.Default.Stop, "结束录音并添加附件") }
+                        val timer = "${capture.seconds / 60}:${(capture.seconds % 60).toString().padStart(2, '0')}"
+                        Text(
+                            stringResource(R.string.msg_composer_recording_timer, timer),
+                            Modifier.weight(1f).padding(horizontal = 8.dp),
+                        )
+                        FilledIconButton(onClick = capture::stopRecording) {
+                            Icon(Icons.Default.Stop, stringResource(R.string.msg_composer_stop_recording_cd))
+                        }
                     }
                 } else {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         IconButton(onClick = { menu = true }, enabled = enabled) {
-                            Icon(Icons.Default.Add, "添加附件")
+                            Icon(Icons.Default.Add, stringResource(R.string.msg_composer_add_attachment_cd))
                         }
                         BasicTextField(
                             value = draft?.body ?: initialBody,
@@ -223,14 +238,21 @@ fun MessageComposer(
                             modifier = Modifier.weight(1f).padding(vertical = 13.dp, horizontal = 4.dp).heightIn(min = 24.dp),
                             decorationBox = { field ->
                                 Box {
-                                    if ((draft?.body ?: initialBody).isEmpty()) Text(if (isMms) "添加消息" else placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if ((draft?.body ?: initialBody).isEmpty()) Text(
+                                        if (isMms) stringResource(R.string.msg_composer_placeholder_mms) else resolvedPlaceholder,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                     field()
                                 }
                             },
                         )
                         FilledIconButton(onClick = ::submit, enabled = canSend, modifier = Modifier.size(48.dp)) {
                             if (state.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.AutoMirrored.Filled.Send, if (isMms) "发送彩信" else "发送短信", Modifier.size(22.dp))
+                            else Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                stringResource(if (isMms) R.string.msg_composer_send_mms_cd else R.string.msg_composer_send_sms_cd),
+                                Modifier.size(22.dp),
+                            )
                         }
                     }
                 }
@@ -240,7 +262,11 @@ fun MessageComposer(
         val currentSim = state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }
         val canChooseSim = state.simPermissionGranted && state.sims.size > 1
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (isMms) "MMS · 彩信" else "SMS · 短信", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(if (isMms) R.string.msg_composer_type_mms else R.string.msg_composer_type_sms),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.weight(1f))
             when {
                 !state.simPermissionGranted -> TextButton(
@@ -250,10 +276,10 @@ fun MessageComposer(
                 ) {
                     Icon(Icons.Default.SimCard, null, Modifier.size(14.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("授权使用 SIM", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.msg_composer_authorize_sim), style = MaterialTheme.typography.labelSmall)
                 }
                 state.sims.isEmpty() -> Text(
-                    "未检测到可用 SIM",
+                    stringResource(R.string.msg_composer_no_sim),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
@@ -268,7 +294,7 @@ fun MessageComposer(
                     Icon(Icons.Default.SimCard, null, Modifier.size(14.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        currentSim?.displayName ?: "选择 SIM",
+                        currentSim?.displayName ?: stringResource(R.string.msg_composer_select_sim),
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -278,7 +304,12 @@ fun MessageComposer(
             }
         }
         if ((state.busy || contactPicker.busy) && !state.accepted) {
-            Text("正在处理，请稍候…", Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(R.string.msg_composer_processing),
+                Modifier.padding(horizontal = 8.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         val error = localError ?: state.error
         if (error != null) {
@@ -288,21 +319,23 @@ fun MessageComposer(
             }
         }
         if (state.importBlocked && !state.busy) {
-            TextButton(onClick = viewModel::acknowledgeImportRemoval) { Text("移除导入失败项，保留现有内容") }
+            TextButton(onClick = viewModel::acknowledgeImportRemoval) {
+                Text(stringResource(R.string.msg_composer_remove_failed_imports))
+            }
         }
     }
     if (menu) {
         ModalBottomSheet(onDismissRequest = { menu = false }) {
-            Text("添加到消息", Modifier.padding(start = 24.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.msg_composer_add_to_message), Modifier.padding(start = 24.dp, bottom = 16.dp), style = MaterialTheme.typography.titleLarge)
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                AttachmentAction("照片与视频", Icons.Default.PhotoLibrary) { menu = false; media.launch(arrayOf("image/*", "video/*")) }
-                AttachmentAction("拍照", Icons.Default.PhotoCamera) { menu = false; localError = null; capture.photo() }
-                AttachmentAction("文件", Icons.Default.AttachFile) { menu = false; media.launch(arrayOf("*/*")) }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_media), Icons.Default.PhotoLibrary) { menu = false; media.launch(arrayOf("image/*", "video/*")) }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_camera), Icons.Default.PhotoCamera) { menu = false; localError = null; capture.photo() }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_file), Icons.Default.AttachFile) { menu = false; media.launch(arrayOf("*/*")) }
             }
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                AttachmentAction("音频", Icons.Default.AudioFile) { menu = false; media.launch(arrayOf("audio/*")) }
-                AttachmentAction("录音", Icons.Default.Mic) { menu = false; localError = null; capture.record() }
-                AttachmentAction("联系人", Icons.Default.Person) { menu = false; localError = null; contactPicker.launch() }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_audio), Icons.Default.AudioFile) { menu = false; media.launch(arrayOf("audio/*")) }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_record), Icons.Default.Mic) { menu = false; localError = null; capture.record() }
+                AttachmentAction(stringResource(R.string.msg_composer_attach_contact), Icons.Default.Person) { menu = false; localError = null; contactPicker.launch() }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
@@ -312,12 +345,12 @@ fun MessageComposer(
         ModalBottomSheet(onDismissRequest = { simSheet = false }) {
             Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Text(
-                    "选择发送 SIM",
+                    stringResource(R.string.msg_composer_select_sim_title),
                     Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    "短信会通过所选 SIM 发送，选择只影响当前会话。",
+                    stringResource(R.string.msg_composer_select_sim_desc),
                     Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -353,13 +386,13 @@ fun MessageComposer(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(card.displayName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
-                                "卡槽 ${card.slotIndex + 1}",
+                                stringResource(R.string.msg_sim_slot, card.slotIndex + 1),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         if (selected) {
-                            Text("当前使用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.msg_composer_sim_in_use), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -371,10 +404,28 @@ fun MessageComposer(
         AlertDialog(
             onDismissRequest = { confirm = false },
             icon = { Icon(if (state.possibleDuplicateOf != null) Icons.Default.WarningAmber else Icons.Default.Info, null) },
-            title = { Text(if (state.possibleDuplicateOf != null) "仍要再次发送？" else "发送彩信") },
+            title = {
+                Text(
+                    stringResource(
+                        if (state.possibleDuplicateOf != null) R.string.msg_composer_duplicate_title
+                        else R.string.msg_composer_send_mms_title,
+                    )
+                )
+            },
             text = {
-                Text(if (state.possibleDuplicateOf != null) "上一条消息的结果未知，对方可能已经收到。再次发送可能造成重复送达和重复收费。"
-                    else "将向 ${draft?.recipientAddress.orEmpty()} 发送彩信，使用 ${state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }?.displayName ?: "所选 SIM"}。运营商可能收取费用，后续彩信不再重复提示。")
+                Text(
+                    if (state.possibleDuplicateOf != null) {
+                        stringResource(R.string.msg_composer_duplicate_desc)
+                    } else {
+                        val simName = state.sims.firstOrNull { it.subscriptionId == draft?.subscriptionId }?.displayName
+                            ?: stringResource(R.string.msg_composer_selected_sim_fallback)
+                        stringResource(
+                            R.string.msg_composer_send_mms_desc,
+                            draft?.recipientAddress.orEmpty(),
+                            simName,
+                        )
+                    }
+                )
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -383,9 +434,16 @@ fun MessageComposer(
                     // 若异步保存失败，下次再次提示费用，不放宽发送权限。
                     if (isMms) consent.edit { putBoolean("acknowledged", true) }
                     viewModel.submit()
-                }) { Text(if (state.possibleDuplicateOf != null) "仍然发送" else "确认发送") }
+                }) {
+                    Text(
+                        stringResource(
+                            if (state.possibleDuplicateOf != null) R.string.msg_composer_send_anyway
+                            else R.string.msg_composer_confirm_send,
+                        )
+                    )
+                }
             },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.msg_action_cancel)) } },
         )
     }
 }
@@ -422,11 +480,12 @@ private fun ComposerAttachment(attachment: MmsAttachment, enabled: Boolean, onRe
     }
     Box(Modifier.width(if (visual) 112.dp else 216.dp).height(112.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
         if (visual) {
-            if (attachment.originalMime.startsWith("image/")) AsyncImage(file, "图片附件", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            else {
-                thumbnail?.let { Image(it, "视频附件", Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                Icon(Icons.Default.PlayCircle, "视频附件", Modifier.align(Alignment.Center).size(36.dp), tint = if (thumbnail != null) Color.White else MaterialTheme.colorScheme.onSurface)
-                Text("视频 · ${attachmentSize(attachment.originalSize)}",
+            if (attachment.originalMime.startsWith("image/")) {
+                AsyncImage(file, stringResource(R.string.msg_composer_image_attachment_cd), Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                thumbnail?.let { Image(it, stringResource(R.string.msg_composer_video_attachment_cd), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                Icon(Icons.Default.PlayCircle, stringResource(R.string.msg_composer_video_attachment_cd), Modifier.align(Alignment.Center).size(36.dp), tint = if (thumbnail != null) Color.White else MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.msg_composer_video_size, attachmentSize(attachment.originalSize)),
                     Modifier.align(Alignment.BottomStart).fillMaxWidth().background(MaterialTheme.colorScheme.surface.copy(alpha = .9f)).padding(6.dp),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
             }
@@ -446,18 +505,27 @@ private fun ComposerAttachment(attachment: MmsAttachment, enabled: Boolean, onRe
                             next.prepareAsync()
                         }.onFailure { playbackError = true; stop() }
                     }
-                }, enabled = enabled && file != null) { Icon(if (playing) Icons.Default.StopCircle else Icons.Default.PlayCircle, if (playing) "停止试听" else "试听音频") }
+                }, enabled = enabled && file != null) {
+                    Icon(
+                        if (playing) Icons.Default.StopCircle else Icons.Default.PlayCircle,
+                        stringResource(if (playing) R.string.msg_composer_stop_preview_cd else R.string.msg_composer_play_preview_cd),
+                    )
+                }
                 else Icon(if (attachment.originalMime in setOf("text/vcard", "text/x-vcard", "application/vcard", "application/x-vcard")) Icons.Default.ContactPage else Icons.AutoMirrored.Filled.InsertDriveFile,
                     null, Modifier.size(32.dp))
                 Column(Modifier.padding(start = 6.dp)) {
                     Text(attachment.displayName, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
-                    Text(if (playbackError) "无法试听" else attachmentSize(attachment.originalSize), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (playbackError) stringResource(R.string.msg_composer_cannot_preview) else attachmentSize(attachment.originalSize),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
         FilledIconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp), shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .9f))) {
-            Icon(Icons.Default.Close, "移除附件 ${attachment.displayName}", Modifier.size(16.dp))
+            Icon(Icons.Default.Close, stringResource(R.string.msg_composer_remove_attachment_cd, attachment.displayName), Modifier.size(16.dp))
         }
         attachment.error?.let { Text(it, Modifier.align(Alignment.BottomStart).background(MaterialTheme.colorScheme.errorContainer).padding(4.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.labelSmall, maxLines = 2) }
     }

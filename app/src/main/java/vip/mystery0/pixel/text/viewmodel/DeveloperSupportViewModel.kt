@@ -13,9 +13,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.SupportChannel
 import vip.mystery0.pixel.text.domain.model.SupportChannelId
 import vip.mystery0.pixel.text.domain.repository.DeveloperSupportRepository
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.IOException
 
 data class SupportQrState(
@@ -93,11 +95,11 @@ class DeveloperSupportViewModel(private val repository: DeveloperSupportReposito
         viewModelScope.launch {
             try {
                 repository.saveQrCode(channel, bytes)
-                _message.value = "收款码已保存到相册"
+                _message.value = AppStrings.get(R.string.sys_support_qr_saved)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _message.value = "保存失败，请稍后重试"
+                _message.value = AppStrings.get(R.string.sys_support_qr_save_failed)
             } finally {
                 updateImage(channel.id) { it.copy(saving = false) }
             }

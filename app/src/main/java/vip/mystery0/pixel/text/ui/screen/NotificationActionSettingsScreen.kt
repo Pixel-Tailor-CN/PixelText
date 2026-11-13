@@ -51,9 +51,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.NOTIFICATION_CODE_PLACEHOLDER
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
@@ -111,13 +113,13 @@ fun NotificationActionSettingsScreen(
                     IconButton(onClick = ::requestNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.settings_action_back)
                         )
                     }
                 },
                 title = {
                     Text(
-                        text = "通知快捷操作",
+                        text = stringResource(R.string.settings_notification_actions_title),
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
@@ -126,7 +128,7 @@ fun NotificationActionSettingsScreen(
                         onClick = ::saveAndExit,
                         enabled = canSave
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.settings_action_save))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -155,7 +157,7 @@ fun NotificationActionSettingsScreen(
             item(key = "editor_title") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "按钮顺序与文案",
+                        text = stringResource(R.string.settings_notif_action_order_title),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -185,14 +187,16 @@ fun NotificationActionSettingsScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("保存更改？") },
+            title = { Text(stringResource(R.string.settings_notif_action_discard_title)) },
             text = {
                 Text(
-                    if (validationErrors.values.all { it == null }) {
-                        "当前修改尚未保存，离开后会丢失。"
-                    } else {
-                        "当前修改尚未保存，且仍有文案错误需要修正。"
-                    }
+                    stringResource(
+                        if (validationErrors.values.all { it == null }) {
+                            R.string.settings_notif_action_discard_unsaved
+                        } else {
+                            R.string.settings_notif_action_discard_errors
+                        },
+                    ),
                 )
             },
             confirmButton = {
@@ -203,7 +207,7 @@ fun NotificationActionSettingsScreen(
                     },
                     enabled = canSave
                 ) {
-                    Text("保存")
+                    Text(stringResource(R.string.settings_action_save))
                 }
             },
             dismissButton = {
@@ -214,10 +218,10 @@ fun NotificationActionSettingsScreen(
                             onNavigateBack()
                         }
                     ) {
-                        Text("放弃更改")
+                        Text(stringResource(R.string.settings_notif_action_discard_btn))
                     }
                     TextButton(onClick = { showDiscardDialog = false }) {
-                        Text("继续编辑")
+                        Text(stringResource(R.string.settings_customization_keep_editing))
                     }
                 }
             }
@@ -240,7 +244,7 @@ private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "验证码通知预览",
+                text = stringResource(R.string.settings_notif_action_preview_title),
                 style = MaterialTheme.typography.titleMedium
             )
             Row(
@@ -273,17 +277,17 @@ private fun NotificationPreviewCard(actions: List<NotificationQuickActionConfig>
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Pixel 安全中心",
+                            text = stringResource(R.string.settings_notif_action_preview_sender),
                             style = MaterialTheme.typography.titleSmall
                         )
                         Text(
-                            text = "刚刚",
+                            text = stringResource(R.string.settings_notif_action_preview_time),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Text(
-                        text = "您的登录验证码为 123456，5 分钟内有效，请勿泄露给他人。",
+                        text = stringResource(R.string.settings_notif_action_preview_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -459,7 +463,7 @@ private fun NotificationActionEditorCard(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = "长按拖动排序",
+                        contentDescription = stringResource(R.string.settings_notif_action_drag_cd),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -470,14 +474,14 @@ private fun NotificationActionEditorCard(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = error != null,
-                label = { Text("按钮文案") },
+                label = { Text(stringResource(R.string.settings_notif_action_label)) },
                 supportingText = {
                     Text(
                         text = error
                             ?: if (type == NotificationQuickActionType.COPY_CODE) {
-                                "可选使用 $NOTIFICATION_CODE_PLACEHOLDER，占位符不计入长度"
+                                stringResource(R.string.settings_notif_action_copy_hint, NOTIFICATION_CODE_PLACEHOLDER)
                             } else {
-                                "最多 4 个中文或 8 个英文"
+                                stringResource(R.string.settings_notif_action_length_hint)
                             }
                     )
                 }

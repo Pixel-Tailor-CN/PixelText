@@ -9,10 +9,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.PixelTextHubClient
 import vip.mystery0.pixel.text.domain.hub.*
 import vip.mystery0.pixel.text.domain.sample.SampleCategory
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.util.AppStrings
 import java.util.UUID
 
 class SampleSubmissionRepository(
@@ -48,12 +50,16 @@ class SampleSubmissionRepository(
         learningFeedback: LearningFeedback? = null): SampleReportSubmission =
         submitMutex.withLock {
             // 其他页面已持久化的请求优先恢复，不能把另一份表单覆盖进去。
-            if (localStore.pending() != null) throw SampleReportException("PENDING_EXISTS", "有一条提交尚未确认，请先恢复本次提交")
+            if (localStore.pending() != null) {
+                throw SampleReportException("PENDING_EXISTS", context.getString(R.string.domain_sample_submit_pending_exists))
+            }
             val modelVersion = withContext(kotlinx.coroutines.Dispatchers.IO) { resources.currentModelBundle().version }
             val versions = listOf(BuildConfig.VERSION_NAME, settings.getRuleResourceVersion(), modelVersion)
             validationError(content, sender, category, versions)?.let { throw SampleReportException("VALIDATION", it) }
             val identity = identity()
-            if (identity.androidId.isEmpty()) throw SampleReportException("DEVICE_ID", "无法读取有效的设备标识，暂不能提交")
+            if (identity.androidId.isEmpty()) {
+                throw SampleReportException("DEVICE_ID", context.getString(R.string.domain_sample_submit_invalid_device_id))
+            }
             checkSubmitCooldown()
             val request = localStore.confirm(SampleReportRequest(identity.androidId, identity.installationId,
                 UUID.randomUUID().toString(), content.trim(), sender.trim(), category,
@@ -64,7 +70,8 @@ class SampleSubmissionRepository(
         }
 
     suspend fun retryPending(onPersisted: (SampleReportRequest) -> Unit): SampleReportSubmission = submitMutex.withLock {
-        val request = localStore.pending() ?: throw SampleReportException("NO_PENDING", "没有待确认的提交，请返回重新打开页面")
+        val request = localStore.pending()
+            ?: throw SampleReportException("NO_PENDING", context.getString(R.string.domain_sample_submit_no_pending))
         onPersisted(request)
         checkSubmitCooldown()
         // 列表不含 clientRequestId，摘要相似不能证明成功；仅幂等提交响应可结束该请求。
@@ -84,7 +91,7 @@ class SampleSubmissionRepository(
         try {
             val result = client.submitReport(request)
             if (!isValidSampleReportId(result.report.summary.id)) {
-                throw SampleReportException("INVALID_RESPONSE", "服务响应不完整，已保留本次提交")
+                throw SampleReportException("INVALID_RESPONSE", context.getString(R.string.domain_sample_submit_incomplete_response))
             }
             withContext(NonCancellable) {
                 // 草稿清理失败不影响已确认响应；请求清理放在最后，失败时仍可幂等恢复。
@@ -106,18 +113,20 @@ class SampleSubmissionRepository(
 
     private fun checkSubmitCooldown() {
         val remaining = (submitRetryAt - System.currentTimeMillis() + 999) / 1000
-        if (remaining > 0) throw SampleReportException("RATE_LIMITED", "请求过于频繁，请稍后重试", remaining)
+        if (remaining > 0) {
+            throw SampleReportException("RATE_LIMITED", context.getString(R.string.domain_sample_submit_rate_limited), remaining)
+        }
     }
 
     companion object {
         fun validationError(content: String, sender: String, category: String, versions: List<String> = emptyList()): String? {
             val text = content.trim()
             return when {
-                text.codePointCount(0, text.length) < 6 -> "样本文本至少需要 6 个字符"
-                text.toByteArray(Charsets.UTF_8).size > 64 * 1024 -> "样本文本不能超过 64 KiB，请减少内容"
-                sender.codePointCount(0, sender.length) > 256 -> "发送方不能超过 256 个字符"
-                SampleCategory.fromValue(category) == null -> "请选择有效的样本类别"
-                versions.any { it.codePointCount(0, it.length) > 128 } -> "资源版本信息过长，请更新资源后重试"
+                text.codePointCount(0, text.length) < 6 -> AppStrings.get(R.string.domain_sample_validation_too_short)
+                text.toByteArray(Charsets.UTF_8).size > 64 * 1024 -> AppStrings.get(R.string.domain_sample_validation_too_large)
+                sender.codePointCount(0, sender.length) > 256 -> AppStrings.get(R.string.domain_sample_validation_sender_too_long)
+                SampleCategory.fromValue(category) == null -> AppStrings.get(R.string.domain_sample_validation_invalid_category)
+                versions.any { it.codePointCount(0, it.length) > 128 } -> AppStrings.get(R.string.domain_sample_validation_versions_too_long)
                 else -> null
             }
         }

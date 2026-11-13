@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.core.net.toUri
 import com.squareup.moshi.Moshi
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.AppSettingsRepositoryImpl
 import vip.mystery0.pixel.text.domain.settings.AppSettingsKeys
 import vip.mystery0.pixel.text.domain.settings.ConversationSwipeAction
@@ -12,7 +13,10 @@ import vip.mystery0.pixel.text.domain.settings.SpamAutoAction
 import vip.mystery0.pixel.text.domain.settings.SmsNotificationIcon
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionConfig
 import vip.mystery0.pixel.text.domain.settings.NotificationQuickActionType
+import vip.mystery0.pixel.text.domain.settings.defaultLabelTemplate
+import vip.mystery0.pixel.text.domain.settings.defaultOrder
 import vip.mystery0.pixel.text.domain.settings.preferenceLabelKey
+import vip.mystery0.pixel.text.domain.settings.preferenceOrderKey
 import vip.mystery0.pixel.text.domain.settings.validationError
 import vip.mystery0.pixel.text.domain.theme.*
 import vip.mystery0.pixel.text.smartspacer.UnreadSmsComplicationSettings
@@ -42,7 +46,8 @@ class BackupSettingsMapper(
         }
         val config = theme.configuration.value
         references(config).forEach { ref ->
-            val source = assets.resolve(ref) ?: throw BackupException("主题背景文件缺失，请重新选择背景后备份")
+            val source = assets.resolve(ref)
+                ?: throw BackupException(context.getString(R.string.domain_backup_error_theme_bg_missing))
             val target = File(directory, "theme/${ref.assetId}.webp")
             target.parentFile!!.mkdirs()
             backupRequire(source.length() <= 32L * 1024 * 1024)
@@ -57,7 +62,8 @@ class BackupSettingsMapper(
     fun validate(directory: File): BackupSettings {
         val file = File(directory, "settings.json")
         backupRequire(file.isFile && file.length() <= 4L * 1024 * 1024)
-        val settings = adapter.fromJson(file.readText()) ?: throw BackupException("设置数据无效")
+        val settings = adapter.fromJson(file.readText())
+            ?: throw BackupException(context.getString(R.string.domain_backup_error_invalid_settings_data))
         backupRequire(settings.preferences.map { it.key }.toSet().size == settings.preferences.size)
         backupRequire(settings.preferences.map { it.key }.toSet() == SPECS.map { it.key }.toSet())
         settings.preferences.forEach { entry ->
@@ -70,7 +76,10 @@ class BackupSettingsMapper(
                 "long" -> backupRequire(entry.value.toLongOrNull() != null)
             }
             NotificationQuickActionType.entries.firstOrNull { it.preferenceLabelKey() == entry.key }?.let { type ->
-                backupRequire(NotificationQuickActionConfig(type, entry.value, 0).validationError() == null, "通知快捷操作文案无效")
+                backupRequire(
+                    NotificationQuickActionConfig(type, entry.value, 0).validationError() == null,
+                    context.getString(R.string.domain_backup_error_invalid_quick_action),
+                )
             }
             when (entry.key) {
                 "verification_code_retention_days" -> backupRequire(entry.value.toInt() in 1..365)
@@ -82,7 +91,10 @@ class BackupSettingsMapper(
             }
         }
         backupRequire(settings.theme.schemaVersion == CURRENT_THEME_SCHEMA_VERSION)
-        backupRequire(settings.theme == settings.theme.normalized(), "主题配置超出允许范围")
+        backupRequire(
+            settings.theme == settings.theme.normalized(),
+            context.getString(R.string.domain_backup_error_theme_out_of_range),
+        )
         val expected = references(settings.theme).map { "${it.assetId}.webp" }.toSet()
         backupRequire(File(directory, "theme").listFiles().orEmpty().map { it.name }.toSet() == expected)
         for ((assetId) in references(settings.theme)) {
@@ -90,7 +102,10 @@ class BackupSettingsMapper(
             backupRequire(image.isFile && image.length() <= 32L * 1024 * 1024)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(image.path, bounds)
-            backupRequire(bounds.outWidth in 1..8192 && bounds.outHeight in 1..8192, "主题图片无效或尺寸过大")
+            backupRequire(
+                bounds.outWidth in 1..8192 && bounds.outHeight in 1..8192,
+                context.getString(R.string.domain_backup_error_theme_image_invalid),
+            )
         }
         return settings
     }
@@ -119,9 +134,20 @@ class BackupSettingsMapper(
             themeCommitted = true
             val activeReferences = references(theme.configuration.value).toSet()
             previousReferences.filter { it !in activeReferences }.forEach(assets::deleteAsset)
-            backupRequire(app.restorePortablePreferences(settings.preferences), "应用设置保存失败，部分主题可能已恢复")
-            backupRequire(smartspacer.restoreDefaultSettings(UnreadSmsComplicationSettings(
-                settings.includeNormal, settings.includeSpam, settings.includeArchived)), "默认筛选设置保存失败")
+            backupRequire(
+                app.restorePortablePreferences(settings.preferences),
+                context.getString(R.string.domain_backup_error_save_app_settings_failed),
+            )
+            backupRequire(
+                smartspacer.restoreDefaultSettings(
+                    UnreadSmsComplicationSettings(
+                        settings.includeNormal,
+                        settings.includeSpam,
+                        settings.includeArchived,
+                    ),
+                ),
+                context.getString(R.string.domain_backup_error_save_filter_settings_failed),
+            )
         } finally {
             if (!themeCommitted) created.forEach { assets.deleteAsset(it.second) }
         }
@@ -132,31 +158,32 @@ class BackupSettingsMapper(
 
     companion object {
         // 显式列表：资源版本、任务进度、教学提示等不会随新设置自动进入备份。
-        val SPECS: List<PortablePreference> = buildList {
-            fun bool(key: String, value: Boolean) { add(PortablePreference(key, "boolean", value.toString())) }
-            bool("auto_download_mms", false)
-            bool("spam_detection_enabled", true)
-            bool("mute_spam_notifications_enabled", false)
-            bool("spam_isolation_enabled", false)
-            bool("show_spam_content_by_default", false)
-            bool("smart_card_enabled", true)
-            bool("verification_code_notification_action_enabled", true)
-            bool("hide_verification_code_on_lock_screen_enabled", true)
-            bool("show_verification_code_content_by_default", true)
-            bool("verification_code_auto_delete_enabled", false)
-            bool("unread_badge_enabled", true)
-            bool("resource_auto_check_enabled", false)
-            add(PortablePreference("spam_auto_action", "string", "none"))
-            add(PortablePreference("verification_code_retention_days", "int", "7"))
-            add(PortablePreference("message_time_display_format", "string", "humanized"))
-            add(PortablePreference("right_swipe_action", "string", "toggle_read"))
-            add(PortablePreference("left_swipe_action", "string", "archive"))
-            add(PortablePreference("sms_notification_icon_id", "string", AppSettingsKeys.DEFAULT_SMS_NOTIFICATION_ICON_ID))
-            add(PortablePreference("resource_auto_check_interval_hours", "long", "24"))
-            for ((index, pair) in listOf("mark_read" to "已阅", "copy_code" to "复制 {code}", "reply" to "回复").withIndex()) {
-                add(PortablePreference("notification_action_${pair.first}_label", "string", pair.second))
-                add(PortablePreference("notification_action_${pair.first}_order", "int", index.toString()))
+        val SPECS: List<PortablePreference>
+            get() = buildList {
+                fun bool(key: String, value: Boolean) { add(PortablePreference(key, "boolean", value.toString())) }
+                bool("auto_download_mms", false)
+                bool("spam_detection_enabled", true)
+                bool("mute_spam_notifications_enabled", false)
+                bool("spam_isolation_enabled", false)
+                bool("show_spam_content_by_default", false)
+                bool("smart_card_enabled", true)
+                bool("verification_code_notification_action_enabled", true)
+                bool("hide_verification_code_on_lock_screen_enabled", true)
+                bool("show_verification_code_content_by_default", true)
+                bool("verification_code_auto_delete_enabled", false)
+                bool("unread_badge_enabled", true)
+                bool("resource_auto_check_enabled", false)
+                add(PortablePreference("spam_auto_action", "string", "none"))
+                add(PortablePreference("verification_code_retention_days", "int", "7"))
+                add(PortablePreference("message_time_display_format", "string", "humanized"))
+                add(PortablePreference("right_swipe_action", "string", "toggle_read"))
+                add(PortablePreference("left_swipe_action", "string", "archive"))
+                add(PortablePreference("sms_notification_icon_id", "string", AppSettingsKeys.DEFAULT_SMS_NOTIFICATION_ICON_ID))
+                add(PortablePreference("resource_auto_check_interval_hours", "long", "24"))
+                for (type in NotificationQuickActionType.entries) {
+                    add(PortablePreference(type.preferenceLabelKey(), "string", type.defaultLabelTemplate()))
+                    add(PortablePreference(type.preferenceOrderKey(), "int", type.defaultOrder().toString()))
+                }
             }
-        }
     }
 }

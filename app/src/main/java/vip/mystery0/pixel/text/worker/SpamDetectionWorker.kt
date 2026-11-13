@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withPermit
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.SenderProfileRepository
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -125,7 +126,7 @@ class SpamDetectionWorker(
         // 模型执行期间可能新增白名单。最终自动操作和通知与规则修改串行化，不能使用过期判定。
         // save 自行获取白名单锁，必须位于后面的 withMessageDecision 临界区之外。
         val key = vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey.create("SMS", messageId, sender, row.date, content)
-        val messageSource = vip.mystery0.pixel.text.data.source.LearningMessageSource(applicationContext.contentResolver)
+        val messageSource = vip.mystery0.pixel.text.data.source.LearningMessageSource(applicationContext.contentResolver, context = applicationContext)
         var stale = false
         restoreSafety.liveMessageEffects(messageId) { allowAutoAction ->
             if (prediction != null && spamRepository.isEnabled() && !spamRepository.savePrediction(messageId, prediction, key)) {
@@ -215,7 +216,7 @@ class SpamDetectionWorker(
         if (sender.isBlank()) return
         if (deferNotification && isSpam) return
         val notificationBody = if (isSpam) {
-            "已识别为骚扰短信，内容已自动隐藏"
+            applicationContext.getString(R.string.sys_spam_hidden_notification_body)
         } else {
             content
         }

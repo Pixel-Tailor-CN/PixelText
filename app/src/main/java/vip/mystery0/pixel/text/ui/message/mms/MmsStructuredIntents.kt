@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.provider.CalendarContract
 import android.provider.ContactsContract
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsCalendarModel
 import vip.mystery0.pixel.text.domain.model.mms.MmsContactModel
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 用户点击后只打开系统编辑页，由用户决定是否保存。 */
 internal fun contactInsertIntent(contact: MmsContactModel): Intent {
@@ -41,7 +43,7 @@ internal fun contactInsertIntent(contact: MmsContactModel): Intent {
 
 internal fun calendarInsertIntent(event: MmsCalendarModel): Intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
     require(event.canImport)
-    putExtra(CalendarContract.Events.TITLE, event.title ?: "未命名事件")
+    putExtra(CalendarContract.Events.TITLE, event.title ?: AppStrings.get(R.string.msg_mms_calendar_untitled_event))
     putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, requireNotNull(event.start).toEpochMilli())
     putExtra(CalendarContract.EXTRA_EVENT_END_TIME, requireNotNull(event.end).toEpochMilli())
     putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, event.allDay)
@@ -59,12 +61,12 @@ internal fun launchMmsStructuredIntent(context: Context, feedback: (String) -> U
     try {
         context.startActivity(createIntent())
     } catch (_: ActivityNotFoundException) {
-        feedback("未找到可处理此操作的应用，可保存或打开原件")
+        feedback(context.getString(R.string.msg_mms_intent_no_app))
     } catch (_: SecurityException) {
-        feedback("系统不允许打开此操作，可保存或打开原件")
+        feedback(context.getString(R.string.msg_mms_intent_security))
     } catch (_: IllegalArgumentException) {
-        feedback("此字段无法交给系统应用，请核对原件")
+        feedback(context.getString(R.string.msg_mms_intent_invalid_arg))
     } catch (_: ArithmeticException) {
-        feedback("日期或时长超出系统支持范围，请打开原件")
+        feedback(context.getString(R.string.msg_mms_intent_overflow))
     }
 }

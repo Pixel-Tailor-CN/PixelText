@@ -23,10 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 
 /** 规则条目以编辑为主要操作，删除仅在主动打开菜单时展示。 */
 @Composable
@@ -37,14 +39,16 @@ fun RuleItemCard(
     onDelete: () -> Unit,
     enabled: Boolean = true,
     titleMaxLines: Int = Int.MAX_VALUE,
-    editDescription: String = "编辑 $title",
-    deleteDescription: String = "删除",
+    editDescription: String? = null,
+    deleteDescription: String? = null,
 ) {
+    val resolvedEditDescription = editDescription ?: stringResource(R.string.settings_rule_edit_cd, title)
+    val resolvedDeleteDescription = deleteDescription ?: stringResource(R.string.settings_action_delete)
     var showMenu by remember { mutableStateOf(false) }
     Card(
         onClick = onEdit,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = editDescription },
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = resolvedEditDescription },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
@@ -70,12 +74,15 @@ fun RuleItemCard(
             }
             Box {
                 IconButton(onClick = { showMenu = true }, enabled = enabled) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "$title 的选项")
+                    Icon(
+                        Icons.Rounded.MoreVert,
+                        contentDescription = stringResource(R.string.settings_rule_options_cd, title),
+                    )
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
-                        text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                        modifier = Modifier.semantics { contentDescription = deleteDescription },
+                        text = { Text(stringResource(R.string.settings_action_delete), color = MaterialTheme.colorScheme.error) },
+                        modifier = Modifier.semantics { contentDescription = resolvedDeleteDescription },
                         enabled = enabled,
                         onClick = { showMenu = false; onDelete() },
                     )

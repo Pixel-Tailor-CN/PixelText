@@ -52,10 +52,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 
 @Composable
 fun SearchPhoneScreen(
@@ -67,6 +70,7 @@ fun SearchPhoneScreen(
     var draftDisplayName by rememberSaveable { mutableStateOf(currentFilter.phoneDisplayName) }
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
 
@@ -87,14 +91,14 @@ fun SearchPhoneScreen(
                             viewModel.setPhoneNumberFilter(picked.number, picked.displayName)
                             onNavigateBack()
                         } else {
-                            Toast.makeText(context, "未能读取所选号码，请手动输入", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.msg_search_phone_read_failed), Toast.LENGTH_SHORT).show()
                         }
                     } catch (_: Exception) {
-                        Toast.makeText(context, "未能读取所选号码，请手动输入", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resources.getString(R.string.msg_search_phone_read_failed), Toast.LENGTH_SHORT).show()
                     }
                 }
             } else {
-                Toast.makeText(context, "未能读取所选号码，请手动输入", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.msg_search_phone_read_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -132,7 +136,7 @@ fun SearchPhoneScreen(
                             decorationBox = { innerTextField ->
                                 if (draftNumber.isEmpty()) {
                                     Text(
-                                        text = "输入电话号码",
+                                        text = stringResource(R.string.msg_search_phone_hint),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -147,7 +151,7 @@ fun SearchPhoneScreen(
                             }) {
                                 Icon(
                                     imageVector = Icons.Rounded.Close,
-                                    contentDescription = "清空输入"
+                                    contentDescription = stringResource(R.string.msg_search_clear_input_cd)
                                 )
                             }
                         }
@@ -157,7 +161,7 @@ fun SearchPhoneScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.msg_action_back)
                         )
                     }
                 },
@@ -198,7 +202,7 @@ fun SearchPhoneScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "查看与 $draftNumber 相关的会话",
+                            text = stringResource(R.string.msg_search_view_conversations, draftNumber),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -229,7 +233,7 @@ fun SearchPhoneScreen(
                             }
                             pickPhoneLauncher.launch(intent)
                         } catch (_: Exception) {
-                            Toast.makeText(context, "未能读取所选号码，请手动输入", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.msg_search_phone_read_failed), Toast.LENGTH_SHORT).show()
                         }
                     }
                     .padding(horizontal = 20.dp, vertical = 16.dp),
@@ -243,7 +247,7 @@ fun SearchPhoneScreen(
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "从联系人选择",
+                    text = stringResource(R.string.msg_search_pick_contact),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -270,7 +274,7 @@ fun SearchPhoneScreen(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "清除号码筛选",
+                        text = stringResource(R.string.msg_search_clear_phone),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.primary
                     )

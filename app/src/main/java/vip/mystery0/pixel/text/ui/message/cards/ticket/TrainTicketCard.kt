@@ -23,8 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
@@ -69,7 +71,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean
                 icon = Icons.Rounded.DirectionsRailway,
                 iconTint = accentColor,
                 iconBg = if (isSelected) onContainerColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primaryContainer,
-                title = "火车票",
+                title = stringResource(R.string.msg_card_train_title),
                 dividerColor = onContainerColor.copy(alpha = 0.1f)
             )
 
@@ -164,6 +166,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean
             DashedDivider(color = accentColor.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
 
+            val gateLabel = stringResource(R.string.domain_parser_detail_gate)
             val detailEntries = result.details.entries.toList()
             val chunkedEntries = detailEntries.chunked(2)
 
@@ -177,7 +180,7 @@ fun TrainTicketCard(result: ParsedResult.Ticket.TrainTicket, isSelected: Boolean
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         rowEntries.forEach { entry ->
-                            val isHighlight = entry.key == "检票口"
+                            val isHighlight = entry.key == gateLabel
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) onContainerColor.copy(alpha = 0.05f) else baseThemeColor.copy(

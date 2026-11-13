@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通用与短信撰写 -->
+    <string name="sys_back">Back</string>
+    <string name="sys_unknown_error">Unknown error</string>
+    <string name="sys_compose_select_recipient">Select recipient</string>
+    <string name="sys_compose_phone_hint">Enter phone number</string>
+    <string name="sys_compose_next">Next</string>
+
+    <!-- SIM 卡信息 -->
+    <string name="sys_sim_slot_fallback">SIM %1$d</string>
+
+    <!-- 彩信接收与附件准备 -->
+    <string name="sys_mms_received_subject_fallback">New MMS received</string>
+    <string name="sys_mms_unknown_sender">Unknown sender</string>
+    <string name="sys_mms_attach_picker_only">Only attachments chosen through the system picker are supported</string>
+    <string name="sys_mms_attach_default_name">Attachment</string>
+    <string name="sys_mms_attach_original_too_large">Original attachment cannot exceed 32 MiB</string>
+    <string name="sys_mms_attach_cannot_open">Unable to open attachment, please choose again</string>
+    <string name="sys_mms_attach_cannot_read">Unable to read attachment, please check the file and choose again</string>
+    <string name="sys_mms_attach_limit_exceeded">Message text and attachments exceed the MMS limit, please reduce content</string>
+    <string name="sys_mms_attach_missing_or_changed">Original attachment is missing or has changed, please choose again</string>
+    <string name="sys_mms_attach_invalid_type">Invalid attachment type, please choose again</string>
+    <string name="sys_mms_attach_animated_exceeds_limit">Animated image exceeds the selected SIM\'s dimension or size limit. Please remove or replace it; it will not be converted to a static image</string>
+    <string name="sys_mms_attach_note_animated_original">Kept original animated image; file may contain original metadata</string>
+    <string name="sys_mms_attach_media_exceeds_budget">Audio, video, or file exceeds this MMS attachment budget, please remove or replace</string>
+    <string name="sys_mms_attach_note_plain_file_fallback">Kept original bytes and sent as a generic file to avoid text encoding loss or external presentation; file may contain original metadata</string>
+    <string name="sys_mms_attach_note_original_generic">Sent as original file; file may contain original metadata and the recipient may not support this format</string>
+    <string name="sys_mms_attach_prepare_failed">Unable to prepare attachment, please try another file</string>
+    <string name="sys_mms_attach_invalid_image_format">Invalid image format</string>
+    <string name="sys_mms_attach_cannot_read_image_size">Unable to read image dimensions</string>
+    <string name="sys_mms_attach_cannot_read_image">Unable to read image</string>
+    <string name="sys_mms_attach_animated_no_static_convert">Animated images cannot be automatically converted to static images</string>
+    <string name="sys_mms_attach_note_png_resized">Resized and oriented image for selected SIM, removed metadata, kept transparency</string>
+    <string name="sys_mms_attach_note_jpeg_flattened">Resized and converted to JPEG with white background, removed original metadata</string>
+    <string name="sys_mms_attach_note_jpeg_resized">Adjusted image size, orientation, and quality for selected SIM, removed original metadata</string>
+    <string name="sys_mms_attach_image_still_too_large">Image still exceeds budget after compression, please reduce attachments or choose another image</string>
+    <string name="sys_mms_attach_image_exceeds_budget">Image exceeds MMS budget</string>
+    <string name="sys_mms_attach_image_pixels_exceeded">Image dimensions are invalid or exceed 64 megapixels</string>
+    <string name="sys_mms_attach_png_corrupt">Incomplete PNG image structure</string>
+
+    <!-- 彩信外部输入 -->
+    <string name="sys_mms_ext_invalid_input">Invalid shared attachment or recipient info, please choose again and confirm</string>
+    <string name="sys_mms_ext_single_recipient_only">Only single-recipient MMS is supported here. Please confirm one phone number; original recipients were not used</string>
+    <string name="sys_mms_ext_missing_attachment">Shared attachment is missing. Please choose files again or explicitly remove unimported attachments to continue</string>
+    <string name="sys_mms_ext_too_many_attachments">Only up to 10 authorized content attachments are accepted, please choose files again</string>
+    <string name="sys_mms_ext_text_too_long">Shared text is too long, please re-enter it in the editor</string>
+
+    <!-- 彩信存储与发送 -->
+    <string name="sys_mms_store_low_space_choose">Insufficient storage space, please free up space and choose attachment again</string>
+    <string name="sys_mms_store_empty_attachment">Attachment is empty, please choose again</string>
+    <string name="sys_mms_store_save_attachment_failed">Unable to save attachment, please retry</string>
+    <string name="sys_mms_store_invalid_copy_size">Invalid attachment copy size</string>
+    <string name="sys_mms_store_invalid_payload">Invalid MMS send payload</string>
+    <string name="sys_mms_store_payload_mismatch">MMS payload identity mismatch, please edit again</string>
+    <string name="sys_mms_store_invalid_path">Invalid attachment path, please choose again</string>
+    <string name="sys_mms_store_invalid_read_budget">Invalid attachment read budget</string>
+    <string name="sys_mms_store_missing_or_over_limit">Attachment does not exist or exceeds send limit</string>
+    <string name="sys_mms_store_exceeds_limit">Attachment exceeds send limit</string>
+    <string name="sys_mms_store_mkdir_failed">Unable to create private MMS storage</string>
+    <string name="sys_mms_store_low_space_retry">Insufficient storage space, please free up space and retry</string>
+    <string name="sys_mms_store_save_payload_failed">Unable to save MMS payload, please retry</string>
+
+    <string name="sys_mms_device_not_supported">Device does not support MMS</string>
+    <string name="sys_mms_confirm_valid_phone">Please confirm a valid phone number</string>
+    <string name="sys_mms_add_body_or_attachment">Please add text or an attachment</string>
+    <string name="sys_mms_attachments_over_local_limit">Attachments exceed local preparation limit</string>
+    <string name="sys_mms_text_or_subject_over_limit">Message text or subject exceeds MMS limit</string>
+    <string name="sys_mms_sim_config_changed_reprepare">SIM or carrier configuration changed, please prepare and confirm again</string>
+    <string name="sys_mms_send_record_unavailable">Send record unavailable</string>
+    <string name="sys_mms_sim_config_changed_restore">SIM or configuration changed, please restore draft and confirm again</string>
+    <string name="sys_mms_deleted_during_dispatch">Message deleted during submission; send result unknown</string>
+    <string name="sys_mms_deleted_result_pending">Message deleted; send result not yet received</string>
+    <string name="sys_mms_interrupted_during_dispatch">App interrupted during submission; message may have been sent</string>
+    <string name="sys_mms_result_timeout_unknown">Send result not yet received; message may have been sent</string>
+    <string name="sys_mms_system_message_changed">System message changed, please keep the record and check again</string>
+    <string name="sys_mms_sim_config_changed_reconfirm">SIM or configuration changed, please confirm again</string>
+    <string name="sys_mms_send_file_unavailable">Send file unavailable</string>
+    <string name="sys_mms_send_file_changed">Send file changed, please confirm again</string>
+    <string name="sys_mms_submit_result_unknown">System submission result unknown; message may have been sent</string>
+    <string name="sys_mms_set_default_sms_app">Please set Pixel Text as the default SMS app first</string>
+    <string name="sys_mms_grant_sms_permission">Please grant SMS permission first</string>
+    <string name="sys_mms_grant_phone_state_permission">Please grant Phone permission first to confirm SIM</string>
+    <string name="sys_mms_device_no_sms_mms">Device does not support SMS and MMS</string>
+
+    <!-- 彩信 PDU 组包与策略 -->
+    <string name="sys_mms_pdu_single_recipient_only">MMS only supports a single valid phone number</string>
+    <string name="sys_mms_pdu_info_changed">MMS send details changed, please confirm again</string>
+    <string name="sys_mms_pdu_invalid_tx_id">Invalid MMS transaction ID</string>
+    <string name="sys_mms_pdu_subject_only_disallowed">Please add text or an attachment; cannot send subject only</string>
+    <string name="sys_mms_pdu_subject_too_long">Subject exceeds length limit for the selected SIM</string>
+    <string name="sys_mms_pdu_attachments_over_limit">Attachment count or total original size exceeds limit</string>
+    <string name="sys_mms_pdu_attachment_not_prepared">Attachment preparation not complete</string>
+    <string name="sys_mms_pdu_attachment_mime_unconfirmed">Attachment type not confirmed</string>
+    <string name="sys_mms_pdu_container_disallowed">This container format cannot be sent directly, please select the original file</string>
+    <string name="sys_mms_pdu_attachment_size_unconfirmed">Attachment size not confirmed</string>
+    <string name="sys_mms_pdu_attachment_not_ready_or_over_limit">Attachment not ready or exceeds MMS limit</string>
+    <string name="sys_mms_pdu_attachment_changed">Attachment content changed, please choose again</string>
+    <string name="sys_mms_pdu_plain_text_encoding_unconfirmed">Plain text attachment encoding unconfirmed, please re-prepare attachment</string>
+    <string name="sys_mms_pdu_full_exceeds_sim_limit_reduce">Complete MMS exceeds selected SIM\'s send limit, please reduce content</string>
+    <string name="sys_mms_pdu_encode_failed">Unable to encode MMS, please check content</string>
+    <string name="sys_mms_pdu_exceeds_limit_or_invalid">Complete MMS exceeds limit or encoding is invalid, please reduce content</string>
+    <string name="sys_mms_pdu_full_exceeds_sim_limit">Complete MMS exceeds selected SIM\'s send limit</string>
+    <string name="sys_mms_pdu_verify_failed">MMS encoding verification failed, not sent</string>
+    <string name="sys_mms_pdu_verify_mismatch">MMS content verification mismatch, not sent</string>
+    <string name="sys_mms_pdu_text_limit_or_invalid_chars">Text or subject exceeds limit or contains unsupported characters</string>
+    <string name="sys_mms_pdu_text_exceeds_sim_bytes">Text or subject exceeds selected SIM\'s byte limit</string>
+    <string name="sys_mms_pdu_text_incomplete_chars">Text or subject contains incomplete characters, please edit again</string>
+
+    <string name="sys_mms_policy_grant_sim_permission">Please allow reading SIM info and retry</string>
+    <string name="sys_mms_policy_device_unsupported">This device does not support sending MMS</string>
+    <string name="sys_mms_policy_select_sim">Please select a SIM to send MMS</string>
+    <string name="sys_mms_policy_cannot_read_sim">Unable to read SIM info</string>
+    <string name="sys_mms_policy_sim_unavailable">Selected SIM is no longer available, please choose another</string>
+    <string name="sys_mms_policy_carrier_config_unavailable">Carrier MMS configuration is unavailable, please reload later</string>
+    <string name="sys_mms_policy_carrier_config_not_loaded">Carrier configuration is not yet loaded, please reload later</string>
+    <string name="sys_mms_policy_device_cannot_read_config">This device cannot read MMS configuration</string>
+    <string name="sys_mms_policy_mms_disabled_by_carrier">MMS is not enabled by the carrier on the selected SIM</string>
+    <string name="sys_mms_policy_sim_permission_changed">SIM read permission changed, please re-grant and retry</string>
+    <string name="sys_mms_policy_device_no_config_read">This device does not support reading MMS configuration</string>
+    <string name="sys_mms_policy_missing_or_invalid">Carrier MMS limits are missing or invalid, please reload later</string>
+
+    <string name="sys_mms_result_invalid_response">Abnormal MMS confirmation; it may have been sent, do not resend directly</string>
+    <string name="sys_mms_result_inconsistent_response">Incomplete MMS result; it may have been sent, do not resend directly</string>
+    <string name="sys_mms_result_mmsc_rejected">Carrier rejected this MMS; please check content and plan before retrying manually</string>
+    <string name="sys_mms_result_unknown_response">Unable to confirm MMS result; it may have been sent</string>
+    <string name="sys_mms_result_error_invalid_apn">MMS APN unavailable; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_unable_connect">Unable to connect to MMS network; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_no_data">MMS data network unavailable; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_http_failure">MMS server communication failed; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_io_error">MMS transmission interrupted; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_config">Carrier MMS configuration error; send result still needs confirmation</string>
+    <string name="sys_mms_result_error_generic">System did not confirm MMS success; it may have been sent, do not resend directly</string>
+
+    <!-- 短信发送 -->
+    <string name="sys_sms_state_sending">Sending SMS</string>
+    <string name="sys_sms_state_sent">SMS sent (delivery not guaranteed)</string>
+    <string name="sys_sms_state_failed">SMS failed to send (parts of a multipart SMS may have been sent)</string>
+    <string name="sys_sms_state_unknown">Send result unknown; it may have been sent, do not resend directly</string>
+    <string name="sys_sms_set_default_app">Please set as default SMS app first</string>
+    <string name="sys_sms_empty_address_or_body">Number and message text cannot be empty</string>
+    <string name="sys_sms_invalid_body">Invalid SMS text</string>
+    <string name="sys_sms_save_outbox_failed">Unable to save pending SMS</string>
+    <string name="sys_sms_outbox_unavailable">Pending SMS unavailable</string>
+
+    <!-- 通知与后台 -->
+    <string name="sys_channel_resource_updates_name">Resource updates</string>
+    <string name="sys_channel_resource_updates_desc">Notifications for rule and model resource updates</string>
+    <string name="sys_resource_update_available_title">Resource update available</string>
+    <string name="sys_resource_update_available_text">New rule or model resources are available, tap to view</string>
+    <string name="sys_resource_update_available_subtext">Model %1$s / Rules %2$s</string>
+
+    <string name="sys_channel_new_sms_name">New messages</string>
+    <string name="sys_channel_new_sms_desc">Notifications for incoming messages</string>
+
+    <string name="sys_channel_spam_scan_name">Spam detection</string>
+    <string name="sys_channel_spam_scan_desc">Progress for historical SMS spam detection</string>
+    <string name="sys_spam_scan_progress_title">Scanning historical messages</string>
+    <string name="sys_spam_scan_progress_text">%1$d/%2$d %3$d%%</string>
+    <string name="sys_spam_scan_completed_title">Historical scan complete</string>
+    <string name="sys_spam_scan_completed_text">Scanned %1$d messages, found %2$d spam messages</string>
+    <string name="sys_spam_scan_failed_title">Historical scan failed</string>
+    <string name="sys_spam_scan_failed_text">Please try again later</string>
+
+    <string name="sys_notification_reply_sending">Sending</string>
+    <string name="sys_spam_hidden_notification_body">Identified as spam, content automatically hidden</string>
+
+    <!-- Smartspacer -->
+    <string name="sys_smartspacer_unread_config_title">Smartspacer unread count</string>
+    <string name="sys_smartspacer_normal_messages">Normal messages</string>
+    <string name="sys_smartspacer_spam_messages">Spam messages</string>
+    <string name="sys_smartspacer_archived_messages">Archived messages</string>
+    <string name="sys_smartspacer_save">Save</string>
+    <string name="sys_smartspacer_unread_hidden">Unread count is hidden</string>
+    <string name="sys_smartspacer_unread_cd">Unread messages</string>
+    <string name="sys_smartspacer_unread_label">Unread message count</string>
+    <string name="sys_smartspacer_unread_desc">Show unread message count in Pixel Text</string>
+    <string name="sys_smartspacer_unread_99_plus">99+ unread</string>
+    <string name="sys_smartspacer_unread_count">%1$d unread</string>
+    <string name="sys_smartspacer_signature_label">[%1$s]</string>
+    <string name="sys_smartspacer_code_title">Verification code %1$s</string>
+    <string name="sys_smartspacer_code_subtitle">%1$s · Tap to copy</string>
+    <string name="sys_smartspacer_code_label">Verification code</string>
+    <string name="sys_smartspacer_code_desc">Show latest unread verification code, tap to copy and mark as read</string>
+
+    <!-- ViewModel -->
+    <string name="sys_app_identity_apply_failed">Failed to apply, please retry. Launcher icon may take a moment to refresh.</string>
+    <string name="sys_theme_image_process_failed">Image processing failed, please retry</string>
+    <string name="sys_theme_save_failed">Failed to save, please retry</string>
+    <string name="sys_detail_load_failed">Failed to load, please retry</string>
+    <string name="sys_detail_delete_failed">Failed to delete</string>
+    <string name="sys_detail_no_text_to_check">No text available to check</string>
+    <string name="sys_detail_already_checked">Detection record already exists</string>
+    <string name="sys_detail_model_updated_recheck">Model updated, please check again</string>
+    <string name="sys_detail_check_failed">Detection failed</string>
+    <string name="sys_list_mark_read_failed">Failed to mark as read</string>
+    <string name="sys_support_qr_saved">QR code saved to gallery</string>
+    <string name="sys_support_qr_save_failed">Failed to save, please try again later</string>
+    <string name="sys_keyword_empty">Please enter a keyword</string>
+    <string name="sys_keyword_duplicate">This keyword already exists</string>
+    <string name="sys_keyword_not_found">Keyword not found, please refresh and retry</string>
+    <string name="sys_keyword_save_failed">Failed to save keyword</string>
+    <string name="sys_keyword_deleted">Deleted \"%1$s\"</string>
+    <string name="sys_keyword_delete_failed">Failed to delete keyword</string>
+    <string name="sys_mms_vm_draft_updated_elsewhere">Draft updated in another window, please close and reopen</string>
+    <string name="sys_mms_vm_max_attachments">Up to 10 attachments per MMS, please choose again or explicitly remove unimported items</string>
+    <string name="sys_mms_vm_import_incomplete">Attachment import incomplete, please choose again or explicitly remove</string>
+    <string name="sys_mms_vm_total_size_exceeded">Total original attachment size exceeds 64 MiB</string>
+    <string name="sys_mms_vm_draft_updated_reselect">Draft updated, please choose attachments again</string>
+    <string name="sys_mms_vm_attachments_not_saved">Attachments not saved yet, please check storage space and choose again; existing content is kept</string>
+    <string name="sys_mms_vm_draft_updated_reprepare">Draft updated, please prepare again</string>
+    <string name="sys_mms_vm_sim_invalidated">Selected SIM is no longer valid, please select a SIM again</string>
+    <string name="sys_mms_vm_sms_submit_failed">Unable to submit SMS, please check default SMS app status and SIM; your input is kept</string>
+    <string name="sys_mms_vm_unsaved_close_warning">Input has not been saved yet, please retry saving or explicitly delete draft before going back</string>
+    <string name="sys_mms_vm_prepare_failed">MMS preparation failed; draft kept, please retry</string>
+    <string name="sys_learning_no_text">This message has no learnable text; images and attachments are not included in learning</string>
+    <string name="sys_learning_meta_load_failed">Failed to load rules or linked info, you can still save locally</string>
+    <string name="sys_learning_save_sample_failed">Unable to save learning sample, please retry</string>
+    <string name="sys_learning_prepare_contribution_failed">Unable to prepare contribution sample, please retry</string>
+    <string name="sys_learning_update_label_failed">Unable to save classification, please retry</string>
+    <string name="sys_learning_operation_failed">Operation incomplete, please retry</string>
+    <string name="sys_sample_report_not_found">Unable to view this report record</string>
+    <string name="sys_sample_network_or_storage_unavailable">Network or local storage temporarily unavailable, please try again later</string>
+    <string name="sys_sample_pagination_stalled">Pagination did not advance, please pull to refresh and retry</string>
+    <string name="sys_sample_pending_restored_init">Submission result unconfirmed. Restored confirmed content and request ID; viewing records will not automatically finish this submission</string>
+    <string name="sys_sample_pending_restored_retry">Restored pending submission; will continue using original request ID and full content</string>
+    <string name="sys_sample_local_reloaded">Local data reloaded, you can continue editing or submitting</string>
+    <string name="sys_sample_saving_submission_hint">Saving this submission, please wait before going back</string>
+    <string name="sys_sample_busy_local_hint">Reading or saving local data, please wait before going back</string>
+    <string name="sys_sample_invalid_amount">Selected text does not appear to be a valid amount format, please edit manually</string>
+    <string name="sys_sample_invalid_temporal">Selected text does not appear to be a valid time format, please edit manually</string>
+    <string name="sys_sample_pending_error_prefix">Submission result unconfirmed. %1$s</string>
+    <string name="sys_whitelist_saved">Rule saved; matching existing messages allowed</string>
+    <string name="sys_whitelist_deleted">Rule deleted; previously allowed messages remain non-spam</string>
+    <string name="sys_whitelist_operation_failed">Operation failed, please try again later</string>
+    <string name="sys_settings_sms_sync_failed">Failed to sync SMS data</string>
+    <string name="sys_settings_check_update_failed">Failed to check for updates</string>
+    <string name="sys_settings_preparing_download">Preparing to download resources</string>
+    <string name="sys_settings_resource_update_complete">Resource update complete</string>
+    <string name="sys_settings_resources_updated">Resources updated</string>
+    <string name="sys_settings_check_sender_profiles_failed">Failed to check sender profiles</string>
+    <string name="sys_settings_preparing_install">Preparing to install</string>
+    <string name="sys_settings_sender_profiles_installed">Sender profiles installed</string>
+    <string name="sys_settings_deleting_model">Deleting downloaded model files</string>
+    <string name="sys_settings_deleted_model">Deleted downloaded model files and reverted to built-in model</string>
+    <string name="sys_settings_deleting_rules">Deleting downloaded smart card rule files</string>
+    <string name="sys_settings_deleted_rules">Deleted downloaded smart card rule files and reverted to built-in rules</string>
+    <string name="sys_vc_index_update_failed">Failed to update verification code index, please try again later</string>
+    <string name="sys_vc_read_body_failed">Failed to read original message, please retry</string>
+    <string name="sys_vc_original_missing">Original message no longer exists</string>
+    <string name="sys_vc_original_missing_cleanup_failed">Original message no longer exists, but failed to clean up index, please retry</string>
+</resources>

@@ -19,22 +19,25 @@ class VerificationCodeTargetProvider : SmartspacerTargetProvider(), KoinComponen
 
     override fun getSmartspaceTargets(smartspacerId: String): List<SmartspaceTarget> {
         val code = repository.getLatestUnreadVerificationCode() ?: return emptyList()
-        val senderLabel = code.signature?.let { "【$it】" } ?: code.sender
+        val context = provideContext()
+        val senderLabel = code.signature?.let {
+            context.getString(R.string.sys_smartspacer_signature_label, it)
+        } ?: code.sender
         return listOf(
             TargetTemplate.Basic(
                 id = "pixel_text_verification_code_${code.messageId}_$smartspacerId",
                 componentName = ComponentName(
-                    provideContext(),
+                    context,
                     VerificationCodeTargetProvider::class.java
                 ),
-                title = Text("验证码 ${code.code}"),
-                subtitle = Text("$senderLabel · 点按复制"),
+                title = Text(context.getString(R.string.sys_smartspacer_code_title, code.code)),
+                subtitle = Text(context.getString(R.string.sys_smartspacer_code_subtitle, senderLabel)),
                 icon = Icon(
                     AndroidIcon.createWithResource(
-                        provideContext(),
+                        context,
                         R.drawable.ic_notification_sms
                     ),
-                    contentDescription = "验证码"
+                    contentDescription = context.getString(R.string.sys_smartspacer_code_label)
                 ),
                 onClick = TapAction(
                     pendingIntent = createCopyPendingIntent(code),
@@ -48,10 +51,11 @@ class VerificationCodeTargetProvider : SmartspacerTargetProvider(), KoinComponen
     }
 
     override fun getConfig(smartspacerId: String?): Config {
+        val context = provideContext()
         return Config(
-            label = "验证码",
-            description = "显示最近一条未读验证码，点按复制并标记已读",
-            icon = AndroidIcon.createWithResource(provideContext(), R.drawable.ic_notification_sms)
+            label = context.getString(R.string.sys_smartspacer_code_label),
+            description = context.getString(R.string.sys_smartspacer_code_desc),
+            icon = AndroidIcon.createWithResource(context, R.drawable.ic_notification_sms)
         )
     }
 

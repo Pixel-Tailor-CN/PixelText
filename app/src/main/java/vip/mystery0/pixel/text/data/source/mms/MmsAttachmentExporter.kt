@@ -23,11 +23,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
 import vip.mystery0.pixel.text.domain.model.mms.MmsContentKind
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.domain.model.mms.usesInlineTextCopy
 import vip.mystery0.pixel.text.domain.parser.mms.MmsMimeTypes
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
@@ -291,7 +293,9 @@ class MmsAttachmentExporter(
 }
 
 fun suggestedMmsAttachmentName(part: MmsPartContent): String = safeMmsAttachmentName(
-    preferredName = part.displayName.takeUnless { it == "附件 ${part.key.partId}" },
+    preferredName = part.displayName.takeUnless {
+        it == AppStrings.get(R.string.domain_mms_attachment_numbered, part.key.partId)
+    },
     kind = part.kind,
     mimeType = part.mimeType,
     partId = part.key.partId,
@@ -314,18 +318,20 @@ fun safeMmsAttachmentName(
         }
     }.trim().trim('.').let(::truncateFileName)
     if (cleaned.isNotBlank()) return cleaned
-    val label = when (kind) {
-        MmsContentKind.TEXT -> "文本附件"
-        MmsContentKind.IMAGE -> "图片附件"
-        MmsContentKind.AUDIO -> "音频附件"
-        MmsContentKind.VIDEO -> "视频附件"
-        MmsContentKind.HTML -> "网页附件"
-        MmsContentKind.CONTACT -> "联系人附件"
-        MmsContentKind.CALENDAR -> "日历附件"
-        MmsContentKind.SMIL -> "演示附件"
-        MmsContentKind.MULTIPART -> "复合附件"
-        MmsContentKind.FILE -> "附件"
-    }
+    val label = AppStrings.get(
+        when (kind) {
+            MmsContentKind.TEXT -> R.string.domain_mms_attachment_text
+            MmsContentKind.IMAGE -> R.string.domain_mms_attachment_image
+            MmsContentKind.AUDIO -> R.string.domain_mms_attachment_audio
+            MmsContentKind.VIDEO -> R.string.domain_mms_attachment_video
+            MmsContentKind.HTML -> R.string.domain_mms_attachment_html
+            MmsContentKind.CONTACT -> R.string.domain_mms_attachment_contact
+            MmsContentKind.CALENDAR -> R.string.domain_mms_attachment_calendar
+            MmsContentKind.SMIL -> R.string.domain_mms_attachment_smil
+            MmsContentKind.MULTIPART -> R.string.domain_mms_attachment_multipart
+            MmsContentKind.FILE -> R.string.domain_mms_attachment_file
+        },
+    )
     return "$label-$partId${extensionForMimeType(mimeType)}"
 }
 

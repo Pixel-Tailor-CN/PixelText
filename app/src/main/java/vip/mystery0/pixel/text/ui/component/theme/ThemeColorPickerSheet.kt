@@ -50,14 +50,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.theme.MaterialColorRole
 import vip.mystery0.pixel.text.domain.theme.ThemeColorReference
 import vip.mystery0.pixel.text.domain.theme.ThemeColorType
 import vip.mystery0.pixel.text.ui.theme.contrastRatio
 import vip.mystery0.pixel.text.ui.theme.resolve
 import vip.mystery0.pixel.text.ui.theme.resolveOr
+import vip.mystery0.pixel.text.util.AppStrings
 import java.util.Locale
 
 private const val MIN_RECOMMENDED_CONTRAST = 4.5f
@@ -236,7 +239,7 @@ fun ThemeColorPickerSheet(
                 item(key = "default") {
                     SourceRow(
                         selected = source == ColorPickerSource.DEFAULT,
-                        title = "使用应用内置",
+                        title = stringResource(R.string.settings_color_use_builtin),
                         supporting = "",
                         swatch = officialDefault,
                         onClick = {
@@ -249,7 +252,7 @@ fun ThemeColorPickerSheet(
 
                 item(key = "material_header") {
                     Text(
-                        text = "Material 3 颜色角色",
+                        text = stringResource(R.string.settings_color_material_roles_header),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
@@ -283,7 +286,7 @@ fun ThemeColorPickerSheet(
 
                 item(key = "custom_header") {
                     Text(
-                        text = "自定义颜色",
+                        text = stringResource(R.string.settings_color_custom_header),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
@@ -327,16 +330,16 @@ fun ThemeColorPickerSheet(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("HEX") },
+                            label = { Text(stringResource(R.string.settings_color_hex_label)) },
                             placeholder = { Text("#AARRGGBB") },
                             singleLine = true,
                             isError = source == ColorPickerSource.CUSTOM && parsedHex == null,
                             supportingText = {
                                 Text(
                                     if (source == ColorPickerSource.CUSTOM && parsedHex == null) {
-                                        "支持 #RRGGBB 或 #AARRGGBB"
+                                        stringResource(R.string.settings_color_hex_error)
                                     } else {
-                                        "将保存为 #AARRGGBB"
+                                        stringResource(R.string.settings_color_hex_hint)
                                     },
                                 )
                             },
@@ -356,7 +359,7 @@ fun ThemeColorPickerSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(stringResource(R.string.settings_action_cancel))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
@@ -382,7 +385,7 @@ fun ThemeColorPickerSheet(
                     },
                     enabled = confirmEnabled,
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.settings_action_confirm))
                 }
             }
         }
@@ -424,11 +427,18 @@ private fun ColorCombinationPreview(
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (usingDefault) "应用内置预览" else "文字预览",
+                text = if (usingDefault) {
+                    stringResource(R.string.settings_color_preview_builtin)
+                } else {
+                    stringResource(R.string.settings_color_preview_text)
+                },
                 color = foreground,
                 style = MaterialTheme.typography.titleMedium,
             )
-            val ratioLabel = "对比度 ${"%.1f".format(Locale.US, contrastRatio)}:1"
+            val ratioLabel = stringResource(
+                R.string.settings_color_contrast_ratio,
+                "%.1f".format(Locale.US, contrastRatio),
+            )
             Text(
                 text = ratioLabel,
                 color = foreground.copy(alpha = 0.85f),
@@ -436,7 +446,7 @@ private fun ColorCombinationPreview(
             )
             if (lowContrast) {
                 Text(
-                    text = "对比度低于 4.5:1，可能影响可读性",
+                    text = stringResource(R.string.settings_color_contrast_warning),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -590,30 +600,31 @@ private fun HueBar(
 }
 
 private fun MaterialColorRole.displayName(): String {
-    return when (this) {
-        MaterialColorRole.PRIMARY -> "主色"
-        MaterialColorRole.ON_PRIMARY -> "主色上的内容"
-        MaterialColorRole.PRIMARY_CONTAINER -> "主色容器"
-        MaterialColorRole.ON_PRIMARY_CONTAINER -> "主色容器上的内容"
-        MaterialColorRole.SECONDARY -> "次色"
-        MaterialColorRole.ON_SECONDARY -> "次色上的内容"
-        MaterialColorRole.SECONDARY_CONTAINER -> "次色容器"
-        MaterialColorRole.ON_SECONDARY_CONTAINER -> "次色容器上的内容"
-        MaterialColorRole.TERTIARY -> "第三色"
-        MaterialColorRole.ON_TERTIARY -> "第三色上的内容"
-        MaterialColorRole.TERTIARY_CONTAINER -> "第三色容器"
-        MaterialColorRole.ON_TERTIARY_CONTAINER -> "第三色容器上的内容"
-        MaterialColorRole.SURFACE -> "表面"
-        MaterialColorRole.ON_SURFACE -> "表面上的内容"
-        MaterialColorRole.SURFACE_VARIANT -> "表面变体"
-        MaterialColorRole.ON_SURFACE_VARIANT -> "表面变体上的内容"
-        MaterialColorRole.ERROR -> "错误"
-        MaterialColorRole.ON_ERROR -> "错误上的内容"
-        MaterialColorRole.ERROR_CONTAINER -> "错误容器"
-        MaterialColorRole.ON_ERROR_CONTAINER -> "错误容器上的内容"
-        MaterialColorRole.INVERSE_SURFACE -> "反色表面"
-        MaterialColorRole.INVERSE_ON_SURFACE -> "反色表面上的内容"
+    val resId = when (this) {
+        MaterialColorRole.PRIMARY -> R.string.settings_color_role_primary
+        MaterialColorRole.ON_PRIMARY -> R.string.settings_color_role_on_primary
+        MaterialColorRole.PRIMARY_CONTAINER -> R.string.settings_color_role_primary_container
+        MaterialColorRole.ON_PRIMARY_CONTAINER -> R.string.settings_color_role_on_primary_container
+        MaterialColorRole.SECONDARY -> R.string.settings_color_role_secondary
+        MaterialColorRole.ON_SECONDARY -> R.string.settings_color_role_on_secondary
+        MaterialColorRole.SECONDARY_CONTAINER -> R.string.settings_color_role_secondary_container
+        MaterialColorRole.ON_SECONDARY_CONTAINER -> R.string.settings_color_role_on_secondary_container
+        MaterialColorRole.TERTIARY -> R.string.settings_color_role_tertiary
+        MaterialColorRole.ON_TERTIARY -> R.string.settings_color_role_on_tertiary
+        MaterialColorRole.TERTIARY_CONTAINER -> R.string.settings_color_role_tertiary_container
+        MaterialColorRole.ON_TERTIARY_CONTAINER -> R.string.settings_color_role_on_tertiary_container
+        MaterialColorRole.SURFACE -> R.string.settings_color_role_surface
+        MaterialColorRole.ON_SURFACE -> R.string.settings_color_role_on_surface
+        MaterialColorRole.SURFACE_VARIANT -> R.string.settings_color_role_surface_variant
+        MaterialColorRole.ON_SURFACE_VARIANT -> R.string.settings_color_role_on_surface_variant
+        MaterialColorRole.ERROR -> R.string.settings_color_role_error
+        MaterialColorRole.ON_ERROR -> R.string.settings_color_role_on_error
+        MaterialColorRole.ERROR_CONTAINER -> R.string.settings_color_role_error_container
+        MaterialColorRole.ON_ERROR_CONTAINER -> R.string.settings_color_role_on_error_container
+        MaterialColorRole.INVERSE_SURFACE -> R.string.settings_color_role_inverse_surface
+        MaterialColorRole.INVERSE_ON_SURFACE -> R.string.settings_color_role_inverse_on_surface
     }
+    return AppStrings.get(resId)
 }
 
 private fun Char.isHexDigit(): Boolean {

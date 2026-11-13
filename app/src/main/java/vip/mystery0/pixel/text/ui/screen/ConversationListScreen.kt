@@ -99,9 +99,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -127,6 +129,7 @@ import vip.mystery0.pixel.text.ui.message.DataInitializationProgressContent
 import vip.mystery0.pixel.text.ui.createDefaultSmsAppRequestIntent
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
 import vip.mystery0.pixel.text.ui.ObserveListScrollDirection
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.util.SimInfoProvider
 import vip.mystery0.pixel.text.util.isDebugModeEnabled
 import vip.mystery0.pixel.text.viewmodel.ConversationListUiState
@@ -136,6 +139,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -165,6 +169,7 @@ fun ConversationListScreen(
     onFloatingActionButtonVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val promptEntryToken by engagementPromptViewModel.entryToken.collectAsState()
     val promptVisible by engagementPromptViewModel.visible.collectAsState()
     LifecycleResumeEffect(allowEngagementPrompt) {
@@ -351,7 +356,11 @@ fun ConversationListScreen(
             onReview = {
                 engagementPromptViewModel.dismissThen {
                     if (!context.openAppReview()) {
-                        Toast.makeText(context, "无法打开 Google Play，请稍后重试", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            resources.getString(R.string.conv_open_play_failed),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     }
                 }
             },
@@ -380,8 +389,8 @@ fun ConversationListScreen(
                 snackbarHostState.currentSnackbarData?.dismiss()
             }
             val result = snackbarHostState.showSnackbar(
-                message = "已删除 ${threadIds.size} 个会话",
-                actionLabel = "恢复",
+                message = resources.getString(R.string.conv_deleted_conversations_count, threadIds.size),
+                actionLabel = resources.getString(R.string.conv_undo),
                 duration = SnackbarDuration.Indefinite
             )
             dismissJob.cancel()
@@ -397,9 +406,11 @@ fun ConversationListScreen(
         viewModel.markAllReadResultEvents.collect { event ->
             val message = when (event) {
                 is MarkAllReadResultEvent.Success ->
-                    "已标记 ${event.conversationCount} 个会话为已读"
+                    resources.getString(R.string.conv_mark_all_read_success, event.conversationCount)
 
-                MarkAllReadResultEvent.NoUnread -> "没有未读会话"
+                MarkAllReadResultEvent.NoUnread ->
+                    resources.getString(R.string.conv_no_unread_conversations)
+
                 is MarkAllReadResultEvent.Failure -> event.reason
             }
             showTransientSnackbar(message)
@@ -413,14 +424,14 @@ fun ConversationListScreen(
                     navigationIcon = {
                         if (selectionMode) {
                             IconButton(onClick = { selectedThreadIds = emptySet() }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Cancel selection")
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.conv_cd_cancel_selection))
                             }
                         }
                     },
                     title = {
                         Text(
                             text = when {
-                                selectionMode -> "已选择 ${selectedThreadIds.size} 项"
+                                selectionMode -> stringResource(R.string.conv_selected_count, selectedThreadIds.size)
                                 else -> appDisplayName
                             },
                             style = MaterialTheme.typography.titleLarge
@@ -440,23 +451,23 @@ fun ConversationListScreen(
                                     viewModel.archiveSelected(conversations)
                                 }
                             ) {
-                                Icon(Icons.Rounded.Archive, contentDescription = "Archive")
+                                Icon(Icons.Rounded.Archive, contentDescription = stringResource(R.string.conv_cd_archive))
                             }
                             IconButton(
                                 onClick = {
                                     deleteCandidateThreadIds = selectedThreadIds
                                 }
                             ) {
-                                Icon(Icons.Rounded.Delete, contentDescription = "Delete")
+                                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.conv_cd_delete))
                             }
                         } else {
                             IconButton(onClick = onNavigateToSearch) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Search")
+                                Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.conv_cd_search))
                             }
                             IconButton(onClick = { showMenuSheet = true }) {
                                 Icon(
                                     Icons.Rounded.MoreVert,
-                                    contentDescription = "More options"
+                                    contentDescription = stringResource(R.string.conv_cd_more_options)
                                 )
                             }
                         }
@@ -484,11 +495,11 @@ fun ConversationListScreen(
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                "尚未设为默认短信应用",
+                                stringResource(R.string.conv_default_sms_banner_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            Text("设为默认后，可接收、发送并同步短信。", style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.conv_default_sms_banner_body), style = MaterialTheme.typography.bodyMedium)
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
@@ -497,17 +508,17 @@ fun ConversationListScreen(
                                 TextButton(onClick = {
                                     showDefaultSmsSuggestion = false
                                     viewModel.refreshOrLoadConversations()
-                                }) { Text("暂不设置") }
+                                }) { Text(stringResource(R.string.conv_not_now)) }
                                 Button(onClick = {
                                     requestPermissionsAfterDefaultPrompt(arrayOf(Manifest.permission.READ_SMS))
-                                }) { Text("设为默认") }
+                                }) { Text(stringResource(R.string.conv_set_as_default)) }
                             }
                         }
                     }
                 } else if (isDefaultSmsRoleHeld && !hasPermission) {
                     ListItem(
-                        trailingContent = { TextButton(onClick = { showReadSmsPermissionDialog = true }) { Text("授权") } },
-                        content = { Text("尚未授予短信读取权限") },
+                        trailingContent = { TextButton(onClick = { showReadSmsPermissionDialog = true }) { Text(stringResource(R.string.conv_grant)) } },
+                        content = { Text(stringResource(R.string.conv_missing_read_sms_permission)) },
                     )
                 }
                 if (isDefaultSmsRoleHeld && hasPermission) vip.mystery0.pixel.text.ui.message.MirrorSyncBanner()
@@ -529,7 +540,7 @@ fun ConversationListScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "读取失败: ${state.message}",
+                                    stringResource(R.string.conv_load_failed, state.message),
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -537,14 +548,32 @@ fun ConversationListScreen(
 
                         is ConversationListUiState.Success -> {
                             if (state.conversations.isEmpty()) {
+                                val emptyContent: @Composable () -> Unit = {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        AppEmptyState(stringResource(R.string.conv_empty_conversations))
+                                        if (!isDefaultSmsRoleHeld && !showDefaultSmsSuggestion) {
+                                            Button(onClick = {
+                                                requestPermissionsAfterDefaultPrompt(
+                                                    arrayOf(Manifest.permission.READ_SMS)
+                                                )
+                                            }) {
+                                                Text(stringResource(R.string.conv_set_as_default_sms_app))
+                                            }
+                                            Spacer(Modifier.height(24.dp))
+                                        }
+                                    }
+                                }
                                 if (showPrompt) {
                                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                                         item(key = "engagement_prompt") { promptCard() }
-                                        item(key = "empty_conversations") { AppEmptyState("暂无会话") }
+                                        item(key = "empty_conversations") { emptyContent() }
                                     }
                                 } else {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        AppEmptyState("暂无会话")
+                                        emptyContent()
                                     }
                                 }
                                 return@Box
@@ -581,7 +610,7 @@ fun ConversationListScreen(
                                                         viewModel.archiveConversation(
                                                             swipedConversation
                                                         )
-                                                        showTransientSnackbar("已归档 1 个会话")
+                                                        showTransientSnackbar(resources.getString(R.string.conv_archived_one))
                                                     }
 
                                                     ConversationSwipeAction.DELETE ->
@@ -592,11 +621,13 @@ fun ConversationListScreen(
                                                     ConversationSwipeAction.TOGGLE_READ -> {
                                                         viewModel.toggleRead(swipedConversation)
                                                         showTransientSnackbar(
-                                                            if (swipedConversation.unreadCount > 0) {
-                                                                "已标记为已读"
-                                                            } else {
-                                                                "已标记为未读"
-                                                            }
+                                                            resources.getString(
+                                                                if (swipedConversation.unreadCount > 0) {
+                                                                    R.string.conv_marked_as_read
+                                                                } else {
+                                                                    R.string.conv_marked_as_unread
+                                                                }
+                                                            )
                                                         )
                                                     }
 
@@ -640,8 +671,8 @@ fun ConversationListScreen(
     if (deleteCandidateThreadIds.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { deleteCandidateThreadIds = emptySet() },
-            title = { Text("删除会话？") },
-            text = { Text("将删除所选 ${deleteCandidateThreadIds.size} 个会话中的短信和彩信。") },
+            title = { Text(stringResource(R.string.conv_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.conv_delete_dialog_message, deleteCandidateThreadIds.size)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -651,12 +682,12 @@ fun ConversationListScreen(
                         deleteWithUndo(selected)
                     }
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.conv_action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteCandidateThreadIds = emptySet() }) {
-                    Text("取消")
+                    Text(stringResource(R.string.conv_action_cancel))
                 }
             }
         )
@@ -669,17 +700,26 @@ fun ConversationListScreen(
             initialization.status == vip.mystery0.pixel.text.domain.model.InitializationStatus.WAITING_PERMISSION
         AlertDialog(
             onDismissRequest = {},
-            title = { Text(if (initialization.isNewerVersion) "数据版本不兼容" else "正在准备应用数据") },
+            title = {
+                Text(
+                    stringResource(
+                        if (initialization.isNewerVersion) R.string.conv_init_incompatible_version
+                        else R.string.conv_init_preparing_data
+                    )
+                )
+            },
             text = {
                 when {
-                    initialization.isNewerVersion -> Text("这些数据由较新版本创建，请更新应用后再使用。")
-                    permission -> Text("请授予短信权限后重试，已有数据不会被清除。")
+                    initialization.isNewerVersion -> Text(stringResource(R.string.conv_init_newer_version_desc))
+                    permission -> Text(stringResource(R.string.conv_init_permission_desc))
                     failed -> Text(
-                        when (initialization.errorCategory) {
-                            "io_error", "IOException" -> "读取或保存应用数据失败，请重试。"
-                            "spam_projection_not_ready", "stale_spam_prediction" -> "短信识别数据尚未准备完成，请重试。"
-                            else -> "数据准备未完成，请重试。"
-                        }
+                        stringResource(
+                            when (initialization.errorCategory) {
+                                "io_error", "IOException" -> R.string.conv_init_error_io
+                                "spam_projection_not_ready", "stale_spam_prediction" -> R.string.conv_init_error_spam_not_ready
+                                else -> R.string.conv_init_error_generic
+                            }
+                        )
                     )
                     else -> DataInitializationProgressContent(
                         phase = initialization.nextPhase,
@@ -688,11 +728,11 @@ fun ConversationListScreen(
                 }
             },
             dismissButton = {
-                if (failed) TextButton(onClick = onNavigateToSettings) { Text("设置") }
+                if (failed) TextButton(onClick = onNavigateToSettings) { Text(stringResource(R.string.conv_action_settings)) }
             },
             confirmButton = {
                 if (!initialization.isNewerVersion && (failed || permission)) {
-                    TextButton(onClick = viewModel::retryInitialization) { Text("重试") }
+                    TextButton(onClick = viewModel::retryInitialization) { Text(stringResource(R.string.conv_action_retry)) }
                 }
             },
         )
@@ -700,7 +740,7 @@ fun ConversationListScreen(
     markAllReadProgress?.let { progress ->
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("正在标记已读") },
+            title = { Text(stringResource(R.string.conv_mark_all_read_title)) },
             text = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -708,7 +748,7 @@ fun ConversationListScreen(
                 ) {
                     LoadingIndicator(modifier = Modifier.size(32.dp))
                     Column {
-                        Text("正在标记所有会话为已读，请稍候…")
+                        Text(stringResource(R.string.conv_mark_all_read_progress_message))
                         Text(
                             "${progress.completed}/${progress.total} ${progress.percent}%",
                             style = MaterialTheme.typography.bodyMedium,
@@ -724,11 +764,9 @@ fun ConversationListScreen(
     if (showReadSmsPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showReadSmsPermissionDialog = false },
-            title = { Text("需要短信读取权限") },
+            title = { Text(stringResource(R.string.conv_read_sms_permission_title)) },
             text = {
-                Text(
-                    "需要短信读取权限以显示会话和短信内容。"
-                )
+                Text(stringResource(R.string.conv_read_sms_permission_message))
             },
             confirmButton = {
                 TextButton(
@@ -737,12 +775,12 @@ fun ConversationListScreen(
                         requestPermissionsAfterDefaultPrompt(missingStartupPermissions())
                     }
                 ) {
-                    Text("申请")
+                    Text(stringResource(R.string.conv_action_request_permission))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showReadSmsPermissionDialog = false }) {
-                    Text("稍后")
+                    Text(stringResource(R.string.conv_action_later))
                 }
             }
         )
@@ -1054,7 +1092,7 @@ fun ConversationItem(
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
                         Text(
-                            text = "彩信",
+                            text = stringResource(R.string.conv_badge_mms),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -1062,8 +1100,11 @@ fun ConversationItem(
                     }
                 }
                 Text(
-                    text = if (conversation.isMms) "[多媒体信息] ${conversation.snippet}".trim()
-                    else conversation.snippet,
+                    text = if (conversation.isMms) {
+                        stringResource(R.string.conv_mms_snippet_prefix, conversation.snippet).trim()
+                    } else {
+                        conversation.snippet
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1108,7 +1149,7 @@ fun MenuSheetContent(
             overlineContent = null,
             supportingContent = null,
             colors = menuItemColors,
-            content = { Text("设置默认短信应用") },
+            content = { Text(stringResource(R.string.conv_menu_set_default_sms_app)) },
         )
         ListItem(
             modifier = Modifier.clickable { onArchiveClicked() },
@@ -1117,7 +1158,7 @@ fun MenuSheetContent(
             overlineContent = null,
             supportingContent = null,
             colors = menuItemColors,
-            content = { Text("归档短信") },
+            content = { Text(stringResource(R.string.conv_menu_archived_messages)) },
         )
         ListItem(
             modifier = Modifier.clickable { onMarkAllReadClicked() },
@@ -1126,7 +1167,7 @@ fun MenuSheetContent(
             overlineContent = null,
             supportingContent = null,
             colors = menuItemColors,
-            content = { Text("标记所有会话为已读") },
+            content = { Text(stringResource(R.string.conv_menu_mark_all_read)) },
         )
         ListItem(
             modifier = Modifier.clickable { onSpamClicked() },
@@ -1135,7 +1176,7 @@ fun MenuSheetContent(
             overlineContent = null,
             supportingContent = null,
             colors = menuItemColors,
-            content = { Text("骚扰与拦截") },
+            content = { Text(stringResource(R.string.conv_menu_spam_blocking)) },
         )
         ListItem(
             modifier = Modifier.clickable { onSettingsClicked() },
@@ -1144,7 +1185,7 @@ fun MenuSheetContent(
             overlineContent = null,
             supportingContent = null,
             colors = menuItemColors,
-            content = { Text("设置") },
+            content = { Text(stringResource(R.string.conv_action_settings)) },
         )
         if (showDebugMenu) {
             ListItem(
@@ -1159,7 +1200,7 @@ fun MenuSheetContent(
                 overlineContent = null,
                 supportingContent = null,
                 colors = menuItemColors,
-                content = { Text("开发测试（MOCK）") },
+                content = { Text(stringResource(R.string.conv_menu_mock)) },
             )
         }
         Spacer(
@@ -1168,11 +1209,14 @@ fun MenuSheetContent(
     }
 }
 
+@Composable
 private fun ConversationSwipeAction.swipeLabel(unread: Boolean): String {
     return when (this) {
-        ConversationSwipeAction.ARCHIVE -> "归档"
-        ConversationSwipeAction.DELETE -> "删除"
-        ConversationSwipeAction.TOGGLE_READ -> if (unread) "标为已读" else "标为未读"
+        ConversationSwipeAction.ARCHIVE -> stringResource(R.string.conv_swipe_archive)
+        ConversationSwipeAction.DELETE -> stringResource(R.string.conv_action_delete)
+        ConversationSwipeAction.TOGGLE_READ -> stringResource(
+            if (unread) R.string.conv_swipe_mark_read else R.string.conv_swipe_mark_unread
+        )
         ConversationSwipeAction.NONE -> ""
     }
 }
@@ -1211,16 +1255,34 @@ fun formatTimeShort(timestamp: Long): String {
         // 本周：显示星期
         dateTime.isAfter(midnightThisWeek) -> {
             val dayOfWeek = dateTime.dayOfWeek.value // 1 (Mon) to 7 (Sun)
-            val days = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-            days[dayOfWeek - 1]
+            val dayResIds = listOf(
+                R.string.conv_weekday_mon,
+                R.string.conv_weekday_tue,
+                R.string.conv_weekday_wed,
+                R.string.conv_weekday_thu,
+                R.string.conv_weekday_fri,
+                R.string.conv_weekday_sat,
+                R.string.conv_weekday_sun,
+            )
+            AppStrings.get(dayResIds[dayOfWeek - 1])
         }
         // 今年：显示月日
         dateTime.year == now.year -> {
-            dateTime.format(DateTimeFormatter.ofPattern("MM月dd日"))
+            dateTime.format(
+                DateTimeFormatter.ofPattern(
+                    AppStrings.get(R.string.conv_date_pattern_month_day),
+                    Locale.getDefault(),
+                )
+            )
         }
         // 去年及更早：显示年月日
         else -> {
-            dateTime.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日"))
+            dateTime.format(
+                DateTimeFormatter.ofPattern(
+                    AppStrings.get(R.string.conv_date_pattern_year_month_day),
+                    Locale.getDefault(),
+                )
+            )
         }
     }
 }
@@ -1231,6 +1293,7 @@ fun NewChatBottomSheet(
     onNavigateToDetail: (Long, String) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var phoneNumber by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
     var showContactPermissionDialog by remember { mutableStateOf(false) }
@@ -1279,14 +1342,20 @@ fun NewChatBottomSheet(
         if (isGranted) {
             contactPickerLauncher.launch(null)
         } else {
-            Toast.makeText(context, "需要联系人权限才能选择联系人", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                resources.getString(R.string.conv_contacts_permission_toast),
+                Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
     val contactDefaultSmsAppLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
-        contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        if (context.isDefaultSmsApp()) {
+            contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
     }
 
     fun requestContactPermissionAfterDefaultPrompt() {
@@ -1318,7 +1387,7 @@ fun NewChatBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "接收人",
+                        stringResource(R.string.conv_recipient_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1329,7 +1398,7 @@ fun NewChatBottomSheet(
                             phoneNumber = it
                             showError = it.isNotBlank() && !it.matches(Regex("^[0-9+\\s-]+$"))
                         },
-                        placeholder = { Text("输入电话号码") },
+                        placeholder = { Text(stringResource(R.string.conv_enter_phone_number)) },
                         isError = showError,
                         modifier = Modifier.weight(1f),
                         singleLine = true,
@@ -1345,7 +1414,7 @@ fun NewChatBottomSheet(
                 }
                 if (showError) {
                     Text(
-                        "请输入有效的电话号码",
+                        stringResource(R.string.conv_invalid_phone_number),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp)
@@ -1384,7 +1453,7 @@ fun NewChatBottomSheet(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("下一步")
+            Text(stringResource(R.string.conv_action_next))
         }
 
         OutlinedButton(
@@ -1398,7 +1467,7 @@ fun NewChatBottomSheet(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("选择联系人")
+            Text(stringResource(R.string.conv_pick_contact))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -1407,11 +1476,9 @@ fun NewChatBottomSheet(
     if (showContactPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showContactPermissionDialog = false },
-            title = { Text("需要联系人权限") },
+            title = { Text(stringResource(R.string.conv_contacts_permission_title)) },
             text = {
-                Text(
-                    "需要联系人权限以选择收件人。"
-                )
+                Text(stringResource(R.string.conv_contacts_permission_message))
             },
             confirmButton = {
                 TextButton(
@@ -1420,12 +1487,12 @@ fun NewChatBottomSheet(
                         requestContactPermissionAfterDefaultPrompt()
                     }
                 ) {
-                    Text("申请")
+                    Text(stringResource(R.string.conv_action_request_permission))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showContactPermissionDialog = false }) {
-                    Text("稍后")
+                    Text(stringResource(R.string.conv_action_later))
                 }
             }
         )

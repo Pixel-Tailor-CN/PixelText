@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.*
 import org.json.JSONArray
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.mirror.*
 import vip.mystery0.pixel.text.data.source.mirror.MirrorAttachmentStore
 import vip.mystery0.pixel.text.data.source.mirror.ProviderRowSnapshot
@@ -21,6 +22,7 @@ import vip.mystery0.pixel.text.domain.model.mirror.*
 import vip.mystery0.pixel.text.domain.model.search.MessageSearchBatch
 import vip.mystery0.pixel.text.domain.model.search.MessageSearchRequest
 import vip.mystery0.pixel.text.domain.repository.MessageMirrorRepository
+import vip.mystery0.pixel.text.util.AppStrings
 
 class MessageMirrorRepositoryImpl(
     private val database: MessageMirrorDatabase,
@@ -191,7 +193,11 @@ class MessageMirrorRepositoryImpl(
     private fun MirrorSearchRow.toSearchMessageModel(request: MessageSearchRequest): MessageModel {
         val isMms = transport == "MMS"
         val preferredSubject = mmsDecodedSubject ?: mmsSubject
-        val fallbackSummary = preferredSubject ?: if (pduType == 130) "等待下载彩信" else "彩信"
+        val fallbackSummary = preferredSubject ?: if (pduType == 130) {
+            AppStrings.get(R.string.domain_mms_pending_download)
+        } else {
+            AppStrings.get(R.string.domain_mms_label)
+        }
         val summary = mmsSummary ?: fallbackSummary
 
         val content = if (isMms) {
@@ -267,7 +273,7 @@ fun MirrorMessageModel.toMessageModel(): MessageModel {
         imageUris = parts.filter { it.mimeType?.startsWith("image/") == true }.mapNotNull { it.attachment?.localUri },
         mmsSubject = if (mms) decodedSubject ?: subject else null, isMms = mms,
         mmsDownloadPending = mms && pduType == 130,
-        mmsSummary = if (mms) mmsSummary ?: decodedSubject ?: subject ?: if (pduType == 130) "等待下载彩信"
+        mmsSummary = if (mms) mmsSummary ?: decodedSubject ?: subject ?: if (pduType == 130) AppStrings.get(R.string.domain_mms_pending_download)
             else mmsAttachmentSummary(parts.map { MmsMimeTypes.classify(it.mimeType) }) else null,
     )
 }

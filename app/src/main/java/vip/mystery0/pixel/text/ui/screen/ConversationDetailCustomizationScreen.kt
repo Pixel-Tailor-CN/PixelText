@@ -69,10 +69,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.theme.ConversationDetailAppearance
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
@@ -92,6 +94,7 @@ import vip.mystery0.pixel.text.ui.component.theme.ThemeColorPickerSheet
 import vip.mystery0.pixel.text.ui.screen.mock.MockMessageFactory
 import vip.mystery0.pixel.text.ui.theme.resolveConversationDetailStyle
 import vip.mystery0.pixel.text.ui.theme.resolveOr
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.viewmodel.ConversationDetailCustomizationViewModel
 import vip.mystery0.pixel.text.viewmodel.ThemeCustomizationEvent
 import java.util.Locale
@@ -132,6 +135,7 @@ fun ConversationDetailCustomizationScreen(
         uri?.let { viewModel.selectBackground(it.toString()) }
     }
 
+    val savedSnackbarText = stringResource(R.string.settings_customization_saved)
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
@@ -139,7 +143,7 @@ fun ConversationDetailCustomizationScreen(
                     snackbarHostState.showSnackbar(event.text)
                 }
                 ThemeCustomizationEvent.Saved -> {
-                    snackbarHostState.showSnackbar("已保存")
+                    snackbarHostState.showSnackbar(savedSnackbarText)
                 }
                 ThemeCustomizationEvent.SavedAndExit -> {
                     onNavigateBack()
@@ -196,13 +200,13 @@ fun ConversationDetailCustomizationScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.settings_action_back),
                         )
                     }
                 },
                 title = {
                     Text(
-                        text = "会话详情显示",
+                        text = stringResource(R.string.settings_conversation_appearance_title),
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
@@ -211,7 +215,12 @@ fun ConversationDetailCustomizationScreen(
                         onClick = { viewModel.save(exitAfterSave = false) },
                         enabled = state.hasUnsavedChanges && !state.isSaving,
                     ) {
-                        Text(if (state.isSaving) "保存中" else "保存")
+                        Text(
+                            stringResource(
+                                if (state.isSaving) R.string.settings_action_saving
+                                else R.string.settings_action_save,
+                            ),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -272,12 +281,12 @@ fun ConversationDetailCustomizationScreen(
                     Tab(
                         selected = state.previewMode == ThemeMode.LIGHT,
                         onClick = { viewModel.setPreviewMode(ThemeMode.LIGHT) },
-                        text = { Text("日间") },
+                        text = { Text(stringResource(R.string.settings_customization_mode_light)) },
                     )
                     Tab(
                         selected = state.previewMode == ThemeMode.DARK,
                         onClick = { viewModel.setPreviewMode(ThemeMode.DARK) },
-                        text = { Text("暗黑") },
+                        text = { Text(stringResource(R.string.settings_customization_mode_dark)) },
                     )
                 }
             }
@@ -290,9 +299,9 @@ fun ConversationDetailCustomizationScreen(
                     val appearance = state.draftTheme.conversationDetail.appearance(state.previewMode)
                     val colorControlsEnabled =
                         !state.highTextContrastEnabled && !state.isSaving
-                    SettingsSectionCard(title = "消息气泡") {
+                    SettingsSectionCard(title = stringResource(R.string.settings_customization_bubbles_section)) {
                         ColorSettingRow(
-                            title = "接收文字颜色",
+                            title = stringResource(R.string.settings_customization_received_text),
                             reference = appearance.receivedTextColor,
                             colorScheme = previewScheme,
                             fallback = previewScheme.onSurface,
@@ -301,7 +310,7 @@ fun ConversationDetailCustomizationScreen(
                         )
                         HorizontalDivider()
                         ColorSettingRow(
-                            title = "接收气泡颜色",
+                            title = stringResource(R.string.settings_customization_received_bubble),
                             reference = appearance.receivedBubbleColor,
                             colorScheme = previewScheme,
                             fallback = previewScheme.surfaceVariant,
@@ -310,7 +319,7 @@ fun ConversationDetailCustomizationScreen(
                         )
                         HorizontalDivider()
                         ColorSettingRow(
-                            title = "发送文字颜色",
+                            title = stringResource(R.string.settings_customization_sent_text),
                             reference = appearance.sentTextColor,
                             colorScheme = previewScheme,
                             fallback = previewScheme.onSurface,
@@ -319,7 +328,7 @@ fun ConversationDetailCustomizationScreen(
                         )
                         HorizontalDivider()
                         ColorSettingRow(
-                            title = "发送气泡颜色",
+                            title = stringResource(R.string.settings_customization_sent_bubble),
                             reference = appearance.sentBubbleColor,
                             colorScheme = previewScheme,
                             fallback = previewScheme.surfaceVariant,
@@ -344,12 +353,14 @@ fun ConversationDetailCustomizationScreen(
                     state.previewMode == module.sharedBackgroundImageMode
                 val backgroundControlsEnabled =
                     backgroundCustomizationEnabled && currentModeOwnsBackground
-                val sourceModeLabel = if (module.sharedBackgroundImageMode == ThemeMode.LIGHT) {
-                    "日间"
-                } else {
-                    "暗黑"
-                }
-                SettingsSectionCard(title = "会话背景") {
+                val sourceModeLabel = stringResource(
+                    if (module.sharedBackgroundImageMode == ThemeMode.LIGHT) {
+                        R.string.settings_customization_mode_light
+                    } else {
+                        R.string.settings_customization_mode_dark
+                    },
+                )
+                SettingsSectionCard(title = stringResource(R.string.settings_customization_background_section)) {
                     ListItem(
                         trailingContent = {
                             Switch(
@@ -361,14 +372,14 @@ fun ConversationDetailCustomizationScreen(
                         supportingContent = {
                             Text(
                                 if (module.useSameBackgroundImage) {
-                                    "使用${sourceModeLabel}背景"
+                                    stringResource(R.string.settings_customization_same_bg_using_mode, sourceModeLabel)
                                 } else {
-                                    "使用当前主题的背景"
+                                    stringResource(R.string.settings_customization_same_bg_using_current)
                                 },
                             )
                         },
                         colors = listItemColors(enabled = backgroundCustomizationEnabled),
-                        content = { Text("日间与暗黑共用背景") },
+                        content = { Text(stringResource(R.string.settings_customization_same_bg_title)) },
                     )
                     HorizontalDivider()
                     ListItem(
@@ -382,22 +393,25 @@ fun ConversationDetailCustomizationScreen(
                         },
                         supportingContent = {
                             Text(
-                                when {
-                                    !module.generateColorsFromBackgroundImage ->
-                                        "跟随系统配色"
-                                    backgroundMissing ->
-                                        "背景文件缺失，暂时使用系统颜色"
-                                    !hasBackground ->
-                                        "未设置有效背景，暂时使用系统颜色"
-                                    backgroundColorsLoading -> "正在提取配色"
-                                    backgroundColorsApplied ->
-                                        "已应用背景配色"
-                                    else -> "图片取色失败，暂时使用系统颜色"
-                                },
+                                stringResource(
+                                    when {
+                                        !module.generateColorsFromBackgroundImage ->
+                                            R.string.settings_customization_bg_colors_off
+                                        backgroundMissing ->
+                                            R.string.settings_customization_bg_colors_missing
+                                        !hasBackground ->
+                                            R.string.settings_customization_bg_colors_none
+                                        backgroundColorsLoading ->
+                                            R.string.settings_customization_bg_colors_loading
+                                        backgroundColorsApplied ->
+                                            R.string.settings_customization_bg_colors_applied
+                                        else -> R.string.settings_customization_bg_colors_failed
+                                    },
+                                ),
                             )
                         },
                         colors = listItemColors(enabled = backgroundCustomizationEnabled),
-                        content = { Text("背景取色") },
+                        content = { Text(stringResource(R.string.settings_customization_bg_colors_title)) },
                     )
                     HorizontalDivider()
                     ListItem(
@@ -418,10 +432,10 @@ fun ConversationDetailCustomizationScreen(
                             Text(
                                 when {
                                     !currentModeOwnsBackground ->
-                                        "当前使用${sourceModeLabel}主题背景，本主题原设置已保留"
-                                    backgroundMissing -> "背景文件缺失，请重新选择"
-                                    hasBackground -> "已设置当前主题背景"
-                                    else -> "仅覆盖消息列表区域"
+                                        stringResource(R.string.settings_customization_bg_select_controlled_summary, sourceModeLabel)
+                                    backgroundMissing -> stringResource(R.string.settings_customization_bg_select_missing_summary)
+                                    hasBackground -> stringResource(R.string.settings_customization_bg_select_change_summary)
+                                    else -> stringResource(R.string.settings_customization_bg_select_choose_summary)
                                 },
                             )
                         },
@@ -429,10 +443,11 @@ fun ConversationDetailCustomizationScreen(
                         content = {
                             Text(
                                 when {
-                                    !currentModeOwnsBackground -> "背景图片由${sourceModeLabel}主题控制"
-                                    backgroundMissing -> "重新选择背景图片"
-                                    hasBackground -> "更换背景图片"
-                                    else -> "选择背景图片"
+                                    !currentModeOwnsBackground ->
+                                        stringResource(R.string.settings_customization_bg_select_controlled_title, sourceModeLabel)
+                                    backgroundMissing -> stringResource(R.string.settings_customization_bg_select_missing_title)
+                                    hasBackground -> stringResource(R.string.settings_customization_bg_select_change_title)
+                                    else -> stringResource(R.string.settings_customization_bg_select_choose_title)
                                 },
                             )
                         },
@@ -446,18 +461,20 @@ fun ConversationDetailCustomizationScreen(
                         },
                         supportingContent = {
                             Text(
-                                when {
-                                    !currentModeOwnsBackground -> "关闭统一背景后恢复本主题原设置"
-                                    backgroundMissing -> "可移除缺失引用或重新选择"
-                                    hasBackground -> "清除当前主题背景"
-                                    else -> "当前未设置背景"
-                                },
+                                stringResource(
+                                    when {
+                                        !currentModeOwnsBackground -> R.string.settings_customization_bg_remove_controlled
+                                        backgroundMissing -> R.string.settings_customization_bg_remove_missing
+                                        hasBackground -> R.string.settings_customization_bg_remove_clear
+                                        else -> R.string.settings_customization_bg_remove_none
+                                    },
+                                ),
                             )
                         },
                         colors = listItemColors(
                             enabled = backgroundControlsEnabled && hasBackground,
                         ),
-                        content = { Text("移除背景图片") },
+                        content = { Text(stringResource(R.string.settings_customization_bg_remove_title)) },
                     )
                 }
             }
@@ -471,9 +488,9 @@ fun ConversationDetailCustomizationScreen(
                         state.draftTheme.conversationDetail.appearance(state.previewMode)
                     val colorControlsEnabled =
                         !state.highTextContrastEnabled && !state.isSaving
-                    SettingsSectionCard(title = "输入区域") {
+                    SettingsSectionCard(title = stringResource(R.string.settings_customization_input_section)) {
                         ColorSettingRow(
-                            title = "输入区域背景色",
+                            title = stringResource(R.string.settings_customization_input_bg),
                             reference = appearance.inputBackgroundColor,
                             colorScheme = previewScheme,
                             fallback = previewScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -491,7 +508,8 @@ fun ConversationDetailCustomizationScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = !state.isSaving,
-                                label = { Text("提示文字") },
+                                label = { Text(stringResource(R.string.settings_customization_input_placeholder_label)) },
+                                placeholder = { Text(stringResource(R.string.settings_input_placeholder_default_hint)) },
                                 singleLine = true,
                                 supportingText = {
                                     Text(
@@ -505,7 +523,7 @@ fun ConversationDetailCustomizationScreen(
             }
 
             item(key = "message_info_section") {
-                SettingsSectionCard(title = "消息信息") {
+                SettingsSectionCard(title = stringResource(R.string.settings_customization_msg_info_section)) {
                     ListItem(
                         trailingContent = {
                             Switch(
@@ -515,7 +533,7 @@ fun ConversationDetailCustomizationScreen(
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        content = { Text("显示 SIM 信息") },
+                        content = { Text(stringResource(R.string.settings_customization_show_sim)) },
                     )
                     HorizontalDivider()
                     Column(
@@ -524,7 +542,10 @@ fun ConversationDetailCustomizationScreen(
                     ) {
                         val scale = state.draftTheme.conversationDetail.textScale
                         Text(
-                            text = "文字缩放 ${"%.2f".format(Locale.US, scale)}x",
+                            text = stringResource(
+                                R.string.settings_customization_text_scale,
+                                "%.2f".format(Locale.US, scale),
+                            ),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         val sliderState = remember {
@@ -543,31 +564,33 @@ fun ConversationDetailCustomizationScreen(
             }
 
             item(key = "reset_section") {
-                SettingsSectionCard(title = "恢复") {
+                SettingsSectionCard(title = stringResource(R.string.settings_customization_reset_section)) {
                     ListItem(
                         modifier = Modifier.clickable(enabled = !state.isSaving) {
                             viewModel.resetCurrentMode()
                         },
                         supportingContent = {
                             Text(
-                                if (state.previewMode == ThemeMode.LIGHT) {
-                                    "重置日间外观为应用内置"
-                                } else {
-                                    "重置暗黑外观为应用内置"
-                                },
+                                stringResource(
+                                    if (state.previewMode == ThemeMode.LIGHT) {
+                                        R.string.settings_customization_reset_light_summary
+                                    } else {
+                                        R.string.settings_customization_reset_dark_summary
+                                    },
+                                ),
                             )
                         },
                         colors = listItemColors(enabled = !state.isSaving),
-                        content = { Text("恢复当前主题") },
+                        content = { Text(stringResource(R.string.settings_customization_reset_current)) },
                     )
                     HorizontalDivider()
                     ListItem(
                         modifier = Modifier.clickable(enabled = !state.isSaving) {
                             showResetAllDialog = true
                         },
-                        supportingContent = { Text("重置日间、暗黑与全部非颜色项") },
+                        supportingContent = { Text(stringResource(R.string.settings_customization_reset_all_summary)) },
                         colors = listItemColors(enabled = !state.isSaving),
-                        content = { Text("恢复全部") },
+                        content = { Text(stringResource(R.string.settings_customization_reset_all)) },
                     )
                 }
             }
@@ -581,8 +604,8 @@ fun ConversationDetailCustomizationScreen(
     if (showExitDialog) {
         AlertDialog(
             onDismissRequest = { showExitDialog = false },
-            title = { Text("有未保存的修改") },
-            text = { Text("离开后将丢失未保存的修改。") },
+            title = { Text(stringResource(R.string.settings_customization_unsaved_title)) },
+            text = { Text(stringResource(R.string.settings_customization_unsaved_body)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -590,7 +613,7 @@ fun ConversationDetailCustomizationScreen(
                         viewModel.save(exitAfterSave = true)
                     },
                 ) {
-                    Text("保存并退出")
+                    Text(stringResource(R.string.settings_customization_save_exit))
                 }
             },
             dismissButton = {
@@ -602,10 +625,10 @@ fun ConversationDetailCustomizationScreen(
                             onNavigateBack()
                         },
                     ) {
-                        Text("不保存")
+                        Text(stringResource(R.string.settings_customization_discard))
                     }
                     TextButton(onClick = { showExitDialog = false }) {
-                        Text("继续编辑")
+                        Text(stringResource(R.string.settings_customization_keep_editing))
                     }
                 }
             },
@@ -615,9 +638,9 @@ fun ConversationDetailCustomizationScreen(
     if (showResetAllDialog) {
         AlertDialog(
             onDismissRequest = { showResetAllDialog = false },
-            title = { Text("恢复全部默认？") },
+            title = { Text(stringResource(R.string.settings_customization_reset_all_confirm_title)) },
             text = {
-                Text("将把日间、暗黑外观以及 SIM、提示文字和文字缩放重置为应用内置。仍需点击保存后才会生效。")
+                Text(stringResource(R.string.settings_customization_reset_all_confirm_body))
             },
             confirmButton = {
                 TextButton(
@@ -626,12 +649,12 @@ fun ConversationDetailCustomizationScreen(
                         viewModel.resetAll()
                     },
                 ) {
-                    Text("恢复全部")
+                    Text(stringResource(R.string.settings_customization_reset_all))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetAllDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.settings_action_cancel))
                 }
             },
         )
@@ -697,7 +720,7 @@ private fun HighContrastBanner() {
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                text = "系统高对比度文字已启用，颜色和背景图片自定义暂时不会生效",
+                text = stringResource(R.string.settings_customization_high_contrast_banner),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -800,33 +823,33 @@ private fun colorPickerConfig(
     val sentBubble = appearance.sentBubbleColor.resolveOr(colorScheme, defaultBubble)
     return when (target) {
         ThemeColorTarget.RECEIVED_TEXT -> ColorPickerConfig(
-            title = "接收文字颜色",
+            title = AppStrings.get(R.string.settings_customization_received_text),
             current = appearance.receivedTextColor,
             comparisonBackground = receivedBubble,
             officialDefault = defaultText,
         )
         ThemeColorTarget.RECEIVED_BUBBLE -> ColorPickerConfig(
-            title = "接收气泡颜色",
+            title = AppStrings.get(R.string.settings_customization_received_bubble),
             current = appearance.receivedBubbleColor,
             comparisonBackground = receivedText,
             officialDefault = defaultBubble,
             selectedActsAsBackground = true,
         )
         ThemeColorTarget.SENT_TEXT -> ColorPickerConfig(
-            title = "发送文字颜色",
+            title = AppStrings.get(R.string.settings_customization_sent_text),
             current = appearance.sentTextColor,
             comparisonBackground = sentBubble,
             officialDefault = defaultText,
         )
         ThemeColorTarget.SENT_BUBBLE -> ColorPickerConfig(
-            title = "发送气泡颜色",
+            title = AppStrings.get(R.string.settings_customization_sent_bubble),
             current = appearance.sentBubbleColor,
             comparisonBackground = sentText,
             officialDefault = defaultBubble,
             selectedActsAsBackground = true,
         )
         ThemeColorTarget.INPUT_BACKGROUND -> ColorPickerConfig(
-            title = "输入区域背景色",
+            title = AppStrings.get(R.string.settings_customization_input_bg),
             current = appearance.inputBackgroundColor,
             comparisonBackground = colorScheme.onSurfaceVariant,
             officialDefault = defaultInput,
@@ -845,13 +868,16 @@ private tailrec fun Context.findActivity(): Activity? {
 
 private fun colorReferenceLabel(reference: ThemeColorReference?): String {
     if (reference == null) {
-        return "应用内置"
+        return AppStrings.get(R.string.settings_customization_color_builtin)
     }
     return when (reference.type) {
         ThemeColorType.MATERIAL_ROLE -> {
             val role = MaterialColorRole.fromStorageValue(reference.value)
-            role?.let { "MD3 · ${it.storageValue}" } ?: "应用内置"
+            role?.let { "MD3 · ${it.storageValue}" }
+                ?: AppStrings.get(R.string.settings_customization_color_builtin)
         }
-        ThemeColorType.CUSTOM_ARGB -> reference.value.ifBlank { "自定义" }
+        ThemeColorType.CUSTOM_ARGB -> reference.value.ifBlank {
+            AppStrings.get(R.string.settings_customization_color_custom)
+        }
     }
 }

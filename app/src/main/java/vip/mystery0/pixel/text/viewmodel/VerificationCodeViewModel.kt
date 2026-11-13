@@ -15,11 +15,13 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.VerificationCodeMonthModel
 import vip.mystery0.pixel.text.domain.repository.VerificationCodeRepository
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.VerificationCodeIndexScheduler
 import java.util.LinkedHashMap
 
@@ -184,7 +186,7 @@ class VerificationCodeViewModel(
         viewModelScope.launch {
             scheduler.observeLatestState().collect { state ->
                 error.value = if (state == WorkInfo.State.FAILED) {
-                    "验证码索引更新失败，请稍后重试"
+                    AppStrings.get(R.string.sys_vc_index_update_failed)
                 } else {
                     null
                 }
@@ -235,7 +237,7 @@ class VerificationCodeViewModel(
             loadingBodies.value -= messageId
             result.onFailure {
                 setOriginalVisible(messageId, false)
-                eventsMutable.emit(VerificationCodeEvent.ShowMessage("读取原文失败，请重试"))
+                eventsMutable.emit(VerificationCodeEvent.ShowMessage(AppStrings.get(R.string.sys_vc_read_body_failed)))
             }.onSuccess { body ->
                 if (body != null) {
                     bodyCache[messageId] = body
@@ -245,11 +247,11 @@ class VerificationCodeViewModel(
                 setOriginalVisible(messageId, false)
                 runCatching { repository.deleteMessageIds(listOf(messageId)) }
                     .onSuccess {
-                        eventsMutable.emit(VerificationCodeEvent.ShowMessage("原短信已不存在"))
+                        eventsMutable.emit(VerificationCodeEvent.ShowMessage(AppStrings.get(R.string.sys_vc_original_missing)))
                     }
                     .onFailure {
                         eventsMutable.emit(
-                            VerificationCodeEvent.ShowMessage("原短信已不存在，但清理索引失败，请重试")
+                            VerificationCodeEvent.ShowMessage(AppStrings.get(R.string.sys_vc_original_missing_cleanup_failed))
                         )
                     }
             }

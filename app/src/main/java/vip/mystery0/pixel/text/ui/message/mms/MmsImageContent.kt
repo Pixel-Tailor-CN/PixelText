@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.localMmsUri
 import vip.mystery0.pixel.text.data.source.mms.mediaCacheKey
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
@@ -52,9 +54,12 @@ fun MmsImageContent(
         uri = part.localUri,
         cacheKey = part.mediaCacheKey(),
         cacheEnabled = part.contentHash != null,
-        description = listOfNotNull(imageNumber?.let { "图片 $it" }, part.displayName).joinToString("，"),
+        description = listOfNotNull(
+            imageNumber?.let { stringResource(R.string.msg_mms_image_number, it) },
+            part.displayName,
+        ).joinToString(stringResource(R.string.msg_mms_list_separator)),
         modifier = modifier.fillMaxWidth().heightIn(min = 120.dp, max = 320.dp)
-            .clickable(enabled = interactionEnabled, onClickLabel = "查看图片", onClick = onOpen),
+            .clickable(enabled = interactionEnabled, onClickLabel = stringResource(R.string.msg_mms_image_view_cd), onClick = onOpen),
         visible = visible,
     )
 }
@@ -87,20 +92,21 @@ internal fun MmsLocalImage(
             // 限制查看页的解码尺寸；手势缩放不触发原图全尺寸分配。
             .size(2048, 2048).build()
     }
+    val loadingCd = stringResource(R.string.msg_mms_image_loading_cd)
     Box(modifier.semantics { contentDescription = description }.onGloballyPositioned {
         val bounds = it.boundsInWindow()
         inWindow = bounds.width > 0 && bounds.height > 0
     }, contentAlignment = Alignment.Center) {
-        if (localUri == null) Text("图片尚不可读")
+        if (localUri == null) Text(stringResource(R.string.msg_mms_image_unreadable))
         else if (visible && resumed && inWindow) {
             // 从组合移除 painter 会停止 Animatable；覆盖后台、离屏和 SMIL 非当前页。
             SubcomposeAsyncImage(
                 model = request, imageLoader = imageLoader, contentDescription = null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit,
                 loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "正在加载图片" })
+                    CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = loadingCd })
                 } },
-                error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("图片无法解码，可保存原件") } },
+                error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.msg_mms_image_decode_error)) } },
             )
         }
     }

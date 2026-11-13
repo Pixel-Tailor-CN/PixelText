@@ -1,10 +1,19 @@
 package vip.mystery0.pixel.text.domain.backup
 
+import androidx.annotation.StringRes
 import com.squareup.moshi.JsonClass
 import kotlinx.coroutines.flow.StateFlow
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
 
 @JsonClass(generateAdapter = false)
-enum class BackupSection(val label: String) { SETTINGS("设置与主题"), RULES("关键词与白名单"), SMS("短信及归档、放行状态") }
+enum class BackupSection(@param:StringRes val labelRes: Int) {
+    SETTINGS(R.string.domain_backup_section_settings),
+    RULES(R.string.domain_backup_section_rules),
+    SMS(R.string.domain_backup_section_sms);
+
+    val label: String get() = AppStrings.get(labelRes)
+}
 enum class BackupPhase {
     IDLE, SYNCING_MIRROR, SNAPSHOTTING, EXPORTING, VALIDATING, PREVIEW,
     RESTORING, REBUILDING, COMPLETED, INTERRUPTED, FAILED

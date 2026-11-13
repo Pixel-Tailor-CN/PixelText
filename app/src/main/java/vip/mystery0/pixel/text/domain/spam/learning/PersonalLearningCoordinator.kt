@@ -11,8 +11,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.resource.HubModelBundle
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.PersonalLearningScheduler
 
 class PersonalLearningCoordinator(
@@ -120,7 +122,11 @@ class PersonalLearningCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                repository.updateStatus(snapshot.revision, LearningStatus.FAILED, "本地学习失败，可重试")
+                repository.updateStatus(
+                    snapshot.revision,
+                    LearningStatus.FAILED,
+                    AppStrings.get(R.string.domain_personal_learning_failed),
+                )
                 false
             }
         }

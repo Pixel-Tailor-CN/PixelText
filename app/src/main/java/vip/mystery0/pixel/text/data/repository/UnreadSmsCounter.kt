@@ -1,16 +1,21 @@
 package vip.mystery0.pixel.text.data.repository
 
+import android.content.Context
+import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.UnreadSmsCandidate
 import vip.mystery0.pixel.text.data.db.mirror.UnreadSmsQuery
+import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.domain.model.UnreadSmsCountFilter
 import vip.mystery0.pixel.text.domain.spam.SpamRepository
 
 class UnreadSmsCounter(
+    private val context: Context,
     private val telephonyDataSource: TelephonyDataSource,
     private val spamRepository: SpamRepository,
     database: MessageMirrorDatabase,
@@ -26,37 +31,51 @@ class UnreadSmsCounter(
             return 0
         }
 
-        val unreadMessages = telephonyDataSource.getUnreadSmsMessagesForSmartspacer()
-        if (unreadMessages.isEmpty()) return 0
-        if (filter.includeNormalMessages &&
-            filter.includeSpamMessages &&
-            filter.includeArchivedMessages &&
-            !filter.excludeFullySpamConversations
-        ) {
-            return unreadMessages.size
+        if (context.smsAccessState() != SmsAccessState.READY) {
+            return countFromMirror(filter)
         }
 
-        // 初始化可能获取同步锁，必须在主库查询或事务之前完成。
-        spamRepository.ensureReady()
-        val fullySpamThreadIds = if (filter.excludeFullySpamConversations) {
-            findFullySpamThreadIds(unreadMessages.map { it.threadId }.distinct())
-        } else {
-            emptySet()
-        }
+        return try {
+            val unreadMessages = telephonyDataSource.getUnreadSmsMessagesForSmartspacer()
+            if (unreadMessages.isEmpty()) return 0
+            if (filter.includeNormalMessages &&
+                filter.includeSpamMessages &&
+                filter.includeArchivedMessages &&
+                !filter.excludeFullySpamConversations
+            ) {
+                return unreadMessages.size
+            }
 
-        return unreadMessages.chunked(UnreadSmsQuery.MAX_CANDIDATES).sumOf { batch ->
-            mirrorDao.filteredUnreadSmsCount(UnreadSmsQuery.count(
-                batch.map { UnreadSmsCandidate(it.id, it.threadId) },
-                filter,
-                fullySpamThreadIds,
-            ))
+            // 初始化可能获取同步锁，必须在主库查询或事务之前完成。
+            spamRepository.ensureReady()
+            val fullySpamThreadIds = if (filter.excludeFullySpamConversations) {
+                findFullySpamThreadIds(unreadMessages.map { it.threadId }.distinct())
+            } else {
+                emptySet()
+            }
+
+            unreadMessages.chunked(UnreadSmsQuery.MAX_CANDIDATES).sumOf { batch ->
+                mirrorDao.filteredUnreadSmsCount(UnreadSmsQuery.count(
+                    batch.map { UnreadSmsCandidate(it.id, it.threadId) },
+                    filter,
+                    fullySpamThreadIds,
+                ))
+            }
+        } catch (_: SecurityException) {
+            countFromMirror(filter)
         }
     }
+
+    private suspend fun countFromMirror(filter: UnreadSmsCountFilter): Int =
+        mirrorDao.filteredUnreadSmsCount(UnreadSmsQuery.countFromMirror(filter))
 
     fun observeClassificationChanges(): Flow<Unit> = merge(
         archiveDao.observeArchivedThreadIds().map { },
         spamRepository.observeChanges(),
     )
+
+    fun observeMirrorChanges(): Flow<Unit> =
+        mirrorDao.observeConversationChanges(SimpleSQLiteQuery("SELECT 1")).map { }
 
     private suspend fun findFullySpamThreadIds(threadIds: List<Long>): Set<Long> {
         if (threadIds.isEmpty()) return emptySet()

@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text.sms
 
+import androidx.annotation.StringRes
 import androidx.core.net.toUri
 import android.app.Activity
 import android.app.PendingIntent
@@ -23,8 +24,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.ConversationCacheRepository
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
@@ -36,10 +39,14 @@ class SmsSendCoordinator(
     private val source: TelephonyDataSource,
     private val cache: ConversationCacheRepository,
 ) {
-    enum class State(val label: String) {
-        SENDING("正在发送短信"), SENT("短信已发送（不代表已送达）"),
-        FAILED("短信发送失败（多段短信可能已有部分发出）"),
-        UNKNOWN("发送结果未知，可能已发出，请勿直接重复发送"),
+    enum class State(@param:StringRes val labelRes: Int) {
+        SENDING(R.string.sys_sms_state_sending),
+        SENT(R.string.sys_sms_state_sent),
+        FAILED(R.string.sys_sms_state_failed),
+        UNKNOWN(R.string.sys_sms_state_unknown);
+
+        val label: String
+            get() = AppStrings.get(labelRes)
     }
 
     private val lock = Mutex()
@@ -57,19 +64,19 @@ class SmsSendCoordinator(
                     if (accepted != null) return@withLock accepted.getLong("id")
                 }
                 check(context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_SMS)) {
-                    "请先设置为默认短信应用"
+                    context.getString(R.string.sys_sms_set_default_app)
                 }
-                require(address.isNotBlank() && body.isNotBlank()) { "号码和正文不能为空" }
+                require(address.isNotBlank() && body.isNotBlank()) { context.getString(R.string.sys_sms_empty_address_or_body) }
                 val base = context.getSystemService(SmsManager::class.java)
                 val manager = if (subId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) base.createForSubscriptionId(subId) else base
                 val parts = manager.divideMessage(body)
-                require(parts.isNotEmpty()) { "短信正文无效" }
-                val uri = requireNotNull(source.insertOutboxPlaceholder(address, body, threadId, subId)) { "无法保存待发送短信" }
+                require(parts.isNotEmpty()) { context.getString(R.string.sys_sms_invalid_body) }
+                val uri = requireNotNull(source.insertOutboxPlaceholder(address, body, threadId, subId)) { context.getString(R.string.sys_sms_save_outbox_failed) }
                 val id = requireNotNull(uri.lastPathSegment?.toLongOrNull())
                 val token = UUID.randomUUID().toString()
                 val record = JSONObject().put("id", id).put("uri", uri.toString())
                     .put("thread", source.queryThreadIdFromUri(uri) ?: threadId)
-                    .put("identity", identity(uri) ?: error("待发送短信不可用"))
+                    .put("identity", identity(uri) ?: error(context.getString(R.string.sys_sms_outbox_unavailable)))
                     .put("started", System.currentTimeMillis()).put("count", parts.size)
                     .put("draftKey", draftKey)
                     .put("state", State.SENDING.name).put("results", JSONObject())

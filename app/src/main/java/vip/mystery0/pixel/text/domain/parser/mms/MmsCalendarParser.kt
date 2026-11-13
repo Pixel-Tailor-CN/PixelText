@@ -11,7 +11,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsCalendarModel
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 有界的 VEVENT 只读解析器；不访问 URL，不展开重复事件或自定义时区规则。 */
 class MmsCalendarParser {
@@ -19,7 +21,7 @@ class MmsCalendarParser {
     private data class EventTime(val value: ZonedDateTime, val allDay: Boolean, val floating: Boolean)
 
     fun parse(text: String, checkCancelled: () -> Unit = {}): List<MmsCalendarModel> {
-        if (text.length > 512 * 1024) return listOf(failed("日历过大，请打开原件"))
+        if (text.length > 512 * 1024) return listOf(failed(AppStrings.get(R.string.domain_mms_calendar_too_large)))
         val unfolded = unfoldMmsContentLines(text, checkCancelled = checkCancelled).toList()
         val result = mutableListOf<MmsCalendarModel>()
         val hasTimezoneDefinition = unfolded.any { it.equals("BEGIN:VTIMEZONE", true) }
@@ -37,7 +39,7 @@ class MmsCalendarParser {
                 if (properties == null && result.size == 32) {
                     val last = result.last()
                     result[result.lastIndex] = last.copy(importWarning = listOfNotNull(last.importWarning,
-                        "最多展示 32 个事件，其余事件请打开原件").joinToString("；"))
+                        AppStrings.get(R.string.domain_mms_calendar_max_events)).joinToString(AppStrings.get(R.string.domain_mms_warning_separator)))
                     break
                 }
                 if (properties != null) incomplete = true
@@ -55,39 +57,39 @@ class MmsCalendarParser {
                 }
             }
         }
-        if (properties != null) result += failed("日历事件不完整，请打开原件")
-        return result.ifEmpty { listOf(failed("无法读取日历事件，请打开原件")) }
+        if (properties != null) result += failed(AppStrings.get(R.string.domain_mms_calendar_incomplete))
+        return result.ifEmpty { listOf(failed(AppStrings.get(R.string.domain_mms_calendar_unreadable))) }
     }
 
     private fun parseEvent(properties: List<Property>, incomplete: Boolean, hasTimezoneDefinition: Boolean): MmsCalendarModel {
         val warnings = mutableListOf<String>()
-        if (incomplete) warnings += "附加字段或提醒未完整导入"
+        if (incomplete) warnings += AppStrings.get(R.string.domain_mms_calendar_extra_fields_incomplete)
         fun first(name: String) = properties.firstOrNull { it.name == name }
         fun field(name: String) = first(name)?.value?.let(::unescape)?.takeIf(String::isNotBlank)?.also {
-            if (it.length > 4096) warnings += "过长字段已截短"
+            if (it.length > 4096) warnings += AppStrings.get(R.string.domain_mms_calendar_field_truncated)
         }?.take(4096)
         val title = field("SUMMARY")
         val location = field("LOCATION")
         val description = field("DESCRIPTION")
         val recurrence = field("RRULE")
         val recurring = properties.any { it.name in setOf("RRULE", "RDATE", "EXDATE", "EXRULE", "RECURRENCE-ID") }
-        if (recurring) warnings += "系统添加仅支持本次事件；完整重复规则及例外请打开原始 ICS"
-        if (properties.any { it.name !in SUPPORTED }) warnings += "部分日历属性请核对原件"
-        if (title == null) warnings += "事件缺少标题"
+        if (recurring) warnings += AppStrings.get(R.string.domain_mms_calendar_recurring_notice)
+        if (properties.any { it.name !in SUPPORTED }) warnings += AppStrings.get(R.string.domain_mms_calendar_check_properties)
+        if (title == null) warnings += AppStrings.get(R.string.domain_mms_calendar_missing_title)
         var start: EventTime? = null
         var end: Instant?
         var valid = true
         try {
             // 自定义规则可能覆盖同名 IANA 时区；不以设备规则静默替代发送方规则。
             if (hasTimezoneDefinition && properties.any { it.name in setOf("DTSTART", "DTEND") && "TZID" in it.parameters }) {
-                warnings += "内嵌时区规则需由日历应用完整读取"
+                warnings += AppStrings.get(R.string.domain_mms_calendar_embedded_tz)
                 error("embedded timezone definition")
             }
             if (listOf("DTSTART", "DTEND", "DURATION").any { name -> properties.count { it.name == name } > 1 }) {
                 error("ambiguous event time")
             }
             start = first("DTSTART")?.let(::time) ?: error("missing start")
-            if (start.floating) warnings += "未声明时区，按设备当前时区显示，请核对"
+            if (start.floating) warnings += AppStrings.get(R.string.domain_mms_calendar_floating_tz)
             val endProperty = first("DTEND")
             val duration = first("DURATION")
             if (endProperty != null && duration != null) error("conflicting end")
@@ -107,10 +109,10 @@ class MmsCalendarParser {
         catch (_: Exception) {
             valid = false
             end = null
-            warnings += "日期、时区或时长无法可靠读取，请打开原件"
+            warnings += AppStrings.get(R.string.domain_mms_calendar_invalid_time)
         }
         return MmsCalendarModel(title, start?.value?.toInstant(), end, start?.value?.zone?.id, start?.allDay ?: false,
-            location, description, recurrence, warnings.distinct().takeIf { it.isNotEmpty() }?.joinToString("；"), valid)
+            location, description, recurrence, warnings.distinct().takeIf { it.isNotEmpty() }?.joinToString(AppStrings.get(R.string.domain_mms_warning_separator)), valid)
     }
 
     private fun time(property: Property): EventTime {

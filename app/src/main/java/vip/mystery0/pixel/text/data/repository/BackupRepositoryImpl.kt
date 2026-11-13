@@ -12,6 +12,7 @@ import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.data.source.SmsAccessException
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.backup.*
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
 import vip.mystery0.pixel.text.data.repository.mirror.MessageMirrorSynchronizer
@@ -46,8 +47,10 @@ class BackupRepositoryImpl(
     private var inspected: ValidatedBackup? = null
     private val root = File(context.noBackupFilesDir, "backup-staging")
     private val initialization = scope.async {
-        if (root.exists()) backupRequire(root.deleteRecursively(), "无法清理上次操作的暂存数据")
-        backupRequire(root.mkdirs() || root.isDirectory, "无法创建备份暂存目录")
+        if (root.exists()) {
+            backupRequire(root.deleteRecursively(), context.getString(R.string.domain_backup_error_cleanup_staging))
+        }
+        backupRequire(root.mkdirs() || root.isDirectory, context.getString(R.string.domain_backup_error_create_staging))
     }
     private val mutable = MutableStateFlow(BackupOperationState(
         phase = if (safety.active) BackupPhase.INTERRUPTED else BackupPhase.IDLE,
@@ -61,9 +64,9 @@ class BackupRepositoryImpl(
         val secret = password?.copyOf()
         password?.fill('\u0000')
         if (!start(BackupPhase.EXPORTING, secret, uri) {
-            backupRequire(!safety.active, "请先确认结束上次恢复保护")
-            backupRequire(sections.isNotEmpty(), "请选择备份内容")
-            backupRequire(secret == null || secret.isNotEmpty(), "请输入加密密码后重试")
+            backupRequire(!safety.active, context.getString(R.string.domain_backup_error_active_protection))
+            backupRequire(sections.isNotEmpty(), context.getString(R.string.domain_backup_error_empty_sections))
+            backupRequire(secret == null || secret.isNotEmpty(), context.getString(R.string.domain_backup_error_empty_password))
             discardPreview()
             val directory = newDirectory()
             var exported = false
@@ -135,12 +138,12 @@ class BackupRepositoryImpl(
                 initializationGuard.withInputMutation {
                 backupRequire(
                     preview != null && preview.directory.name == token,
-                    "预览已过期，请重新选择文件"
+                    context.getString(R.string.domain_backup_error_preview_expired),
                 )
                 val backup = requireNotNull(preview)
                 backupRequire(
                     sections.isNotEmpty() && backup.manifest.sections.containsAll(sections),
-                    "恢复类别无效"
+                    context.getString(R.string.domain_backup_error_invalid_restore_sections),
                 )
                 if (BackupSection.SMS in sections) sms.requireAccess()
                 // 所有包含历史数据/设置的恢复都建立保护，避免应用设置提前开启清理。
@@ -230,8 +233,12 @@ class BackupRepositoryImpl(
 
     /** 结束保护时总会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。 */
     private suspend fun finishProtection() {
-        backupRequire(appSettings.restorePortablePreferences(listOf(
-            PortablePreference("verification_code_auto_delete_enabled", "boolean", "false"))), "无法暂停验证码清理")
+        backupRequire(
+            appSettings.restorePortablePreferences(
+                listOf(PortablePreference("verification_code_auto_delete_enabled", "boolean", "false")),
+            ),
+            context.getString(R.string.domain_backup_error_pause_code_cleanup),
+        )
         safety.finish()
     }
 
@@ -247,8 +254,8 @@ class BackupRepositoryImpl(
                     // 恢复中断由中断对话框说明，避免同时弹出两个提示；导出没有这类状态，需要单独告知。
                     errorMessage = when {
                         safety.active -> null
-                        phase == BackupPhase.EXPORTING -> "请检查已保存的备份文件是否完整"
-                        else -> "操作已停止"
+                        phase == BackupPhase.EXPORTING -> context.getString(R.string.domain_backup_error_export_interrupted)
+                        else -> context.getString(R.string.domain_backup_error_operation_stopped)
                     }) }
             } catch (error: Exception) {
                 // 不显示底层异常文本，避免数据库/URI/正文进入界面或日志。
@@ -257,9 +264,10 @@ class BackupRepositoryImpl(
                     is BackupException -> error.message
                     is SecurityException -> if (context.smsAccessState() != SmsAccessState.READY) {
                         context.smsAccessState().userMessage
-                    } else "无法访问所选文件，请重新选择文件后重试"
-                    is net.lingala.zip4j.exception.ZipException -> "密码错误或备份文件损坏"
-                    else -> "操作失败（${error.javaClass.simpleName}），已写入的数据会保留，请检查权限、文件和空间"
+                    } else context.getString(R.string.domain_backup_error_access_selected_file)
+                    is net.lingala.zip4j.exception.ZipException ->
+                        context.getString(R.string.domain_backup_error_wrong_password_or_corrupt)
+                    else -> context.getString(R.string.domain_backup_error_generic_failure, error.javaClass.simpleName)
                 }
                 mutable.update { it.copy(phase = BackupPhase.FAILED, restoreProtected = safety.active, errorMessage = message,
                     authorizationRequired = error is SmsAccessException ||
@@ -279,7 +287,9 @@ class BackupRepositoryImpl(
             total = summary.inserted + summary.existing + summary.failed + summary.remaining, restoreProtected = safety.active) }
         safety.record(summary)
     }
-    private fun newDirectory(): File = File(root, UUID.randomUUID().toString()).also { backupRequire(it.mkdirs(), "无法创建暂存目录") }
+    private fun newDirectory(): File = File(root, UUID.randomUUID().toString()).also {
+        backupRequire(it.mkdirs(), context.getString(R.string.domain_backup_error_create_temp_dir))
+    }
     private fun discardPreview() { inspected?.directory?.deleteRecursively(); inspected = null }
     private fun hasReadPermission() = context.smsAccessState() == SmsAccessState.READY
     private fun smsCount(directory: File): Long {

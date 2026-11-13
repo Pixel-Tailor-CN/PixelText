@@ -25,10 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.backup.*
 import vip.mystery0.pixel.text.viewmodel.BackupViewModel
 import vip.mystery0.pixel.text.ui.isDefaultSmsApp
@@ -128,8 +130,10 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     fun createFile() { create.launch("PixelText-${System.currentTimeMillis()}.ptbackup") }
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text("备份与恢复") }, navigationIcon = {
-            IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
+        TopAppBar(title = { Text(stringResource(R.string.settings_backup_restore_title)) }, navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.settings_action_back))
+            }
         })
     }) { padding ->
         Column(
@@ -138,14 +142,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "安全导出短信，或从备份文件合并恢复。现有短信不会被清空。",
+                stringResource(R.string.settings_backup_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // 所有反馈信息都用对话框呈现，页面只保留操作入口。
             if (!state.busy && (!state.restoreProtected || preview != null)) {
                 if (preview == null) {
-                    BackupTaskCard(title = "导出备份") {
+                    BackupTaskCard(title = stringResource(R.string.settings_backup_export_title)) {
                         Row(
                             modifier = Modifier.fillMaxWidth()
                                 .heightIn(min = 48.dp)
@@ -154,9 +158,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("加密导出", style = MaterialTheme.typography.titleSmall)
+                                Text(stringResource(R.string.settings_backup_encrypt_title), style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    if (encrypt) "使用密码保护备份文件" else "文件不加密，持有者可直接读取短信",
+                                    stringResource(
+                                        if (encrypt) R.string.settings_backup_encrypt_on
+                                        else R.string.settings_backup_encrypt_off,
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -169,9 +176,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             OutlinedTextField(
                                 value = confirmation,
                                 onValueChange = { confirmation = it },
-                                label = { Text("确认密码") },
+                                label = { Text(stringResource(R.string.settings_backup_confirm_password)) },
                                 supportingText = {
-                                    Text(if (mismatch) "两次输入的密码不一致" else "建议至少 12 位，丢失后无法找回")
+                                    Text(
+                                        stringResource(
+                                            if (mismatch) R.string.settings_backup_password_mismatch
+                                            else R.string.settings_backup_password_hint,
+                                        ),
+                                    )
                                 },
                                 isError = mismatch,
                                 visualTransformation = PasswordVisualTransformation(),
@@ -180,18 +192,18 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             )
                         }
                         Text(
-                            "不含彩信、附件及应用名称与图标。文件大小和条目名称仍可能可见，保存位置由你自己选择。",
+                            stringResource(R.string.settings_backup_export_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
                             onClick = { showExportContentDialog = true },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("导出备份") }
+                        ) { Text(stringResource(R.string.settings_backup_export_title)) }
                     }
-                    BackupTaskCard(title = "恢复备份") {
+                    BackupTaskCard(title = stringResource(R.string.settings_backup_restore_card_title)) {
                         Text(
-                            "选择备份文件后会先显示预览，确认后才开始恢复。",
+                            stringResource(R.string.settings_backup_restore_intro),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -207,9 +219,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("加密文件", style = MaterialTheme.typography.titleSmall)
+                                Text(stringResource(R.string.settings_backup_encrypted_file), style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    if (restoreEncrypted) "需要密码才能解密备份文件" else "文件未加密，将直接读取",
+                                    stringResource(
+                                        if (restoreEncrypted) R.string.settings_backup_encrypted_file_on
+                                        else R.string.settings_backup_encrypted_file_off,
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -220,7 +235,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             BackupPasswordField(
                                 password = restorePassword,
                                 onPasswordChange = { restorePassword = it },
-                                label = "文件密码",
+                                label = stringResource(R.string.settings_backup_file_password),
                             )
                         }
                         Button(
@@ -228,42 +243,53 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                             enabled = !restoreEncrypted || restorePassword.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("选择备份文件")
+                            Text(stringResource(R.string.settings_backup_select_file))
                         }
                     }
                 } else {
-                    BackupTaskCard(title = "恢复文件预览", cornerRadius = 28.dp) {
+                    BackupTaskCard(title = stringResource(R.string.settings_backup_preview_title), cornerRadius = 28.dp) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("短信数量 ${preview.smsCount}", style = MaterialTheme.typography.titleLarge)
                             Text(
-                                "备份时间：${SimpleDateFormat("yyyy年MM月dd日 HH:mm:ss", locale).format(Date(preview.createdAt))}",
+                                stringResource(
+                                    if (preview.smsCount == 1L) R.string.settings_backup_preview_sms_count_single
+                                    else R.string.settings_backup_preview_sms_count_plural,
+                                    preview.smsCount,
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            val timePattern = stringResource(R.string.settings_backup_preview_time_pattern)
+                            Text(
+                                stringResource(
+                                    R.string.settings_backup_preview_time,
+                                    SimpleDateFormat(timePattern, locale).format(Date(preview.createdAt)),
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Text("选择恢复内容", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.settings_backup_preview_select_content), style = MaterialTheme.typography.titleSmall)
                         BackupSectionSelection(
                             sections = BackupSection.entries.filter { it in preview.sections },
                             selection = selection,
                             onSelectionChange = { selection = it },
                         )
                         Text(
-                            "短信去重合并，规则取并集；选中的设置由备份覆盖。旧 SIM 标识不迁移；出站消息转为失败且不会发送。会话归档可能同时影响该会话现有彩信的列表展示。",
+                            stringResource(R.string.settings_backup_preview_note),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
                             onClick = { restoreConfirm = true }, enabled = selection.isNotEmpty(),
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("恢复所选内容") }
-                        TextButton(onClick = viewModel::cancel) { Text("关闭预览") }
+                        ) { Text(stringResource(R.string.settings_backup_restore_selected)) }
+                        TextButton(onClick = viewModel::cancel) { Text(stringResource(R.string.settings_backup_close_preview)) }
                     }
                 }
             }
             if (state.busy) {
-                Text("请保持应用在前台", style = MaterialTheme.typography.bodySmall,
+                Text(stringResource(R.string.settings_backup_keep_foreground), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                BackupTaskCard(title = "正在处理") {
+                BackupTaskCard(title = stringResource(R.string.settings_backup_processing)) {
                     val progress = state.total?.takeIf { it > 0 }?.let {
                         (state.processed.toFloat() / it).coerceIn(0f, 1f)
                     }
@@ -284,20 +310,32 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         (elapsedSeconds * (it - state.processed).coerceAtLeast(0) / state.processed).coerceAtLeast(0)
                     }
                     Text(
-                        buildString {
-                            append("已用时 ").append(formatDuration(elapsedSeconds))
-                            remainingSeconds?.let { append(" · 预计还需 ").append(formatDuration(it)) }
+                        if (remainingSeconds != null) {
+                            stringResource(
+                                R.string.settings_backup_elapsed_remaining,
+                                formatDuration(elapsedSeconds),
+                                formatDuration(remainingSeconds),
+                            )
+                        } else {
+                            stringResource(
+                                R.string.settings_backup_elapsed,
+                                formatDuration(elapsedSeconds),
+                            )
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(when (state.phase) {
-                        BackupPhase.SYNCING_MIRROR -> "正在同步短信镜像…"
-                        BackupPhase.SNAPSHOTTING -> "正在创建应用数据库快照…"
-                        BackupPhase.EXPORTING -> "正在打包并保存备份…"
-                        BackupPhase.VALIDATING -> "正在解密并校验全部备份内容…"
-                        BackupPhase.REBUILDING -> "正在对账和重建索引…"
-                        else -> "正在恢复… ${state.processed} / ${state.total ?: "—"}"
+                        BackupPhase.SYNCING_MIRROR -> stringResource(R.string.settings_backup_phase_syncing)
+                        BackupPhase.SNAPSHOTTING -> stringResource(R.string.settings_backup_phase_snapshotting)
+                        BackupPhase.EXPORTING -> stringResource(R.string.settings_backup_phase_exporting)
+                        BackupPhase.VALIDATING -> stringResource(R.string.settings_backup_phase_validating)
+                        BackupPhase.REBUILDING -> stringResource(R.string.settings_backup_phase_rebuilding)
+                        else -> stringResource(
+                            R.string.settings_backup_phase_restoring,
+                            state.processed,
+                            state.total?.toString() ?: "—",
+                        )
                     }, style = MaterialTheme.typography.bodyMedium)
                     // 导出与恢复的中断影响不同，提示和按钮按当前操作区分。
                     val exporting = state.phase in setOf(
@@ -305,13 +343,13 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                     )
                     if (state.restoreProtected || !exporting) {
                         Text(
-                            "已写入的短信不会撤销；停止后可以重新导入，重复内容会自动跳过。",
+                            stringResource(R.string.settings_backup_interrupt_restore_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
-                            "停止后已写入的文件可能不完整。",
+                            stringResource(R.string.settings_backup_interrupt_export_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -320,9 +358,9 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                         Text(
                             when (state.phase) {
                                 BackupPhase.SYNCING_MIRROR, BackupPhase.SNAPSHOTTING,
-                                BackupPhase.EXPORTING -> "停止导出"
-                                BackupPhase.VALIDATING -> "取消"
-                                else -> "停止恢复"
+                                BackupPhase.EXPORTING -> stringResource(R.string.settings_backup_stop_export)
+                                BackupPhase.VALIDATING -> stringResource(R.string.settings_action_cancel)
+                                else -> stringResource(R.string.settings_backup_stop_restore)
                             },
                         )
                     }
@@ -331,7 +369,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
             // 中断态的入口：反馈在对话框里，这里只保留继续处理的按钮。
             if (state.restoreProtected && !state.busy && state.phase != BackupPhase.COMPLETED) {
                 Button(onClick = { showInterruptedDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("继续处理上次恢复")
+                    Text(stringResource(R.string.settings_backup_resume_button))
                 }
             }
         }
@@ -340,20 +378,27 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     state.errorMessage?.let { message ->
         AlertDialog(
             onDismissRequest = viewModel::clearError,
-            title = { Text(if (state.phase == BackupPhase.INTERRUPTED) "操作已停止" else "操作失败") },
+            title = {
+                Text(
+                    stringResource(
+                        if (state.phase == BackupPhase.INTERRUPTED) R.string.settings_backup_error_stopped
+                        else R.string.settings_backup_error_failed,
+                    ),
+                )
+            },
             text = {
                 Text(
                     if (state.authorizationRequired && !authorizationNeeded) {
-                        "权限已恢复，请重新创建备份或重试恢复"
+                        stringResource(R.string.settings_backup_auth_restored)
                     } else message,
                 )
             },
             confirmButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (authorizationNeeded) {
-                        TextButton(onClick = { viewModel.clearError(); authorize() }) { Text("授权") }
+                        TextButton(onClick = { viewModel.clearError(); authorize() }) { Text(stringResource(R.string.settings_action_grant)) }
                     }
-                    TextButton(onClick = viewModel::clearError) { Text("知道了") }
+                    TextButton(onClick = viewModel::clearError) { Text(stringResource(R.string.settings_action_ok)) }
                 }
             },
         )
@@ -364,32 +409,32 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
     ) {
         AlertDialog(
             onDismissRequest = { showInterruptedDialog = false },
-            title = { Text("上次恢复未完成") },
+            title = { Text(stringResource(R.string.settings_backup_interrupted_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("已写入的短信会保留，验证码自动清理暂缓。")
+                    Text(stringResource(R.string.settings_backup_interrupted_body))
                     BackupResultDetails(state.summary)
                     if (preview == null) {
                         if (restoreEncrypted) {
                             BackupPasswordField(
                                 password = restorePassword,
                                 onPasswordChange = { restorePassword = it },
-                                label = "文件密码",
+                                label = stringResource(R.string.settings_backup_file_password),
                             )
                         }
                         TextButton(
                             onClick = { showInterruptedDialog = false; open.launch(arrayOf("*/*")) },
                             enabled = !restoreEncrypted || restorePassword.isNotEmpty(),
-                        ) { Text("重新选择文件继续恢复") }
+                        ) { Text(stringResource(R.string.settings_backup_reselect_file)) }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showInterruptedDialog = false; finishConfirm = true }) {
-                    Text("确认结果并结束保护")
+                    Text(stringResource(R.string.settings_backup_confirm_end_protection))
                 }
             },
-            dismissButton = { TextButton(onClick = { showInterruptedDialog = false }) { Text("稍后处理") } },
+            dismissButton = { TextButton(onClick = { showInterruptedDialog = false }) { Text(stringResource(R.string.settings_action_later)) } },
         )
     }
     // 导出和恢复完成后都用对话框告知结果，关闭后页面回到初始状态。
@@ -397,30 +442,37 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
         val restored = state.summary.completedSections.isNotEmpty()
         AlertDialog(
             onDismissRequest = viewModel::dismissResult,
-            title = { Text(if (restored) "恢复完成" else "导出完成") },
+            title = {
+                Text(
+                    stringResource(
+                        if (restored) R.string.settings_backup_completed_restore_title
+                        else R.string.settings_backup_completed_export_title,
+                    ),
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (restored) {
-                        Text("短信已写入并完成同步，可以直接返回使用。")
+                        Text(stringResource(R.string.settings_backup_completed_restore_body))
                         BackupResultDetails(state.summary)
                     } else {
-                        Text("备份文件已保存到你选择的位置，请妥善保管。")
-                        if (encrypt) Text("文件使用你设置的密码加密，忘记密码将无法恢复。")
+                        Text(stringResource(R.string.settings_backup_completed_export_body))
+                        if (encrypt) Text(stringResource(R.string.settings_backup_completed_export_encrypted))
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = viewModel::dismissResult) { Text("完成") } },
+            confirmButton = { TextButton(onClick = viewModel::dismissResult) { Text(stringResource(R.string.settings_action_done)) } },
         )
     }
     if (showExportContentDialog) AlertDialog(
         onDismissRequest = { showExportContentDialog = false },
-        title = { Text("选择备份内容") },
+        title = { Text(stringResource(R.string.settings_backup_export_dialog_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("选择要导出的内容，确认后进入文件保存流程。")
+                Text(stringResource(R.string.settings_backup_export_dialog_body))
                 if (encrypt && (password.isEmpty() || password != confirmation)) {
                     Text(
-                        "请先输入并确认备份密码。",
+                        stringResource(R.string.settings_backup_export_dialog_pw_error),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -440,22 +492,31 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit, viewModel: BackupViewModel =
                 },
                 enabled = selection.isNotEmpty() &&
                     (!encrypt || (password.isNotEmpty() && password == confirmation)),
-            ) { Text("继续导出") }
+            ) { Text(stringResource(R.string.settings_backup_export_dialog_continue)) }
         },
-        dismissButton = { TextButton(onClick = { showExportContentDialog = false }) { Text("取消") } },
+        dismissButton = { TextButton(onClick = { showExportContentDialog = false }) { Text(stringResource(R.string.settings_action_cancel)) } },
     )
-    if (warning) AlertDialog(onDismissRequest = { warning = false }, title = { Text("导出未加密备份？") },
-        text = { Text("任何持有此文件的人都可以读取短信正文及设置，请妥善保管。") },
-        confirmButton = { TextButton(onClick = { warning = false; createFile() }) { Text("继续") } },
-        dismissButton = { TextButton(onClick = { warning = false }) { Text("取消") } })
-    if (restoreConfirm && preview != null) AlertDialog(onDismissRequest = { restoreConfirm = false }, title = { Text("确认恢复") },
-        text = { Text("不会清空现有短信。所选设置会被覆盖，中断时已写入的数据会保留。") },
-        confirmButton = { TextButton(onClick = { restoreConfirm = false; viewModel.restore(preview.token, selection) }) { Text("开始恢复") } },
-        dismissButton = { TextButton(onClick = { restoreConfirm = false }) { Text("取消") } })
-    if (finishConfirm) AlertDialog(onDismissRequest = { finishConfirm = false }, title = { Text("结束恢复保护") },
-        text = { Text("会先暂停验证码自动删除，避免清理刚恢复的历史验证码；需要时可在设置中重新开启。已写入的短信保留，重新导入会去重。") },
-        confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge() }) { Text("确认结束") } },
-        dismissButton = { TextButton(onClick = { finishConfirm = false }) { Text("取消") } })
+    if (warning) AlertDialog(
+        onDismissRequest = { warning = false },
+        title = { Text(stringResource(R.string.settings_backup_unencrypted_title)) },
+        text = { Text(stringResource(R.string.settings_backup_unencrypted_body)) },
+        confirmButton = { TextButton(onClick = { warning = false; createFile() }) { Text(stringResource(R.string.settings_backup_unencrypted_confirm)) } },
+        dismissButton = { TextButton(onClick = { warning = false }) { Text(stringResource(R.string.settings_action_cancel)) } },
+    )
+    if (restoreConfirm && preview != null) AlertDialog(
+        onDismissRequest = { restoreConfirm = false },
+        title = { Text(stringResource(R.string.settings_backup_restore_confirm_title)) },
+        text = { Text(stringResource(R.string.settings_backup_restore_confirm_body)) },
+        confirmButton = { TextButton(onClick = { restoreConfirm = false; viewModel.restore(preview.token, selection) }) { Text(stringResource(R.string.settings_backup_restore_confirm_button)) } },
+        dismissButton = { TextButton(onClick = { restoreConfirm = false }) { Text(stringResource(R.string.settings_action_cancel)) } },
+    )
+    if (finishConfirm) AlertDialog(
+        onDismissRequest = { finishConfirm = false },
+        title = { Text(stringResource(R.string.settings_backup_finish_confirm_title)) },
+        text = { Text(stringResource(R.string.settings_backup_finish_confirm_body)) },
+        confirmButton = { TextButton(onClick = { finishConfirm = false; viewModel.acknowledge() }) { Text(stringResource(R.string.settings_action_confirm)) } },
+        dismissButton = { TextButton(onClick = { finishConfirm = false }) { Text(stringResource(R.string.settings_action_cancel)) } },
+    )
 }
 
 private fun formatDuration(seconds: Long): String {

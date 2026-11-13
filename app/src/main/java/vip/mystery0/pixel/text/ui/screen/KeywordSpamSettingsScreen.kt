@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.domain.model.BlockedKeyword
@@ -86,13 +87,19 @@ fun KeywordSpamSettingsScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_action_back),
+                        )
                     }
                 },
-                title = { Text("关键词拦截") },
+                title = { Text(stringResource(R.string.settings_keyword_blocking_title)) },
                 actions = {
                     IconButton(onClick = { showInfo = true }) {
-                        Icon(Icons.Rounded.Info, contentDescription = "关于关键词拦截")
+                        Icon(
+                            Icons.Rounded.Info,
+                            contentDescription = stringResource(R.string.settings_keyword_about_cd),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -109,7 +116,7 @@ fun KeywordSpamSettingsScreen(
                     showEditor = true
                 },
                 icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("添加关键词") },
+                text = { Text(stringResource(R.string.settings_keyword_add)) },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -144,14 +151,18 @@ fun KeywordSpamSettingsScreen(
                 item(key = "empty") {
                     AppEmptyState(
                         imageRes = R.drawable.illustration_spam_conversation_empty,
-                        text = "还没有拦截关键词",
+                        text = stringResource(R.string.settings_keyword_empty),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                     )
                 }
             } else {
                 item(key = "count") {
                     Text(
-                        "已添加 ${keywords.size} 个关键词",
+                        stringResource(
+                            if (keywords.size == 1) R.string.settings_keyword_added_count_single
+                            else R.string.settings_keyword_added_count_plural,
+                            keywords.size,
+                        ),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 4.dp),
@@ -176,9 +187,9 @@ fun KeywordSpamSettingsScreen(
     if (showInfo) {
         AlertDialog(
             onDismissRequest = { showInfo = false },
-            title = { Text("关键词拦截") },
-            text = { Text("正文包含关键词的短信会被标记为骚扰。规则仅保存在本机，不上传关键词、短信内容或匹配结果。") },
-            confirmButton = { TextButton(onClick = { showInfo = false }) { Text("知道了") } },
+            title = { Text(stringResource(R.string.settings_keyword_blocking_title)) },
+            text = { Text(stringResource(R.string.settings_keyword_about_body)) },
+            confirmButton = { TextButton(onClick = { showInfo = false }) { Text(stringResource(R.string.settings_action_ok)) } },
         )
     }
 
@@ -199,18 +210,18 @@ fun KeywordSpamSettingsScreen(
     deletingKeyword?.let { keyword ->
         AlertDialog(
             onDismissRequest = { deletingKeyword = null },
-            title = { Text("删除关键词？") },
-            text = { Text("删除“${keyword.keyword}”后，将重新检查历史短信的骚扰状态。") },
+            title = { Text(stringResource(R.string.settings_keyword_delete_title)) },
+            text = { Text(stringResource(R.string.settings_keyword_delete_body, keyword.keyword)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.delete(keyword)
                         deletingKeyword = null
                     }
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                ) { Text(stringResource(R.string.settings_action_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { deletingKeyword = null }) { Text("取消") }
+                TextButton(onClick = { deletingKeyword = null }) { Text(stringResource(R.string.settings_action_cancel)) }
             },
         )
     }
@@ -237,11 +248,14 @@ private fun RebuildStatusCard(running: Boolean, onRetry: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                if (running) "正在更新匹配结果" else "匹配结果更新失败",
+                stringResource(
+                    if (running) R.string.settings_keyword_rebuild_running
+                    else R.string.settings_keyword_rebuild_failed,
+                ),
                 style = MaterialTheme.typography.titleSmall,
             )
             if (!running) {
-                Text("已保留上次匹配结果", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_keyword_rebuild_kept), style = MaterialTheme.typography.bodyMedium)
             }
             if (running) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -249,7 +263,7 @@ private fun RebuildStatusCard(running: Boolean, onRetry: () -> Unit) {
                 TextButton(onClick = onRetry) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("重试")
+                    Text(stringResource(R.string.settings_action_retry))
                 }
             }
         }
@@ -269,7 +283,14 @@ private fun KeywordEditorDialog(
     val saving = saveState == KeywordSaveUiState.Saving
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
-        title = { Text(if (keyword == null) "添加拦截关键词" else "编辑拦截关键词") },
+        title = {
+            Text(
+                stringResource(
+                    if (keyword == null) R.string.settings_keyword_editor_add_title
+                    else R.string.settings_keyword_editor_edit_title,
+                ),
+            )
+        },
         text = {
             OutlinedTextField(
                 value = input,
@@ -278,7 +299,7 @@ private fun KeywordEditorDialog(
                     onInputChanged()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("关键词或短语") },
+                label = { Text(stringResource(R.string.settings_keyword_editor_label)) },
                 singleLine = true,
                 enabled = !saving,
                 isError = error != null,
@@ -289,8 +310,15 @@ private fun KeywordEditorDialog(
             TextButton(
                 onClick = { onSave(input) },
                 enabled = !saving && input.isNotBlank(),
-            ) { Text(if (saveState == KeywordSaveUiState.Saving) "保存中" else "保存") }
+            ) {
+                Text(
+                    stringResource(
+                        if (saveState == KeywordSaveUiState.Saving) R.string.settings_action_saving
+                        else R.string.settings_action_save,
+                    ),
+                )
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !saving) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !saving) { Text(stringResource(R.string.settings_action_cancel)) } },
     )
 }

@@ -3,13 +3,15 @@ package vip.mystery0.pixel.text.domain.parser.mms
 import ezvcard.io.text.VCardReader
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsContactModel
 import vip.mystery0.pixel.text.domain.model.mms.MmsContactValue
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 只调用文本 API，不调用库的 URL、HTML、XML 或 JSON 入口。 */
 class MmsContactParser {
     fun parse(text: String, checkCancelled: () -> Unit = {}): List<MmsContactModel> {
-        if (text.length > MAX_TEXT) return listOf(failed("名片过大，请打开原件"))
+        if (text.length > MAX_TEXT) return listOf(failed(AppStrings.get(R.string.domain_mms_contact_too_large)))
         val result = mutableListOf<MmsContactModel>()
         var lines: MutableList<String>? = null
         var nested = false
@@ -20,7 +22,7 @@ class MmsContactParser {
                     if (lines == null && result.size == MAX_CONTACTS) {
                         val last = result.last()
                         result[result.lastIndex] = last.copy(importWarning = listOfNotNull(last.importWarning,
-                            "最多展示 $MAX_CONTACTS 位联系人，其余内容请打开原件").joinToString("；"))
+                            AppStrings.get(R.string.domain_mms_contact_max_contacts, MAX_CONTACTS)).joinToString(AppStrings.get(R.string.domain_mms_warning_separator)))
                         break
                     }
                     if (lines != null) nested = true else lines = mutableListOf(line)
@@ -28,15 +30,15 @@ class MmsContactParser {
                 "END:VCARD" -> {
                     val block = lines ?: continue
                     block += line
-                    result += if (nested) failed("嵌套名片无法完整读取，请打开原件") else parseOne(block, checkCancelled)
+                    result += if (nested) failed(AppStrings.get(R.string.domain_mms_contact_nested)) else parseOne(block, checkCancelled)
                     lines = null
                     nested = false
                 }
                 else -> lines?.add(line)
             }
         }
-        if (lines != null) result += failed("名片不完整，请打开原件")
-        return result.ifEmpty { listOf(failed("无法读取名片，请打开原件")) }
+        if (lines != null) result += failed(AppStrings.get(R.string.domain_mms_contact_incomplete))
+        return result.ifEmpty { listOf(failed(AppStrings.get(R.string.domain_mms_contact_unreadable))) }
     }
 
     private fun parseOne(lines: List<String>, checkCancelled: () -> Unit): MmsContactModel = try {
@@ -53,7 +55,7 @@ class MmsContactParser {
         }
         VCardReader(filtered.joinToString("\r\n")).use { reader ->
             reader.defaultQuotedPrintableCharset = Charsets.UTF_8
-            val card = reader.readNext() ?: return failed("无法读取名片，请打开原件")
+            val card = reader.readNext() ?: return failed(AppStrings.get(R.string.domain_mms_contact_unreadable))
             checkCancelled()
             incomplete = incomplete || reader.warnings.isNotEmpty()
             fun clean(value: String?) = value?.trim()?.takeIf { it.isNotEmpty() }?.also { if (it.length > 4096) incomplete = true }?.take(4096)
@@ -86,11 +88,11 @@ class MmsContactParser {
                 title = clean(card.titles.joinToString(" · ") { it.value.orEmpty() }),
                 notes = clean(card.notes.joinToString("\n") { it.value.orEmpty() }),
                 photoBytes = photoData, photoReference = reference,
-                importWarning = if (incomplete || name == null) "部分字段、照片或姓名未完整读取，请核对原件" else null,
+                importWarning = if (incomplete || name == null) AppStrings.get(R.string.domain_mms_contact_partial_fields) else null,
             )
         }
     } catch (cancelled: CancellationException) { throw cancelled }
-    catch (_: Exception) { failed("名片字段异常，请打开原件") }
+    catch (_: Exception) { failed(AppStrings.get(R.string.domain_mms_contact_invalid_fields)) }
 
     private fun failed(warning: String) = MmsContactModel(null, null, emptyList(), emptyList(), emptyList(), null, null, importWarning = warning)
 

@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.ui.screen.formatTimeShort
 
@@ -58,7 +60,7 @@ fun SearchResultItem(
             .combinedClickable(
                 enabled = enabled,
                 onClick = onClick,
-                onLongClickLabel = "选择消息",
+                onLongClickLabel = stringResource(R.string.msg_search_select_message_cd),
                 onLongClick = onLongClick,
             )
             .padding(horizontal = 16.dp, vertical = 16.dp),

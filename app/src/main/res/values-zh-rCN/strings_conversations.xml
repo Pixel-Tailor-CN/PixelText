@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 首页与导航 -->
+    <string name="conv_start_chat">开始聊天</string>
+    <string name="conv_tab_conversations">会话</string>
+    <string name="conv_tab_verification_codes">验证码</string>
+
+    <!-- 通用操作与无障碍描述 -->
+    <string name="conv_action_cancel">取消</string>
+    <string name="conv_action_delete">删除</string>
+    <string name="conv_action_retry">重试</string>
+    <string name="conv_action_settings">设置</string>
+    <string name="conv_action_close">关闭</string>
+    <string name="conv_action_got_it">知道了</string>
+    <string name="conv_action_hide">隐藏</string>
+    <string name="conv_action_next">下一步</string>
+    <string name="conv_action_load">加载</string>
+    <string name="conv_action_load_more">加载更多</string>
+    <string name="conv_action_request_permission">申请</string>
+    <string name="conv_action_later">稍后</string>
+    <string name="conv_undo">恢复</string>
+    <string name="conv_cd_back">返回</string>
+    <string name="conv_cd_cancel_selection">取消选择</string>
+    <string name="conv_cd_clear_selection">清除选择</string>
+    <string name="conv_cd_archive">归档</string>
+    <string name="conv_cd_unarchive">取消归档</string>
+    <string name="conv_cd_delete">删除</string>
+    <string name="conv_cd_search">搜索</string>
+    <string name="conv_cd_more_options">更多选项</string>
+    <string name="conv_cd_more">更多</string>
+    <string name="conv_cd_copy">复制</string>
+    <string name="conv_cd_call">拨打电话</string>
+    <string name="conv_cd_refresh">刷新</string>
+    <string name="conv_cd_open_conversation">进入会话</string>
+
+    <!-- 会话列表 -->
+    <string name="conv_selected_count">已选择 %1$d 项</string>
+    <string name="conv_load_failed">读取失败: %1$s</string>
+    <string name="conv_empty_conversations">暂无会话</string>
+    <string name="conv_default_sms_banner_title">尚未设为默认短信应用</string>
+    <string name="conv_default_sms_banner_body">设为默认后，可接收、发送并同步短信。</string>
+    <string name="conv_not_now">暂不设置</string>
+    <string name="conv_set_as_default">设为默认</string>
+    <string name="conv_set_as_default_sms_app">设为默认短信应用</string>
+    <string name="conv_grant">授权</string>
+    <string name="conv_missing_read_sms_permission">尚未授予短信读取权限</string>
+    <string name="conv_open_play_failed">无法打开 Google Play，请稍后重试</string>
+    <string name="conv_deleted_conversations_count">已删除 %1$d 个会话</string>
+    <string name="conv_mark_all_read_success">已标记 %1$d 个会话为已读</string>
+    <string name="conv_no_unread_conversations">没有未读会话</string>
+    <string name="conv_archived_one">已归档 1 个会话</string>
+    <string name="conv_marked_as_read">已标记为已读</string>
+    <string name="conv_marked_as_unread">已标记为未读</string>
+    <string name="conv_delete_dialog_title">删除会话？</string>
+    <string name="conv_delete_dialog_message">将删除所选 %1$d 个会话中的短信和彩信。</string>
+    <string name="conv_init_incompatible_version">数据版本不兼容</string>
+    <string name="conv_init_preparing_data">正在准备应用数据</string>
+    <string name="conv_init_newer_version_desc">这些数据由较新版本创建，请更新应用后再使用。</string>
+    <string name="conv_init_permission_desc">请授予短信权限后重试，已有数据不会被清除。</string>
+    <string name="conv_init_error_io">读取或保存应用数据失败，请重试。</string>
+    <string name="conv_init_error_spam_not_ready">短信识别数据尚未准备完成，请重试。</string>
+    <string name="conv_init_error_generic">数据准备未完成，请重试。</string>
+    <string name="conv_mark_all_read_title">正在标记已读</string>
+    <string name="conv_mark_all_read_progress_message">正在标记所有会话为已读，请稍候…</string>
+    <string name="conv_read_sms_permission_title">需要短信读取权限</string>
+    <string name="conv_read_sms_permission_message">需要短信读取权限以显示会话和短信内容。</string>
+    <string name="conv_badge_mms">彩信</string>
+    <string name="conv_mms_snippet_prefix">[多媒体信息] %1$s</string>
+
+    <!-- 菜单与滑动操作 -->
+    <string name="conv_menu_set_default_sms_app">设置默认短信应用</string>
+    <string name="conv_menu_archived_messages">归档短信</string>
+    <string name="conv_menu_mark_all_read">标记所有会话为已读</string>
+    <string name="conv_menu_spam_blocking">骚扰与拦截</string>
+    <string name="conv_menu_mock">开发测试（MOCK）</string>
+    <string name="conv_swipe_archive">归档</string>
+    <string name="conv_swipe_mark_read">标为已读</string>
+    <string name="conv_swipe_mark_unread">标为未读</string>
+
+    <!-- 日期与时间格式 -->
+    <string name="conv_weekday_mon">周一</string>
+    <string name="conv_weekday_tue">周二</string>
+    <string name="conv_weekday_wed">周三</string>
+    <string name="conv_weekday_thu">周四</string>
+    <string name="conv_weekday_fri">周五</string>
+    <string name="conv_weekday_sat">周六</string>
+    <string name="conv_weekday_sun">周日</string>
+    <string name="conv_date_pattern_month_day">MM月dd日</string>
+    <string name="conv_date_pattern_year_month_day">yyyy年MM月dd日</string>
+    <string name="conv_month_year_pattern">yyyy年M月</string>
+
+    <!-- 新建聊天底部弹窗 -->
+    <string name="conv_contacts_permission_toast">需要联系人权限才能选择联系人</string>
+    <string name="conv_recipient_label">接收人</string>
+    <string name="conv_enter_phone_number">输入电话号码</string>
+    <string name="conv_invalid_phone_number">请输入有效的电话号码</string>
+    <string name="conv_pick_contact">选择联系人</string>
+    <string name="conv_contacts_permission_title">需要联系人权限</string>
+    <string name="conv_contacts_permission_message">需要联系人权限以选择收件人。</string>
+
+    <!-- 会话详情 -->
+    <string name="conv_text_scale_save_failed">文字大小保存失败</string>
+    <string name="conv_deleted_messages_count">已删除 %1$d 条消息</string>
+    <string name="conv_no_messages_deleted">未删除任何消息</string>
+    <string name="conv_learning_saved_whitelist">纠正已保存，正在更新个人学习（此短信已放行，放行优先于个人学习）</string>
+    <string name="conv_learning_saved_keyword">纠正已保存，正在更新个人学习（该短信仍按关键词优先处理）</string>
+    <string name="conv_learning_saved">纠正已保存，正在更新个人学习</string>
+    <string name="conv_learning_view_action">查看学习</string>
+    <string name="conv_clipboard_label">短信</string>
+    <string name="conv_menu_message_details">详情信息</string>
+    <string name="conv_menu_check_spam">识别骚扰内容</string>
+    <string name="conv_menu_adjust_category">调整短信分类</string>
+    <string name="conv_menu_contribute_sample">贡献样本</string>
+    <string name="conv_menu_share">分享</string>
+    <string name="conv_menu_forward">转发</string>
+    <string name="conv_unable_open_dialer">无法打开拨号器</string>
+    <string name="conv_original_message_not_found">原短信已不存在</string>
+    <string name="conv_empty_messages">还没有消息</string>
+    <string name="conv_sms_sent">已发送</string>
+    <string name="conv_delete_messages_title">删除消息？</string>
+    <string name="conv_delete_messages_message">将删除所选 %1$d 条短信或彩信。已提交的彩信可能仍然发出，删除记录无法撤回。</string>
+
+    <!-- 已归档与骚扰拦截列表 -->
+    <string name="conv_archived_title">已归档会话</string>
+    <string name="conv_empty_archived">暂无归档会话</string>
+    <string name="conv_empty_spam">暂无已识别骚扰会话</string>
+    <string name="conv_spam_history_scan_title">历史短信识别</string>
+    <string name="conv_spam_scan_waiting">等待开始历史短信识别</string>
+    <string name="conv_spam_scan_retrying">等待重试历史短信识别</string>
+    <string name="conv_spam_scan_preparing">正在准备历史短信识别</string>
+    <string name="conv_spam_scan_scanning">正在识别历史短信</string>
+    <string name="conv_spam_scan_finalizing">正在完成历史短信识别</string>
+    <string name="conv_spam_scan_completed">历史短信识别完成</string>
+    <string name="conv_spam_scan_failed">历史短信识别失败</string>
+    <string name="conv_spam_scan_cancelled">历史短信识别已取消</string>
+    <string name="conv_spam_stats_loading">正在统计短信数据...</string>
+    <string name="conv_spam_stats_error">统计失败: %1$s</string>
+    <string name="conv_spam_stats_total">短信总数量: %1$d</string>
+    <string name="conv_spam_stats_identified">已识别数量: %1$d</string>
+    <string name="conv_spam_stats_pending">未识别数量: %1$d</string>
+    <string name="conv_spam_start_scan">开始扫描</string>
+
+    <!-- 验证码列表 -->
+    <string name="conv_verification_codes_title">验证码</string>
+    <string name="conv_verification_initializing">正在识别验证码…</string>
+    <string name="conv_verification_check_settings">检查设置</string>
+    <string name="conv_verification_empty">还没有验证码</string>
+    <string name="conv_verification_hide_original">收起原文</string>
+    <string name="conv_verification_show_original">展开原文</string>
+
+    <!-- 镜像消息详情与彩信附件 -->
+    <string name="conv_message_detail_title">消息详情</string>
+    <string name="conv_message_not_found">消息已不存在或尚未同步</string>
+    <string name="conv_message_loading">正在读取消息</string>
+    <string name="conv_unknown_number">未知号码</string>
+    <string name="conv_message_received">收到的消息</string>
+    <string name="conv_message_sent">发出的消息</string>
+    <string name="conv_sim_slot_with_name">SIM %1$d · %2$s</string>
+    <string name="conv_sim_with_name">SIM · %1$s</string>
+    <string name="conv_sim_unavailable">SIM 信息不可用</string>
+    <string name="conv_addr_from">发件人</string>
+    <string name="conv_addr_to">收件人</string>
+    <string name="conv_addr_cc">抄送</string>
+    <string name="conv_addr_bcc">密送</string>
+    <string name="conv_addr_separator">、</string>
+    <string name="conv_addr_line">%1$s：%2$s</string>
+    <string name="conv_mms_loading">正在读取彩信</string>
+    <string name="conv_mms_part_title">彩信附件</string>
+    <string name="conv_mms_part_not_found">附件已不存在或尚未同步</string>
+    <string name="conv_mms_part_loading">正在读取附件</string>
+
+    <!-- 样本上报与详情 -->
+    <string name="conv_sample_retry_in_seconds">%1$d 秒后可重试</string>
+    <string name="conv_sample_unknown_category">未知分类</string>
+    <string name="conv_sample_date_pattern">yyyy年M月d日 HH:mm</string>
+    <string name="conv_unknown_time">时间未知</string>
+    <string name="conv_sample_detail_title">上报详情</string>
+    <string name="conv_sample_record_info">记录信息</string>
+    <string name="conv_sample_content_removed">样本内容已移除</string>
+    <string name="conv_sample_reported_content">上报内容</string>
+    <string name="conv_sample_no_body">暂无正文</string>
+    <string name="conv_sample_sender">发送方</string>
+    <string name="conv_sample_submitted_category">提交分类</string>
+    <string name="conv_sample_reviewed_category">审核分类</string>
+    <string name="conv_sample_submitted_at">上报时间</string>
+    <string name="conv_sample_record_id">记录编号</string>
+    <string name="conv_sample_reviewed_at">审核时间</string>
+    <string name="conv_sample_review_method">审核方式</string>
+    <string name="conv_sample_review_ai">自动审核</string>
+    <string name="conv_sample_review_manual">人工审核</string>
+    <string name="conv_sample_pending_confirm">待确认</string>
+    <string name="conv_sample_source">来源</string>
+    <string name="conv_sample_source_legacy">历史上报</string>
+    <string name="conv_sample_source_app">应用上报</string>
+    <string name="conv_sample_my_reports">我的上报</string>
+    <string name="conv_sample_about_reports">关于上报记录</string>
+    <string name="conv_sample_pending_submission">提交结果待确认</string>
+    <string name="conv_sample_empty_reports">还没有上报记录</string>
+    <string name="conv_sample_unavailable_report">无法查看这条上报记录</string>
+    <string name="conv_sample_removed_preview">样本已移除，内容不再提供</string>
+    <string name="conv_sample_no_preview">暂无摘要</string>
+    <string name="conv_sample_about_reports_desc">记录与本次应用安装关联，卸载或清除应用数据后将无法访问。审核状态不影响本机的短信分类。</string>
+    <string name="conv_sample_error_too_short">样本文本至少需要 6 个字符</string>
+    <string name="conv_sample_error_too_large">样本文本不能超过 64 KiB，请减少内容</string>
+    <string name="conv_sample_saving_submission">正在保存提交内容…</string>
+    <string name="conv_sample_pending_title">暂未确认提交结果</string>
+    <string name="conv_sample_pending_desc">重试将提交已确认的内容。</string>
+    <string name="conv_sample_reloading_local">正在重新读取…</string>
+    <string name="conv_sample_reload_local">重新读取本机数据</string>
+    <string name="conv_sample_body_label">短信正文</string>
+    <string name="conv_sample_desensitize_assistant">辅助脱敏</string>
+    <string name="conv_sample_sender_optional">发送方（可选）</string>
+    <string name="conv_sample_sender_too_long">发送方不能超过 256 个字符</string>
+    <string name="conv_sample_next_confirm">下一步：确认提交</string>
+    <string name="conv_sample_confirm_upload_title">确认本次上传内容</string>
+    <string name="conv_sample_empty_placeholder">（空）</string>
+    <string name="conv_sample_category_label">分类</string>
+    <string name="conv_sample_not_provided">未填写</string>
+    <string name="conv_sample_back_to_edit">返回修改</string>
+    <string name="conv_sample_also_included">同时提交</string>
+    <string name="conv_sample_builtin">内置</string>
+    <string name="conv_sample_none">无</string>
+    <string name="conv_sample_label_spam">骚扰短信</string>
+    <string name="conv_sample_label_normal">正常短信</string>
+    <string name="conv_sample_included_learning_feedback">1. 应用与资源版本、学习反馈（来源：本机学习；基础版本：%1$s；代次：%2$s；标签：%3$s；不上传个人参数或学习样本库）；</string>
+    <string name="conv_sample_included_versions">1. 应用版本、当前规则版本与离线模型版本（不上传个人参数或本机学习样本库）；</string>
+    <string name="conv_sample_included_device_id">2. Android 设备标识与本次安装身份。</string>
+    <string name="conv_sample_included_purpose">用于规则改进、模型优化、反滥用风控和查询本人记录。</string>
+    <string name="conv_sample_consent_text">我已检查脱敏结果并移除敏感信息，同意上传以上内容。</string>
+    <string name="conv_sample_btn_saving">正在保存…</string>
+    <string name="conv_sample_btn_submitting">正在提交…</string>
+    <string name="conv_sample_btn_retry_submit">重试本次提交</string>
+    <string name="conv_sample_btn_confirm_submit">确认并提交</string>
+    <string name="conv_sample_view_my_reports">查看我的上报</string>
+    <string name="conv_sample_keep_and_back">保留并返回</string>
+    <string name="conv_sample_draft_choice_title">选择要编辑的内容</string>
+    <string name="conv_sample_draft_choice_desc">本机已有一份保留草稿。请选择使用当前短信，或继续编辑保留草稿。选择当前短信不会删除或覆盖原草稿。</string>
+    <string name="conv_sample_use_current_message">使用当前短信</string>
+    <string name="conv_sample_continue_draft">继续保留草稿</string>
+    <string name="conv_sample_keep_draft_title">保留这份草稿？</string>
+    <string name="conv_sample_keep_draft_desc">脱敏修改尚未提交。保留后仅存于本次安装的本机私有目录，不参与备份，也不会自动上传。</string>
+    <string name="conv_sample_keep_draft_desc_overwrite">脱敏修改尚未提交。保留后仅存于本次安装的本机私有目录，不参与备份，也不会自动上传。保留会覆盖先前保留的草稿；选择放弃草稿会删除先前的保留草稿。</string>
+    <string name="conv_sample_discard_draft">放弃草稿</string>
+    <string name="conv_sample_continue_editing">继续编辑</string>
+    <string name="conv_sample_discard_edits_title">放弃修改？</string>
+    <string name="conv_sample_discard_edits_desc">辅助脱敏中的修改还没有应用到样本。</string>
+    <string name="conv_sample_discard_edits">放弃修改</string>
+    <string name="conv_sample_step_review">检查内容</string>
+    <string name="conv_sample_step_confirm">确认提交</string>
+    <string name="conv_sample_select_sensitive">选择敏感片段</string>
+    <string name="conv_sample_sensitive_type">敏感类型</string>
+    <string name="conv_sample_preview">预览</string>
+    <string name="conv_sample_replace">替换</string>
+    <string name="conv_sample_apply_to_sample">应用到样本</string>
+    <string name="conv_token_newline">换行</string>
+    <string name="conv_token_tab">制表</string>
+    <string name="conv_token_space">空格</string>
+
+    <!-- Mock 测试页 -->
+    <string name="conv_mock_sim_1">卡1</string>
+    <string name="conv_mock_sim_2">卡2</string>
+    <string name="conv_mock_sender_default">模拟短信</string>
+    <string name="conv_mock_mms_media">彩信媒体</string>
+    <string name="conv_mock_mms_preview_title">本地彩信预览</string>
+    <string name="conv_mock_mms_id_label">MMS 消息 ID</string>
+    <string name="conv_mock_mms_enter_id">输入已同步到镜像的彩信 ID</string>
+    <string name="conv_mock_mms_not_found_or_loading">消息不存在或正在读取</string>
+</resources>

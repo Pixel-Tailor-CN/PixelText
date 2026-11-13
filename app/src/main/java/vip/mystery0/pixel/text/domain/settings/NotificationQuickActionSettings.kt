@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.domain.settings
 
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
+
 const val NOTIFICATION_CODE_PLACEHOLDER = "{code}"
 private const val NOTIFICATION_ACTION_LABEL_MAX_UNITS = 8
 
@@ -65,7 +68,7 @@ fun NotificationQuickActionConfig.renderLabel(code: String): String {
 fun NotificationQuickActionConfig.validationError(): String? {
     val trimmedLabel = labelTemplate.trim()
     if (trimmedLabel.isBlank()) {
-        return "文案不能为空"
+        return AppStrings.get(R.string.domain_notification_action_error_empty)
     }
     return when (type) {
         NotificationQuickActionType.COPY_CODE -> validateCopyCodeLabel(trimmedLabel)
@@ -76,9 +79,12 @@ fun NotificationQuickActionConfig.validationError(): String? {
 
 fun NotificationQuickActionType.defaultLabelTemplate(): String {
     return when (this) {
-        NotificationQuickActionType.MARK_READ -> "已阅"
-        NotificationQuickActionType.COPY_CODE -> "复制 {code}"
-        NotificationQuickActionType.REPLY -> "回复"
+        NotificationQuickActionType.MARK_READ ->
+            AppStrings.get(R.string.domain_notification_action_mark_read)
+        NotificationQuickActionType.COPY_CODE ->
+            AppStrings.get(R.string.domain_notification_action_copy_code)
+        NotificationQuickActionType.REPLY ->
+            AppStrings.get(R.string.domain_notification_action_reply)
     }
 }
 
@@ -118,10 +124,10 @@ fun NotificationQuickActionType.defaultOrder(): Int {
 
 private fun validateNormalLabel(label: String): String? {
     if (label.contains(NOTIFICATION_CODE_PLACEHOLDER)) {
-        return "该按钮不支持 {code} 占位符"
+        return AppStrings.get(R.string.domain_notification_action_error_no_placeholder)
     }
     return if (label.displayWidthUnits() > NOTIFICATION_ACTION_LABEL_MAX_UNITS) {
-        "文案最多 4 个中文或 8 个英文"
+        AppStrings.get(R.string.domain_notification_action_error_too_long)
     } else {
         null
     }
@@ -130,11 +136,11 @@ private fun validateNormalLabel(label: String): String? {
 private fun validateCopyCodeLabel(label: String): String? {
     val placeholderCount = label.countPlaceholderOccurrences()
     if (placeholderCount > 1) {
-        return "{code} 最多出现一次"
+        return AppStrings.get(R.string.domain_notification_action_error_duplicate_placeholder)
     }
     val fixedLabel = label.replace(NOTIFICATION_CODE_PLACEHOLDER, "")
     return if (fixedLabel.displayWidthUnits() > NOTIFICATION_ACTION_LABEL_MAX_UNITS) {
-        "固定文案最多 4 个中文或 8 个英文"
+        AppStrings.get(R.string.domain_notification_action_error_fixed_too_long)
     } else {
         null
     }

@@ -21,8 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 
 @Composable
@@ -49,7 +51,7 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery, isSelected: Boolea
                     icon = Icons.Rounded.Inventory,
                     iconTint = themeColor,
                     iconBg = headerBgColor,
-                    title = "${result.company} · 取件通知",
+                    title = stringResource(R.string.msg_card_express_title, result.company),
                     dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.outlineVariant
                 )
 
@@ -84,7 +86,7 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery, isSelected: Boolea
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Rounded.LocationOn,
-                            contentDescription = "Location",
+                            contentDescription = stringResource(R.string.msg_card_express_location_cd),
                             tint = onContainerVariantColor,
                             modifier = Modifier.size(16.dp)
                         )
@@ -101,7 +103,7 @@ fun ExpressDeliveryCard(result: ParsedResult.ExpressDelivery, isSelected: Boolea
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Rounded.Schedule,
-                                contentDescription = "Time",
+                                contentDescription = stringResource(R.string.msg_card_express_time_cd),
                                 tint = onContainerVariantColor,
                                 modifier = Modifier.size(16.dp)
                             )

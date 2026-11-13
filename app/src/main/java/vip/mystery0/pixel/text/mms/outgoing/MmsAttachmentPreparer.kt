@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.RandomAccessFile
@@ -35,23 +36,23 @@ class MmsAttachmentPreparer(
         val ownedResult = AtomicReference<File?>()
         try {
             return withContext(Dispatchers.IO) {
-                if (uri.scheme != "content" || uri.authority.isNullOrBlank()) throw MmsSendException("只支持通过系统选择器选择的附件")
+                if (uri.scheme != "content" || uri.authority.isNullOrBlank()) throw MmsSendException(context.getString(R.string.sys_mms_attach_picker_only))
                 var original: File? = null
                 try {
-                    var name = "附件"
+                    var name = context.getString(R.string.sys_mms_attach_default_name)
                     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
                         if (cursor.moveToFirst()) {
                             val nameColumn = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                             if (nameColumn >= 0) name = safeDisplayName(cursor.getString(nameColumn).orEmpty())
                             val sizeColumn = cursor.getColumnIndex(OpenableColumns.SIZE)
                             if (sizeColumn >= 0 && !cursor.isNull(sizeColumn) && cursor.getLong(sizeColumn) > MmsPayloadStore.MAX_ORIGINAL_BYTES) {
-                                throw MmsSendException("附件原件不能超过 32 MiB")
+                                throw MmsSendException(context.getString(R.string.sys_mms_attach_original_too_large))
                             }
                         }
                     }
                     val declaredMime = normalizeMime(context.contentResolver.getType(uri))
                     original = context.contentResolver.openInputStream(uri)?.use { payloadStore.importOriginal(it) }
-                        ?: throw MmsSendException("无法打开附件，请重新选择")
+                        ?: throw MmsSendException(context.getString(R.string.sys_mms_attach_cannot_open))
                     ownedResult.set(original)
                     currentCoroutineContext().ensureActive()
                     val magicMime = sniffImageMime(original)
@@ -67,7 +68,7 @@ class MmsAttachmentPreparer(
                 } catch (exception: Exception) {
                     original?.delete()
                     if (exception is MmsSendException) throw exception
-                    throw MmsSendException("无法读取附件，请检查文件后重新选择")
+                    throw MmsSendException(context.getString(R.string.sys_mms_attach_cannot_read))
                 }
             }
         } catch (exception: CancellationException) {
@@ -91,15 +92,15 @@ class MmsAttachmentPreparer(
         try {
             return withContext(Dispatchers.IO) {
                 val maxBytes = minOf(budget, policy.maxMessageBytes, MmsPayloadStore.MAX_PDU_BYTES)
-                if (maxBytes <= 0) throw MmsSendException("正文和附件已超出彩信限额，请减少内容")
+                if (maxBytes <= 0) throw MmsSendException(context.getString(R.string.sys_mms_attach_limit_exceeded))
                 val original = payloadStore.resolveOwned(attachment.originalPath)
                 if (!original.isFile || original.length() != attachment.originalSize || original.length() > MmsPayloadStore.MAX_ORIGINAL_BYTES) {
-                    throw MmsSendException("附件原件缺失或已改变，请重新选择")
+                    throw MmsSendException(context.getString(R.string.sys_mms_attach_missing_or_changed))
                 }
                 var prepared: File? = null
                 try {
                     currentCoroutineContext().ensureActive()
-                    val mime = normalizeMime(attachment.originalMime) ?: throw MmsSendException("附件类型无效，请重新选择")
+                    val mime = normalizeMime(attachment.originalMime) ?: throw MmsSendException(context.getString(R.string.sys_mms_attach_invalid_type))
                     val encoded: ByteArray
                     val preparedMime: String
                     val note: String
@@ -108,11 +109,11 @@ class MmsAttachmentPreparer(
                         val animated = header.animated || mime == "image/gif" || isAnimatedPng(original, mime)
                         if (animated) {
                             if (header.width > policy.maxImageWidth || header.height > policy.maxImageHeight || original.length() > maxBytes) {
-                                throw MmsSendException("动图超出所选 SIM 的尺寸或大小限额，请移除或更换；不会自动转为静态图")
+                                throw MmsSendException(context.getString(R.string.sys_mms_attach_animated_exceeds_limit))
                             }
                             encoded = payloadStore.read(original.path, maxBytes)
                             preparedMime = header.mime
-                            note = "保留动图原件，文件可能含原始元数据"
+                            note = context.getString(R.string.sys_mms_attach_note_animated_original)
                         } else {
                             val result = encodeStaticImage(original, policy, maxBytes)
                             encoded = result.bytes
@@ -120,14 +121,14 @@ class MmsAttachmentPreparer(
                             note = result.note
                         }
                     } else {
-                        if (original.length() > maxBytes) throw MmsSendException("音视频或文件超出本条彩信的附件预算，请移除或更换")
+                        if (original.length() > maxBytes) throw MmsSendException(context.getString(R.string.sys_mms_attach_media_exceeds_budget))
                         encoded = payloadStore.read(original.path, maxBytes)
                         if (mime == "application/smil" || mime == "text/plain" && !isLosslessInlineText(encoded)) {
                             preparedMime = "application/octet-stream"
-                            note = "保留原件字节，按普通文件发送以避免文字编码损失或外部演示；文件可能含原始元数据"
+                            note = context.getString(R.string.sys_mms_attach_note_plain_file_fallback)
                         } else {
                             preparedMime = mime
-                            note = "按原件发送，文件可能含原始元数据；接收端未必支持此格式"
+                            note = context.getString(R.string.sys_mms_attach_note_original_generic)
                         }
                     }
                     currentCoroutineContext().ensureActive()
@@ -142,7 +143,7 @@ class MmsAttachmentPreparer(
                 } catch (exception: Exception) {
                     prepared?.delete()
                     if (exception is MmsSendException) throw exception
-                    throw MmsSendException("无法准备附件，请更换文件后重试")
+                    throw MmsSendException(context.getString(R.string.sys_mms_attach_prepare_failed))
                 }
             }
         } catch (exception: CancellationException) {
@@ -161,13 +162,13 @@ class MmsAttachmentPreparer(
             ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { _, info, _ ->
                 checkPixels(info.size.width, info.size.height)
                 header = Header(info.size.width, info.size.height, normalizeMime(info.mimeType)
-                    ?: throw MmsSendException("图片格式无效"), info.isAnimated)
+                    ?: throw MmsSendException(context.getString(R.string.sys_mms_attach_invalid_image_format)), info.isAnimated)
                 throw HeaderRead()
             }
         } catch (_: HeaderRead) {
-            return header ?: throw MmsSendException("无法读取图片尺寸")
+            return header ?: throw MmsSendException(context.getString(R.string.sys_mms_attach_cannot_read_image_size))
         }
-        throw MmsSendException("无法读取图片")
+        throw MmsSendException(context.getString(R.string.sys_mms_attach_cannot_read_image))
     }
 
     private class EncodedImage(val bytes: ByteArray, val mime: String, val note: String)
@@ -175,7 +176,7 @@ class MmsAttachmentPreparer(
     private suspend fun encodeStaticImage(file: File, policy: MmsSendPolicy, budget: Int): EncodedImage {
         var bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
                 checkPixels(info.size.width, info.size.height)
-                if (info.isAnimated) throw MmsSendException("动图不能自动转为静态图")
+                if (info.isAnimated) throw MmsSendException(context.getString(R.string.sys_mms_attach_animated_no_static_convert))
                 val scale = minOf(1.0, minOf(policy.maxImageWidth, MAX_DECODE_EDGE).toDouble() / info.size.width,
                     minOf(policy.maxImageHeight, MAX_DECODE_EDGE).toDouble() / info.size.height,
                     sqrt(MAX_DECODE_PIXELS.toDouble() / (info.size.width.toLong() * info.size.height)))
@@ -189,7 +190,7 @@ class MmsAttachmentPreparer(
             var flattened = false
             if (bitmap.hasAlpha()) {
                 compressBounded(bitmap, Bitmap.CompressFormat.PNG, 100, budget)?.let {
-                    return EncodedImage(it, "image/png", "已按所选 SIM 调整图片尺寸和方向，移除原始元数据，保留透明背景")
+                    return EncodedImage(it, "image/png", context.getString(R.string.sys_mms_attach_note_png_resized))
                 }
                 val opaque = createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
                 try {
@@ -207,17 +208,24 @@ class MmsAttachmentPreparer(
                 for (quality in intArrayOf(90, 80, 70, 60, 50)) {
                     currentCoroutineContext().ensureActive()
                     compressBounded(bitmap, Bitmap.CompressFormat.JPEG, quality, budget)?.let {
-                        return EncodedImage(it, "image/jpeg", if (flattened) "已缩放并转为 JPEG，透明背景变为白色，原始元数据已移除" else "已按所选 SIM 调整图片尺寸、方向和质量，原始元数据已移除")
+                        return EncodedImage(
+                            it,
+                            "image/jpeg",
+                            context.getString(
+                                if (flattened) R.string.sys_mms_attach_note_jpeg_flattened
+                                else R.string.sys_mms_attach_note_jpeg_resized
+                            )
+                        )
                     }
                 }
                 if (round == 3 || maxOf(bitmap.width, bitmap.height) <= 160) {
-                    throw MmsSendException("图片压缩后仍超出预算，请减少附件或更换图片")
+                    throw MmsSendException(context.getString(R.string.sys_mms_attach_image_still_too_large))
                 }
                 val smaller = bitmap.scale(maxOf(1, bitmap.width * 3 / 4), maxOf(1, bitmap.height * 3 / 4))
                 bitmap.recycle()
                 bitmap = smaller
             }
-            throw MmsSendException("图片超出彩信预算")
+            throw MmsSendException(context.getString(R.string.sys_mms_attach_image_exceeds_budget))
         } finally {
             bitmap.recycle()
         }
@@ -243,7 +251,7 @@ class MmsAttachmentPreparer(
     }
 
     private fun checkPixels(width: Int, height: Int) {
-        if (width <= 0 || height <= 0 || width.toLong() * height > 64_000_000L) throw MmsSendException("图片尺寸无效或超过 6400 万像素")
+        if (width <= 0 || height <= 0 || width.toLong() * height > 64_000_000L) throw MmsSendException(context.getString(R.string.sys_mms_attach_image_pixels_exceeded))
     }
 
     private fun sniffImageMime(file: File): String? {
@@ -264,7 +272,7 @@ class MmsAttachmentPreparer(
             while (input.filePointer + 12 <= input.length()) {
                 val length = input.readInt().toLong() and 0xffffffffL
                 val type = input.readInt()
-                if (length > input.length() - input.filePointer - 4) throw MmsSendException("PNG 图片结构不完整")
+                if (length > input.length() - input.filePointer - 4) throw MmsSendException(context.getString(R.string.sys_mms_attach_png_corrupt))
                 if (type == 0x6163544c) return true // acTL
                 if (type == 0x49454e44) return false // IEND
                 input.seek(input.filePointer + length + 4)
@@ -283,7 +291,7 @@ class MmsAttachmentPreparer(
 
     private fun safeDisplayName(value: String): String = value.filter {
         !it.isISOControl() && it !in "\\/" && Character.getType(it) != Character.FORMAT.toInt()
-    }.take(120).trim().ifEmpty { "附件" }
+    }.take(120).trim().ifEmpty { context.getString(R.string.sys_mms_attach_default_name) }
 
     private fun normalizeMime(value: String?): String? = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
         ?.takeIf { it.length in 3..127 && it.matches(Regex("[a-z0-9!#$&^_.+\\-]+/[a-z0-9!#$&^_.+\\-]+")) }

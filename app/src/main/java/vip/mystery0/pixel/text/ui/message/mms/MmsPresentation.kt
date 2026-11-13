@@ -13,11 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.*
 
 /** 播放会话由页面外壳持有；页内没有播放器或自动启动声音的独立生命周期。 */
@@ -85,16 +87,23 @@ fun MmsPresentation(model: MmsContentModel, enabled: Boolean, onOpenPart: (MmsPa
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(enabled = enabled && currentPage > 0, onClick = { stop(); page = currentPage - 1 }) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一页")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = stringResource(R.string.msg_mms_presentation_prev_cd))
             }
             Text("${currentPage + 1} / ${pages.size}", style = MaterialTheme.typography.labelLarge)
             IconButton(enabled = enabled && currentPage < pages.lastIndex, onClick = { stop(); page = currentPage + 1 }) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一页")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = stringResource(R.string.msg_mms_presentation_next_cd))
             }
             }
             if (canAutoPlay) TextButton(enabled = enabled, onClick = {
                 if (playing) stop() else request = controller.beginPresentation(model.key)
-            }) { Text(if (playing) "停止播放" else "自动播放") }
+            }) {
+                Text(
+                    stringResource(
+                        if (playing) R.string.msg_mms_presentation_stop_autoplay
+                        else R.string.msg_mms_presentation_start_autoplay,
+                    )
+                )
+            }
         }
     }
 }

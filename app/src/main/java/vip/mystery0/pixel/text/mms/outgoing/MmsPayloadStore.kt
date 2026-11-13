@@ -3,6 +3,7 @@ package vip.mystery0.pixel.text.mms.outgoing
 import android.content.Context
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import vip.mystery0.pixel.text.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -15,6 +16,7 @@ import java.util.UUID
 // 发送预算只计实际可用空间并保留余量，不把可回收缓存计入可用容量。
 @android.annotation.SuppressLint("UsableSpace")
 class MmsPayloadStore(context: Context) {
+    private val appContext = context.applicationContext
     private val attachments = File(context.noBackupFilesDir, "mms-outgoing").canonicalFile
     private val pduDirectory = File(context.filesDir, "mms-send-pdu").canonicalFile
     // 当前进程写入但尚未入库的文件不能当孤儿；重启后只有数据库引用继续保护。
@@ -37,15 +39,15 @@ class MmsPayloadStore(context: Context) {
                     if (count < 0) break
                     if (count == 0) continue
                     total += count
-                    if (total > MAX_ORIGINAL_BYTES) throw MmsSendException("附件原件不能超过 32 MiB")
-                    if (directory.usableSpace < DISK_RESERVE_BYTES) throw MmsSendException("存储空间不足，请清理后重新选择附件")
+                    if (total > MAX_ORIGINAL_BYTES) throw MmsSendException(appContext.getString(R.string.sys_mms_attach_original_too_large))
+                    if (directory.usableSpace < DISK_RESERVE_BYTES) throw MmsSendException(appContext.getString(R.string.sys_mms_store_low_space_choose))
                     output.write(buffer, 0, count)
                 }
-                if (total == 0L) throw MmsSendException("附件为空，请重新选择")
+                if (total == 0L) throw MmsSendException(appContext.getString(R.string.sys_mms_store_empty_attachment))
                 output.fd.sync()
             }
             currentCoroutineContext().ensureActive()
-            if (!temporary.renameTo(target)) throw MmsSendException("无法保存附件，请重试")
+            if (!temporary.renameTo(target)) throw MmsSendException(appContext.getString(R.string.sys_mms_store_save_attachment_failed))
             return target
         } finally {
             temporary.delete()
@@ -53,7 +55,7 @@ class MmsPayloadStore(context: Context) {
     }
 
     fun writePrepared(bytes: ByteArray): File {
-        if (bytes.isEmpty() || bytes.size > MAX_PDU_BYTES) throw MmsSendException("附件副本大小无效")
+        if (bytes.isEmpty() || bytes.size > MAX_PDU_BYTES) throw MmsSendException(appContext.getString(R.string.sys_mms_store_invalid_copy_size))
         return atomicWrite(directory(attachments), "prepared-${UUID.randomUUID()}.bin", bytes)
     }
 
@@ -61,13 +63,13 @@ class MmsPayloadStore(context: Context) {
     @Synchronized
     fun writePdu(token: String, bytes: ByteArray): File {
         if (!token.matches(Regex("[A-Za-z0-9_-]{1,100}")) || bytes.isEmpty() || bytes.size > MAX_PDU_BYTES) {
-            throw MmsSendException("彩信发送载荷无效")
+            throw MmsSendException(appContext.getString(R.string.sys_mms_store_invalid_payload))
         }
         val directory = directory(pduDirectory)
         val target = File(directory, "$token.pdu")
         currentProcessFiles.add(target.absolutePath)
         if (target.exists()) {
-            if (!read(target.path, MAX_PDU_BYTES).contentEquals(bytes)) throw MmsSendException("彩信载荷身份不一致，请重新编辑")
+            if (!read(target.path, MAX_PDU_BYTES).contentEquals(bytes)) throw MmsSendException(appContext.getString(R.string.sys_mms_store_payload_mismatch))
             return target
         }
         return atomicWrite(directory, target.name, bytes)
@@ -80,16 +82,16 @@ class MmsPayloadStore(context: Context) {
         if (!file.isAbsolute || file.absoluteFile != canonical ||
             (parent != attachments.canonicalFile && parent != pduDirectory.canonicalFile) ||
             canonical.name.endsWith(".partial")
-        ) throw MmsSendException("附件路径无效，请重新选择")
+        ) throw MmsSendException(appContext.getString(R.string.sys_mms_store_invalid_path))
         return canonical
     }
 
     fun file(path: String): File = resolveOwned(path)
 
     fun read(path: String, maxBytes: Int): ByteArray {
-        if (maxBytes !in 1..MAX_ORIGINAL_BYTES.toInt()) throw MmsSendException("附件读取预算无效")
+        if (maxBytes !in 1..MAX_ORIGINAL_BYTES.toInt()) throw MmsSendException(appContext.getString(R.string.sys_mms_store_invalid_read_budget))
         val file = resolveOwned(path)
-        if (!file.isFile || file.length() > maxBytes) throw MmsSendException("附件不存在或已超出发送限额")
+        if (!file.isFile || file.length() > maxBytes) throw MmsSendException(appContext.getString(R.string.sys_mms_store_missing_or_over_limit))
         FileInputStream(file).use { input ->
             val output = ByteArrayOutputStream(minOf(file.length().toInt(), 64 * 1024))
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -97,7 +99,7 @@ class MmsPayloadStore(context: Context) {
                 val count = input.read(buffer)
                 if (count < 0) break
                 if (count == 0) continue
-                if (output.size().toLong() + count > maxBytes) throw MmsSendException("附件超出发送限额")
+                if (output.size().toLong() + count > maxBytes) throw MmsSendException(appContext.getString(R.string.sys_mms_store_exceeds_limit))
                 output.write(buffer, 0, count)
             }
             return output.toByteArray()
@@ -128,13 +130,13 @@ class MmsPayloadStore(context: Context) {
 
     private fun directory(file: File): File {
         if ((!file.isDirectory && !file.mkdirs()) || file.canonicalFile != file.absoluteFile) {
-            throw MmsSendException("无法创建彩信私有存储")
+            throw MmsSendException(appContext.getString(R.string.sys_mms_store_mkdir_failed))
         }
         return file
     }
 
     private fun atomicWrite(directory: File, name: String, bytes: ByteArray): File {
-        if (directory.usableSpace < bytes.size.toLong() + DISK_RESERVE_BYTES) throw MmsSendException("存储空间不足，请清理后重试")
+        if (directory.usableSpace < bytes.size.toLong() + DISK_RESERVE_BYTES) throw MmsSendException(appContext.getString(R.string.sys_mms_store_low_space_retry))
         val target = File(directory, name)
         val temporary = File(directory, ".$name-${UUID.randomUUID()}.partial")
         currentProcessFiles.add(target.absolutePath); currentProcessFiles.add(temporary.absolutePath)
@@ -143,7 +145,7 @@ class MmsPayloadStore(context: Context) {
                 output.write(bytes)
                 output.fd.sync()
             }
-            if (!temporary.renameTo(target)) throw MmsSendException("无法保存彩信载荷，请重试")
+            if (!temporary.renameTo(target)) throw MmsSendException(appContext.getString(R.string.sys_mms_store_save_payload_failed))
             return target
         } finally {
             temporary.delete()

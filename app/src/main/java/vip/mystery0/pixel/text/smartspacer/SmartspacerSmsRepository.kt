@@ -1,10 +1,13 @@
 package vip.mystery0.pixel.text.smartspacer
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import vip.mystery0.pixel.text.data.repository.UnreadSmsCounter
 import vip.mystery0.pixel.text.data.source.SmartspacerSmsRow
+import vip.mystery0.pixel.text.data.source.SmsAccessState
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.source.smsAccessState
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.model.UnreadSmsCountFilter
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -20,6 +23,7 @@ data class SmartspacerVerificationCode(
 )
 
 class SmartspacerSmsRepository(
+    private val context: Context,
     private val telephonyDataSource: TelephonyDataSource,
     private val messageParser: MessageParser,
     private val settingsRepository: UnreadSmsComplicationSettingsRepository,
@@ -27,6 +31,7 @@ class SmartspacerSmsRepository(
     private val messageRepository: MessageRepository,
 ) {
     fun getUnreadSmsCount(smartspacerId: String): Int {
+        if (context.smsAccessState() != SmsAccessState.READY) return 0
         val settings = settingsRepository.getSettings(smartspacerId)
         if (!settings.hasEnabledCategory()) return 0
         return runBlocking(Dispatchers.IO) {
@@ -41,6 +46,7 @@ class SmartspacerSmsRepository(
     }
 
     fun getLatestUnreadVerificationCode(): SmartspacerVerificationCode? {
+        if (context.smsAccessState() != SmsAccessState.READY) return null
         return telephonyDataSource.getRecentSmsMessagesForSmartspacer(RECENT_SMS_LIMIT)
             .asSequence()
             .filterNot(SmartspacerSmsRow::read)
@@ -63,6 +69,7 @@ class SmartspacerSmsRepository(
     }
 
     suspend fun markMessageRead(messageId: Long) {
+        if (context.smsAccessState() != SmsAccessState.READY) return
         messageRepository.markMessagesAsRead(setOf(messageId))
     }
 

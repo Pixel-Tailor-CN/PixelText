@@ -16,12 +16,14 @@ import retrofit2.http.Streaming
 import retrofit2.http.Url
 import retrofit2.http.Query
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.HubArtifact
 import vip.mystery0.pixel.text.domain.hub.HubFileArtifact
 import vip.mystery0.pixel.text.domain.hub.HubResourceManifest
 import vip.mystery0.pixel.text.domain.hub.HubSpamModelArtifact
 import vip.mystery0.pixel.text.domain.hub.*
 import vip.mystery0.pixel.text.domain.model.SenderProfileManifest
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -64,7 +66,10 @@ class PixelTextHubClient(
 
     private fun <T : Any> reportBody(response: Response<T>, operation: ReportOperation): T {
         if (response.isSuccessful) return response.body()
-            ?: throw SampleReportException("INVALID_RESPONSE", "服务响应不完整，请稍后重试")
+            ?: throw SampleReportException(
+                "INVALID_RESPONSE",
+                AppStrings.get(R.string.domain_hub_report_incomplete_response),
+            )
         val code = response.errorBody()?.use { body ->
             runCatching { moshi.adapter(SampleReportErrorDto::class.java).fromJson(body.string())?.code }.getOrNull()
         }.orEmpty()
@@ -73,16 +78,24 @@ class PixelTextHubClient(
         } else null
         val message = when (response.code()) {
             400 -> when (operation) {
-                ReportOperation.LIST -> if (code == "INVALID_CURSOR") "记录分页已失效，请下拉刷新后重试" else "查询信息不符合要求，请刷新后重试"
-                ReportOperation.SUBMIT -> "提交信息不符合要求，请检查后重试"
-                ReportOperation.DETAIL -> "查询信息不符合要求，请刷新后重试"
+                ReportOperation.LIST -> if (code == "INVALID_CURSOR") {
+                    AppStrings.get(R.string.domain_hub_report_invalid_cursor)
+                } else {
+                    AppStrings.get(R.string.domain_hub_report_invalid_query)
+                }
+                ReportOperation.SUBMIT -> AppStrings.get(R.string.domain_hub_report_invalid_submit)
+                ReportOperation.DETAIL -> AppStrings.get(R.string.domain_hub_report_invalid_query)
             }
-            404 -> if (operation == ReportOperation.DETAIL) "无法查看这条上报记录" else "上报服务暂不可用，请稍后重试"
-            409 -> "本次请求存在冲突，已保留原请求，请稍后重试或反馈问题"
-            413 -> "提交内容超出大小限制，请减少内容后重试"
-            429 -> "请求过于频繁，请在稍后重试"
-            503 -> "上报服务暂不可用，请稍后重试"
-            else -> "服务暂未确认结果，请稍后重试"
+            404 -> if (operation == ReportOperation.DETAIL) {
+                AppStrings.get(R.string.domain_hub_report_detail_not_found)
+            } else {
+                AppStrings.get(R.string.domain_hub_report_service_unavailable)
+            }
+            409 -> AppStrings.get(R.string.domain_hub_report_conflict)
+            413 -> AppStrings.get(R.string.domain_hub_report_payload_too_large)
+            429 -> AppStrings.get(R.string.domain_hub_report_rate_limited)
+            503 -> AppStrings.get(R.string.domain_hub_report_service_unavailable)
+            else -> AppStrings.get(R.string.domain_hub_report_unknown_error)
         }
         throw SampleReportException(code.ifBlank { "HTTP_${response.code()}" }, message, retryAfter,
             operation == ReportOperation.SUBMIT && ((response.code() == 400 && code == "INVALID_REQUEST") ||
@@ -190,9 +203,9 @@ class PixelTextHubClient(
     private fun <T : Any> bodyOrThrow(response: Response<T>): T {
         response.errorBody()?.close()
         if (!response.isSuccessful) {
-            throw IllegalStateException("资源协议 v2 暂不可用 status=${response.code()}")
+            throw IllegalStateException(AppStrings.get(R.string.domain_hub_protocol_v2_unavailable_status, response.code()))
         }
-        return response.body() ?: throw IllegalStateException("资源协议 v2 暂不可用 empty body")
+        return response.body() ?: throw IllegalStateException(AppStrings.get(R.string.domain_hub_protocol_v2_unavailable_empty))
     }
 
     private fun normalizeBaseUrl(url: String): String {

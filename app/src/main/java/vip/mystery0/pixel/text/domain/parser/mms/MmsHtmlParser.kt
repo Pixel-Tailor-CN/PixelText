@@ -7,8 +7,10 @@ import org.jsoup.nodes.DataNode
 import org.jsoup.parser.Parser
 import org.jsoup.safety.Cleaner
 import org.jsoup.safety.Safelist
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartContent
 import vip.mystery0.pixel.text.domain.model.mms.MmsPartKey
+import vip.mystery0.pixel.text.util.AppStrings
 
 /** 派生页面仅保存消息内身份；原始 HTML、附件名称与字节不变。 */
 data class MmsHtmlDocument(
@@ -64,7 +66,7 @@ class MmsHtmlParser {
             if (target == null) {
                 unresolved++
                 image.removeAttr("src")
-                if (image.attr("alt").isBlank()) image.attr("alt", "图片不可用")
+                if (image.attr("alt").isBlank()) image.attr("alt", AppStrings.get(R.string.domain_mms_html_image_unavailable))
             } else {
                 val url = "$origin${path}resource/${target.key.partId}"
                 resources[url] = target.key

@@ -1,8 +1,10 @@
 package vip.mystery0.pixel.text.data.backup
 
 import com.squareup.moshi.JsonClass
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.backup.BackupSection
 import vip.mystery0.pixel.text.domain.theme.ThemeConfiguration
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.File
 
 @JsonClass(generateAdapter = true)
@@ -28,7 +30,10 @@ internal const val MAX_BACKUP_BYTES = 4L * 1024 * 1024 * 1024
 internal const val MAX_SMS_COUNT = 1_000_000L
 internal const val MAX_SMS_BYTES = 1024 * 1024
 internal val BACKUP_DATABASES = listOf("message_mirror.db", "spam.db", "conversation_archive.db")
-internal fun backupRequire(condition: Boolean, message: String = "备份文件无效或不受支持") {
+internal fun backupRequire(
+    condition: Boolean,
+    message: String = AppStrings.get(R.string.domain_backup_error_invalid_or_unsupported),
+) {
     if (!condition) throw BackupException(message)
 }
 internal class BackupException(message: String) : Exception(message)

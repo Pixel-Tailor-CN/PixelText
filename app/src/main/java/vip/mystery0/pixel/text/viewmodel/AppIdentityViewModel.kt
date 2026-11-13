@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.settings.AppIdentity
 import vip.mystery0.pixel.text.domain.settings.AppIdentityRepository
+import vip.mystery0.pixel.text.util.AppStrings
 
 data class AppIdentityUpdateState(
     val isApplying: Boolean = false,
@@ -32,7 +34,7 @@ class AppIdentityViewModel(
             _updateState.value = if (repository.apply(identity).isSuccess) {
                 AppIdentityUpdateState(applied = true)
             } else {
-                AppIdentityUpdateState(error = "应用失败，请重试。桌面图标可能需要稍后刷新。")
+                AppIdentityUpdateState(error = AppStrings.get(R.string.sys_app_identity_apply_failed))
             }
         }
     }

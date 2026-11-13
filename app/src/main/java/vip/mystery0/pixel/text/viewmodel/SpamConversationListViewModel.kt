@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.MirrorSpamScanner
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.repository.MessageRepository
@@ -133,7 +134,7 @@ class SpamConversationListViewModel(
             _historyStatsState.value = result.fold(
                 onSuccess = { HistorySpamStatsUiState.Success(it) },
                 onFailure = {
-                    HistorySpamStatsUiState.Error(it.message ?: "Unknown error")
+                    HistorySpamStatsUiState.Error(it.message ?: appContext.getString(R.string.sys_unknown_error))
                 }
             )
         }
@@ -176,7 +177,7 @@ class SpamConversationListViewModel(
                                 SpamConversationListUiState.Success(conversations.toList())
                         } else if (showError && conversations.isEmpty()) {
                             _uiState.value =
-                                SpamConversationListUiState.Error(e.message ?: "Unknown error")
+                                SpamConversationListUiState.Error(e.message ?: appContext.getString(R.string.sys_unknown_error))
                         }
                         isLoadingMore = false
                     }

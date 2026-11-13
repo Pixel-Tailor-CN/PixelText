@@ -25,22 +25,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.spam.learning.*
 import vip.mystery0.pixel.text.ui.component.AppEmptyState
+import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.viewmodel.LearningRuleConflict
 import vip.mystery0.pixel.text.viewmodel.PersonalLearningViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-private const val LEARNING_NOTICE =
-    "学习样本独立保存在本机，删除原短信不会忘记学习。样本和学习成果不参与备份及设备迁移，卸载或清除数据后会丢失。关闭学习会保留样本和人工纠正，并停止个人训练与预测。白名单和关键词规则始终优先于个人学习结果。"
 
 @Composable
 fun PersonalLearningScreen(
@@ -63,23 +63,29 @@ fun PersonalLearningScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("个人学习") },
+                title = { Text(stringResource(R.string.settings_personal_learning_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(R.string.settings_action_back),
+                        )
                     }
                 },
                 actions = {
                     Box {
                         IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "更多选项")
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.settings_action_more_options),
+                            )
                         }
                         DropdownMenu(
                             expanded = showMoreMenu,
                             onDismissRequest = { showMoreMenu = false },
                         ) {
                             DropdownMenuItem(
-                                text = { Text("清空学习数据") },
+                                text = { Text(stringResource(R.string.settings_learning_clear_menu)) },
                                 enabled = samples.isNotEmpty(),
                                 onClick = {
                                     showMoreMenu = false
@@ -87,7 +93,7 @@ fun PersonalLearningScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("关于个人学习") },
+                                text = { Text(stringResource(R.string.settings_learning_about_menu)) },
                                 onClick = {
                                     showMoreMenu = false
                                     showAboutDialog = true
@@ -138,7 +144,7 @@ fun PersonalLearningScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         Text(
-                            "使用个人学习",
+                            stringResource(R.string.settings_learning_master_switch),
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
                         )
@@ -174,9 +180,13 @@ fun PersonalLearningScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("学习记录", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.settings_learning_records_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${samples.size} 条",
+                        stringResource(
+                            if (samples.size == 1) R.string.settings_learning_records_count_single
+                            else R.string.settings_learning_records_count_plural,
+                            samples.size,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -186,7 +196,7 @@ fun PersonalLearningScreen(
             if (samples.isEmpty()) {
                 item(key = "empty_records") {
                     AppEmptyState(
-                        text = "还没有学习记录",
+                        text = stringResource(R.string.settings_learning_records_empty),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                     )
                 }
@@ -212,7 +222,12 @@ fun PersonalLearningScreen(
                             )
                             Text(
                                 text = buildString {
-                                    append(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
+                                    append(
+                                        stringResource(
+                                            if (sample.label == LearningLabel.SPAM) R.string.settings_learning_label_spam
+                                            else R.string.settings_learning_label_normal,
+                                        ),
+                                    )
                                     append(" · ")
                                     append(formatLearningSampleDate(sample.updatedAt))
                                 },
@@ -222,7 +237,7 @@ fun PersonalLearningScreen(
                         }
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = "查看详情",
+                            contentDescription = stringResource(R.string.settings_learning_view_details_cd),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -256,21 +271,23 @@ fun PersonalLearningScreen(
     if (enableConfirmation) {
         AlertDialog(
             onDismissRequest = { enableConfirmation = false },
-            title = { Text("开启个人学习") },
+            title = { Text(stringResource(R.string.settings_learning_enable_title)) },
             text = {
                 Text(
-                    LEARNING_NOTICE +
-                        if (!settings.spamDetectionEnabled) "\n\n同时开启本地模型识别，以使用个人学习结果。" else ""
+                    stringResource(R.string.settings_learning_notice) +
+                        if (!settings.spamDetectionEnabled) {
+                            "\n\n" + stringResource(R.string.settings_learning_enable_also_model)
+                        } else ""
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.setEnabled(true)
                     enableConfirmation = false
-                }) { Text("开启") }
+                }) { Text(stringResource(R.string.settings_learning_enable_btn)) }
             },
             dismissButton = {
-                TextButton(onClick = { enableConfirmation = false }) { Text("取消") }
+                TextButton(onClick = { enableConfirmation = false }) { Text(stringResource(R.string.settings_action_cancel)) }
             },
         )
     }
@@ -278,19 +295,23 @@ fun PersonalLearningScreen(
     samples.firstOrNull { it.id == deletionId }?.let { sample ->
         AlertDialog(
             onDismissRequest = { deletionId = null },
-            title = { Text("删除学习样本") },
+            title = { Text(stringResource(R.string.settings_learning_delete_title)) },
             text = {
-                Text("删除后将撤销此样本的分类纠正，并重新学习。原短信会保留。" +
-                    if (sample.linkedMessageCount > 1) "这会影响 ${sample.linkedMessageCount} 条相同内容的短信。" else "")
+                Text(
+                    stringResource(R.string.settings_learning_delete_body) +
+                        if (sample.linkedMessageCount > 1) {
+                            stringResource(R.string.settings_learning_delete_linked, sample.linkedMessageCount)
+                        } else ""
+                )
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteSample(sample.id)
                     deletionId = null
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.settings_action_delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { deletionId = null }) { Text("取消") }
+                TextButton(onClick = { deletionId = null }) { Text(stringResource(R.string.settings_action_cancel)) }
             },
         )
     }
@@ -298,16 +319,16 @@ fun PersonalLearningScreen(
     if (clearConfirmation) {
         AlertDialog(
             onDismissRequest = { clearConfirmation = false },
-            title = { Text("清空学习数据") },
-            text = { Text("删除全部学习样本、关联纠正和个人参数，保留短信、白名单与关键词。此操作无法撤销。") },
+            title = { Text(stringResource(R.string.settings_learning_clear_title)) },
+            text = { Text(stringResource(R.string.settings_learning_clear_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clear()
                     clearConfirmation = false
-                }) { Text("清空", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.settings_learning_clear_btn), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { clearConfirmation = false }) { Text("取消") }
+                TextButton(onClick = { clearConfirmation = false }) { Text(stringResource(R.string.settings_action_cancel)) }
             },
         )
     }
@@ -315,10 +336,10 @@ fun PersonalLearningScreen(
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
-            title = { Text("关于个人学习") },
-            text = { Text(LEARNING_NOTICE) },
+            title = { Text(stringResource(R.string.settings_learning_about_menu)) },
+            text = { Text(stringResource(R.string.settings_learning_notice)) },
             confirmButton = {
-                TextButton(onClick = { showAboutDialog = false }) { Text("知道了") }
+                TextButton(onClick = { showAboutDialog = false }) { Text(stringResource(R.string.settings_action_ok)) }
             },
         )
     }
@@ -343,43 +364,45 @@ private fun PersonalLearningStatusSection(
 
     when {
         !enabled && sampleCount == 0 -> {
-            title = "尚未开启"
+            title = stringResource(R.string.settings_learning_status_not_enabled)
             subtitle = ""
         }
         !enabled -> {
-            title = "已暂停"
+            title = stringResource(R.string.settings_learning_status_paused)
             subtitle = ""
         }
         !spamDetectionEnabled -> {
-            title = "本地模型识别已关闭"
-            subtitle = "在骚扰识别设置中开启后生效。"
+            title = stringResource(R.string.settings_learning_status_model_off)
+            subtitle = stringResource(R.string.settings_learning_status_model_off_sub)
         }
         sampleCount == 0 -> {
-            title = "等待学习"
+            title = stringResource(R.string.settings_learning_status_waiting)
             subtitle = ""
         }
         state.status == LearningStatus.APPLIED && state.hasActiveParameters -> {
-            title = "已生效"
+            title = stringResource(R.string.settings_learning_status_active)
             subtitle = ""
         }
         state.status == LearningStatus.APPLIED -> {
-            title = "学习结果未就绪"
-            subtitle = "暂时使用基础识别。"
+            title = stringResource(R.string.settings_learning_status_not_ready)
+            subtitle = stringResource(R.string.settings_learning_status_not_ready_sub)
         }
         state.status == LearningStatus.RUNNING -> {
-            title = "正在更新个人学习"
+            title = stringResource(R.string.settings_learning_status_running)
             subtitle = ""
         }
         state.status == LearningStatus.FAILED -> {
-            title = if (state.hasActiveParameters) {
-                "本次更新失败，仍使用上次学习结果"
-            } else {
-                "本次更新失败，暂时使用基础识别"
-            }
+            title = stringResource(
+                if (state.hasActiveParameters) {
+                    R.string.settings_learning_status_failed_with_params
+                } else {
+                    R.string.settings_learning_status_failed_no_params
+                },
+            )
             subtitle = state.error.orEmpty()
         }
         else -> {
-            title = "等待更新"
+            title = stringResource(R.string.settings_learning_status_pending)
             subtitle = ""
         }
     }
@@ -437,7 +460,7 @@ private fun PersonalLearningStatusSection(
                     onClick = onRetry,
                     contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
                 ) {
-                    Text("重试学习")
+                    Text(stringResource(R.string.settings_learning_retry_btn))
                 }
             }
         }
@@ -468,7 +491,7 @@ private fun LearningSampleDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("学习记录", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.settings_learning_records_title), style = MaterialTheme.typography.titleLarge)
                     Text(
                         formatLearningSampleDetailTime(sample.updatedAt),
                         style = MaterialTheme.typography.bodySmall,
@@ -477,17 +500,20 @@ private fun LearningSampleDetailSheet(
                 }
                 Box {
                     IconButton(onClick = { showMore = true }, enabled = !busy) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "记录选项")
+                        Icon(
+                            Icons.Rounded.MoreVert,
+                            contentDescription = stringResource(R.string.settings_learning_record_options_cd),
+                        )
                     }
                     DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
                         DropdownMenuItem(
-                            text = { Text("删除记录", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.settings_learning_delete_record), color = MaterialTheme.colorScheme.error) },
                             onClick = { showMore = false; onRequestDelete() },
                         )
                     }
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "关闭")
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.settings_action_close))
                 }
             }
             Column(
@@ -498,9 +524,14 @@ private fun LearningSampleDetailSheet(
                     Text(sample.text, style = MaterialTheme.typography.bodyLarge)
                 }
                 ListItem(
-                    content = { Text("短信分类") },
+                    content = { Text(stringResource(R.string.settings_learning_msg_category)) },
                     supportingContent = {
-                        Text(if (sample.label == LearningLabel.SPAM) "骚扰短信" else "正常短信")
+                        Text(
+                            stringResource(
+                                if (sample.label == LearningLabel.SPAM) R.string.settings_learning_label_spam
+                                else R.string.settings_learning_label_normal,
+                            ),
+                        )
                     },
                     trailingContent = {
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
@@ -521,14 +552,14 @@ private fun LearningSampleDetailSheet(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)
                     .heightIn(min = 48.dp),
-            ) { Text("贡献样本") }
+            ) { Text(stringResource(R.string.settings_learning_contribute_btn)) }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
     if (editingLabel) {
         AlertDialog(
             onDismissRequest = { editingLabel = false },
-            title = { Text("短信分类") },
+            title = { Text(stringResource(R.string.settings_learning_msg_category)) },
             text = {
                 Column {
                     LearningLabelRadioGroup(
@@ -538,7 +569,7 @@ private fun LearningSampleDetailSheet(
                     )
                     if (sample.linkedMessageCount > 1) {
                         Text(
-                            "将同时更新 ${sample.linkedMessageCount} 条相同内容短信的分类。",
+                            stringResource(R.string.settings_learning_linked_update_note, sample.linkedMessageCount),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -548,10 +579,10 @@ private fun LearningSampleDetailSheet(
                 TextButton(
                     onClick = { onUpdateLabel(selectedLabel); editingLabel = false },
                     enabled = selectedLabel != sample.label,
-                ) { Text("保存") }
+                ) { Text(stringResource(R.string.settings_action_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingLabel = false }) { Text("取消") }
+                TextButton(onClick = { editingLabel = false }) { Text(stringResource(R.string.settings_action_cancel)) }
             },
         )
     }
@@ -590,7 +621,7 @@ internal fun PersonalLearningDialog(
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("调整短信分类", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.settings_learning_dialog_title), style = MaterialTheme.typography.headlineSmall)
 
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -608,21 +639,24 @@ internal fun PersonalLearningDialog(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = message.content.ifBlank { "这条消息没有可学习的文本" },
+                        text = message.content.ifBlank { stringResource(R.string.settings_learning_no_text) },
                         maxLines = if (summaryExpanded) Int.MAX_VALUE else 2,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     if (message.content.length > 56 || message.content.count { it == '\n' } >= 2) {
                         Text(
-                            text = if (summaryExpanded) "收起全文" else "展开全文",
+                            text = stringResource(
+                                if (summaryExpanded) R.string.settings_learning_collapse
+                                else R.string.settings_learning_expand,
+                            ),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     if (interaction.linkedMessageCount > 1) {
                         Text(
-                            text = "相同内容已关联 ${interaction.linkedMessageCount} 条短信，保存将一并更新。",
+                            text = stringResource(R.string.settings_learning_linked_save_note, interaction.linkedMessageCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -648,11 +682,11 @@ internal fun PersonalLearningDialog(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text("首次开启个人学习", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.settings_learning_first_enable_title), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = "学习样本独立保存在本机，删除原短信不会忘记学习，不参与备份或设备迁移。" +
+                            text = stringResource(R.string.settings_learning_first_enable_body) +
                                 if (!settings.spamDetectionEnabled) {
-                                    "\n继续将同时开启本地模型识别，以使用个人学习结果。"
+                                    "\n" + stringResource(R.string.settings_learning_first_enable_also_model)
                                 } else {
                                     ""
                                 },
@@ -675,10 +709,12 @@ internal fun PersonalLearningDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = when (conflict) {
-                                LearningRuleConflict.WHITELIST -> "此短信已命中白名单或历史放行记录，放行优先于个人学习。"
-                                LearningRuleConflict.KEYWORD -> "该短信命中拦截关键词，当前仍按关键词规则处理。"
-                            },
+                            text = stringResource(
+                                when (conflict) {
+                                    LearningRuleConflict.WHITELIST -> R.string.settings_learning_conflict_whitelist
+                                    LearningRuleConflict.KEYWORD -> R.string.settings_learning_conflict_keyword
+                                },
+                            ),
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -694,10 +730,12 @@ internal fun PersonalLearningDialog(
                             enabled = !interaction.busy,
                         ) {
                             Text(
-                                when (conflict) {
-                                    LearningRuleConflict.WHITELIST -> "查看白名单"
-                                    LearningRuleConflict.KEYWORD -> "查看规则"
-                                }
+                                stringResource(
+                                    when (conflict) {
+                                        LearningRuleConflict.WHITELIST -> R.string.settings_learning_view_whitelist
+                                        LearningRuleConflict.KEYWORD -> R.string.settings_learning_view_rules
+                                    },
+                                ),
                             )
                         }
                     }
@@ -723,15 +761,14 @@ internal fun PersonalLearningDialog(
                         enabled = !interaction.busy,
                         modifier = Modifier.padding(12.dp),
                     )
-                    Text("同时贡献此样本", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_learning_contribute_checkbox), style = MaterialTheme.typography.bodyLarge)
                 }
             }
             Text(
-                text = if (interaction.contributeSample) {
-                    "保存后可检查待上传内容，确认后才会上传样本。"
-                } else {
-                    "仅在本机学习，不会上传短信。"
-                },
+                text = stringResource(
+                    if (interaction.contributeSample) R.string.settings_learning_contribute_on_hint
+                    else R.string.settings_learning_contribute_off_hint,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -751,7 +788,7 @@ internal fun PersonalLearningDialog(
                     onClick = viewModel::dismiss,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("知道了")
+                    Text(stringResource(R.string.settings_action_ok))
                 }
             } else {
                 Button(
@@ -759,14 +796,19 @@ internal fun PersonalLearningDialog(
                     enabled = interaction.selectedLabel != null && !interaction.busy,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
-                    Text(if (interaction.needsEnable) "开启个人学习并保存" else "保存纠正")
+                    Text(
+                        stringResource(
+                            if (interaction.needsEnable) R.string.settings_learning_enable_and_save
+                            else R.string.settings_learning_save_correction,
+                        ),
+                    )
                 }
                 TextButton(
                     onClick = viewModel::dismiss,
                     enabled = !interaction.busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("取消")
+                    Text(stringResource(R.string.settings_action_cancel))
                 }
             }
 
@@ -786,15 +828,15 @@ private fun LearningLabelRadioGroup(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LearningLabelRadioRow(
-            title = "正常短信",
-            subtitle = "日常通知、验证码或个人消息",
+            title = stringResource(R.string.settings_learning_label_normal),
+            subtitle = stringResource(R.string.settings_learning_normal_desc),
             selected = selectedLabel == LearningLabel.NORMAL,
             enabled = enabled,
             onClick = { onSelect(LearningLabel.NORMAL) },
         )
         LearningLabelRadioRow(
-            title = "骚扰短信",
-            subtitle = "广告推广、诈骗或其他骚扰",
+            title = stringResource(R.string.settings_learning_label_spam),
+            subtitle = stringResource(R.string.settings_learning_spam_desc),
             selected = selectedLabel == LearningLabel.SPAM,
             enabled = enabled,
             onClick = { onSelect(LearningLabel.SPAM) },
@@ -851,13 +893,22 @@ private fun formatLearningSampleDate(timestamp: Long): String {
     val nowDay = now.get(Calendar.DAY_OF_YEAR)
     val targetDay = target.get(Calendar.DAY_OF_YEAR)
     return when {
-        sameYear && nowDay == targetDay -> "今天"
-        sameYear && nowDay - targetDay == 1 -> "昨天"
-        sameYear -> SimpleDateFormat("M月d日", Locale.getDefault()).format(Date(timestamp))
-        else -> SimpleDateFormat("yyyy年M月d日", Locale.getDefault()).format(Date(timestamp))
+        sameYear && nowDay == targetDay -> AppStrings.get(R.string.settings_learning_date_today)
+        sameYear && nowDay - targetDay == 1 -> AppStrings.get(R.string.settings_learning_date_yesterday)
+        sameYear -> SimpleDateFormat(
+            AppStrings.get(R.string.settings_learning_date_same_year_pattern),
+            Locale.getDefault(),
+        ).format(Date(timestamp))
+        else -> SimpleDateFormat(
+            AppStrings.get(R.string.settings_learning_date_other_year_pattern),
+            Locale.getDefault(),
+        ).format(Date(timestamp))
     }
 }
 
 private fun formatLearningSampleDetailTime(timestamp: Long): String {
-    return SimpleDateFormat("yyyy年M月d日 HH:mm", Locale.getDefault()).format(Date(timestamp))
+    return SimpleDateFormat(
+        AppStrings.get(R.string.settings_learning_detail_time_pattern),
+        Locale.getDefault(),
+    ).format(Date(timestamp))
 }

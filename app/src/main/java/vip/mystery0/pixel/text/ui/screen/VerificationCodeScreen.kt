@@ -55,12 +55,16 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.VerificationCodeIndexModel
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.domain.settings.MessageTimeDisplayFormat
@@ -95,6 +99,7 @@ fun VerificationCodeScreen(
     var showMenuSheet by remember { mutableStateOf(false) }
     val menuSheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
     val context = LocalContext.current
+    val resources = LocalResources.current
     var accessRefreshKey by remember { mutableIntStateOf(0) }
     val roleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -128,9 +133,11 @@ fun VerificationCodeScreen(
         conversationListViewModel.markAllReadResultEvents.collect { event ->
             val message = when (event) {
                 is MarkAllReadResultEvent.Success ->
-                    "已标记 ${event.conversationCount} 个会话为已读"
+                    resources.getString(R.string.conv_mark_all_read_success, event.conversationCount)
 
-                MarkAllReadResultEvent.NoUnread -> "没有未读会话"
+                MarkAllReadResultEvent.NoUnread ->
+                    resources.getString(R.string.conv_no_unread_conversations)
+
                 is MarkAllReadResultEvent.Failure -> event.reason
             }
             snackbarHostState.showSnackbar(message)
@@ -157,10 +164,10 @@ fun VerificationCodeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("验证码") },
+                title = { Text(stringResource(R.string.conv_verification_codes_title)) },
                 actions = {
                     IconButton(onClick = { showMenuSheet = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "更多")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.conv_cd_more))
                     }
                 },
             )
@@ -177,15 +184,15 @@ fun VerificationCodeScreen(
                 .consumeWindowInsets(padding),
         ) {
             when {
-                state.isInitializing -> CenterMessage("正在识别验证码…", true)
+                state.isInitializing -> CenterMessage(stringResource(R.string.conv_verification_initializing), true)
                 state.errorMessage != null && state.pages.isEmpty() -> CenterMessage(
                     message = state.errorMessage!!,
                     loading = false,
-                    actionLabel = "检查设置",
+                    actionLabel = stringResource(R.string.conv_verification_check_settings),
                     onAction = onNavigateToSettings,
                 )
 
-                state.pages.isEmpty() -> AppEmptyState("还没有验证码", modifier = Modifier.fillMaxSize())
+                state.pages.isEmpty() -> AppEmptyState(stringResource(R.string.conv_verification_empty), modifier = Modifier.fillMaxSize())
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -318,7 +325,7 @@ private fun VerificationIndexCard(
                 )
             }
             IconButton(onClick = onNavigate) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "进入会话")
+                Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = stringResource(R.string.conv_cd_open_conversation))
             }
         }
 
@@ -335,7 +342,7 @@ private fun VerificationIndexCard(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = if (showOriginal) "收起原文" else "展开原文",
+                text = stringResource(if (showOriginal) R.string.conv_verification_hide_original else R.string.conv_verification_show_original),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable(enabled = !loadingBody, onClick = onToggle),
@@ -370,9 +377,14 @@ private fun requestDefaultSmsRole(context: Context, launch: (android.content.Int
     launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS))
 }
 
-private fun formatMonth(monthKey: String): String = runCatching {
-    DateTimeFormatter.ofPattern("yyyy年M月", Locale.CHINA)
-        .format(YearMonth.parse(monthKey))
-}.getOrDefault(monthKey)
+@Composable
+private fun formatMonth(monthKey: String): String {
+    val pattern = stringResource(R.string.conv_month_year_pattern)
+    val locale = LocalLocale.current.platformLocale
+    return runCatching {
+        DateTimeFormatter.ofPattern(pattern, locale)
+            .format(YearMonth.parse(monthKey))
+    }.getOrDefault(monthKey)
+}
 
 private const val LOAD_MORE_THRESHOLD = 4

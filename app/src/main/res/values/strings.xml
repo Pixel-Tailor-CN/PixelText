@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Pixel Text</string>
-    <string name="notification_reply_hint">回复…</string>
-    <string name="notification_reply_sent">消息已发送</string>
-    <string name="notification_reply_failed">发送失败，请重试</string>
+    <string name="notification_reply_hint">Reply…</string>
+    <string name="notification_reply_sent">Message sent</string>
+    <string name="notification_reply_failed">Failed to send, please retry</string>
 </resources>

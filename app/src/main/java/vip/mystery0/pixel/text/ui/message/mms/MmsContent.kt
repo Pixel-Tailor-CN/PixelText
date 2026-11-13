@@ -7,12 +7,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.mms.*
 import vip.mystery0.pixel.text.ui.message.cards.MmsDownloadCard
 
@@ -35,13 +37,15 @@ fun MmsContent(
     val longClick by rememberUpdatedState(onLongClick)
     val color = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.surfaceContainerHigh
     val textColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val selectMmsLabel = stringResource(R.string.msg_mms_select_cd)
+    val toggleSelectLabel = stringResource(R.string.msg_mms_toggle_select_cd)
     Surface(color = if (detailMode) MaterialTheme.colorScheme.surface else color,
         contentColor = if (detailMode) MaterialTheme.colorScheme.onSurface else textColor,
         shape = if (detailMode) androidx.compose.ui.graphics.RectangleShape else MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().semantics {
             selected = isSelected
-            if (interactionEnabled && longClick != null) onLongClick("选择彩信") { longClick?.invoke(); true }
-            if (interactionEnabled && selectionMode && click != null) onClick("切换选择") { click?.invoke(); true }
+            if (interactionEnabled && longClick != null) onLongClick(selectMmsLabel) { longClick?.invoke(); true }
+            if (interactionEnabled && selectionMode && click != null) onClick(toggleSelectLabel) { click?.invoke(); true }
         }.pointerInput(selectionMode, interactionEnabled) {
             // 初始阶段观察长按，达到阈值才消费；普通附件点击仍只交给一个子控件。
             awaitEachGesture {
@@ -76,7 +80,7 @@ fun MmsContent(
         CompositionLocalProvider(LocalMmsLinkGesture provides linkGesture) {
         Column(Modifier.padding(if (detailMode) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (model.pendingDownload) MmsDownloadCard(model.key.sourceId, interactionEnabled = interactionEnabled && !selectionMode, isSelected = isSelected)
-            if (model.issues.isNotEmpty()) Text("部分彩信内容不可用", style = MaterialTheme.typography.bodySmall)
+            if (model.issues.isNotEmpty()) Text(stringResource(R.string.msg_mms_partial_unavailable), style = MaterialTheme.typography.bodySmall)
             if (!model.preparing && displayContent.attachmentPages.isNotEmpty()) {
                 MmsPresentation(model, interactionEnabled && !selectionMode, onOpenPart, controller,
                     isSelected = isSelected, pages = displayContent.attachmentPages)
@@ -87,11 +91,13 @@ fun MmsContent(
                 displayContent.bodyParts.forEach {
                     MmsContentPart(it, model.parts, isSelected, interactionEnabled && !selectionMode, onOpenPart)
                 }
-                if (model.parts.isEmpty() && model.subject.isNullOrBlank() && !model.pendingDownload) Text("彩信暂无可读内容")
+                if (model.parts.isEmpty() && model.subject.isNullOrBlank() && !model.pendingDownload) {
+                    Text(stringResource(R.string.msg_mms_no_readable_content))
+                }
             }
             if (detailMode && model.parts.isNotEmpty()) {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Text("附件（${model.parts.size}）", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.msg_mms_attachments_count, model.parts.size), style = MaterialTheme.typography.titleSmall)
                 model.parts.forEach { part ->
                     MmsFileCard(part, isSelected = isSelected, interactionEnabled = interactionEnabled && !selectionMode, onOpenPart = onOpenPart)
                 }

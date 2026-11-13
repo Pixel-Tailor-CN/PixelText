@@ -28,7 +28,7 @@ class UnreadSmsComplicationProvider : SmartspacerComplicationProvider(), KoinCom
                         provideContext(),
                         R.drawable.ic_notification_sms
                     ),
-                    contentDescription = "未读短信"
+                    contentDescription = provideContext().getString(R.string.sys_smartspacer_unread_cd)
                 ),
                 content = Text(label),
                 onClick = TapAction(intent = openAppIntent())
@@ -38,8 +38,8 @@ class UnreadSmsComplicationProvider : SmartspacerComplicationProvider(), KoinCom
 
     override fun getConfig(smartspacerId: String?): Config {
         return Config(
-            label = "未读短信数量",
-            description = "显示 PixelText 中的未读短信数量",
+            label = provideContext().getString(R.string.sys_smartspacer_unread_label),
+            description = provideContext().getString(R.string.sys_smartspacer_unread_desc),
             icon = AndroidIcon.createWithResource(provideContext(), R.drawable.ic_notification_sms),
             configActivity = Intent(
                 provideContext(),
@@ -60,6 +60,10 @@ class UnreadSmsComplicationProvider : SmartspacerComplicationProvider(), KoinCom
 
     private fun formatUnreadCount(count: Int): String? {
         if (count <= 0) return null
-        return if (count > 99) "99+ 未读" else "$count 未读"
+        return if (count > 99) {
+            provideContext().getString(R.string.sys_smartspacer_unread_99_plus)
+        } else {
+            provideContext().getString(R.string.sys_smartspacer_unread_count, count)
+        }
     }
 }

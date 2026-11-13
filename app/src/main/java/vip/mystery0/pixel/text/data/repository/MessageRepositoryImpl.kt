@@ -22,6 +22,7 @@ import vip.mystery0.pixel.text.domain.model.mirror.ConversationArchiveFilter
 import vip.mystery0.pixel.text.data.db.toArchivedConversationEntity
 import vip.mystery0.pixel.text.data.source.ContactDataSource
 import vip.mystery0.pixel.text.data.source.TelephonyDataSource
+import vip.mystery0.pixel.text.data.source.requireSmsAccess
 import vip.mystery0.pixel.text.domain.model.ConversationModel
 import vip.mystery0.pixel.text.domain.model.MessageModel
 import vip.mystery0.pixel.text.domain.model.mirror.ConversationListQuery
@@ -165,6 +166,7 @@ class MessageRepositoryImpl(
     override suspend fun deleteThreads(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
+            context.requireSmsAccess()
             telephonyDataSource.deleteThreads(threadIds)
             val existingSmsThreadIds = telephonyDataSource.existingSmsThreadIds(threadIds)
             verificationCodeRepository.deleteThreadIds(threadIds - existingSmsThreadIds)
@@ -178,6 +180,7 @@ class MessageRepositoryImpl(
     override suspend fun deleteMessages(messageIds: Set<Long>): Int {
         if (messageIds.isEmpty()) return 0
         return withContext(Dispatchers.IO) {
+            context.requireSmsAccess()
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val deletedCount = telephonyDataSource.deleteMessages(messageIds)
             val requestedSmsIds = messageIds.filterTo(mutableSetOf()) { it > 0 }
@@ -194,6 +197,7 @@ class MessageRepositoryImpl(
     override suspend fun markMessagesAsRead(messageIds: Set<Long>): Int {
         if (messageIds.isEmpty()) return 0
         return withContext(Dispatchers.IO) {
+            context.requireSmsAccess()
             val threadIds = telephonyDataSource.getThreadIdsForMessages(messageIds)
             val updatedCount = telephonyDataSource.markMessagesAsRead(messageIds)
             conversationCacheRepository.syncLocalChanges()
@@ -237,6 +241,7 @@ class MessageRepositoryImpl(
     override suspend fun markThreadsAsRead(threadIds: Set<Long>) {
         if (threadIds.isEmpty()) return
         withContext(Dispatchers.IO) {
+            context.requireSmsAccess()
             telephonyDataSource.markThreadsAsRead(threadIds)
             conversationCacheRepository.syncLocalChanges()
             SmsNotificationHelper.cancelThreadNotifications(context, threadIds)
@@ -247,6 +252,7 @@ class MessageRepositoryImpl(
     override suspend fun markThreadAsUnread(threadId: Long) {
         if (threadId < 0) return
         withContext(Dispatchers.IO) {
+            context.requireSmsAccess()
             telephonyDataSource.markLatestIncomingMessageAsUnread(threadId)
             conversationCacheRepository.syncLocalChanges()
             SmartspacerIntegration.notifyChanged(context)

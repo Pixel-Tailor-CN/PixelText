@@ -72,6 +72,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -83,6 +85,7 @@ import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
 import vip.mystery0.pixel.text.ComposeSmsActivity
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.repository.ConversationContentFilter
 import vip.mystery0.pixel.text.domain.settings.AppSettingsRepository
 import vip.mystery0.pixel.text.domain.theme.MAX_CONVERSATION_DETAIL_TEXT_SCALE
@@ -229,6 +232,7 @@ fun ConversationDetailScreen(
     val manualSpamChecks by viewModel.manualSpamChecks.collectAsState()
     val newMessageKeys by viewModel.newMessageKeys.collectAsState()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val outgoingRepository: vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository = koinInject()
     val outgoing by remember(outgoingRepository) { outgoingRepository.observeMessages() }.collectAsState(emptyList())
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
@@ -316,7 +320,7 @@ fun ConversationDetailScreen(
                 textScaleResolvedGeneration = pendingFailureGeneration
                 textScalePendingFailureGeneration = 0
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("文字大小保存失败")
+                    snackbarHostState.showSnackbar(resources.getString(R.string.conv_text_scale_save_failed))
                 }
             }
 
@@ -347,7 +351,7 @@ fun ConversationDetailScreen(
                                 themeRepository.configuration.value.conversationDetail.textScale
                             textScaleResolvedGeneration = persistGeneration
                             textScalePendingFailureGeneration = 0
-                            snackbarHostState.showSnackbar("文字大小保存失败")
+                            snackbarHostState.showSnackbar(resources.getString(R.string.conv_text_scale_save_failed))
                         }
                     } else {
                         textScaleResolvedGeneration = persistGeneration
@@ -386,9 +390,9 @@ fun ConversationDetailScreen(
             when (event) {
                 is DeleteMessageResultEvent.Success -> {
                     val message = if (event.count > 0) {
-                        "已删除 ${event.count} 条消息"
+                        resources.getString(R.string.conv_deleted_messages_count, event.count)
                     } else {
-                        "未删除任何消息"
+                        resources.getString(R.string.conv_no_messages_deleted)
                     }
                     snackbarHostState.showSnackbar(message)
                 }
@@ -418,16 +422,18 @@ fun ConversationDetailScreen(
                 )
                 return@collectLatest
             }
-            val text = when (event.ruleConflict) {
-                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.WHITELIST ->
-                    "纠正已保存，正在更新个人学习（此短信已放行，放行优先于个人学习）"
-                vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.KEYWORD ->
-                    "纠正已保存，正在更新个人学习（该短信仍按关键词优先处理）"
-                null -> "纠正已保存，正在更新个人学习"
-            }
+            val text = resources.getString(
+                when (event.ruleConflict) {
+                    vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.WHITELIST ->
+                        R.string.conv_learning_saved_whitelist
+                    vip.mystery0.pixel.text.viewmodel.LearningRuleConflict.KEYWORD ->
+                        R.string.conv_learning_saved_keyword
+                    null -> R.string.conv_learning_saved
+                }
+            )
             val result = snackbarHostState.showSnackbar(
                 message = text,
-                actionLabel = "查看学习",
+                actionLabel = resources.getString(R.string.conv_learning_view_action),
                 withDismissAction = true,
             )
             if (result == SnackbarResult.ActionPerformed) {
@@ -444,7 +450,7 @@ fun ConversationDetailScreen(
                     title = { Text(selectedMessageIds.size.toString()) },
                     navigationIcon = {
                         IconButton(onClick = { selectedMessageIds.clear() }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Clear selection")
+                            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.conv_cd_clear_selection))
                         }
                     },
                     actions = {
@@ -459,32 +465,32 @@ fun ConversationDetailScreen(
                                 @Suppress("UsePropertyAccessSyntax")
                                 clipboardManager.setPrimaryClip(
                                     ClipData.newPlainText(
-                                        "Messages",
+                                        resources.getString(R.string.conv_clipboard_label),
                                         texts.joinToString("\n")
                                     )
                                 )
                             }
                             selectedMessageIds.clear()
                         }) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy")
+                            Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.conv_cd_copy))
                         }
                         IconButton(onClick = {
                             deleteCandidateMessageIds = selectedMessageIds.toSet()
                         }) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete")
+                            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.conv_cd_delete))
                         }
                         if (selectedMessageIds.size == 1) {
                             var showMoreMenu by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
-                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.conv_cd_more))
                                 }
                                 DropdownMenu(
                                     expanded = showMoreMenu,
                                     onDismissRequest = { showMoreMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("详情信息") },
+                                        text = { Text(stringResource(R.string.conv_menu_message_details)) },
                                         enabled = selectedMessage != null,
                                         onClick = {
                                             showMoreMenu = false
@@ -493,7 +499,7 @@ fun ConversationDetailScreen(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("识别骚扰内容") },
+                                        text = { Text(stringResource(R.string.conv_menu_check_spam)) },
                                         enabled = canCheckSelectedSpam,
                                         onClick = {
                                             showMoreMenu = false
@@ -502,7 +508,7 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("调整短信分类") },
+                                        text = { Text(stringResource(R.string.conv_menu_adjust_category)) },
                                         enabled = selectedMessage != null && !selectedMessage.isMms,
                                         onClick = {
                                             showMoreMenu = false
@@ -511,7 +517,7 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("贡献样本") },
+                                        text = { Text(stringResource(R.string.conv_menu_contribute_sample)) },
                                         enabled = canReportSelectedSample,
                                         onClick = {
                                             showMoreMenu = false
@@ -528,7 +534,7 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("分享") },
+                                        text = { Text(stringResource(R.string.conv_menu_share)) },
                                         onClick = {
                                             showMoreMenu = false
                                             if (uiState is MessageUiState.Success) {
@@ -552,7 +558,7 @@ fun ConversationDetailScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("转发") },
+                                        text = { Text(stringResource(R.string.conv_menu_forward)) },
                                         onClick = {
                                             showMoreMenu = false
                                             selectedMessage?.let { message ->
@@ -596,7 +602,7 @@ fun ConversationDetailScreen(
                             IconButton(onClick = onNavigateBack) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back"
+                                    contentDescription = stringResource(R.string.conv_cd_back)
                                 )
                             }
                         }
@@ -612,13 +618,13 @@ fun ConversationDetailScreen(
                                     context.startActivity(dialIntent)
                                 }.onFailure {
                                     coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("无法打开拨号器")
+                                        snackbarHostState.showSnackbar(resources.getString(R.string.conv_unable_open_dialer))
                                     }
                                 }
                             },
                             enabled = address.isNotBlank()
                         ) {
-                            Icon(Icons.Rounded.Call, contentDescription = "Call")
+                            Icon(Icons.Rounded.Call, contentDescription = stringResource(R.string.conv_cd_call))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -662,7 +668,7 @@ fun ConversationDetailScreen(
 
             is MessageUiState.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("读取失败: ${state.message}", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.conv_load_failed, state.message), color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -694,7 +700,7 @@ fun ConversationDetailScreen(
                     if (locatedTargetMessageId == targetId) return@LaunchedEffect
                     val targetIndex = viewModel.loadUntilMessage(targetId)
                     if (targetIndex == null) {
-                        snackbarHostState.showSnackbar("原短信已不存在")
+                        snackbarHostState.showSnackbar(resources.getString(R.string.conv_original_message_not_found))
                         return@LaunchedEffect
                     }
 
@@ -726,7 +732,7 @@ fun ConversationDetailScreen(
                         modifier = Modifier.matchParentSize(),
                     )
                     if (state.messages.isEmpty()) {
-                        AppEmptyState("还没有消息", modifier = Modifier.fillMaxSize())
+                        AppEmptyState(stringResource(R.string.conv_empty_messages), modifier = Modifier.fillMaxSize())
                     }
                     LazyColumn(
                         state = listState,
@@ -788,7 +794,12 @@ fun ConversationDetailScreen(
                                 animateEntrance = message.stableKey in entranceMessageKeys,
                             )
                             if (!message.isMms) smsSendStates[message.id]?.let { status ->
-                                Text(if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.SENT) "已发送" else status.label,
+                                Text(
+                                    if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.SENT) {
+                                        stringResource(R.string.conv_sms_sent)
+                                    } else {
+                                        status.label
+                                    },
                                     modifier = Modifier.padding(top = 4.dp, end = 4.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (status == vip.mystery0.pixel.text.sms.SmsSendCoordinator.State.UNKNOWN ||
@@ -809,8 +820,8 @@ fun ConversationDetailScreen(
     if (deleteCandidateMessageIds.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { deleteCandidateMessageIds = emptySet() },
-            title = { Text("删除消息？") },
-            text = { Text("将删除所选 ${deleteCandidateMessageIds.size} 条短信或彩信。已提交的彩信可能仍然发出，删除记录无法撤回。") },
+            title = { Text(stringResource(R.string.conv_delete_messages_title)) },
+            text = { Text(stringResource(R.string.conv_delete_messages_message, deleteCandidateMessageIds.size)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -820,12 +831,12 @@ fun ConversationDetailScreen(
                         viewModel.deleteMessages(selected)
                     }
                 ) {
-                    Text("删除")
+                    Text(stringResource(R.string.conv_action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { deleteCandidateMessageIds = emptySet() }) {
-                    Text("取消")
+                    Text(stringResource(R.string.conv_action_cancel))
                 }
             }
         )

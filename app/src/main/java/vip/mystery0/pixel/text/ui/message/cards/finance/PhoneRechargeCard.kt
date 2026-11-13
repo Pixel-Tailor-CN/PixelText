@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
@@ -47,7 +49,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge, isSelected: Boolean = 
                 icon = Icons.Rounded.PhoneIphone,
                 iconTint = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else baseThemeColor,
                 iconBg = if (isSelected) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.primaryContainer,
-                title = "充值成功",
+                title = stringResource(R.string.msg_card_recharge_title),
                 dividerColor = if (isSelected) themeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.1f)
             )
 
@@ -65,7 +67,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge, isSelected: Boolean = 
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "元",
+                    text = stringResource(R.string.msg_card_recharge_currency_unit),
                     style = MaterialTheme.typography.titleMedium,
                     color = onContainerVariantColor,
                     modifier = Modifier.padding(bottom = 6.dp)
@@ -76,7 +78,7 @@ fun PhoneRechargeCard(result: ParsedResult.PhoneRecharge, isSelected: Boolean = 
 
             InfoMapList(
                 details = result.details,
-                highlightKey = "当前余额",
+                highlightKey = stringResource(R.string.domain_parser_detail_balance),
                 highlightColor = themeColor,
                 containerColor = if (isSelected) baseThemeColor.copy(alpha = 0.1f) else baseThemeColor.copy(alpha = 0.08f)
             )

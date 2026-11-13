@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.SenderWhitelistRuleEntity
 import vip.mystery0.pixel.text.data.db.mirror.MessageMirrorDatabase
 import vip.mystery0.pixel.text.data.db.mirror.MirrorSpamLegacyImporter
@@ -22,6 +23,7 @@ import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRepository
 import vip.mystery0.pixel.text.domain.spam.SenderWhitelistRule
 import vip.mystery0.pixel.text.domain.spam.WhitelistRuleType
 import vip.mystery0.pixel.text.domain.spam.MessageSpamSource
+import vip.mystery0.pixel.text.util.AppStrings
 
 class SenderWhitelistRepositoryImpl(
     private val mirror: MessageMirrorDatabase,
@@ -45,17 +47,17 @@ class SenderWhitelistRepositoryImpl(
         val values = if (type == WhitelistRuleType.EXACT) {
             input.split('\n', ',', '，', ';', '；').map(String::trim).filter(String::isNotEmpty).distinct()
         } else listOf(input.trim())
-        require(values.isNotEmpty()) { "请输入号码或表达式" }
-        require(id == null || values.size == 1) { "编辑时只能输入一条规则" }
+        require(values.isNotEmpty()) { AppStrings.get(R.string.domain_whitelist_error_empty) }
+        require(id == null || values.size == 1) { AppStrings.get(R.string.domain_whitelist_error_edit_single) }
         values.forEach { value -> SenderWhitelistMatcher.validate(type, value)?.let { error(it) } }
         decisionMutex.withLock {
             val current = dao.getRules()
-            require(id == null || current.any { it.id == id }) { "规则不存在，请刷新后重试" }
+            require(id == null || current.any { it.id == id }) { AppStrings.get(R.string.domain_whitelist_error_not_found) }
             require(current.count { it.id != id } + values.size <= SenderWhitelistMatcher.MAX_RULES) {
-                "最多保存 ${SenderWhitelistMatcher.MAX_RULES} 条规则"
+                AppStrings.get(R.string.domain_whitelist_error_max_rules, SenderWhitelistMatcher.MAX_RULES)
             }
             require(values.none { value -> current.any { it.id != id && it.type == type.name && it.value == value } }) {
-                "包含已存在的规则，请删除重复项后重试"
+                AppStrings.get(R.string.domain_whitelist_error_duplicate)
             }
             val now = System.currentTimeMillis()
             val additions = values.map { SenderWhitelistRuleEntity(id ?: 0, type.name, it, now) }
@@ -70,7 +72,7 @@ class SenderWhitelistRepositoryImpl(
         importer.ensureImported()
         decisionMutex.withLock {
             val current = dao.getRules()
-            require(current.any { it.id == id }) { "规则不存在，请刷新后重试" }
+            require(current.any { it.id == id }) { AppStrings.get(R.string.domain_whitelist_error_not_found) }
             updateRules(current, current.filterNot { it.id == id }) {
                 dao.deleteRule(id)
             }
@@ -104,7 +106,9 @@ class SenderWhitelistRepositoryImpl(
             val current = dao.getRules()
             val keys = current.map { it.type to it.value }.toSet()
             val additions = rules.distinctBy { it.type to it.value }.filter { (it.type to it.value) !in keys }
-            require(current.size + additions.size <= SenderWhitelistMatcher.MAX_RULES) { "合并后白名单超过 500 条" }
+            require(current.size + additions.size <= SenderWhitelistMatcher.MAX_RULES) {
+                AppStrings.get(R.string.domain_whitelist_error_merge_limit, SenderWhitelistMatcher.MAX_RULES)
+            }
             updateRules(current, current + additions, rebuildKeywords = true) {
                 val keywordDao = mirror.blockedKeywordDao()
                 keywords.forEach { row ->

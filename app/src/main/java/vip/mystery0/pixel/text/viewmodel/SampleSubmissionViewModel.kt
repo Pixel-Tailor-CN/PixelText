@@ -7,9 +7,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.*
 import vip.mystery0.pixel.text.domain.sample.*
+import vip.mystery0.pixel.text.util.AppStrings
 
 data class SampleSubmissionDraftChoice(
     val currentMessage: SampleReportDraft,
@@ -66,7 +68,7 @@ class SampleSubmissionViewModel(
                     content = pending.content, sender = pending.sender, category = pending.category,
                     learningFeedback = pending.learningFeedback,
                     agreed = true, pending = true, loading = false,
-                    resultMessage = "暂未确认提交结果。已恢复本次确认的内容和请求编号；查看记录不会自动结束本次提交",
+                    resultMessage = AppStrings.get(R.string.sys_sample_pending_restored_init),
                 ) else if (draft != null && (content.isNotBlank() || sender.isNotBlank())) {
                     // 只在内存中等待用户选择，不展示原文摘要、不覆盖原有保留文件。
                     SampleSubmissionState(loading = false, hasRetainedDraft = true,
@@ -101,9 +103,9 @@ class SampleSubmissionViewModel(
                 mutableState.value = if (pending != null) before.copy(content = pending.content,
                     sender = pending.sender, category = pending.category, learningFeedback = pending.learningFeedback, agreed = true, pending = true,
                     loading = false, preparing = false, localError = false, draftChoice = null,
-                    resultMessage = "已恢复本次待确认提交，将继续使用原请求编号和全部内容")
+                    resultMessage = AppStrings.get(R.string.sys_sample_pending_restored_retry))
                 else before.copy(loading = false, preparing = false, localError = false, pending = false,
-                    resultMessage = "本机数据已重新读取，可继续编辑或提交")
+                    resultMessage = AppStrings.get(R.string.sys_sample_local_reloaded))
             } catch (error: CancellationException) { throw error
             } catch (error: Exception) {
                 mutableState.update { it.copy(loading = false, localError = true, resultMessage = error.reportMessage()) }
@@ -112,7 +114,14 @@ class SampleSubmissionViewModel(
     }
 
     fun showPreparingHint() {
-        mutableState.update { it.copy(resultMessage = if (it.preparing) "正在保存本次提交，请稍候再返回" else "正在读取或保存本机数据，请稍候再返回") }
+        mutableState.update {
+            it.copy(
+                resultMessage = AppStrings.get(
+                    if (it.preparing) R.string.sys_sample_saving_submission_hint
+                    else R.string.sys_sample_busy_local_hint
+                )
+            )
+        }
     }
 
     fun chooseCurrentMessage() = chooseDraft(useCurrentMessage = true)
@@ -160,8 +169,8 @@ class SampleSubmissionViewModel(
         val result = desensitizationAssistant.replaceSelected(state.value.desensitizationState)
         mutableState.update { it.copy(desensitizationState = result.state,
             desensitizationHintMessage = when (result.error) {
-                SampleReplacementError.INVALID_AMOUNT_FORMAT -> "选择的内容似乎不是有效的金额格式，请手动修改"
-                SampleReplacementError.INVALID_TEMPORAL_FORMAT -> "选择的内容似乎不是有效的时间格式，请手动修改"
+                SampleReplacementError.INVALID_AMOUNT_FORMAT -> AppStrings.get(R.string.sys_sample_invalid_amount)
+                SampleReplacementError.INVALID_TEMPORAL_FORMAT -> AppStrings.get(R.string.sys_sample_invalid_temporal)
                 null -> null
             }) }
     }
@@ -199,7 +208,11 @@ class SampleSubmissionViewModel(
                         content = pending?.content ?: it.content, sender = pending?.sender ?: it.sender,
                         category = pending?.category ?: it.category,
                         learningFeedback = if (pending != null) pending.learningFeedback else it.learningFeedback,
-                        resultMessage = if (pending != null) "暂未确认提交结果。${error.reportMessage()}" else error.reportMessage(),
+                        resultMessage = if (pending != null) {
+                            AppStrings.get(R.string.sys_sample_pending_error_prefix, error.reportMessage())
+                        } else {
+                            error.reportMessage()
+                        },
                         retryAt = error.reportRetryAt()) }
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (storageError: Exception) {

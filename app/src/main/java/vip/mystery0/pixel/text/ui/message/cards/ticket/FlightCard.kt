@@ -27,8 +27,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.DashedDivider
@@ -73,7 +75,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
                 icon = Icons.Rounded.FlightTakeoff,
                 iconTint = accentColor,
                 iconBg = if (isSelected) onContainerColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primaryContainer,
-                title = "航班行程",
+                title = stringResource(R.string.msg_card_flight_title),
                 dividerColor = onContainerColor.copy(alpha = 0.1f)
             )
 
@@ -181,7 +183,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
             ) {
                 Column {
                     Text(
-                        text = "航站楼",
+                        text = stringResource(R.string.msg_card_flight_terminal),
                         style = MaterialTheme.typography.labelSmall,
                         color = onContainerVariantColor.copy(alpha = 0.7f)
                     )
@@ -202,7 +204,7 @@ fun FlightCard(result: ParsedResult.Ticket.Flight, isSelected: Boolean = false) 
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "登机时间",
+                        text = stringResource(R.string.msg_card_flight_boarding_time),
                         style = MaterialTheme.typography.labelSmall,
                         color = onContainerVariantColor.copy(alpha = 0.7f)
                     )

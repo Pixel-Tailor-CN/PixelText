@@ -2,6 +2,7 @@ package vip.mystery0.pixel.text.data.source
 
 import android.content.ContentResolver
 import android.content.ContentUris
+import android.content.Context
 import android.provider.Telephony
 import vip.mystery0.pixel.text.data.repository.mirror.toMessageModel
 import vip.mystery0.pixel.text.domain.model.mirror.MessageTransport
@@ -13,8 +14,12 @@ import vip.mystery0.pixel.text.domain.spam.learning.LearningMessageKey
 class LearningMessageSource(
     private val resolver: ContentResolver,
     private val mirror: MessageMirrorRepository? = null,
+    private val context: Context? = null,
 ) {
-    suspend fun keys(ids: Collection<Long>): Map<Long, LearningMessageKey> = buildMap {
+    suspend fun keys(ids: Collection<Long>): Map<Long, LearningMessageKey> {
+        if (ids.isEmpty()) return emptyMap()
+        context?.requireSmsAccess()
+        return buildMap {
         for (batch in ids.filter { it > 0 }.chunked(500)) {
             resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("_id", "address", "date", "body"),
                 "_id IN (${batch.joinToString(",") { "?" }})", batch.map(Long::toString).toTypedArray(), null)?.use { cursor ->
@@ -38,6 +43,7 @@ class LearningMessageSource(
             if (!matches) continue
             val message = snapshot.toMessageModel()
             put(id, LearningMessageKey.create("MMS", id, message.sender, message.timestamp, message.content))
+        }
         }
     }
 }

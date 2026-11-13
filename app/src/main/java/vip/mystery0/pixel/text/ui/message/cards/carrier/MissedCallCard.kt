@@ -18,10 +18,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.ParsedResult
 import vip.mystery0.pixel.text.ui.message.cards.CardHeader
 import vip.mystery0.pixel.text.ui.message.cards.InfoMapList
@@ -40,9 +42,11 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
     val variantColor =
         if (isSelected) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.7f)
         else MaterialTheme.colorScheme.onSurfaceVariant
+    val callTimeLabel = stringResource(R.string.msg_card_missed_call_time)
+    val callLocationLabel = stringResource(R.string.msg_card_missed_call_location)
     val details = linkedMapOf<String, String>().apply {
-        result.time?.let { put("来电时间", it) }
-        result.location?.let { put("来电归属地", it) }
+        result.time?.let { put(callTimeLabel, it) }
+        result.location?.let { put(callLocationLabel, it) }
     }
 
     Surface(
@@ -63,7 +67,7 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
                 } else {
                     MaterialTheme.colorScheme.primaryContainer
                 },
-                title = "来电提醒",
+                title = stringResource(R.string.msg_card_missed_call_title),
                 titleColor = if (isSelected) {
                     MaterialTheme.colorScheme.inverseOnSurface
                 } else {
@@ -74,7 +78,7 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "来电号码",
+                text = stringResource(R.string.msg_card_missed_call_number),
                 style = MaterialTheme.typography.bodyMedium,
                 color = variantColor,
             )
@@ -127,7 +131,7 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
                     .fillMaxWidth()
                     .height(48.dp),
             ) {
-                Text("一键回拨")
+                Text(stringResource(R.string.msg_card_missed_call_callback))
             }
         }
     }

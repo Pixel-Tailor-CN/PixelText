@@ -22,8 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.MmsMediaMetadataReader
 import vip.mystery0.pixel.text.data.source.mms.MmsMediaPreview
 import vip.mystery0.pixel.text.data.source.mms.mediaCacheKey
@@ -55,22 +57,28 @@ fun MmsMediaCard(
         contentColor = if (isSelected) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface,
     ) {
         Column(Modifier.padding(12.dp)) {
-            preview?.thumbnail?.let { Image(it.asImageBitmap(), "视频预览，${part.displayName}",
+            preview?.thumbnail?.let { Image(it.asImageBitmap(), stringResource(R.string.msg_mms_video_preview_cd, part.displayName),
                 Modifier.fillMaxWidth().height(160.dp), contentScale = ContentScale.Fit) }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (actionable) Icon(Icons.Rounded.PlayCircle, contentDescription = "播放")
+                if (actionable) Icon(Icons.Rounded.PlayCircle, contentDescription = stringResource(R.string.msg_mms_play))
                 Text(
-                    if (part.kind == MmsContentKind.VIDEO) "视频 · ${part.displayName}" else "音频 · ${part.displayName}",
+                    stringResource(
+                        if (part.kind == MmsContentKind.VIDEO) R.string.msg_mms_video_title else R.string.msg_mms_audio_title,
+                        part.displayName,
+                    ),
                     modifier = Modifier.weight(1f),
                 )
                 MmsAttachmentActions(part, enabled = interactionEnabled && !selectionMode, menuOnly = true)
             }
             MmsPartStatus(part)
-            if (actionable) Text(preview?.error ?: preview?.durationMillis?.let(::formatMediaTime)
-                ?: if (preview == null) "正在读取媒体预览" else "预览信息不可用，可尝试播放")
+            if (actionable) Text(
+                preview?.error
+                    ?: preview?.durationMillis?.let(::formatMediaTime)
+                    ?: stringResource(if (preview == null) R.string.msg_mms_media_loading_preview else R.string.msg_mms_media_preview_unavailable)
+            )
         }
     }
 }

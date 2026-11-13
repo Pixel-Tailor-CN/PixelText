@@ -12,10 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
 import vip.mystery0.pixel.text.domain.hub.SampleReportSummary
 import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
@@ -39,15 +41,15 @@ fun SampleReportDetailScreen(
     }
     Scaffold(
         topBar = {
-            SampleReportTopBar("上报详情", onNavigateBack) {
+            SampleReportTopBar(stringResource(R.string.conv_sample_detail_title), onNavigateBack) {
                 IconButton(onClick = { showInfo = true }, enabled = state.report != null) {
-                    Icon(Icons.Rounded.Info, contentDescription = "记录信息")
+                    Icon(Icons.Rounded.Info, contentDescription = stringResource(R.string.conv_sample_record_info))
                 }
                 IconButton(
                     onClick = { viewModel.refresh(reportId) },
                     enabled = !state.loading && retrySeconds == 0L,
                 ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "刷新")
+                    Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.conv_cd_refresh))
                 }
             }
         },
@@ -72,7 +74,7 @@ fun SampleReportDetailScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             SampleReportStatusLabel(summary.status, prominent = true)
                             if (summary.status == SampleReportStatus.REMOVED) {
-                                Text("样本内容已移除", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.conv_sample_content_removed), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             } else if (summary.reasonText.isNotBlank() && summary.reasonText != summary.status.label) {
                                 Text(summary.reasonText, style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -86,15 +88,15 @@ fun SampleReportDetailScreen(
                     if (summary.status != SampleReportStatus.REMOVED) {
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Text("上报内容", style = MaterialTheme.typography.titleSmall,
+                                Text(stringResource(R.string.conv_sample_reported_content), style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 SelectionContainer {
-                                    Text(report.submittedContent.ifBlank { "暂无正文" },
+                                    Text(report.submittedContent.ifBlank { stringResource(R.string.conv_sample_no_body) },
                                         style = MaterialTheme.typography.bodyLarge)
                                 }
                                 if (report.submittedSender.isNotBlank()) {
                                     SelectionContainer {
-                                        ReportDetailMetadata("发送方", report.submittedSender)
+                                        ReportDetailMetadata(stringResource(R.string.conv_sample_sender), report.submittedSender)
                                     }
                                 }
                             }
@@ -103,11 +105,11 @@ fun SampleReportDetailScreen(
                     }
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                            ReportDetailMetadata("提交分类", sampleReportCategory(summary.submittedCategory))
+                            ReportDetailMetadata(stringResource(R.string.conv_sample_submitted_category), sampleReportCategory(summary.submittedCategory))
                             if (summary.reviewedCategory.isNotBlank()) {
-                                ReportDetailMetadata("审核分类", sampleReportCategory(summary.reviewedCategory))
+                                ReportDetailMetadata(stringResource(R.string.conv_sample_reviewed_category), sampleReportCategory(summary.reviewedCategory))
                             }
-                            ReportDetailMetadata("上报时间", sampleReportDate(summary.submittedAt))
+                            ReportDetailMetadata(stringResource(R.string.conv_sample_submitted_at), sampleReportDate(summary.submittedAt))
                         }
                     }
                 }
@@ -123,27 +125,37 @@ fun SampleReportDetailScreen(
         state.report?.summary?.let { summary ->
             AlertDialog(
                 onDismissRequest = { showInfo = false },
-                title = { Text("记录信息") },
+                title = { Text(stringResource(R.string.conv_sample_record_info)) },
                 text = {
                     Column(Modifier.verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        SelectionContainer { SampleReportField("记录编号", summary.id) }
-                        summary.reviewedAt?.let { SampleReportField("审核时间", sampleReportDate(it)) }
+                        SelectionContainer { SampleReportField(stringResource(R.string.conv_sample_record_id), summary.id) }
+                        summary.reviewedAt?.let { SampleReportField(stringResource(R.string.conv_sample_reviewed_at), sampleReportDate(it)) }
                         if (summary.reviewMethod.isNotBlank()) {
-                            SampleReportField("审核方式", when (summary.reviewMethod) {
-                                "ai" -> "自动审核"
-                                "manual" -> "人工审核"
-                                else -> "待确认"
-                            })
+                            SampleReportField(
+                                stringResource(R.string.conv_sample_review_method),
+                                stringResource(
+                                    when (summary.reviewMethod) {
+                                        "ai" -> R.string.conv_sample_review_ai
+                                        "manual" -> R.string.conv_sample_review_manual
+                                        else -> R.string.conv_sample_pending_confirm
+                                    }
+                                ),
+                            )
                         }
-                        SampleReportField("来源", when (summary.source) {
-                            "legacy" -> "历史上报"
-                            "app" -> "应用上报"
-                            else -> "待确认"
-                        })
+                        SampleReportField(
+                            stringResource(R.string.conv_sample_source),
+                            stringResource(
+                                when (summary.source) {
+                                    "legacy" -> R.string.conv_sample_source_legacy
+                                    "app" -> R.string.conv_sample_source_app
+                                    else -> R.string.conv_sample_pending_confirm
+                                }
+                            ),
+                        )
                     }
                 },
-                confirmButton = { TextButton(onClick = { showInfo = false }) { Text("关闭") } },
+                confirmButton = { TextButton(onClick = { showInfo = false }) { Text(stringResource(R.string.conv_action_close)) } },
             )
         }
     }

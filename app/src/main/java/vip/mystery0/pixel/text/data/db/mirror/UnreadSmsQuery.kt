@@ -34,6 +34,35 @@ internal object UnreadSmsQuery {
         """.trimIndent(), arguments(candidates))
     }
 
+    /** 非默认短信状态下只统计本地镜像中的收件箱未读短信，不访问系统 Provider。 */
+    fun countFromMirror(filter: UnreadSmsCountFilter): SimpleSQLiteQuery {
+        val excludeFullySpam = filter.excludeFullySpamConversations.asSqlFlag()
+        val includeArchived = filter.includeArchivedMessages.asSqlFlag()
+        val includeSpam = filter.includeSpamMessages.asSqlFlag()
+        val includeNormal = filter.includeNormalMessages.asSqlFlag()
+        return SimpleSQLiteQuery("""
+            SELECT COUNT(*) FROM mirror_message m
+            LEFT JOIN archived_conversation a ON a.thread_id=m.threadId
+            WHERE m.transport='SMS' AND m.boxType=1 AND m.read=0
+              AND (
+                  $excludeFullySpam=0
+                  OR a.thread_id IS NOT NULL
+                  OR m.threadId IS NULL
+                  OR EXISTS (
+                      SELECT 1 FROM mirror_message m2
+                      WHERE m2.threadId=m.threadId AND COALESCE(m2.isSpam, 0)!=1
+                  )
+              )
+              AND (
+                  ($includeArchived=1 AND a.thread_id IS NOT NULL)
+                  OR (a.thread_id IS NULL AND (
+                      ($includeSpam=1 AND m.isSpam=1)
+                      OR ($includeNormal=1 AND COALESCE(m.isSpam, 0)!=1)
+                  ))
+              )
+        """.trimIndent())
+    }
+
     /** 一条正常、未识别或尚未镜像的原消息，就足以否定“全骚扰”；归档会话不参与排除。 */
     fun nonFullySpamThreads(candidates: List<UnreadSmsCandidate>): SimpleSQLiteQuery {
         require(candidates.isNotEmpty() && candidates.size <= MAX_CANDIDATES)

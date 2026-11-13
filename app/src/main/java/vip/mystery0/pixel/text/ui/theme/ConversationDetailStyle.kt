@@ -4,6 +4,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.theme.ConversationDetailAppearance
 import vip.mystery0.pixel.text.domain.theme.MaterialColorRole
 import vip.mystery0.pixel.text.domain.theme.ThemeColorReference
@@ -13,6 +14,7 @@ import vip.mystery0.pixel.text.domain.theme.ThemeImageReference
 import vip.mystery0.pixel.text.domain.theme.ThemeMode
 import vip.mystery0.pixel.text.domain.theme.appearance
 import vip.mystery0.pixel.text.domain.theme.backgroundAppearance
+import vip.mystery0.pixel.text.util.AppStrings
 import kotlin.math.max
 
 private const val MIN_LINK_CONTRAST_RATIO = 3f
@@ -105,7 +107,9 @@ fun resolveConversationDetailStyle(
             inputArea = ResolvedInputAreaStyle(backgroundColor = highContrastSurface),
             background = ResolvedConversationBackgroundStyle(image = null),
             showSimInfo = module.showSimInfo,
-            inputPlaceholder = module.inputPlaceholder,
+            inputPlaceholder = module.inputPlaceholder.ifBlank {
+                AppStrings.get(R.string.domain_default_input_placeholder)
+            },
             textScale = module.textScale,
             customizationSuppressed = true,
         )
@@ -136,7 +140,9 @@ fun resolveConversationDetailStyle(
             image = module.backgroundAppearance(mode).backgroundImage,
         ),
         showSimInfo = module.showSimInfo,
-        inputPlaceholder = module.inputPlaceholder,
+        inputPlaceholder = module.inputPlaceholder.ifBlank {
+            AppStrings.get(R.string.domain_default_input_placeholder)
+        },
         textScale = module.textScale,
         customizationSuppressed = false,
     )

@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import vip.mystery0.pixel.text.R
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -84,9 +86,15 @@ fun AppNavigation(
     val settings by settingsRepository.settings.collectAsState()
     val reportSnackbarHost = remember { SnackbarHostState() }
     var submittedReportId by rememberSaveable { mutableStateOf<String?>(null) }
+    val reportSubmittedText = stringResource(R.string.settings_report_submitted)
+    val reportViewLabel = stringResource(R.string.settings_action_view)
     LaunchedEffect(submittedReportId) {
         val id = submittedReportId ?: return@LaunchedEffect
-        val result = reportSnackbarHost.showSnackbar("样本已上报", actionLabel = "查看", withDismissAction = true)
+        val result = reportSnackbarHost.showSnackbar(
+            reportSubmittedText,
+            actionLabel = reportViewLabel,
+            withDismissAction = true,
+        )
         submittedReportId = null
         if (result == SnackbarResult.ActionPerformed && isValidSampleReportId(id)) {
             navController.navigate("sample_report/$id")
@@ -98,13 +106,13 @@ fun AppNavigation(
     if (showRestoreNotice) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showRestoreNotice = false },
-            title = { androidx.compose.material3.Text("上次恢复尚未结束") },
-            text = { androidx.compose.material3.Text("已恢复的数据会保留，验证码自动清理仍受保护。请进入备份与恢复确认结果，或重新导入。") },
+            title = { androidx.compose.material3.Text(stringResource(R.string.settings_restore_unfinished_title)) },
+            text = { androidx.compose.material3.Text(stringResource(R.string.settings_restore_unfinished_body)) },
             confirmButton = { androidx.compose.material3.TextButton(onClick = {
                 showRestoreNotice = false
                 navController.navigate("backup_restore")
-            }) { androidx.compose.material3.Text("查看恢复状态") } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { showRestoreNotice = false }) { androidx.compose.material3.Text("稍后处理") } },
+            }) { androidx.compose.material3.Text(stringResource(R.string.settings_restore_unfinished_confirm)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { showRestoreNotice = false }) { androidx.compose.material3.Text(stringResource(R.string.settings_action_later)) } },
         )
     }
     var resourceUpdateCheckRequestId by remember { mutableStateOf<Long?>(null) }

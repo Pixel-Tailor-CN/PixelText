@@ -7,8 +7,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.SampleSubmissionRepository
 import vip.mystery0.pixel.text.domain.hub.*
+import vip.mystery0.pixel.text.util.AppStrings
 
 data class SampleReportDetailState(
     val report: SampleReportDetail? = null,
@@ -32,7 +34,7 @@ class SampleReportDetailViewModel(private val repository: SampleSubmissionReposi
         mutableState.value = SampleReportDetailState(loading = true)
         job = viewModelScope.launch {
             try {
-                if (!isValidSampleReportId(id)) throw SampleReportException("REPORT_NOT_FOUND", "无法查看这条上报记录")
+                if (!isValidSampleReportId(id)) throw SampleReportException("REPORT_NOT_FOUND", AppStrings.get(R.string.sys_sample_report_not_found))
                 val report = repository.detail(id)
                 if (generation == current) mutableState.value = SampleReportDetailState(report = report)
             } catch (error: CancellationException) { throw error

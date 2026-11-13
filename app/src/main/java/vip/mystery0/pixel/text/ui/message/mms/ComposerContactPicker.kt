@@ -7,10 +7,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.MmsContactExporter
 
 internal class ComposerContactPicker {
@@ -26,6 +28,7 @@ internal fun rememberComposerContactPicker(
     onError: (String) -> Unit,
 ): ComposerContactPicker {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val exporter: MmsContactExporter = koinInject()
     val scope = rememberCoroutineScope()
     val controller = remember { ComposerContactPicker() }
@@ -48,11 +51,11 @@ internal fun rememberComposerContactPicker(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: SecurityException) {
-                    latestError("无法读取联系人，请允许通讯录权限后重试")
+                    latestError(resources.getString(R.string.msg_contact_picker_no_permission))
                 } catch (error: IllegalStateException) {
-                    latestError(error.message ?: "无法导出联系人，请重新选择")
+                    latestError(error.message ?: resources.getString(R.string.msg_contact_picker_export_retry))
                 } catch (_: Exception) {
-                    latestError("无法导出联系人，请检查权限和存储空间后重试")
+                    latestError(resources.getString(R.string.msg_contact_picker_export_failed))
                 } finally {
                     if (!handedOff) { result?.file?.delete(); controller.busy = false }
                 }
@@ -60,10 +63,10 @@ internal fun rememberComposerContactPicker(
         }
     }
     val openPicker: () -> Unit = {
-        runCatching { picker.launch(null) }.onFailure { latestError("没有可用的联系人选择应用") }
+        runCatching { picker.launch(null) }.onFailure { latestError(resources.getString(R.string.msg_contact_picker_no_app)) }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) openPicker() else latestError("未获得通讯录权限，已有消息内容已保留")
+        if (granted) openPicker() else latestError(resources.getString(R.string.msg_contact_picker_perm_denied))
     }
     SideEffect {
         controller.open = {

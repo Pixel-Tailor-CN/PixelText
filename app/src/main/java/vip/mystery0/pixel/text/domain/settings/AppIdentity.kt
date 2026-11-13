@@ -1,24 +1,32 @@
 package vip.mystery0.pixel.text.domain.settings
 
-enum class AppDisplayName(val storageValue: String, val label: String) {
-    CHISU_FULL("chisu_full", "原点尺素"),
-    SMS_FULL("sms_full", "原点短信"),
-    JIANXUN_FULL("jianxun_full", "原点简讯"),
-    PIXEL_TEXT("pixel_text", "Pixel Text"),
-    CHISU("chisu", "尺素"),
-    SMS("sms", "短信"),
-    MESSAGE("message", "Message"),
-    PIXEL_MESSAGE("pixel_message", "Pixel Message"),
+import androidx.annotation.StringRes
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
+
+enum class AppDisplayName(val storageValue: String, @param:StringRes val labelRes: Int) {
+    CHISU_FULL("chisu_full", R.string.domain_app_display_name_chisu_full),
+    SMS_FULL("sms_full", R.string.domain_app_display_name_sms_full),
+    JIANXUN_FULL("jianxun_full", R.string.domain_app_display_name_jianxun_full),
+    PIXEL_TEXT("pixel_text", R.string.domain_app_display_name_pixel_text),
+    CHISU("chisu", R.string.domain_app_display_name_chisu),
+    SMS("sms", R.string.domain_app_display_name_sms),
+    MESSAGE("message", R.string.domain_app_display_name_message),
+    PIXEL_MESSAGE("pixel_message", R.string.domain_app_display_name_pixel_message);
+
+    val label: String get() = AppStrings.get(labelRes)
 }
 
-enum class AppIconStyle(val storageValue: String, val label: String) {
-    VIOLET("violet", "叠语"),
-    BLUE("blue", "原点"),
-    GREEN("green", "小零"),
-    AZURE("azure", "信息"),
+enum class AppIconStyle(val storageValue: String, @param:StringRes val labelRes: Int) {
+    VIOLET("violet", R.string.domain_app_icon_style_violet),
+    BLUE("blue", R.string.domain_app_icon_style_blue),
+    GREEN("green", R.string.domain_app_icon_style_green),
+    AZURE("azure", R.string.domain_app_icon_style_azure),
     // 保留旧标识以关闭升级前启用的启动器别名，不再提供该选项。
-    APRICOT("apricot", "叠语"),
-    CLASSIC("classic", "经典");
+    APRICOT("apricot", R.string.domain_app_icon_style_apricot),
+    CLASSIC("classic", R.string.domain_app_icon_style_classic);
+
+    val label: String get() = AppStrings.get(labelRes)
 
     companion object {
         val selectableEntries: List<AppIconStyle> = entries.filter { it != APRICOT }

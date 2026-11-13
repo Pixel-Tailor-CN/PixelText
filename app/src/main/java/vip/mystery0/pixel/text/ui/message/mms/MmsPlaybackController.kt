@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.source.mms.localMmsUri
 import vip.mystery0.pixel.text.data.source.mms.mediaCacheKey
 import vip.mystery0.pixel.text.domain.model.mirror.MirrorAttachmentState
@@ -109,7 +110,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
                 override fun onEvents(player: Player, events: Player.Events) = updateState()
                 override fun onPlayerError(error: PlaybackException) {
                     mutableState.value = mutableState.value.copy(isPlaying = false, isBuffering = false, playRequested = false,
-                        error = "无法播放此附件：文件损坏或设备不支持其编码，可保存原件后使用其他应用打开")
+                        error = context.getString(R.string.msg_mms_playback_decode_error))
                 }
             })
         }
@@ -143,7 +144,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
         if (uri == null || part.state != MirrorAttachmentState.READY ||
             part.kind !in setOf(MmsContentKind.AUDIO, MmsContentKind.VIDEO)) {
             stop()
-            mutableState.value = MmsPlaybackState(partKey = part.key, error = "附件尚不可播放")
+            mutableState.value = MmsPlaybackState(partKey = part.key, error = context.getString(R.string.msg_mms_playback_not_ready))
             return
         }
         if (contentKey != part.mediaCacheKey() || player.playerError != null) {
@@ -191,7 +192,7 @@ class MmsPlaybackController(context: Context, private val mirror: MessageMirrorR
     /** 来源更新后保留受影响身份，后续模型刷新不能把原因清掉。 */
     private fun stopForSourceChange(key: MmsPartKey) {
         stop()
-        mutableState.value = MmsPlaybackState(partKey = key, error = "附件已删除或更新，请重新打开")
+        mutableState.value = MmsPlaybackState(partKey = key, error = context.getString(R.string.msg_mms_playback_source_changed))
     }
 
     fun onViewerSourceChanged(part: MmsPartContent) {

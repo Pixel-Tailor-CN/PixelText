@@ -1,5 +1,8 @@
 package vip.mystery0.pixel.text.domain.model
 
+import vip.mystery0.pixel.text.R
+import vip.mystery0.pixel.text.util.AppStrings
+
 sealed class ParsedResult {
     data class VerificationCode(val code: String, val signature: String? = null) : ParsedResult()
 
@@ -85,7 +88,7 @@ data class MessageModel(
     val content: String,
     val timestamp: Long,
     val subId: Int = -1,
-    val simName: String = "卡1",
+    val simName: String = AppStrings.get(R.string.domain_sim_slot, 1),
     val isRead: Boolean = true,
     val isReceived: Boolean = true,
     val parsedResult: ParsedResult = ParsedResult.None,

@@ -12,12 +12,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository
 import vip.mystery0.pixel.text.mms.outgoing.*
 import vip.mystery0.pixel.text.ui.component.AppEmptyState
@@ -38,13 +42,30 @@ fun MmsComposerDialog(
     LaunchedEffect(state.discarded) { if (state.discarded) onClose() }
     Dialog(onDismissRequest = { viewModel.close(onClose) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Scaffold(modifier = Modifier.fillMaxSize().imePadding(), topBar = {
-            TopAppBar(title = { Text(if (resendRequestId != null) "重新编辑" else "新消息") }, navigationIcon = {
-                IconButton(onClick = { viewModel.close(onClose) }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "保存草稿并返回") }
-            }, actions = { IconButton(enabled = !state.busy, onClick = { confirmDiscard = true }) { Icon(Icons.Rounded.Delete, "删除草稿") } })
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(
+                            if (resendRequestId != null) R.string.msg_mms_composer_reedit
+                            else R.string.msg_mms_composer_new_message,
+                        )
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { viewModel.close(onClose) }) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.msg_mms_composer_back_cd))
+                    }
+                },
+                actions = {
+                    IconButton(enabled = !state.busy, onClick = { confirmDiscard = true }) {
+                        Icon(Icons.Rounded.Delete, stringResource(R.string.msg_mms_composer_delete_draft_cd))
+                    }
+                },
+            )
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 AppEmptyState(
-                    text = "开始一段对话",
+                    text = stringResource(R.string.msg_mms_composer_empty_state),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
                 MessageComposer(
@@ -57,55 +78,106 @@ fun MmsComposerDialog(
             }
         }
     }
-    if (confirmDiscard) AlertDialog(onDismissRequest = { confirmDiscard = false }, title = { Text("删除此草稿？") }, text = { Text("删除本地编辑内容和不再使用的附件") },
-        confirmButton = { TextButton(onClick = { confirmDiscard = false; viewModel.discard() }) { Text("删除") } }, dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("保留") } })
+    if (confirmDiscard) AlertDialog(
+        onDismissRequest = { confirmDiscard = false },
+        title = { Text(stringResource(R.string.msg_mms_composer_discard_title)) },
+        text = { Text(stringResource(R.string.msg_mms_composer_discard_body)) },
+        confirmButton = { TextButton(onClick = { confirmDiscard = false; viewModel.discard() }) { Text(stringResource(R.string.msg_action_delete)) } },
+        dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.msg_action_keep)) } },
+    )
 }
 
 @Composable
 fun OutgoingMmsStatus(message: OutgoingMmsMessage, coordinator: MmsSendCoordinator = koinInject()) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
     var resendSession by remember { mutableStateOf<String?>(null) }
     var confirmCleanup by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
-    val label = when (message.state) {
-        MmsSendState.PREPARING, MmsSendState.READY -> "准备发送"
-        MmsSendState.DISPATCHING, MmsSendState.AWAITING_RESULT -> "发送中"
-        MmsSendState.SENT -> if (message.providerSyncPending) "已发送，记录同步中" else "已发送"
-        MmsSendState.FAILED -> "发送失败"
-        MmsSendState.UNKNOWN -> "发送结果待确认"
-        MmsSendState.CANCELLED -> "已取消发送"
-    }
+    val label = stringResource(
+        when (message.state) {
+            MmsSendState.PREPARING, MmsSendState.READY -> R.string.msg_mms_send_state_preparing
+            MmsSendState.DISPATCHING, MmsSendState.AWAITING_RESULT -> R.string.msg_mms_send_state_sending
+            MmsSendState.SENT -> if (message.providerSyncPending) R.string.msg_mms_send_state_sent_syncing else R.string.msg_mms_send_state_sent
+            MmsSendState.FAILED -> R.string.msg_mms_send_state_failed
+            MmsSendState.UNKNOWN -> R.string.msg_mms_send_state_unknown
+            MmsSendState.CANCELLED -> R.string.msg_mms_send_state_cancelled
+        }
+    )
     Column(Modifier.fillMaxWidth().padding(top = 4.dp, end = 4.dp), horizontalAlignment = Alignment.End) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("彩信 · $label", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.msg_mms_status_label, label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (message.state != MmsSendState.SENT) Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) { Icon(Icons.Rounded.MoreHoriz, "发送操作", Modifier.size(18.dp)) }
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Rounded.MoreHoriz, stringResource(R.string.msg_mms_send_actions_cd), Modifier.size(18.dp))
+                }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (message.state in setOf(MmsSendState.PREPARING, MmsSendState.READY)) DropdownMenuItem(text = { Text("取消发送") }, onClick = {
-                        menu = false; scope.launch { if (!coordinator.cancel(message.requestId)) error = "已交给系统，无法撤回" }
-                    })
-                    if (!message.deleted && message.state == MmsSendState.FAILED) DropdownMenuItem(text = { Text("手动重试") }, onClick = {
-                        menu = false; scope.launch {
-                            try { coordinator.retryFailed(message.requestId) } catch (e: Exception) { error = (e as? MmsSendException)?.userMessage ?: "重试未接纳，请检查记录" }
-                        }
-                    })
+                    if (message.state in setOf(MmsSendState.PREPARING, MmsSendState.READY)) DropdownMenuItem(
+                        text = { Text(stringResource(R.string.msg_mms_action_cancel_send)) },
+                        onClick = {
+                            menu = false
+                            scope.launch {
+                                if (!coordinator.cancel(message.requestId)) {
+                                    error = resources.getString(R.string.msg_mms_error_cannot_recall)
+                                }
+                            }
+                        },
+                    )
+                    if (!message.deleted && message.state == MmsSendState.FAILED) DropdownMenuItem(
+                        text = { Text(stringResource(R.string.msg_mms_action_manual_retry)) },
+                        onClick = {
+                            menu = false
+                            scope.launch {
+                                try {
+                                    coordinator.retryFailed(message.requestId)
+                                } catch (e: Exception) {
+                                    error = (e as? MmsSendException)?.userMessage
+                                        ?: resources.getString(R.string.msg_mms_error_retry_rejected)
+                                }
+                            }
+                        },
+                    )
                     if (!message.deleted && message.state in setOf(MmsSendState.UNKNOWN, MmsSendState.FAILED, MmsSendState.CANCELLED)) DropdownMenuItem(
-                        text = { Text(if (message.state == MmsSendState.UNKNOWN) "查看重发风险" else "恢复编辑") },
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (message.state == MmsSendState.UNKNOWN) R.string.msg_mms_action_review_resend
+                                    else R.string.msg_mms_action_resume_editing,
+                                )
+                            )
+                        },
                         onClick = { menu = false; resendSession = UUID.randomUUID().toString() },
                     )
-                    if (message.state == MmsSendState.UNKNOWN && message.pduPath != null) DropdownMenuItem(text = { Text("清理遗留发送文件") }, onClick = { menu = false; confirmCleanup = true })
-                    if (message.state in setOf(MmsSendState.DISPATCHING, MmsSendState.AWAITING_RESULT)) DropdownMenuItem(text = { Text("已交给系统，无法撤回") }, enabled = false, onClick = {})
+                    if (message.state == MmsSendState.UNKNOWN && message.pduPath != null) DropdownMenuItem(
+                        text = { Text(stringResource(R.string.msg_mms_action_clean_payload)) },
+                        onClick = { menu = false; confirmCleanup = true },
+                    )
+                    if (message.state in setOf(MmsSendState.DISPATCHING, MmsSendState.AWAITING_RESULT)) DropdownMenuItem(
+                        text = { Text(stringResource(R.string.msg_mms_error_cannot_recall)) },
+                        enabled = false,
+                        onClick = {},
+                    )
                 }
             }
         }
         message.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
-    if (confirmCleanup) AlertDialog(onDismissRequest = { confirmCleanup = false }, title = { Text("清理遗留发送文件？") },
-        text = { Text("清理不能撤回已经提交的彩信，可能中断系统仍在读取的文件。发送结果仍保留为待确认，不会自动重发。") },
-        confirmButton = { TextButton(onClick = { confirmCleanup = false; scope.launch { coordinator.releaseUnknownPayload(message.requestId) } }) { Text("清理") } },
-        dismissButton = { TextButton(onClick = { confirmCleanup = false }) { Text("保留") } })
+    if (confirmCleanup) AlertDialog(
+        onDismissRequest = { confirmCleanup = false },
+        title = { Text(stringResource(R.string.msg_mms_clean_payload_title)) },
+        text = { Text(stringResource(R.string.msg_mms_clean_payload_body)) },
+        confirmButton = {
+            TextButton(onClick = { confirmCleanup = false; scope.launch { coordinator.releaseUnknownPayload(message.requestId) } }) {
+                Text(stringResource(R.string.msg_action_clean_up))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { confirmCleanup = false }) { Text(stringResource(R.string.msg_action_keep)) }
+        },
+    )
     resendSession?.let { MmsComposerDialog(it, onClose = { resendSession = null }, resendRequestId = message.requestId) }
 }
 
@@ -120,18 +192,26 @@ fun MmsDraftsAndPendingButton(repository: OutgoingMmsRepository = koinInject()) 
     var selectedDraftId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     var session by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     if (visibleDrafts.isEmpty() && pending.isEmpty()) return
-    TextButton(onClick = { show = true }) { Text("草稿 ${visibleDrafts.size} · 待处理 ${pending.size}") }
-    if (show) AlertDialog(onDismissRequest = { show = false }, title = { Text("草稿与发送记录") },
+    TextButton(onClick = { show = true }) { Text(stringResource(R.string.msg_mms_drafts_pending_btn, visibleDrafts.size, pending.size)) }
+    if (show) AlertDialog(
+        onDismissRequest = { show = false },
+        title = { Text(stringResource(R.string.msg_mms_drafts_pending_title)) },
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             visibleDrafts.forEach { draft ->
                 OutlinedButton(onClick = { selectedDraftId = draft.id; session = UUID.randomUUID().toString(); show = false }, modifier = Modifier.fillMaxWidth()) {
-                    Text("草稿 · ${draft.recipientAddress.ifBlank { "未选择收件人" }} · ${draft.attachments.size} 个附件")
+                    val recipientText = draft.recipientAddress.ifBlank { stringResource(R.string.msg_mms_no_recipient) }
+                    Text(stringResource(R.string.msg_mms_draft_item, recipientText, draft.attachments.size))
                 }
             }
             pending.forEach { message ->
-                Text(if (message.deleted) "已删除消息的遗留发送文件" else message.snapshot.recipientAddress, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    if (message.deleted) stringResource(R.string.msg_mms_deleted_leftover) else message.snapshot.recipientAddress,
+                    style = MaterialTheme.typography.labelMedium,
+                )
                 OutgoingMmsStatus(message)
             }
-        } }, confirmButton = { TextButton(onClick = { show = false }) { Text("关闭") } })
+        } },
+        confirmButton = { TextButton(onClick = { show = false }) { Text(stringResource(R.string.msg_action_close)) } },
+    )
     selectedDraftId?.let { id -> MmsComposerDialog(session, onClose = { selectedDraftId = null }, existingDraftId = id) }
 }

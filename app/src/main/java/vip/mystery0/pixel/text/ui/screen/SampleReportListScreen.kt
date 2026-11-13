@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.androidx.compose.koinViewModel
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.hub.SampleReportStatus
 import vip.mystery0.pixel.text.ui.component.ExpressivePullToRefreshBox
 import vip.mystery0.pixel.text.ui.component.AppEmptyState
@@ -58,9 +60,9 @@ fun SampleReportListScreen(
             }
     }
     Scaffold(topBar = {
-        SampleReportTopBar("我的上报", onNavigateBack) {
+        SampleReportTopBar(stringResource(R.string.conv_sample_my_reports), onNavigateBack) {
             IconButton(onClick = { showInfo = true }) {
-                Icon(Icons.Rounded.Info, contentDescription = "关于上报记录")
+                Icon(Icons.Rounded.Info, contentDescription = stringResource(R.string.conv_sample_about_reports))
             }
         }
     }, floatingActionButton = {
@@ -68,7 +70,7 @@ fun SampleReportListScreen(
             ExtendedFloatingActionButton(
                 onClick = onNewReport,
                 icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
-                text = { Text("贡献样本") },
+                text = { Text(stringResource(R.string.conv_menu_contribute_sample)) },
             )
         }
     }, containerColor = MaterialTheme.colorScheme.background) { padding ->
@@ -83,7 +85,7 @@ fun SampleReportListScreen(
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Rounded.Outbox, contentDescription = null)
-                            Text("提交结果待确认", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.conv_sample_pending_submission), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
                         }
                     }
@@ -94,9 +96,9 @@ fun SampleReportListScreen(
                 state.error?.let { message -> item(key = "error") { SampleReportError(message, state.retryAt, viewModel::refresh) } }
                 if (state.loaded && state.items.isEmpty() && state.error == null) item(key = "empty") {
                     AppEmptyState(
-                        text = "还没有上报记录",
+                        text = stringResource(R.string.conv_sample_empty_reports),
                         modifier = Modifier.fillParentMaxHeight(0.75f),
-                        imageRes = vip.mystery0.pixel.text.R.drawable.illustration_archived_conversation_empty,
+                        imageRes = R.drawable.illustration_archived_conversation_empty,
                     )
                 }
                 state.items.forEachIndexed { index, report ->
@@ -110,9 +112,9 @@ fun SampleReportListScreen(
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(when {
-                                    report.id in state.unavailableReportIds -> "无法查看这条上报记录"
-                                    report.status == SampleReportStatus.REMOVED -> "样本已移除，内容不再提供"
-                                    else -> report.contentPreview.ifBlank { "暂无摘要" }
+                                    report.id in state.unavailableReportIds -> stringResource(R.string.conv_sample_unavailable_report)
+                                    report.status == SampleReportStatus.REMOVED -> stringResource(R.string.conv_sample_removed_preview)
+                                    else -> report.contentPreview.ifBlank { stringResource(R.string.conv_sample_no_preview) }
                                 },
                                     maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
                                 Text("${sampleReportCategory(report.submittedCategory)} · ${sampleReportDate(report.submittedAt)}", style = MaterialTheme.typography.bodySmall,
@@ -132,12 +134,12 @@ fun SampleReportListScreen(
                     SampleReportError(message, state.retryAt, viewModel::loadMore)
                 } }
                 if (state.nextCursor != null && !state.loadingMore && state.appendError == null && !state.refreshing) item(key = "load_more") {
-                    TextButton(onClick = viewModel::loadMore, modifier = Modifier.fillMaxWidth()) { Text("加载更多") }
+                    TextButton(onClick = viewModel::loadMore, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.conv_action_load_more)) }
                 }
             }
         }
     }
-    if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("关于上报记录") },
-        text = { Text("记录与本次应用安装关联，卸载或清除应用数据后将无法访问。审核状态不影响本机的短信分类。") },
-        confirmButton = { TextButton(onClick = { showInfo = false }) { Text("知道了") } })
+    if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text(stringResource(R.string.conv_sample_about_reports)) },
+        text = { Text(stringResource(R.string.conv_sample_about_reports_desc)) },
+        confirmButton = { TextButton(onClick = { showInfo = false }) { Text(stringResource(R.string.conv_action_got_it)) } })
 }

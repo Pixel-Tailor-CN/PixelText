@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vip.mystery0.pixel.text.BuildConfig
+import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.data.db.ConversationCacheDatabase
 import vip.mystery0.pixel.text.data.db.SenderProfileEntity
 import vip.mystery0.pixel.text.data.db.SenderProfileGenerationEntity
@@ -17,6 +18,7 @@ import vip.mystery0.pixel.text.data.source.SenderProfileDownloadException
 import vip.mystery0.pixel.text.domain.model.SenderProfileManifest
 import vip.mystery0.pixel.text.domain.model.SenderProfileMatch
 import vip.mystery0.pixel.text.domain.model.SenderProfileUpdateInfo
+import vip.mystery0.pixel.text.util.AppStrings
 import java.io.FileInputStream
 
 class SenderProfileRepository(
@@ -32,19 +34,27 @@ class SenderProfileRepository(
 
     suspend fun checkUpdate(): SenderProfileUpdateAvailability = withContext(Dispatchers.IO) {
         val manifest = client.fetchSenderProfileManifest()
-            ?: return@withContext SenderProfileUpdateAvailability.NoUpdate("服务端暂未发布发件方资料")
+            ?: return@withContext SenderProfileUpdateAvailability.NoUpdate(
+                AppStrings.get(R.string.domain_sender_profile_not_published),
+            )
         validateManifest(manifest)
         val current = dao.getState()?.activeVersion
         if (current == manifest.version) {
-            SenderProfileUpdateAvailability.NoUpdate("发件方资料已经是最新版本")
+            SenderProfileUpdateAvailability.NoUpdate(
+                AppStrings.get(R.string.domain_sender_profile_already_latest),
+            )
         } else if (manifest.minAppVersionCode > BuildConfig.VERSION_CODE) {
-            SenderProfileUpdateAvailability.NoUpdate("该资料版本需要更新 PixelText 后才能安装")
+            SenderProfileUpdateAvailability.NoUpdate(
+                AppStrings.get(R.string.domain_sender_profile_requires_app_update),
+            )
         } else {
             SenderProfileUpdateAvailability.Available(
                 info = SenderProfileUpdateInfo(
                     version = manifest.version,
                     sizeBytes = manifest.sizeBytes,
-                    releaseNotes = manifest.releaseNotes.ifBlank { "暂无版本说明" },
+                    releaseNotes = manifest.releaseNotes.ifBlank {
+                        AppStrings.get(R.string.domain_hub_no_release_notes)
+                    },
                 ),
                 manifest = manifest,
             )
@@ -57,33 +67,33 @@ class SenderProfileRepository(
     ): SenderProfileInstallResult = withContext(Dispatchers.IO) {
         var targetVersion = expectedManifest.version
         runCatching {
-            onProgress("正在获取最新下载地址", 0.03f)
+            onProgress(AppStrings.get(R.string.domain_sender_profile_progress_fetching_url), 0.03f)
             var manifest = client.fetchSenderProfileManifest()
-                ?: error("服务端暂未发布发件方资料")
+                ?: error(AppStrings.get(R.string.domain_sender_profile_not_published))
             validateManifest(manifest)
             ensureSameArtifact(expectedManifest, manifest)
             targetVersion = manifest.version
             val tempFile = store.tempBundleFile(manifest.version)
             try {
-                onProgress("正在下载发件方资料", 0.08f)
+                onProgress(AppStrings.get(R.string.domain_sender_profile_progress_downloading), 0.08f)
                 try {
                     download(manifest, tempFile, onProgress)
                 } catch (error: SenderProfileDownloadException) {
                     if (error.statusCode != 401 && error.statusCode != 403) throw error
                     manifest = client.fetchSenderProfileManifest()
-                        ?: error("服务端暂未发布发件方资料")
+                        ?: error(AppStrings.get(R.string.domain_sender_profile_not_published))
                     validateManifest(manifest)
                     ensureSameArtifact(expectedManifest, manifest)
                     download(manifest, tempFile, onProgress)
                 }
-                onProgress("正在校验发件方资料", 0.58f)
+                onProgress(AppStrings.get(R.string.domain_sender_profile_progress_verifying), 0.58f)
                 store.verifyBundle(tempFile, manifest.sizeBytes, manifest.sha256)
                 val installed = FileInputStream(tempFile).use { input ->
                     store.installBundle(input, manifest.version)
                 }
-                onProgress("正在导入发件方资料", 0.72f)
+                onProgress(AppStrings.get(R.string.domain_sender_profile_progress_importing), 0.72f)
                 importBundle(installed.bundle)
-                onProgress("正在清理旧版发件方资料", 0.9f)
+                onProgress(AppStrings.get(R.string.domain_sender_profile_progress_cleaning), 0.9f)
                 runCatching { cleanupOldGenerations() }
                     .onFailure { error ->
                         Log.w(
@@ -92,7 +102,7 @@ class SenderProfileRepository(
                             error,
                         )
                     }
-                onProgress("发件方资料安装完成", 1f)
+                onProgress(AppStrings.get(R.string.domain_sender_profile_progress_complete), 1f)
                 Log.i(
                     TAG,
                     "sender profile bundle activated version=${installed.bundle.version} profiles=${installed.bundle.profiles.size}",
@@ -107,7 +117,9 @@ class SenderProfileRepository(
             if (activeVersion != targetVersion) {
                 runCatching { store.deleteVersion(targetVersion) }
             }
-            SenderProfileInstallResult.Failure(error.message ?: "发件方资料安装失败")
+            SenderProfileInstallResult.Failure(
+                error.message ?: AppStrings.get(R.string.domain_sender_profile_install_failed),
+            )
         }
     }
 
@@ -135,7 +147,10 @@ class SenderProfileRepository(
         ) { bytes ->
             val fraction = if (manifest.sizeBytes <= 0L) 0f
             else bytes.toFloat() / manifest.sizeBytes.toFloat()
-            onProgress("正在下载发件方资料", 0.08f + fraction.coerceIn(0f, 1f) * 0.46f)
+            onProgress(
+                AppStrings.get(R.string.domain_sender_profile_progress_downloading),
+                0.08f + fraction.coerceIn(0f, 1f) * 0.46f,
+            )
         }
     }
 
@@ -179,14 +194,14 @@ class SenderProfileRepository(
 
     private fun validateManifest(manifest: SenderProfileManifest) {
         if (manifest.schemaVersion != SUPPORTED_SCHEMA_VERSION) {
-            error("不支持的发件方资料格式：${manifest.schemaVersion}")
+            error(AppStrings.get(R.string.domain_sender_profile_unsupported_schema, manifest.schemaVersion))
         }
-        if (manifest.version.isBlank()) error("发件方资料版本为空")
+        if (manifest.version.isBlank()) error(AppStrings.get(R.string.domain_sender_profile_empty_version))
         if (manifest.sizeBytes !in 1..MAX_BUNDLE_BYTES) {
-            error("发件方资料大小不合法")
+            error(AppStrings.get(R.string.domain_sender_profile_invalid_size))
         }
-        if (!SHA256.matches(manifest.sha256)) error("发件方资料哈希不合法")
-        if (!manifest.downloadUrl.startsWith("https://")) error("发件方资料下载地址不安全")
+        if (!SHA256.matches(manifest.sha256)) error(AppStrings.get(R.string.domain_sender_profile_invalid_hash))
+        if (!manifest.downloadUrl.startsWith("https://")) error(AppStrings.get(R.string.domain_sender_profile_insecure_url))
     }
 
     private fun ensureSameArtifact(
@@ -199,7 +214,7 @@ class SenderProfileRepository(
             expected.sizeBytes != actual.sizeBytes ||
             !expected.sha256.equals(actual.sha256, ignoreCase = true)
         ) {
-            error("发件方资料版本已变化，请重新检查更新")
+            error(AppStrings.get(R.string.domain_sender_profile_version_changed))
         }
     }
 

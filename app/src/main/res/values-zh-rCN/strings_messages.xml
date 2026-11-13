@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通用操作与标签 -->
+    <string name="msg_action_retry">重试</string>
+    <string name="msg_action_open">打开</string>
+    <string name="msg_action_cancel">取消</string>
+    <string name="msg_action_save">保存</string>
+    <string name="msg_action_share">分享</string>
+    <string name="msg_action_delete">删除</string>
+    <string name="msg_action_keep">保留</string>
+    <string name="msg_action_close">关闭</string>
+    <string name="msg_action_back">返回</string>
+    <string name="msg_action_reset">重置</string>
+    <string name="msg_action_done">完成</string>
+    <string name="msg_action_apply">应用</string>
+    <string name="msg_action_clean_up">清理</string>
+
+    <!-- DataInitializationProgressContent -->
+    <string name="msg_init_phase_mirror">导入短信和彩信</string>
+    <string name="msg_init_phase_mms_text">解析彩信文本</string>
+    <string name="msg_init_phase_spam">识别历史骚扰短信</string>
+    <string name="msg_init_phase_verification">建立验证码索引</string>
+    <string name="msg_init_phase_complete">完成准备</string>
+    <string name="msg_init_current_step">当前步骤 %1$d/4 · %2$s</string>
+    <string name="msg_init_processed_of_total">已处理 %1$s / %2$s 条</string>
+    <string name="msg_init_percent">%1$d%%</string>
+    <string name="msg_init_step_no_action">当前步骤无需处理</string>
+    <string name="msg_init_processed_count">已处理 %1$s 条</string>
+    <string name="msg_init_almost_done">即将完成准备，请稍候…</string>
+    <string name="msg_init_waiting_verification">等待继续，已完成进度会保留；验证码索引将重新扫描</string>
+    <string name="msg_init_waiting">等待继续，已完成进度会保留</string>
+    <string name="msg_init_estimating_remaining">正在估算剩余时间</string>
+    <string name="msg_init_next_step">即将进入下一步骤…</string>
+    <string name="msg_init_elapsed_and_remaining">已耗时 %1$s · %2$s</string>
+    <string name="msg_init_elapsed_estimating">已耗时 %1$s · 正在估算剩余时间</string>
+    <string name="msg_init_remaining_less_than_1s">预计剩余不到 1 秒</string>
+    <string name="msg_init_remaining_approx">预计剩余约 %1$s</string>
+    <string name="msg_init_duration_less_than_1s">不到 1 秒</string>
+    <string name="msg_init_duration_seconds">%1$d 秒</string>
+    <string name="msg_init_duration_minutes">%1$d 分钟</string>
+    <string name="msg_init_duration_minutes_seconds">%1$d 分 %2$d 秒</string>
+
+    <!-- MessageItem -->
+    <string name="msg_mms_loading">正在读取彩信</string>
+    <string name="msg_unsupported_message">【不支持的消息】</string>
+    <string name="msg_sim_content_description">SIM</string>
+    <string name="msg_toggle_hide_content">隐藏内容</string>
+    <string name="msg_toggle_collapse_original">收起原文</string>
+    <string name="msg_toggle_expand_original">展开原文</string>
+    <string name="msg_toggle_show_smart_card">显示智能卡片</string>
+    <string name="msg_toggle_show_original">显示原文</string>
+    <string name="msg_manual_spam_checking">识别中...</string>
+    <string name="msg_manual_spam_high">手动识别: 骚扰概率 %1$d%%</string>
+    <string name="msg_manual_spam_low">手动识别: 风险较低 %1$d%%</string>
+    <string name="msg_time_just_now">刚刚</string>
+    <string name="msg_time_minutes_ago">%1$d分钟前</string>
+    <string name="msg_time_hours_ago">%1$d小时前</string>
+    <string name="msg_time_days_ago">%1$d天前</string>
+    <string name="msg_time_detailed_format">yyyy年M月d日 HH:mm:ss</string>
+
+    <!-- MirrorSyncBanner -->
+    <string name="msg_mirror_initial_import">正在首次同步消息，结果可能尚未完整</string>
+    <string name="msg_mirror_sync_failure">部分消息同步失败，结果可能不完整</string>
+    <string name="msg_mirror_attachment_failure">部分附件尚未复制，可稍后重试</string>
+
+    <!-- 智能卡片 -->
+    <string name="msg_card_express_title">%1$s · 取件通知</string>
+    <string name="msg_card_express_location_cd">取件地点</string>
+    <string name="msg_card_express_time_cd">取件时间</string>
+
+    <string name="msg_mms_download_persisting">正在保存彩信</string>
+    <string name="msg_mms_download_downloading">正在下载彩信</string>
+    <string name="msg_mms_download_save_failed">彩信已下载，保存失败，可重试保存</string>
+    <string name="msg_mms_download_parse_failed">彩信已下载，暂时无法解析，原件已保留</string>
+    <string name="msg_mms_download_failed">彩信下载失败</string>
+    <string name="msg_mms_download_expired">彩信已过期，服务器副本无法下载</string>
+    <string name="msg_mms_download_invalid_subscription">无法确定接收彩信的 SIM 卡</string>
+    <string name="msg_mms_download_sim_unavailable">接收彩信的 SIM 卡不可用</string>
+    <string name="msg_mms_download_uncertain">下载结果未确认，已有文件已保留，可重新下载</string>
+    <string name="msg_mms_download_retry_wait">下载失败，等待自动重试</string>
+    <string name="msg_mms_download_state_invalid">下载状态异常，请重新下载</string>
+    <string name="msg_mms_download_not_downloaded">彩信尚未下载</string>
+    <string name="msg_mms_download_error_fallback">暂时无法完成，请稍后重试</string>
+    <string name="msg_mms_download_action_retry_parse">重试解析</string>
+    <string name="msg_mms_download_action_retry_save">重试保存</string>
+    <string name="msg_mms_download_action_download">下载</string>
+
+    <string name="msg_open_link_title">打开链接</string>
+    <string name="msg_open_link_message">确定要在浏览器中打开以下链接吗？\n\n%1$s</string>
+
+    <string name="msg_spam_hidden">骚扰内容已隐藏</string>
+    <string name="msg_spam_label">骚扰短信</string>
+
+    <string name="msg_card_verification_title">验证码</string>
+    <string name="msg_card_verification_copy_cd">复制验证码</string>
+
+    <string name="msg_card_data_usage_cutoff">截止时间</string>
+    <string name="msg_card_data_usage_title_normal">流量提醒</string>
+    <string name="msg_card_data_usage_title_low">流量不足预警</string>
+    <string name="msg_card_data_usage_title_exhausted">流量用尽提醒</string>
+    <string name="msg_card_data_usage_exhausted_value">已用尽</string>
+
+    <string name="msg_card_missed_call_time">来电时间</string>
+    <string name="msg_card_missed_call_location">来电归属地</string>
+    <string name="msg_card_missed_call_title">来电提醒</string>
+    <string name="msg_card_missed_call_number">来电号码</string>
+    <string name="msg_card_missed_call_callback">一键回拨</string>
+
+    <string name="msg_card_bank_title">银行交易</string>
+    <string name="msg_card_bank_failed_badge">交易失败</string>
+    <string name="msg_bank_failure_reason">失败原因</string>
+
+    <string name="msg_card_recharge_title">充值成功</string>
+    <string name="msg_card_recharge_currency_unit">元</string>
+
+    <string name="msg_card_flight_title">航班行程</string>
+    <string name="msg_card_flight_terminal">航站楼</string>
+    <string name="msg_card_flight_boarding_time">登机时间</string>
+
+    <string name="msg_card_train_title">火车票</string>
+
+    <!-- 彩信采集与编辑器 -->
+    <string name="msg_capture_record_error">无法录音，请检查麦克风权限或是否被其他应用占用</string>
+    <string name="msg_capture_record_too_short">录音太短，请重新录制</string>
+    <string name="msg_capture_voice_filename">语音消息.m4a</string>
+    <string name="msg_capture_photo_filename">照片.jpg</string>
+    <string name="msg_capture_mic_denied">未获得麦克风权限，仍可选择已有音频或继续输入文字</string>
+    <string name="msg_capture_no_camera">没有可用的相机应用</string>
+    <string name="msg_capture_record_cancelled">录音已取消，已有消息内容已保留</string>
+
+    <string name="msg_contact_picker_no_permission">无法读取联系人，请允许通讯录权限后重试</string>
+    <string name="msg_contact_picker_export_retry">无法导出联系人，请重新选择</string>
+    <string name="msg_contact_picker_export_failed">无法导出联系人，请检查权限和存储空间后重试</string>
+    <string name="msg_contact_picker_no_app">没有可用的联系人选择应用</string>
+    <string name="msg_contact_picker_perm_denied">未获得通讯录权限，已有消息内容已保留</string>
+
+    <string name="msg_composer_placeholder_sms">短信</string>
+    <string name="msg_composer_draft_busy_contact">草稿正在处理，请稍后重新选择联系人</string>
+    <string name="msg_composer_recipient_label">收件人</string>
+    <string name="msg_composer_recipient_hint">输入一个手机号码</string>
+    <string name="msg_composer_mms_subject_label">彩信主题</string>
+    <string name="msg_composer_remove_subject_cd">移除主题</string>
+    <string name="msg_composer_cancel_recording_cd">取消录音</string>
+    <string name="msg_composer_recording_timer">%1$s · 最长 1 分钟</string>
+    <string name="msg_composer_stop_recording_cd">结束录音并添加附件</string>
+    <string name="msg_composer_add_attachment_cd">添加附件</string>
+    <string name="msg_composer_placeholder_mms">添加消息</string>
+    <string name="msg_composer_send_mms_cd">发送彩信</string>
+    <string name="msg_composer_send_sms_cd">发送短信</string>
+    <string name="msg_composer_type_mms">MMS · 彩信</string>
+    <string name="msg_composer_type_sms">SMS · 短信</string>
+    <string name="msg_composer_authorize_sim">授权使用 SIM</string>
+    <string name="msg_composer_no_sim">未检测到可用 SIM</string>
+    <string name="msg_composer_select_sim">选择 SIM</string>
+    <string name="msg_composer_processing">正在处理，请稍候…</string>
+    <string name="msg_composer_remove_failed_imports">移除导入失败项，保留现有内容</string>
+    <string name="msg_composer_add_to_message">添加到消息</string>
+    <string name="msg_composer_attach_media">照片与视频</string>
+    <string name="msg_composer_attach_camera">拍照</string>
+    <string name="msg_composer_attach_file">文件</string>
+    <string name="msg_composer_attach_audio">音频</string>
+    <string name="msg_composer_attach_record">录音</string>
+    <string name="msg_composer_attach_contact">联系人</string>
+    <string name="msg_composer_select_sim_title">选择发送 SIM</string>
+    <string name="msg_composer_select_sim_desc">短信会通过所选 SIM 发送，选择只影响当前会话。</string>
+    <string name="msg_sim_slot">卡槽 %1$d</string>
+    <string name="msg_composer_sim_in_use">当前使用</string>
+    <string name="msg_composer_duplicate_title">仍要再次发送？</string>
+    <string name="msg_composer_send_mms_title">发送彩信</string>
+    <string name="msg_composer_duplicate_desc">上一条消息的结果未知，对方可能已经收到。再次发送可能造成重复送达和重复收费。</string>
+    <string name="msg_composer_send_mms_desc">将向 %1$s 发送彩信，使用 %2$s。运营商可能收取费用，后续彩信不再重复提示。</string>
+    <string name="msg_composer_selected_sim_fallback">所选 SIM</string>
+    <string name="msg_composer_send_anyway">仍然发送</string>
+    <string name="msg_composer_confirm_send">确认发送</string>
+    <string name="msg_composer_image_attachment_cd">图片附件</string>
+    <string name="msg_composer_video_attachment_cd">视频附件</string>
+    <string name="msg_composer_video_size">视频 · %1$s</string>
+    <string name="msg_composer_stop_preview_cd">停止试听</string>
+    <string name="msg_composer_play_preview_cd">试听音频</string>
+    <string name="msg_composer_cannot_preview">无法试听</string>
+    <string name="msg_composer_remove_attachment_cd">移除附件 %1$s</string>
+
+    <!-- 彩信附件操作与查看器 -->
+    <string name="msg_mms_open_external">外部打开</string>
+    <string name="msg_mms_no_app_for_attachment">没有可处理此附件的应用</string>
+    <string name="msg_mms_no_permission_attachment">没有权限访问附件，请重试</string>
+    <string name="msg_mms_attachment_action_failed">附件处理失败，请重试</string>
+    <string name="msg_mms_save_request_expired">保存请求已失效，请重新选择附件</string>
+    <string name="msg_mms_attachment_saved">附件已保存</string>
+    <string name="msg_mms_no_save_app">没有可保存附件的系统应用</string>
+    <string name="msg_mms_no_permission_save_ui">没有权限打开系统保存界面，请重试</string>
+    <string name="msg_mms_cannot_open_save_ui">无法打开系统保存界面，请重试</string>
+    <string name="msg_mms_attachment_actions_cd">附件操作：%1$s</string>
+    <string name="msg_mms_share_chooser_title">分享附件</string>
+    <string name="msg_mms_export_err_missing">附件已删除或失效，请刷新后重试</string>
+    <string name="msg_mms_export_err_not_ready">附件仍在准备中，请稍后重试</string>
+    <string name="msg_mms_export_err_permission">没有权限访问附件或目标位置，请重试</string>
+    <string name="msg_mms_export_err_no_space">存储空间不足，请清理后重试</string>
+    <string name="msg_mms_export_err_write_failed">附件写入失败，请重试</string>
+
+    <string name="msg_mms_calendar_confirm_title">核对日历导入</string>
+    <string name="msg_mms_calendar_confirm_body">%1$s\n\n仅把卡片中的本次事件交给系统编辑，保存前请核对日期、时区与字段。</string>
+    <string name="msg_mms_calendar_confirm_add">继续添加本次</string>
+    <string name="msg_mms_calendar_header">日历事件 · %1$s</string>
+    <string name="msg_mms_calendar_untitled_event">未命名事件</string>
+    <string name="msg_mms_calendar_all_day">（全天）</string>
+    <string name="msg_mms_calendar_exclusive_end">（不含此日）</string>
+    <string name="msg_mms_calendar_start">开始：%1$s%2$s</string>
+    <string name="msg_mms_calendar_end">结束：%1$s%2$s</string>
+    <string name="msg_mms_calendar_location">地点：%1$s</string>
+    <string name="msg_mms_calendar_recurrence">重复规则：%1$s</string>
+    <string name="msg_mms_calendar_add_event">添加日历事件</string>
+    <string name="msg_mms_calendar_add_occurrence">添加本次事件</string>
+
+    <string name="msg_mms_composer_reedit">重新编辑</string>
+    <string name="msg_mms_composer_new_message">新消息</string>
+    <string name="msg_mms_composer_back_cd">保存草稿并返回</string>
+    <string name="msg_mms_composer_delete_draft_cd">删除草稿</string>
+    <string name="msg_mms_composer_empty_state">开始一段对话</string>
+    <string name="msg_mms_composer_discard_title">删除此草稿？</string>
+    <string name="msg_mms_composer_discard_body">删除本地编辑内容和不再使用的附件</string>
+    <string name="msg_mms_send_state_preparing">准备发送</string>
+    <string name="msg_mms_send_state_sending">发送中</string>
+    <string name="msg_mms_send_state_sent_syncing">已发送，记录同步中</string>
+    <string name="msg_mms_send_state_sent">已发送</string>
+    <string name="msg_mms_send_state_failed">发送失败</string>
+    <string name="msg_mms_send_state_unknown">发送结果待确认</string>
+    <string name="msg_mms_send_state_cancelled">已取消发送</string>
+    <string name="msg_mms_status_label">彩信 · %1$s</string>
+    <string name="msg_mms_send_actions_cd">发送操作</string>
+    <string name="msg_mms_action_cancel_send">取消发送</string>
+    <string name="msg_mms_error_cannot_recall">已交给系统，无法撤回</string>
+    <string name="msg_mms_action_manual_retry">手动重试</string>
+    <string name="msg_mms_error_retry_rejected">重试未接纳，请检查记录</string>
+    <string name="msg_mms_action_review_resend">查看重发风险</string>
+    <string name="msg_mms_action_resume_editing">恢复编辑</string>
+    <string name="msg_mms_action_clean_payload">清理遗留发送文件</string>
+    <string name="msg_mms_clean_payload_title">清理遗留发送文件？</string>
+    <string name="msg_mms_clean_payload_body">清理不能撤回已经提交的彩信，可能中断系统仍在读取的文件。发送结果仍保留为待确认，不会自动重发。</string>
+    <string name="msg_mms_drafts_pending_btn">草稿 %1$d · 待处理 %2$d</string>
+    <string name="msg_mms_drafts_pending_title">草稿与发送记录</string>
+    <string name="msg_mms_draft_item">草稿 · %1$s · %2$d 个附件</string>
+    <string name="msg_mms_no_recipient">未选择收件人</string>
+    <string name="msg_mms_deleted_leftover">已删除消息的遗留发送文件</string>
+
+    <string name="msg_mms_contact_name_label">姓名</string>
+    <string name="msg_mms_contact_unnamed">未命名联系人</string>
+    <string name="msg_mms_contact_photo_cd">联系人照片</string>
+    <string name="msg_mms_contact_phone_label">电话号码</string>
+    <string name="msg_mms_contact_dial_label">拨号</string>
+    <string name="msg_mms_contact_copy_number_label">复制号码</string>
+    <string name="msg_mms_contact_company_label">公司</string>
+    <string name="msg_mms_contact_other_phone_label">其他电话</string>
+    <string name="msg_mms_contact_email_with_label">邮箱 · %1$s</string>
+    <string name="msg_mms_contact_email_label">邮箱</string>
+    <string name="msg_mms_contact_collapse_details">收起详情</string>
+    <string name="msg_mms_contact_expand_details">地址、职位与备注</string>
+    <string name="msg_mms_contact_address_label">地址</string>
+    <string name="msg_mms_contact_title_label">职位</string>
+    <string name="msg_mms_contact_notes_label">备注</string>
+    <string name="msg_mms_contact_photo_warning">系统添加不携带照片；完整名片可通过右上角菜单打开原件导入</string>
+    <string name="msg_mms_contact_add_btn">添加联系人</string>
+    <string name="msg_mms_contact_copy_btn">复制名片</string>
+    <string name="msg_mms_contact_send_email_label">发送邮件</string>
+    <string name="msg_mms_contact_copy_email_label">复制邮箱</string>
+    <string name="msg_mms_contact_clip_label">联系人</string>
+    <string name="msg_mms_copied">已复制</string>
+
+    <string name="msg_mms_select_cd">选择彩信</string>
+    <string name="msg_mms_toggle_select_cd">切换选择</string>
+    <string name="msg_mms_partial_unavailable">部分彩信内容不可用</string>
+    <string name="msg_mms_no_readable_content">彩信暂无可读内容</string>
+    <string name="msg_mms_attachments_count">附件（%1$d）</string>
+
+    <string name="msg_mms_html_no_summary">暂无可读摘要</string>
+    <string name="msg_mms_html_view_full">查看完整内容</string>
+    <string name="msg_mms_unknown_size">大小未知</string>
+
+    <string name="msg_mms_html_viewer_title">离线网页</string>
+    <string name="msg_mms_html_mode_web">网页</string>
+    <string name="msg_mms_html_mode_plain">纯文本</string>
+    <string name="msg_mms_html_webview_unavailable">系统网页组件不可用，仍可阅读纯文本或导出原件</string>
+    <string name="msg_mms_html_over_limit">网页超过安全预览限制，可导出原件</string>
+    <string name="msg_mms_html_no_text">没有可显示的文本</string>
+    <string name="msg_mms_html_blocked_images">%1$d 个图片引用不可用或已阻止</string>
+    <string name="msg_mms_html_open_system_title">打开系统应用？</string>
+    <string name="msg_mms_html_open_browser_title">在浏览器中打开链接？</string>
+    <string name="msg_mms_html_open_system_body">将打开拨号或邮件编辑界面：\n%1$s</string>
+    <string name="msg_mms_html_open_browser_body">此操作将离开彩信并访问网络：\n%1$s</string>
+    <string name="msg_mms_html_no_handler">没有可用的处理应用</string>
+    <string name="msg_mms_html_open_app">打开应用</string>
+    <string name="msg_mms_html_open_browser">打开浏览器</string>
+
+    <string name="msg_mms_image_number">图片 %1$d</string>
+    <string name="msg_mms_list_separator">，</string>
+    <string name="msg_mms_image_view_cd">查看图片</string>
+    <string name="msg_mms_image_unreadable">图片尚不可读</string>
+    <string name="msg_mms_image_loading_cd">正在加载图片</string>
+    <string name="msg_mms_image_decode_error">图片无法解码，可保存原件</string>
+    <string name="msg_mms_image_number_desc">图片 %1$d，%2$s</string>
+
+    <string name="msg_mms_video_preview_cd">视频预览，%1$s</string>
+    <string name="msg_mms_play">播放</string>
+    <string name="msg_mms_video_title">视频 · %1$s</string>
+    <string name="msg_mms_audio_title">音频 · %1$s</string>
+    <string name="msg_mms_media_loading_preview">正在读取媒体预览</string>
+    <string name="msg_mms_media_preview_unavailable">预览信息不可用，可尝试播放</string>
+
+    <string name="msg_mms_video">视频</string>
+    <string name="msg_mms_audio">音频</string>
+    <string name="msg_mms_play_video_cd">播放视频</string>
+    <string name="msg_mms_playback_progress_cd">播放进度</string>
+    <string name="msg_mms_pause">暂停</string>
+    <string name="msg_mms_stop">停止</string>
+
+    <string name="msg_mms_part_preparing">正在准备附件</string>
+    <string name="msg_mms_part_pending_download">等待下载</string>
+    <string name="msg_mms_part_source_present">等待保存到本地</string>
+    <string name="msg_mms_part_copying">正在保存到本地</string>
+    <string name="msg_mms_part_copy_failed">附件保存失败，请稍后重试</string>
+    <string name="msg_mms_part_source_unreadable">附件已删除或无法读取</string>
+    <string name="msg_mms_part_unknown">附件尚不可用</string>
+    <string name="msg_mms_part_available_utf8">仍可导出 UTF-8 文本副本</string>
+    <string name="msg_mms_part_available_original">原件仍可导出</string>
+    <string name="msg_mms_part_ready_utf8">可导出 · UTF-8 文本副本</string>
+    <string name="msg_mms_part_ready_original">可打开、保存或分享</string>
+    <string name="msg_mms_part_issue_too_large">内容过大，%1$s</string>
+    <string name="msg_mms_part_issue_charset">文本编码无法预览，%1$s</string>
+    <string name="msg_mms_part_issue_unreadable">内容无法预览，%1$s</string>
+    <string name="msg_mms_part_issue_multipart_invalid">复合附件结构异常，%1$s</string>
+    <string name="msg_mms_part_issue_multipart_ambiguous">复合附件关系不明确，%1$s</string>
+    <string name="msg_mms_part_issue_multipart_unresolved">复合附件结构未解析，%1$s</string>
+    <string name="msg_mms_part_issue_multipart_no_alt">没有可预览的替代内容，%1$s</string>
+    <string name="msg_mms_part_issue_smil_too_large">演示控制内容过大，%1$s</string>
+    <string name="msg_mms_part_issue_smil_unsafe">演示控制内容不安全，%1$s</string>
+    <string name="msg_mms_part_issue_smil_invalid">演示结构异常，%1$s</string>
+    <string name="msg_mms_part_issue_smil_missing_ref">演示附件引用不完整，%1$s</string>
+    <string name="msg_mms_part_issue_smil_duration">演示时长无效，%1$s</string>
+
+    <string name="msg_mms_playback_decode_error">无法播放此附件：文件损坏或设备不支持其编码，可保存原件后使用其他应用打开</string>
+    <string name="msg_mms_playback_not_ready">附件尚不可播放</string>
+    <string name="msg_mms_playback_source_changed">附件已删除或更新，请重新打开</string>
+
+    <string name="msg_mms_presentation_prev_cd">上一页</string>
+    <string name="msg_mms_presentation_next_cd">下一页</string>
+    <string name="msg_mms_presentation_stop_autoplay">停止播放</string>
+    <string name="msg_mms_presentation_start_autoplay">自动播放</string>
+
+    <string name="msg_mms_intent_no_app">未找到可处理此操作的应用，可保存或打开原件</string>
+    <string name="msg_mms_intent_security">系统不允许打开此操作，可保存或打开原件</string>
+    <string name="msg_mms_intent_invalid_arg">此字段无法交给系统应用，请核对原件</string>
+    <string name="msg_mms_intent_overflow">日期或时长超出系统支持范围，请打开原件</string>
+
+    <!-- 搜索 -->
+    <string name="msg_search_filter_sender">发件人号码</string>
+    <string name="msg_search_filter_sender_cd">发件人号码筛选，当前：%1$s</string>
+    <string name="msg_search_filter_sim">SIM 卡</string>
+    <string name="msg_search_sim_fallback">卡 %1$d</string>
+    <string name="msg_search_filter_sim_count">SIM 卡 · %1$d</string>
+    <string name="msg_search_filter_sim_cd">SIM卡筛选，当前：%1$s</string>
+    <string name="msg_search_transport_sms">短信</string>
+    <string name="msg_search_transport_mms">彩信</string>
+    <string name="msg_search_filter_type">结果类型</string>
+    <string name="msg_search_filter_type_cd">结果类型筛选，当前：%1$s</string>
+    <string name="msg_search_filter_date">日期</string>
+    <string name="msg_search_filter_date_cd">日期筛选，当前：%1$s</string>
+    <string name="msg_search_filter_unread">未读</string>
+    <string name="msg_search_filter_unread_on_cd">已开启未读筛选</string>
+    <string name="msg_search_filter_unread_off_cd">未开启未读筛选</string>
+
+    <string name="msg_search_date_any">任意时间</string>
+    <string name="msg_search_date_week">一周前</string>
+    <string name="msg_search_date_month">一月前</string>
+    <string name="msg_search_date_half_year">半年前</string>
+    <string name="msg_search_date_year">一年前</string>
+
+    <string name="msg_search_sim_slot">%1$s (卡槽 %2$d)</string>
+    <string name="msg_search_select_sim">选择 SIM 卡</string>
+    <string name="msg_search_no_sim">暂无可用的 SIM 卡</string>
+    <string name="msg_search_clear_sim">清除 SIM 卡筛选</string>
+    <string name="msg_search_any_sim">不限 SIM 卡</string>
+    <string name="msg_search_all_messages">全部消息</string>
+    <string name="msg_search_filter_by_date">按日期筛选</string>
+
+    <string name="msg_search_phone_read_failed">未能读取所选号码，请手动输入</string>
+    <string name="msg_search_phone_hint">输入电话号码</string>
+    <string name="msg_search_clear_input_cd">清空输入</string>
+    <string name="msg_search_view_conversations">查看与 %1$s 相关的会话</string>
+    <string name="msg_search_pick_contact">从联系人选择</string>
+    <string name="msg_search_clear_phone">清除号码筛选</string>
+
+    <string name="msg_search_select_message_cd">选择消息</string>
+    <string name="msg_search_idle">搜索短信和彩信</string>
+    <string name="msg_search_empty_incomplete">当前未找到匹配消息，结果可能尚未完整</string>
+    <string name="msg_search_empty">没有找到符合条件的消息</string>
+    <string name="msg_search_incomplete_banner">部分消息仍在准备，结果可能不完整</string>
+
+    <string name="msg_search_hint">搜索短信</string>
+    <string name="msg_search_clear_query_cd">清空搜索内容</string>
+
+    <string name="msg_search_exit_selection_cd">退出多选</string>
+    <string name="msg_search_deleting">正在删除…</string>
+    <string name="msg_search_selected_count">已选 %1$d 条</string>
+    <string name="msg_search_deselect_all">取消全选</string>
+    <string name="msg_search_select_all_results">全选当前结果</string>
+    <string name="msg_search_delete_selected_cd">删除所选消息</string>
+    <string name="msg_search_delete_dialog_title">删除所选消息？</string>
+    <string name="msg_search_delete_dialog_body">将永久删除所选 %1$d 条短信或彩信，无法恢复。不会删除同一会话中未选中的消息。</string>
+    <string name="msg_search_delete_dialog_incomplete">\n\n搜索结果可能不完整，本次仅删除已选中的消息，不包含后续出现的结果。</string>
+
+    <string name="msg_search_deleted_count">已删除 %1$d 条消息</string>
+    <string name="msg_search_deleted_partial">已删除 %1$d 条消息，其余消息未删除或已不存在，请检查搜索结果</string>
+    <string name="msg_search_delete_incomplete_error">删除未完成，部分消息可能已删除，请检查搜索结果后重试</string>
+    <string name="msg_search_failed_error">搜索失败，请稍后重试</string>
+</resources>

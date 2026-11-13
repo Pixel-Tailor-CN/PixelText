@@ -38,8 +38,6 @@ import vip.mystery0.pixel.text.receiver.NotificationActionReceiver
 object SmsNotificationHelper {
 
     const val CHANNEL_ID_SMS = "channel_new_sms"
-    private const val CHANNEL_NAME = "新短信"
-    private const val CHANNEL_DESC = "收到新短信时的通知"
     private const val TAG = "SmsNotificationHelper"
 
 
@@ -49,10 +47,10 @@ object SmsNotificationHelper {
     fun createNotificationChannel(context: Context) {
         val channel = NotificationChannel(
             CHANNEL_ID_SMS,
-            CHANNEL_NAME,
+            context.getString(R.string.sys_channel_new_sms_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = CHANNEL_DESC
+            description = context.getString(R.string.sys_channel_new_sms_desc)
             enableVibration(true)
             enableLights(true)
         }
@@ -90,6 +88,7 @@ object SmsNotificationHelper {
                 return
             }
         }
+        createNotificationChannel(context)
 
         val notificationId = notificationIdOverride ?:
             if (threadId != 0L) threadId.toInt() else System.currentTimeMillis().toInt()
