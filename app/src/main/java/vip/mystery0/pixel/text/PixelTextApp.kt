@@ -25,6 +25,7 @@ import vip.mystery0.pixel.text.di.appModule
 import vip.mystery0.pixel.text.notification.ResourceUpdateNotificationHelper
 import vip.mystery0.pixel.text.notification.SmsNotificationHelper
 import vip.mystery0.pixel.text.notification.SpamScanNotificationHelper
+import vip.mystery0.pixel.text.util.AppLocaleManager
 import vip.mystery0.pixel.text.util.AppStrings
 import vip.mystery0.pixel.text.worker.ResourceUpdateScheduler
 import vip.mystery0.pixel.text.worker.VerificationCodeCleanupScheduler
@@ -36,10 +37,16 @@ class PixelTextApp : Application() {
         }
     }
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(AppLocaleManager.wrapBaseContext(base))
+    }
+
     override fun onCreate() {
         super.onCreate()
-        AppStrings.init(this)
-        createNotificationChannels()
+        val localized = AppLocaleManager.localizedContext(this)
+        AppStrings.init(localized)
+        AppLocaleManager.setOnLegacyLanguageChangedListener(::createNotificationChannels)
+        createNotificationChannels(localized)
         startKoin {
             androidLogger()
             androidContext(this@PixelTextApp)
@@ -74,13 +81,15 @@ class PixelTextApp : Application() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        createNotificationChannels()
+        val localized = AppLocaleManager.localizedContext(this)
+        AppStrings.init(localized)
+        createNotificationChannels(localized)
     }
 
-    private fun createNotificationChannels() {
-        SmsNotificationHelper.createNotificationChannel(this)
-        SpamScanNotificationHelper.createNotificationChannel(this)
-        ResourceUpdateNotificationHelper.createNotificationChannel(this)
+    private fun createNotificationChannels(context: Context = AppLocaleManager.localizedContext(this)) {
+        SmsNotificationHelper.createNotificationChannel(context)
+        SpamScanNotificationHelper.createNotificationChannel(context)
+        ResourceUpdateNotificationHelper.createNotificationChannel(context)
     }
 
     private fun startMirror() {

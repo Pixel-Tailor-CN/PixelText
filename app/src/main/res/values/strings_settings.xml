@@ -95,7 +95,7 @@
     <string name="settings_summary_spam_model_only">On-device model enabled</string>
     <string name="settings_summary_spam_keywords_only">Keyword blocking only (%1$d)</string>
     <string name="settings_summary_spam_none">Auto-detection disabled</string>
-    <string name="settings_summary_display">App icon, chat style, and notifications</string>
+    <string name="settings_summary_display">App icon, language, chat style, and notifications</string>
     <string name="settings_summary_resources_available">Resource update available</string>
     <string name="settings_summary_resources_default">Offline model, card rules, and sender profiles</string>
     <string name="settings_summary_backup_protected">Restore protection active, review result</string>
@@ -132,6 +132,10 @@
 
     <!-- SettingsScreen: Display -->
     <string name="settings_section_display_app">App &amp; home</string>
+    <string name="settings_app_language_title">App language</string>
+    <string name="settings_app_language_system">Follow system</string>
+    <string name="settings_app_language_english">English</string>
+    <string name="settings_app_language_chinese">简体中文</string>
     <string name="settings_transition_title">Page transitions</string>
     <string name="settings_transition_default">Default</string>
     <string name="settings_transition_default_desc">Slide, scale, and fade</string>

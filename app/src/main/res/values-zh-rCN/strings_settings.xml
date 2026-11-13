@@ -95,7 +95,7 @@
     <string name="settings_summary_spam_model_only">本地模型识别已开启</string>
     <string name="settings_summary_spam_keywords_only">仅关键词拦截生效（%1$d 个）</string>
     <string name="settings_summary_spam_none">未开启自动识别</string>
-    <string name="settings_summary_display">应用图标、会话样式与通知操作</string>
+    <string name="settings_summary_display">应用图标、语言、会话样式与通知</string>
     <string name="settings_summary_resources_available">发现可用资源更新</string>
     <string name="settings_summary_resources_default">离线模型、卡片规则与发件方资料</string>
     <string name="settings_summary_backup_protected">恢复保护已开启，请确认恢复结果</string>
@@ -132,6 +132,10 @@
 
     <!-- SettingsScreen: Display -->
     <string name="settings_section_display_app">应用与主界面</string>
+    <string name="settings_app_language_title">应用语言</string>
+    <string name="settings_app_language_system">跟随系统</string>
+    <string name="settings_app_language_english">English</string>
+    <string name="settings_app_language_chinese">简体中文</string>
     <string name="settings_transition_title">页面转场动画</string>
     <string name="settings_transition_default">默认</string>
     <string name="settings_transition_default_desc">滑动、缩放与淡入淡出</string>

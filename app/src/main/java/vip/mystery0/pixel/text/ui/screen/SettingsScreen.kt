@@ -60,10 +60,13 @@ import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Star
+import vip.mystery0.pixel.text.util.AppLanguage
+import vip.mystery0.pixel.text.util.AppLocaleManager
 import vip.mystery0.pixel.text.util.openAppReview
 import vip.mystery0.pixel.text.viewmodel.EngagementPromptViewModel
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
@@ -220,7 +223,11 @@ fun SettingsScreen(
     var confirmSpamDeletion by remember { mutableStateOf(false) }
     var showSpamAutoActionDialog by remember { mutableStateOf(false) }
     var showMessageTimeFormatDialog by remember { mutableStateOf(false) }
+    var showAppLanguageDialog by remember { mutableStateOf(false) }
     var showNavigationTransitionDialog by remember { mutableStateOf(false) }
+    val currentAppLanguage = remember(context, resources.configuration) {
+        AppLocaleManager.currentLanguage(context)
+    }
     var showResourceAutoCheckIntervalDialog by remember { mutableStateOf(false) }
     var resourceAutoCheckIntervalInput by remember { mutableStateOf("") }
     var resourceAutoCheckIntervalError by remember { mutableStateOf<String?>(null) }
@@ -413,6 +420,14 @@ fun SettingsScreen(
             add(SettingsSection("display_app", resources.getString(R.string.settings_section_display_app), listOf(
                 SettingsEntry("app_identity") {
                     AppIdentitySettingsPreference(onClick = onNavigateToAppIdentity)
+                },
+                SettingsEntry("app_language") {
+                    Preference(
+                        title = { Text(stringResource(R.string.settings_app_language_title)) },
+                        summary = { Text(currentAppLanguage.title()) },
+                        icon = { Icon(Icons.Rounded.Language, contentDescription = null) },
+                        onClick = { showAppLanguageDialog = true },
+                    )
                 },
                 SettingsEntry("navigation_transition_style") {
                     Preference(
@@ -1290,6 +1305,50 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showNavigationTransitionDialog = false }) {
+                    Text(stringResource(R.string.settings_action_cancel))
+                }
+            },
+        )
+    }
+
+    if (showAppLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showAppLanguageDialog = false },
+            title = { Text(stringResource(R.string.settings_app_language_title)) },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    AppLanguage.entries.forEach { language ->
+                        val selected = currentAppLanguage == language
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        showAppLanguageDialog = false
+                                        AppLocaleManager.setLanguage(context, language)
+                                    },
+                                )
+                                .padding(vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = null,
+                            )
+                            Text(
+                                text = language.title(),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppLanguageDialog = false }) {
                     Text(stringResource(R.string.settings_action_cancel))
                 }
             },
@@ -2187,3 +2246,12 @@ private fun friendlyResourceVersion(version: String): String =
             AppStrings.get(R.string.settings_version_builtin_with_suffix, version.removePrefix("builtin"))
         else -> version
     }
+
+@Composable
+private fun AppLanguage.title(): String = stringResource(
+    when (this) {
+        AppLanguage.SYSTEM -> R.string.settings_app_language_system
+        AppLanguage.ENGLISH -> R.string.settings_app_language_english
+        AppLanguage.SIMPLIFIED_CHINESE -> R.string.settings_app_language_chinese
+    }
+)

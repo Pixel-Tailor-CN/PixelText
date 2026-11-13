@@ -45,12 +45,13 @@ object SmsNotificationHelper {
      * 在 Application.onCreate() 中调用，注册通知渠道。
      */
     fun createNotificationChannel(context: Context) {
+        val localized = vip.mystery0.pixel.text.util.AppLocaleManager.localizedContext(context)
         val channel = NotificationChannel(
             CHANNEL_ID_SMS,
-            context.getString(R.string.sys_channel_new_sms_name),
+            localized.getString(R.string.sys_channel_new_sms_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = context.getString(R.string.sys_channel_new_sms_desc)
+            description = localized.getString(R.string.sys_channel_new_sms_desc)
             enableVibration(true)
             enableLights(true)
         }

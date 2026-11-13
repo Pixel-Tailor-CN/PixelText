@@ -1,5 +1,6 @@
 package vip.mystery0.pixel.text
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,10 +21,15 @@ import vip.mystery0.pixel.text.ui.AppNavigation
 import vip.mystery0.pixel.text.ui.ConversationDeepLink
 import vip.mystery0.pixel.text.ui.SettingsDeepLink
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
+import vip.mystery0.pixel.text.util.AppLocaleManager
 
 class MainActivity : ComponentActivity() {
     private val engagementRepository: EngagementPromptRepository by inject()
     private var engagementSessionJob: Job? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocaleManager.wrapBaseContext(newBase))
+    }
 
     companion object {
         const val EXTRA_THREAD_ID = "extra_thread_id"

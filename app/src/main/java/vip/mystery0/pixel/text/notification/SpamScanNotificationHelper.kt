@@ -21,12 +21,13 @@ object SpamScanNotificationHelper {
     private const val NOTIFICATION_ID_SCAN_PROGRESS = 20010
 
     fun createNotificationChannel(context: Context) {
+        val localized = vip.mystery0.pixel.text.util.AppLocaleManager.localizedContext(context)
         val channel = NotificationChannel(
             CHANNEL_ID_SPAM_SCAN,
-            context.getString(R.string.sys_channel_spam_scan_name),
+            localized.getString(R.string.sys_channel_spam_scan_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = context.getString(R.string.sys_channel_spam_scan_desc)
+            description = localized.getString(R.string.sys_channel_spam_scan_desc)
             setShowBadge(false)
         }
         val notificationManager =

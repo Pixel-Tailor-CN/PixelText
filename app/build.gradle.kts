@@ -103,6 +103,12 @@ android {
         localeFilters.add("zh-rCN")
         noCompress += "tflite"
     }
+    bundle {
+        language {
+            // 适配应用内语言切换与 Per-App Language，避免 Play 分包裁剪另一套语言资源。
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {

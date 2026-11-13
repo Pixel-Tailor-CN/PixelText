@@ -1,6 +1,8 @@
 package vip.mystery0.pixel.text.smartspacer
 
+import android.content.Context
 import android.os.Bundle
+import vip.mystery0.pixel.text.util.AppLocaleManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -49,6 +51,10 @@ import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class UnreadSmsComplicationConfigActivity : ComponentActivity() {
     private val settingsRepository: UnreadSmsComplicationSettingsRepository by inject()
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocaleManager.wrapBaseContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()

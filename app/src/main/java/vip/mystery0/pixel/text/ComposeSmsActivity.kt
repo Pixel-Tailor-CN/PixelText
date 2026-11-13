@@ -1,6 +1,8 @@
 package vip.mystery0.pixel.text
 
+import android.content.Context
 import android.os.Bundle
+import vip.mystery0.pixel.text.util.AppLocaleManager
 import android.provider.Telephony
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,6 +45,10 @@ import vip.mystery0.pixel.text.ui.screen.ConversationDetailScreen
 import vip.mystery0.pixel.text.ui.theme.PixelTextTheme
 
 class ComposeSmsActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocaleManager.wrapBaseContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

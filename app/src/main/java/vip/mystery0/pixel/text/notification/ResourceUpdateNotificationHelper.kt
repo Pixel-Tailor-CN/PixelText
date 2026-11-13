@@ -21,12 +21,13 @@ object ResourceUpdateNotificationHelper {
     private const val NOTIFICATION_ID_RESOURCE_UPDATE = 20020
 
     fun createNotificationChannel(context: Context) {
+        val localized = vip.mystery0.pixel.text.util.AppLocaleManager.localizedContext(context)
         val channel = NotificationChannel(
             CHANNEL_ID_RESOURCE_UPDATES,
-            context.getString(R.string.sys_channel_resource_updates_name),
+            localized.getString(R.string.sys_channel_resource_updates_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = context.getString(R.string.sys_channel_resource_updates_desc)
+            description = localized.getString(R.string.sys_channel_resource_updates_desc)
             setShowBadge(false)
         }
         val notificationManager =
