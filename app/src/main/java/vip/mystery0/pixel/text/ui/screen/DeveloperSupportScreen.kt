@@ -2,7 +2,6 @@ package vip.mystery0.pixel.text.ui.screen
 
 import android.content.Intent
 import android.graphics.Bitmap
-import androidx.core.net.toUri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,9 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import org.koin.androidx.compose.koinViewModel
 import vip.mystery0.pixel.text.R
 import vip.mystery0.pixel.text.domain.model.SupportChannelId
@@ -96,11 +96,16 @@ fun DeveloperSupportScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when {
-            state.loading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            state.loading -> Box(Modifier
+                .fillMaxSize()
+                .padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             state.error || !state.enabled -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -115,14 +120,21 @@ fun DeveloperSupportScreen(
                 }
                 TextButton(onClick = {
                     try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, "https://pixel.mystery0.app/#support".toUri()))
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                "https://pixel.mystery0.vip/#support".toUri()
+                            )
+                        )
                     } catch (_: Exception) {
                         viewModel.showMessage(resources.getString(R.string.settings_support_site_error))
                     }
                 }) { Text(stringResource(R.string.settings_support_visit_site)) }
             }
             else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -143,7 +155,9 @@ fun DeveloperSupportScreen(
                     val image = state.images[channel.id]
                     Card(Modifier.fillMaxWidth()) {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
@@ -152,7 +166,9 @@ fun DeveloperSupportScreen(
                                 image?.bitmap != null -> Image(
                                     bitmap = image.bitmap.asImageBitmap(),
                                     contentDescription = stringResource(R.string.settings_support_qr_cd, name),
-                                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
+                                    modifier = Modifier
+                                        .widthIn(max = 320.dp)
+                                        .fillMaxWidth()
                                         .height(420.dp)
                                         .background(Color.White)
                                         .clickable(onClickLabel = stringResource(R.string.settings_support_qr_enlarge)) {
@@ -209,13 +225,18 @@ fun DeveloperSupportScreen(
     enlargedImage?.let { bitmap ->
         Dialog(onDismissRequest = { enlargedImage = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Column(
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Image(
                     bitmap.asImageBitmap(),
                     stringResource(R.string.settings_support_qr_dialog_cd),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                     contentScale = ContentScale.Fit,
                 )
                 TextButton(onClick = { enlargedImage = null }) { Text(stringResource(R.string.settings_action_close)) }

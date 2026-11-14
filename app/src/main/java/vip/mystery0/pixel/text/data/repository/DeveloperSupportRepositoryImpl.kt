@@ -21,7 +21,6 @@ import vip.mystery0.pixel.text.domain.repository.DeveloperSupportRepository
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -37,7 +36,7 @@ class DeveloperSupportRepositoryImpl(context: Context) : DeveloperSupportReposit
         .build()
 
     override suspend fun loadConfig(): DeveloperSupportConfig = withContext(Dispatchers.IO) {
-        val bytes = download("https://pixel.mystery0.app/support/config.json", 64 * 1024)
+        val bytes = download("https://pixel.mystery0.vip/support/config.json", 64 * 1024)
         parser.parse(bytes.toString(Charsets.UTF_8))
     }
 
