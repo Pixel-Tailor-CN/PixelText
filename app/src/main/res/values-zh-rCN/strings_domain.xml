@@ -188,10 +188,10 @@
     <string name="domain_app_display_name_pixel_message">Pixel Message</string>
 
     <string name="domain_app_icon_style_violet">叠语</string>
-    <string name="domain_app_icon_style_blue">原点</string>
-    <string name="domain_app_icon_style_green">小零</string>
-    <string name="domain_app_icon_style_azure">信息</string>
-    <string name="domain_app_icon_style_apricot">叠语</string>
+    <string name="domain_app_icon_style_origin">原点</string>
+    <string name="domain_app_icon_style_zero">小零</string>
+    <string name="domain_app_icon_style_messages">信息</string>
+    <string name="domain_app_icon_style_message_new">信息（新）</string>
     <string name="domain_app_icon_style_classic">经典</string>
 
     <string name="domain_sms_notification_icon_double_bubble">双气泡</string>

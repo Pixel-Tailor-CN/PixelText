@@ -2,6 +2,6 @@
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetLeft="22%" android:insetTop="22%"
     android:insetRight="22%" android:insetBottom="22%">
-    <bitmap android:src="@drawable/ic_identity_green_art"
+    <bitmap android:src="@drawable/ic_identity_zero_art"
         android:gravity="fill" android:filter="true" />
 </inset>

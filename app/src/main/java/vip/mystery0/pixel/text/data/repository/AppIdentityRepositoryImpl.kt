@@ -23,16 +23,8 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
     private val preferences = context.getSharedPreferences("app_identity", Context.MODE_PRIVATE)
     private val lock = Any()
     private val combinations = AppDisplayName.entries.flatMap { name ->
-        AppIconStyle.selectableEntries.map { icon -> AppIdentity(name, icon) }
-    } + listOf(
-        // 只保留旧版本实际发布过的杏色入口，用于升级时关闭旧组件。
-        AppDisplayName.CHISU_FULL,
-        AppDisplayName.SMS_FULL,
-        AppDisplayName.JIANXUN_FULL,
-        AppDisplayName.PIXEL_TEXT,
-        AppDisplayName.CHISU,
-        AppDisplayName.SMS,
-    ).map { AppIdentity(it, AppIconStyle.APRICOT) }
+        AppIconStyle.entries.map { icon -> AppIdentity(name, icon) }
+    }
     private val mutableIdentity = MutableStateFlow(readActiveIdentity() ?: AppIdentity())
     override val identity: StateFlow<AppIdentity> = mutableIdentity.asStateFlow()
 
@@ -68,10 +60,17 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
         synchronized(lock) {
             val previous = mutableIdentity.value
             try {
-                // 偏好与组件状态可能来自不同设备；以已保存的稳定标识为准。
-                val saved = readSavedIdentity()
-                selectAlias(saved)
-                mutableIdentity.value = saved
+                // 偏好与组件状态可能来自不同设备或旧版枚举；先处理新旧枚举映射，再以已保存的稳定标识为准。
+                val resolved = resolveSavedIdentity()
+                selectAlias(resolved.identity)
+                if (resolved.legacyIconValue != null) {
+                    check(persist(resolved.identity)) { "app identity migration persistence failed" }
+                    Log.i(
+                        TAG,
+                        "app identity icon migrated from=${resolved.legacyIconValue} to=${resolved.identity.iconStyle.storageValue}",
+                    )
+                }
+                mutableIdentity.value = resolved.identity
             } catch (error: Exception) {
                 restoreAlias(previous, error)
                 Log.e(TAG, "app identity reconcile failed", error)
@@ -79,17 +78,34 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
         }
     }
 
-    private fun readSavedIdentity(): AppIdentity {
+    private data class SavedIdentityResolution(
+        val identity: AppIdentity,
+        val legacyIconValue: String?,
+    )
+
+    private fun resolveSavedIdentity(): SavedIdentityResolution {
         val values = preferences.all
         // 首装和未保存名称、图标的旧版升级均沿用经典默认组合。
         val defaults = AppIdentity()
-        return AppIdentity(
-            displayName = AppDisplayName.entries.firstOrNull {
-                it.storageValue == values[KEY_NAME]
-            } ?: defaults.displayName,
-            iconStyle = AppIconStyle.selectableEntries.firstOrNull {
-                it.storageValue == values[KEY_ICON]
-            } ?: defaults.iconStyle,
+        val rawName = values[KEY_NAME] as? String
+        val rawIcon = values[KEY_ICON] as? String
+        val displayName = AppDisplayName.entries.firstOrNull {
+            it.storageValue == rawName
+        } ?: defaults.displayName
+        val directIcon = AppIconStyle.entries.firstOrNull {
+            it.storageValue == rawIcon
+        }
+        val migratedIcon = if (directIcon == null && rawIcon != null) {
+            LEGACY_ICON_MIGRATION[rawIcon]
+        } else {
+            null
+        }
+        return SavedIdentityResolution(
+            identity = AppIdentity(
+                displayName = displayName,
+                iconStyle = directIcon ?: migratedIcon ?: defaults.iconStyle,
+            ),
+            legacyIconValue = if (migratedIcon != null) rawIcon else null,
         )
     }
 
@@ -175,5 +191,11 @@ class AppIdentityRepositoryImpl(context: Context) : AppIdentityRepository {
         const val TAG = "AppIdentityRepository"
         const val KEY_NAME = "display_name"
         const val KEY_ICON = "icon_style"
+        val LEGACY_ICON_MIGRATION = mapOf(
+            "blue" to AppIconStyle.ORIGIN,
+            "green" to AppIconStyle.ZERO,
+            "azure" to AppIconStyle.MESSAGES,
+            "apricot" to AppIconStyle.VIOLET,
+        )
     }
 }

@@ -188,10 +188,10 @@
     <string name="domain_app_display_name_pixel_message">Pixel Message</string>
 
     <string name="domain_app_icon_style_violet">Violet</string>
-    <string name="domain_app_icon_style_blue">Origin</string>
-    <string name="domain_app_icon_style_green">Zero</string>
-    <string name="domain_app_icon_style_azure">Messages</string>
-    <string name="domain_app_icon_style_apricot">Violet</string>
+    <string name="domain_app_icon_style_origin">Origin</string>
+    <string name="domain_app_icon_style_zero">Zero</string>
+    <string name="domain_app_icon_style_messages">Messages</string>
+    <string name="domain_app_icon_style_message_new">Messages (New)</string>
     <string name="domain_app_icon_style_classic">Classic</string>
 
     <string name="domain_sms_notification_icon_double_bubble">Double Bubble</string>

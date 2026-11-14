@@ -101,7 +101,7 @@ fun AppIdentitySettingsScreen(
     var iconValue by rememberSaveable { mutableStateOf(identity.iconStyle.storageValue) }
     val displayName = AppDisplayName.entries.firstOrNull { it.storageValue == nameValue }
         ?: AppIdentity().displayName
-    val iconStyle = AppIconStyle.selectableEntries.firstOrNull { it.storageValue == iconValue }
+    val iconStyle = AppIconStyle.entries.firstOrNull { it.storageValue == iconValue }
         ?: AppIdentity().iconStyle
     val draft = AppIdentity(displayName, iconStyle)
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -216,7 +216,7 @@ fun AppIdentitySettingsScreen(
             item(key = "icon_heading", span = { GridItemSpan(maxLineSpan) }) {
                 Text(stringResource(R.string.settings_app_identity_icon_heading), style = MaterialTheme.typography.titleSmall)
             }
-            items(AppIconStyle.selectableEntries, key = AppIconStyle::storageValue) { style ->
+            items(AppIconStyle.entries, key = AppIconStyle::storageValue) { style ->
                 AppIconStyleCard(
                     style = style,
                     selected = style == iconStyle,
@@ -287,10 +287,11 @@ private fun AppIconStyleCard(
 private fun AppIdentityIcon(style: AppIconStyle, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val resourceId = when (style) {
-        AppIconStyle.VIOLET, AppIconStyle.APRICOT -> R.mipmap.ic_launcher_identity_violet
-        AppIconStyle.BLUE -> R.mipmap.ic_launcher_identity_blue
-        AppIconStyle.GREEN -> R.mipmap.ic_launcher_identity_green
-        AppIconStyle.AZURE -> R.mipmap.ic_launcher_identity_message
+        AppIconStyle.VIOLET -> R.mipmap.ic_launcher_identity_violet
+        AppIconStyle.ORIGIN -> R.mipmap.ic_launcher_identity_origin
+        AppIconStyle.ZERO -> R.mipmap.ic_launcher_identity_zero
+        AppIconStyle.MESSAGES -> R.mipmap.ic_launcher_identity_messages
+        AppIconStyle.MESSAGE_NEW -> R.mipmap.ic_launcher_identity_message_new
         AppIconStyle.CLASSIC -> R.mipmap.ic_launcher
     }
     // 使用平台的自适应图标蒙版，避免 Compose 直接读取 adaptive-icon XML。
