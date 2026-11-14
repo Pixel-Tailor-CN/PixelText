@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Password
@@ -122,12 +123,14 @@ fun VerificationCodeCard(
                                 baseThemeColor.copy(alpha = 0.12f)
                             },
                         ) {
-                            Text(
-                                text = stringResource(R.string.msg_card_verification_title),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) onContainerColor else baseThemeColor,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                            )
+                            DisableSelection {
+                                Text(
+                                    text = stringResource(R.string.msg_card_verification_title),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) onContainerColor else baseThemeColor,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                )
+                            }
                         }
                     }
 

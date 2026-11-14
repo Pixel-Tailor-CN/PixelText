@@ -20,14 +20,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.layout.onSizeChanged
@@ -77,6 +83,7 @@ fun MessageItem(
     showVerificationCodeContentByDefault: Boolean = true,
     animateEntrance: Boolean = false,
     selectionMode: Boolean = false,
+    allowTextSelection: Boolean = false,
     onOpenMmsPart: (vip.mystery0.pixel.text.domain.model.mms.MmsPartKey) -> Unit = {},
 ) {
     val bubbleColor = if (message.isReceived) {
@@ -178,7 +185,8 @@ fun MessageItem(
             .then(if (message.isMms) Modifier else Modifier.combinedClickable(
                 enabled = interactionEnabled,
                 onClick = onClick,
-                onLongClick = onLongClick,
+                // 单选当前消息时将长按交给 SelectionContainer 自由划选部分文本。
+                onLongClick = onLongClick.takeUnless { allowTextSelection },
                 // 多选模式下不监听双击，避免单击切换选择被双击判定延迟。
                 onDoubleClick = onDoubleClick.takeUnless { selectionMode },
                 indication = null,
@@ -190,8 +198,8 @@ fun MessageItem(
             modifier = Modifier.fillMaxWidth(0.85f),
             contentAlignment = if (message.isReceived) Alignment.CenterStart else Alignment.CenterEnd
         ) {
-            Column(horizontalAlignment = cardAlignment) {
-                if (message.isMms) {
+            if (message.isMms) {
+                Column(horizontalAlignment = cardAlignment) {
                     val key = vip.mystery0.pixel.text.domain.model.mirror.SourceMessageKey(
                         vip.mystery0.pixel.text.domain.model.mirror.MessageTransport.MMS, -message.id)
                     val contentViewModel = org.koin.androidx.compose.koinViewModel<vip.mystery0.pixel.text.viewmodel.MmsContentViewModel>(key = "mms:${key.sourceId}")
@@ -208,76 +216,84 @@ fun MessageItem(
                         .onSizeChanged { if (ready) contentHeight = it.height }) {
                         model?.let {
                             vip.mystery0.pixel.text.ui.message.mms.MmsContent(it, isSelected, interactionEnabled,
-                                onOpenMmsPart, selectionMode, onClick, onLongClick)
+                                onOpenMmsPart, selectionMode, onClick, onLongClick, allowTextSelection = allowTextSelection)
                         } ?: Text(stringResource(R.string.msg_mms_loading), color = textColor)
                     }
-                } else {
-                    val hasTextContent = message.content.isNotBlank()
-                    if (hasTextContent) {
-                        when {
-                            isSpam && showOriginal -> {
-                                OriginalTextCard(
-                                    content = message.content,
-                                    isSelected = isSelected,
-                                    isReceived = message.isReceived,
-                                    textScale = textScale,
-                                    backgroundColor = bubbleColor,
-                                    textColor = textColor,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                SpamMessageIndicator(isSelected = isSelected)
-                            }
+                }
+            } else {
+                SelectableMessageContent(enabled = allowTextSelection, isSelected = isSelected) {
+                    Column(horizontalAlignment = cardAlignment) {
+                        val hasTextContent = message.content.isNotBlank()
+                        if (hasTextContent) {
+                            when {
+                                isSpam && showOriginal -> {
+                                    OriginalTextCard(
+                                        content = message.content,
+                                        isSelected = isSelected,
+                                        isReceived = message.isReceived,
+                                        textScale = textScale,
+                                        backgroundColor = bubbleColor,
+                                        textColor = textColor,
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    DisableSelection {
+                                        SpamMessageIndicator(isSelected = isSelected)
+                                    }
+                                }
 
-                            isSpam -> SpamMessageCard(isSelected = isSelected)
+                                isSpam -> DisableSelection {
+                                    SpamMessageCard(isSelected = isSelected)
+                                }
 
-                            message.parsedResult is ParsedResult.None -> {
-                                OriginalTextCard(
-                                    content = message.content,
-                                    isSelected = isSelected,
-                                    isReceived = message.isReceived,
-                                    textScale = textScale,
-                                    backgroundColor = bubbleColor,
-                                    textColor = textColor,
-                                )
-                            }
+                                message.parsedResult is ParsedResult.None -> {
+                                    OriginalTextCard(
+                                        content = message.content,
+                                        isSelected = isSelected,
+                                        isReceived = message.isReceived,
+                                        textScale = textScale,
+                                        backgroundColor = bubbleColor,
+                                        textColor = textColor,
+                                    )
+                                }
 
-                            isVerificationCode -> {
-                                MessageCardFactory.CreateCard(
-                                    content = message.content,
-                                    parsedResult = message.parsedResult,
-                                    isSelected = isSelected,
-                                    showVerificationOriginal = showOriginal,
-                                )
-                            }
+                                isVerificationCode -> {
+                                    MessageCardFactory.CreateCard(
+                                        content = message.content,
+                                        parsedResult = message.parsedResult,
+                                        isSelected = isSelected,
+                                        showVerificationOriginal = showOriginal,
+                                    )
+                                }
 
-                            showOriginal -> {
-                                OriginalTextCard(
-                                    content = message.content,
-                                    isSelected = isSelected,
-                                    isReceived = message.isReceived,
-                                    textScale = textScale,
-                                    backgroundColor = bubbleColor,
-                                    textColor = textColor,
-                                )
-                            }
+                                showOriginal -> {
+                                    OriginalTextCard(
+                                        content = message.content,
+                                        isSelected = isSelected,
+                                        isReceived = message.isReceived,
+                                        textScale = textScale,
+                                        backgroundColor = bubbleColor,
+                                        textColor = textColor,
+                                    )
+                                }
 
-                            else -> {
-                                MessageCardFactory.CreateCard(
-                                    content = message.content,
-                                    parsedResult = message.parsedResult,
-                                    isSelected = isSelected
-                                )
+                                else -> {
+                                    MessageCardFactory.CreateCard(
+                                        content = message.content,
+                                        parsedResult = message.parsedResult,
+                                        isSelected = isSelected
+                                    )
+                                }
                             }
+                        } else if (message.imageUris.isEmpty() && !message.mmsDownloadPending) {
+                            OriginalTextCard(
+                                content = stringResource(R.string.msg_unsupported_message),
+                                isSelected = isSelected,
+                                isReceived = message.isReceived,
+                                textScale = textScale,
+                                backgroundColor = bubbleColor,
+                                textColor = textColor,
+                            )
                         }
-                    } else if (message.imageUris.isEmpty() && !message.mmsDownloadPending) {
-                        OriginalTextCard(
-                            content = stringResource(R.string.msg_unsupported_message),
-                            isSelected = isSelected,
-                            isReceived = message.isReceived,
-                            textScale = textScale,
-                            backgroundColor = bubbleColor,
-                            textColor = textColor,
-                        )
                     }
                 }
             }
@@ -388,6 +404,38 @@ fun MessageItem(
                 )
             }
         }
+    }
+}
+
+@Composable
+internal fun SelectableMessageContent(
+    enabled: Boolean,
+    isSelected: Boolean,
+    content: @Composable () -> Unit,
+) {
+    // 复用同一槽位，避免单选进入或退出文本选择时重置卡片动画或彩信状态。
+    val slot = remember {
+        movableContentOf { inner: @Composable () -> Unit ->
+            inner()
+        }
+    }
+    if (enabled) {
+        val defaultColors = LocalTextSelectionColors.current
+        val selectionColors = if (isSelected) {
+            TextSelectionColors(
+                handleColor = MaterialTheme.colorScheme.inversePrimary,
+                backgroundColor = MaterialTheme.colorScheme.inversePrimary.copy(alpha = 0.4f),
+            )
+        } else {
+            defaultColors
+        }
+        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+            SelectionContainer {
+                slot(content)
+            }
+        }
+    } else {
+        slot(content)
     }
 }
 

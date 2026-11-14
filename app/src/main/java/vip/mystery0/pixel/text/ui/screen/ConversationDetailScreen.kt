@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -236,6 +237,9 @@ fun ConversationDetailScreen(
     val outgoingRepository: vip.mystery0.pixel.text.data.repository.OutgoingMmsRepository = koinInject()
     val outgoing by remember(outgoingRepository) { outgoingRepository.observeMessages() }.collectAsState(emptyList())
     val selectedMessageIds = remember { mutableStateListOf<Long>() }
+    BackHandler(enabled = selectedMessageIds.isNotEmpty()) {
+        selectedMessageIds.clear()
+    }
     // 详情信息复用彩信附件路由，partId 为 -1 时进入消息详情页。
     val openMessageDetail: (vip.mystery0.pixel.text.domain.model.MessageModel) -> Unit = { message ->
         val transport = if (message.isMms)
@@ -749,11 +753,13 @@ fun ConversationDetailScreen(
                             key = { it.stableKey }
                         ) { message ->
                             val isSelected = selectedMessageIds.contains(message.id)
+                            val allowTextSelection = isSelected && selectedMessageIds.size == 1
                             val isTargetHighlighted = highlightedMessageId == message.id
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
                             MessageItem(
                                 message = message,
                                 selectionMode = selectedMessageIds.isNotEmpty(),
+                                allowTextSelection = allowTextSelection,
                                 onOpenMmsPart = onOpenMmsPart,
                                 isSelected = isSelected,
                                 isHighlighted = isTargetHighlighted,

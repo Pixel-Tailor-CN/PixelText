@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PhoneCallback
 import androidx.compose.material3.Button
@@ -131,7 +132,9 @@ fun MissedCallCard(result: ParsedResult.MissedCall, isSelected: Boolean = false)
                     .fillMaxWidth()
                     .height(48.dp),
             ) {
-                Text(stringResource(R.string.msg_card_missed_call_callback))
+                DisableSelection {
+                    Text(stringResource(R.string.msg_card_missed_call_callback))
+                }
             }
         }
     }
