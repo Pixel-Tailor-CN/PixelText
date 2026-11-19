@@ -1,12 +1,10 @@
 package vip.mystery0.pixel.text.ui.screen
 
-import androidx.activity.compose.BackHandler
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import vip.mystery0.pixel.text.ui.AppNavHost
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import vip.mystery0.pixel.text.ui.navigationEnterTransition
-import vip.mystery0.pixel.text.ui.navigationExitTransition
-import vip.mystery0.pixel.text.ui.navigationPopEnterTransition
-import vip.mystery0.pixel.text.ui.navigationPopExitTransition
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import vip.mystery0.pixel.text.ui.screen.settings.SettingsCategory
@@ -54,7 +52,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Rule
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DashboardCustomize
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Forum
@@ -67,6 +64,7 @@ import vip.mystery0.pixel.text.viewmodel.EngagementPromptViewModel
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.NotificationsOff
@@ -195,19 +193,9 @@ fun SettingsScreen(
     val backupState by backupViewModel.state.collectAsState()
     val whitelistRules by whitelistViewModel.rules.collectAsState()
     val currentDisplayName = currentAppDisplayName()
+    val categoryNav = rememberNavController()
     var selectedCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
-    var returnCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
-    var targetSection by rememberSaveable { mutableStateOf<String?>(null) }
-    var navigatingBack by remember { mutableStateOf(false) }
     val categoryStates = rememberSaveableStateHolder()
-    fun navigateBack() {
-        navigatingBack = true
-        if (selectedCategory != null) {
-            selectedCategory = returnCategory
-            returnCategory = null
-            targetSection = null
-        } else onNavigateBack()
-    }
     val settings by viewModel.settings.collectAsState()
     val blockedKeywords by keywordSpamViewModel.keywords.collectAsState()
     val resourceUpdateState by viewModel.resourceUpdateState.collectAsState()
@@ -283,17 +271,6 @@ fun SettingsScreen(
         resourceUpdateState !is ResourceUpdateState.Busy
     val smsSyncEnabled = smsSyncState !is SmsSyncState.Syncing
     val spamAutoActionEnabled = settings.muteSpamNotificationsEnabled
-
-    LaunchedEffect(resourceUpdateCheckRequestId) {
-        if (resourceUpdateCheckRequestId != null) {
-            navigatingBack = false
-            selectedCategory = SettingsCategory.RESOURCES
-            returnCategory = null
-            targetSection = null
-            viewModel.checkResourceUpdates()
-            onResourceUpdateCheckRequestConsumed()
-        }
-    }
 
     fun requestPermissionsAfterDefaultPrompt(permissions: List<String>) {
         if (permissions.isEmpty()) return
@@ -379,28 +356,27 @@ fun SettingsScreen(
                         },
                     )
                 },
-                SettingsEntry("notification_link") {
-                    Preference(
-                        title = { Text(stringResource(R.string.settings_otp_notification_privacy_title)) },
+                SettingsEntry("verification_code_notification_action") {
+                    SwitchPreference(
+                        value = settings.verificationCodeNotificationActionEnabled,
+                        onValueChange = viewModel::setVerificationCodeNotificationActionEnabled,
+                        title = { Text(stringResource(R.string.settings_otp_quick_copy_title)) },
+                        icon = { Icon(Icons.Rounded.ContentCopy, null) },
+                    )
+                },
+                SettingsEntry("hide_verification_code_on_lock_screen") {
+                    SwitchPreference(
+                        value = settings.hideVerificationCodeOnLockScreenEnabled,
+                        onValueChange = viewModel::setHideVerificationCodeOnLockScreenEnabled,
+                        title = { Text(stringResource(R.string.settings_otp_hide_lockscreen_title)) },
                         summary = {
-                            Text(
-                                when {
-                                    !settings.verificationCodeNotificationActionEnabled ->
-                                        stringResource(R.string.settings_otp_notification_privacy_off)
-                                    settings.hideVerificationCodeOnLockScreenEnabled ->
-                                        stringResource(R.string.settings_otp_notification_privacy_hidden)
-                                    else ->
-                                        stringResource(R.string.settings_otp_notification_privacy_shown)
-                                }
-                            )
+                            Text(stringResource(
+                                if (settings.verificationCodeNotificationActionEnabled) R.string.settings_otp_hide_lockscreen_summary
+                                else R.string.settings_otp_hide_lockscreen_disabled
+                            ))
                         },
+                        enabled = settings.verificationCodeNotificationActionEnabled,
                         icon = { Icon(Icons.Rounded.Lock, null) },
-                        onClick = {
-                            returnCategory = SettingsCategory.MESSAGES
-                            navigatingBack = false
-                            selectedCategory = SettingsCategory.DISPLAY
-                            targetSection = "display_notifications"
-                        },
                     )
                 },
             )))
@@ -524,40 +500,6 @@ fun SettingsScreen(
                             Icon(Icons.Rounded.Forum, contentDescription = null)
                         },
                         onClick = onNavigateToNotificationActions
-                    )
-                },
-                SettingsEntry("verification_code_notification_action") {
-                    SwitchPreference(
-                        value = settings.verificationCodeNotificationActionEnabled,
-                        onValueChange =
-                            viewModel::setVerificationCodeNotificationActionEnabled,
-                        title = { Text(stringResource(R.string.settings_otp_quick_copy_title)) },
-                        icon = {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = null)
-                        }
-                    )
-                },
-                SettingsEntry("hide_verification_code_on_lock_screen") {
-                    SwitchPreference(
-                        value = settings.hideVerificationCodeOnLockScreenEnabled,
-                        onValueChange =
-                            viewModel::setHideVerificationCodeOnLockScreenEnabled,
-                        title = { Text(stringResource(R.string.settings_otp_hide_lockscreen_title)) },
-                        summary = {
-                            Text(
-                                stringResource(
-                                    if (settings.verificationCodeNotificationActionEnabled) {
-                                        R.string.settings_otp_hide_lockscreen_summary
-                                    } else {
-                                        R.string.settings_otp_hide_lockscreen_disabled
-                                    }
-                                )
-                            )
-                        },
-                        enabled = settings.verificationCodeNotificationActionEnabled,
-                        icon = {
-                            Icon(Icons.Rounded.Lock, contentDescription = null)
-                        }
                     )
                 },
             )))
@@ -1121,66 +1063,80 @@ fun SettingsScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wideLayout = maxWidth >= 840.dp
-        fun handleBack() {
-            if (wideLayout && returnCategory == null) onNavigateBack() else navigateBack()
-        }
-        BackHandler(enabled = selectedCategory != null || wideLayout, onBack = ::handleBack)
-        // 宽窄布局切换直接重建容器，分类间转场与应用导航复用同一组动效。
-        key(wideLayout) {
-            AnimatedContent(
-                targetState = if (wideLayout) null else selectedCategory,
-                modifier = Modifier.fillMaxSize(),
-                transitionSpec = {
-                    if (navigatingBack) {
-                        (navigationPopEnterTransition(settings.navigationTransitionStyle) togetherWith
-                            navigationPopExitTransition(settings.navigationTransitionStyle))
-                            .apply { targetContentZIndex = -1f }
-                    } else {
-                        (navigationEnterTransition(settings.navigationTransitionStyle) togetherWith
-                            navigationExitTransition(settings.navigationTransitionStyle))
-                            .apply { targetContentZIndex = 1f }
-                    }.using(null)
-                },
-                label = "settings_navigation",
-            ) { animatedCategory ->
-                val pageCategory = if (wideLayout) selectedCategory else animatedCategory
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            navigationIcon = { IconButton(onClick = ::handleBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.settings_action_back))
-                            } },
-                            title = {
-                                Text(
-                                    if (wideLayout) {
-                                        stringResource(R.string.settings_title)
-                                    } else {
-                                        pageCategory?.let { stringResource(it.titleRes) }
-                                            ?: stringResource(R.string.settings_title)
-                                    }
-                                )
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                        )
-                    },
-                    containerColor = MaterialTheme.colorScheme.background,
-                ) { padding ->
-                    SettingsPage(
-                        category = pageCategory, wide = wideLayout, sections = sectionsFor(pageCategory),
-                        states = categoryStates, summary = ::categorySummary,
-                        onSelect = { navigatingBack = false; selectedCategory = it; returnCategory = null; targetSection = null },
-                        notice = when {
-                            !defaultSmsApp -> stringResource(R.string.settings_notice_not_default)
-                            !notificationGranted -> stringResource(R.string.settings_notice_no_notifications)
-                            permissionItems.any { it.key == "sms" && !it.granted } -> stringResource(R.string.settings_notice_no_sms)
-                            else -> null
-                        },
-                        onNoticeClick = { navigatingBack = false; selectedCategory = SettingsCategory.PERMISSIONS; returnCategory = null },
-                        targetSection = targetSection.takeIf { pageCategory == selectedCategory },
-                        onTargetConsumed = { targetSection = null },
-                        modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                    )
+        fun selectCategory(category: SettingsCategory) {
+            if (wideLayout) {
+                selectedCategory = category
+            } else if (categoryNav.currentDestination?.route != category.name) {
+                categoryNav.navigate(category.name) {
+                    popUpTo("categories")
+                    launchSingleTop = true
                 }
+            }
+        }
+        val page: @Composable (SettingsCategory?) -> Unit = { pageCategory ->
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                if (wideLayout || categoryNav.previousBackStackEntry == null) onNavigateBack()
+                                else categoryNav.popBackStack()
+                            }) {
+                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.settings_action_back))
+                            }
+                        },
+                        title = {
+                            Text(
+                                if (wideLayout) {
+                                    stringResource(R.string.settings_title)
+                                } else {
+                                    pageCategory?.let { stringResource(it.titleRes) }
+                                        ?: stringResource(R.string.settings_title)
+                                }
+                            )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.background,
+            ) { padding ->
+                SettingsPage(
+                    category = pageCategory, wide = wideLayout, sections = sectionsFor(pageCategory),
+                    states = categoryStates, summary = ::categorySummary,
+                    onSelect = ::selectCategory,
+                    notice = when {
+                        !defaultSmsApp -> stringResource(R.string.settings_notice_not_default)
+                        !notificationGranted -> stringResource(R.string.settings_notice_no_notifications)
+                        permissionItems.any { it.key == "sms" && !it.granted } -> stringResource(R.string.settings_notice_no_sms)
+                        else -> null
+                    },
+                    onNoticeClick = { selectCategory(SettingsCategory.PERMISSIONS) },
+                    modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+                )
+            }
+        }
+        if (wideLayout) {
+            page(selectedCategory)
+        } else {
+            AppNavHost(categoryNav, "categories", settings.navigationTransitionStyle) {
+                composable("categories") { page(null) }
+                SettingsCategory.entries.forEach { category ->
+                    composable(category.name) { page(category) }
+                }
+            }
+            LaunchedEffect(categoryNav) {
+                // 窗口变窄时接续双栏选中的分类；手势返回完成后再同步选择。
+                selectedCategory?.let(::selectCategory)
+                categoryNav.currentBackStackEntryFlow.collect { entry ->
+                    selectedCategory = SettingsCategory.entries.find { it.name == entry.destination.route }
+                }
+            }
+        }
+        LaunchedEffect(resourceUpdateCheckRequestId) {
+            if (resourceUpdateCheckRequestId != null) {
+                selectCategory(SettingsCategory.RESOURCES)
+                viewModel.checkResourceUpdates()
+                onResourceUpdateCheckRequestConsumed()
             }
         }
     }

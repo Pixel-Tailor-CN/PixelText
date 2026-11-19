@@ -105,7 +105,12 @@ fun SampleSubmissionScreen(
         }
     }
 
-    BackHandler(enabled = !state.desensitizationState.visible && state.draftChoice == null, onBack = handleBack)
+    val interceptBack = state.preparing || state.saving || state.loading ||
+        (!state.pending && (state.dirty || confirmStep))
+    BackHandler(
+        enabled = interceptBack && !state.desensitizationState.visible && state.draftChoice == null,
+        onBack = handleBack,
+    )
     LaunchedEffect(initialContent, initialSender, initialCategory) {
         viewModel.initialize(initialContent, initialSender, initialCategory, initialLearningFeedback)
     }

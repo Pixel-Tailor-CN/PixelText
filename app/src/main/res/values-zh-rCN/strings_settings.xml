@@ -122,10 +122,6 @@
     <string name="settings_otp_retention_days_plural">%1$d 天</string>
     <string name="settings_otp_retention_days_disabled_single">%1$d 天 · 开启自动删除后生效</string>
     <string name="settings_otp_retention_days_disabled_plural">%1$d 天 · 开启自动删除后生效</string>
-    <string name="settings_otp_notification_privacy_title">验证码通知与锁屏隐私</string>
-    <string name="settings_otp_notification_privacy_off">快捷复制已关闭</string>
-    <string name="settings_otp_notification_privacy_hidden">快捷复制已开启 · 锁屏时隐藏</string>
-    <string name="settings_otp_notification_privacy_shown">快捷复制已开启 · 锁屏时显示</string>
     <string name="settings_section_mms">彩信</string>
     <string name="settings_auto_download_mms_title">自动下载彩信</string>
     <string name="settings_auto_download_mms_summary">可能使用移动数据</string>

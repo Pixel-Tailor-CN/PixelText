@@ -28,7 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,8 +67,6 @@ fun SettingsPage(
     onSelect: (SettingsCategory) -> Unit,
     notice: String?,
     onNoticeClick: () -> Unit,
-    targetSection: String?,
-    onTargetConsumed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
@@ -86,15 +83,6 @@ fun SettingsPage(
             if (category != null) {
                 states.SaveableStateProvider(category.name) {
                     val listState = rememberLazyListState()
-                    LaunchedEffect(targetSection) {
-                        if (targetSection != null) {
-                            val index = sections.indexOfFirst { it.key == targetSection }
-                            if (index >= 0) {
-                                listState.scrollToItem(sections.take(index).sumOf { it.rows.size + 1 } + if (wide) 1 else 0)
-                            }
-                            onTargetConsumed()
-                        }
-                    }
                     LazyColumn(
                         modifier = Modifier.weight(1f), state = listState,
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),

@@ -122,10 +122,6 @@
     <string name="settings_otp_retention_days_plural">%1$d days</string>
     <string name="settings_otp_retention_days_disabled_single">%1$d day · Active when auto-delete is enabled</string>
     <string name="settings_otp_retention_days_disabled_plural">%1$d days · Active when auto-delete is enabled</string>
-    <string name="settings_otp_notification_privacy_title">OTP notifications &amp; lock screen</string>
-    <string name="settings_otp_notification_privacy_off">Quick copy disabled</string>
-    <string name="settings_otp_notification_privacy_hidden">Quick copy enabled · Hidden on lock screen</string>
-    <string name="settings_otp_notification_privacy_shown">Quick copy enabled · Shown on lock screen</string>
     <string name="settings_section_mms">MMS</string>
     <string name="settings_auto_download_mms_title">Auto-download MMS</string>
     <string name="settings_auto_download_mms_summary">May use mobile data</string>

@@ -33,6 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import vip.mystery0.pixel.text.domain.settings.NavigationTransitionStyle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -151,18 +154,7 @@ fun AppNavigation(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = "home",
-            modifier = Modifier.fillMaxSize(),
-            enterTransition = { navigationEnterTransition(settings.navigationTransitionStyle) },
-            exitTransition = { navigationExitTransition(settings.navigationTransitionStyle) },
-            popEnterTransition = { navigationPopEnterTransition(settings.navigationTransitionStyle) },
-            popExitTransition = { navigationPopExitTransition(settings.navigationTransitionStyle) },
-            // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与所选风格一致。
-            predictivePopEnterTransition = { _ -> navigationPopEnterTransition(settings.navigationTransitionStyle) },
-            predictivePopExitTransition = { _ -> navigationPopExitTransition(settings.navigationTransitionStyle) }
-        ) {
+        AppNavHost(navController, "home", settings.navigationTransitionStyle) {
             composable("home") {
                 HomeScreen(
                     allowEngagementPrompt = currentEntry?.destination?.route == "home" &&
@@ -476,6 +468,28 @@ fun AppNavigation(
         }
         SnackbarHost(reportSnackbarHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp))
     }
+}
+
+@Composable
+internal fun AppNavHost(
+    navController: NavHostController,
+    startDestination: String,
+    style: NavigationTransitionStyle,
+    builder: NavGraphBuilder.() -> Unit,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        modifier = Modifier.fillMaxSize(),
+        enterTransition = { navigationEnterTransition(style) },
+        exitTransition = { navigationExitTransition(style) },
+        popEnterTransition = { navigationPopEnterTransition(style) },
+        popExitTransition = { navigationPopExitTransition(style) },
+        // Navigation 2.10 的手势返回默认使用独立缩放动画，需显式保持与所选风格一致。
+        predictivePopEnterTransition = { _ -> navigationPopEnterTransition(style) },
+        predictivePopExitTransition = { _ -> navigationPopExitTransition(style) },
+        builder = builder,
+    )
 }
 
 private fun conversationDetailRoute(

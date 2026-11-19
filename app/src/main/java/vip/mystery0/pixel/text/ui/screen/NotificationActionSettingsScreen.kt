@@ -104,7 +104,7 @@ fun NotificationActionSettingsScreen(
         }
     }
 
-    BackHandler(onBack = ::requestNavigateBack)
+    BackHandler(enabled = hasChanges, onBack = ::requestNavigateBack)
 
     Scaffold(
         topBar = {

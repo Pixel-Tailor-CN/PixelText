@@ -163,8 +163,7 @@ fun ConversationDetailCustomizationScreen(
         }
     }
 
-    // Always enabled so system back is consumed while saving; requestNavigateBack no-ops then.
-    BackHandler(onBack = ::requestNavigateBack)
+    BackHandler(enabled = state.isSaving || state.hasUnsavedChanges, onBack = ::requestNavigateBack)
 
     val view = LocalView.current
     val systemDarkTheme = isSystemInDarkTheme()
